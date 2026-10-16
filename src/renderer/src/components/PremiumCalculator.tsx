@@ -3,6 +3,7 @@ import { RotateCcw, Copy, Check } from 'lucide-react'
 import { countDays, calcProRataPremium } from '../utils/premiumCalc'
 import type { InstalmentRow } from '../utils/premiumCalc'
 import { StrMoneyInput } from './quotation-tabs/shared'
+import { Field } from './ui'
 
 // ── Number to words ────────────────────────────────────────────────────────────
 const ONES = [
@@ -188,150 +189,51 @@ export default function PremiumCalculator(): React.JSX.Element {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              Start Date & Time
-            </label>
+        <div className="form-grid cols-2">
+          <Field label="Start date & time">
             <input
               type="datetime-local"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
               aria-label="Policy start date and time"
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              End Date & Time
-            </label>
+          </Field>
+          <Field label="End date & time">
             <input
               type="datetime-local"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
               aria-label="Policy end date and time"
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              Annual Premium
-            </label>
+          </Field>
+          <Field label="Annual premium">
             <StrMoneyInput
               value={annualPremium}
               onChange={(s) => setAnnualPremium(s)}
               placeholder="e.g. 10000"
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
+              style={{ width: '100%' }}
               aria-label="Annual premium amount"
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              Standard Period (days)
-            </label>
+          </Field>
+          <Field label="Standard period (days)">
             <input
               type="number"
               value={standardPeriod}
               onChange={(e) => setStandardPeriod(e.target.value)}
               min="1"
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
               aria-label="Standard policy period in days"
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              Number of Instalments
-            </label>
+          </Field>
+          <Field label="Number of instalments">
             <input
               type="number"
               value={numInstalments}
               onChange={(e) => setNumInstalments(e.target.value)}
               min="1"
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
               aria-label="Number of premium instalments"
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}
-            >
-              Commission (%)
-            </label>
+          </Field>
+          <Field label="Commission (%)">
             <input
               type="number"
               value={commissionPct}
@@ -339,17 +241,9 @@ export default function PremiumCalculator(): React.JSX.Element {
               min="0"
               max="100"
               step="0.01"
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                color: 'var(--text-primary)'
-              }}
               aria-label="Commission percentage"
             />
-          </div>
+          </Field>
         </div>
       </section>
 
@@ -386,9 +280,9 @@ export default function PremiumCalculator(): React.JSX.Element {
               <div
                 style={{
                   padding: '16px',
-                  background: 'rgba(0, 255, 136, 0.08)',
+                  background: 'color-mix(in srgb, var(--success) 8%, transparent)',
                   borderRadius: '10px',
-                  border: '1px solid rgba(0, 255, 136, 0.2)'
+                  border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)'
                 }}
               >
                 <div
@@ -427,9 +321,9 @@ export default function PremiumCalculator(): React.JSX.Element {
               <div
                 style={{
                   padding: '16px',
-                  background: 'rgba(255, 165, 0, 0.08)',
+                  background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
                   borderRadius: '10px',
-                  border: '1px solid rgba(255, 165, 0, 0.2)'
+                  border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)'
                 }}
               >
                 <div
@@ -474,31 +368,19 @@ export default function PremiumCalculator(): React.JSX.Element {
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
               Instalment Breakdown
             </h3>
-            <div
-              style={{
-                overflow: 'hidden',
-                borderRadius: '8px',
-                border: '1px solid var(--table-border)'
-              }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="table-wrap">
+              <table className="data-table">
                 <caption className="sr-only">Premium and commission instalment breakdown</caption>
                 <thead>
-                  <tr
-                    style={{
-                      textAlign: 'left',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)'
-                    }}
-                  >
-                    <th scope="col" style={{ padding: '14px 16px', width: '80px' }}>
+                  <tr>
+                    <th scope="col" style={{ width: '80px' }}>
                       #
                     </th>
-                    <th scope="col" style={{ padding: '14px 16px' }}>
+                    <th scope="col" className="num">
                       Premium Instalment
                     </th>
                     {parseFloat(commissionPct) > 0 && (
-                      <th scope="col" style={{ padding: '14px 16px' }}>
+                      <th scope="col" className="num">
                         Commission Instalment
                       </th>
                     )}
@@ -506,25 +388,23 @@ export default function PremiumCalculator(): React.JSX.Element {
                 </thead>
                 <tbody>
                   {calculation.rows.map((row) => (
-                    <tr key={row.number} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                        {row.number}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                    <tr key={row.number}>
+                      <td className="muted">{row.number}</td>
+                      <td className="num" style={{ fontWeight: '500' }}>
                         {fmt(row.premium)}
                       </td>
                       {parseFloat(commissionPct) > 0 && (
-                        <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                        <td className="num" style={{ fontWeight: '500' }}>
                           {fmt(row.commission)}
                         </td>
                       )}
                     </tr>
                   ))}
-                  <tr style={{ background: 'var(--table-header-bg)', fontWeight: '700' }}>
-                    <td style={{ padding: '14px 16px' }}>Total</td>
-                    <td style={{ padding: '14px 16px' }}>{fmt(calculation.proRataPremium)}</td>
+                  <tr style={{ fontWeight: 600, background: 'var(--table-header-bg)' }}>
+                    <td>Total</td>
+                    <td className="num">{fmt(calculation.proRataPremium)}</td>
                     {parseFloat(commissionPct) > 0 && (
-                      <td style={{ padding: '14px 16px' }}>{fmt(calculation.commissionTotal)}</td>
+                      <td className="num">{fmt(calculation.commissionTotal)}</td>
                     )}
                   </tr>
                 </tbody>
@@ -542,12 +422,12 @@ export default function PremiumCalculator(): React.JSX.Element {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
-                fontFamily: 'monospace',
+                fontFamily: 'var(--font-mono)',
                 fontSize: '0.9rem'
               }}
             >
               {/* Step 1: Days */}
-              <div style={stepStyle('0, 210, 255')}>
+              <div style={stepStyle('var(--accent-primary-rgb)')}>
                 <div style={stepLabel}>Step 1: Calculate Number of Days</div>
                 <div style={stepVal}>Calendar day difference = {calculation.calendarDays} days</div>
                 <div style={stepVal}>

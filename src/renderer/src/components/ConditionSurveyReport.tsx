@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Download, Search, FileText, ClipboardCheck } from 'lucide-react'
 import { SurveyWarranty } from '../../../shared/types'
-import { useTheme } from '../contexts/ThemeContext'
+import { Badge, EmptyState, type BadgeTone } from './ui'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { jsPDF } from 'jspdf'
@@ -42,6 +42,14 @@ const STATUS_META: Record<DisplayStatus, { label: string; color: string }> = {
   waived: { label: 'Waived', color: '#8a8f9a' }
 }
 
+// On-screen pill tones (STATUS_META colours stay for the PDF)
+const STATUS_TONE: Record<DisplayStatus, BadgeTone> = {
+  pending: 'warning',
+  carried_out: 'info',
+  survey_done: 'success',
+  waived: 'neutral'
+}
+
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
@@ -68,8 +76,6 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function ConditionSurveyReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   const [warranties, setWarranties] = useState<SurveyWarranty[]>([])
@@ -397,20 +403,7 @@ export default function ConditionSurveyReport(): React.JSX.Element {
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
-              style={{
-                padding: '7px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                border:
-                  statusFilter === f.key
-                    ? '2px solid var(--accent-primary)'
-                    : '1px solid var(--glass-border-color)',
-                background:
-                  statusFilter === f.key ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
-                color: statusFilter === f.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontWeight: statusFilter === f.key ? 600 : 400
-              }}
+              className={`chip${statusFilter === f.key ? ' active' : ''}`}
             >
               {f.label}
             </button>
@@ -480,42 +473,33 @@ export default function ConditionSurveyReport(): React.JSX.Element {
           <strong style={{ color: 'var(--text-primary)' }}>{stats.total}</strong> survey warranties
         </span>
         <span>
-          <strong style={{ color: '#2fa66a' }}>{stats.surveyDone}</strong> survey done
+          <strong style={{ color: 'var(--success)' }}>{stats.surveyDone}</strong> survey done
         </span>
         <span>
-          <strong style={{ color: '#3b9bd6' }}>{stats.carriedOut}</strong> carried out
+          <strong style={{ color: 'var(--info)' }}>{stats.carriedOut}</strong> carried out
         </span>
         <span>
-          <strong style={{ color: '#e0912f' }}>{stats.pending}</strong> pending
+          <strong style={{ color: 'var(--warning)' }}>{stats.pending}</strong> pending
         </span>
       </div>
 
       {groups.length === 0 ? (
-        <div
-          className="glass-card"
-          style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}
-        >
-          <ClipboardCheck size={28} style={{ opacity: 0.4, marginBottom: '10px' }} />
-          <div>No survey warranties recorded.</div>
+        <div className="table-wrap">
+          <EmptyState icon={<ClipboardCheck size={40} />} title="No survey warranties recorded." />
         </div>
       ) : (
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr
-                style={{
-                  background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)',
-                  borderBottom: '2px solid var(--table-border)'
-                }}
-              >
-                <th style={thStyle}>Vessel</th>
-                <th style={thStyle}>IMO</th>
-                <th style={thStyle}>Policy</th>
-                <th style={thStyle}>Warranty</th>
-                <th style={thStyle}>Due Date</th>
-                <th style={thStyle}>Carried Out</th>
-                <th style={thStyle}>Surveyor</th>
-                <th style={thStyle}>Status</th>
+              <tr>
+                <th>Vessel</th>
+                <th>IMO</th>
+                <th>Policy</th>
+                <th>Warranty</th>
+                <th>Due Date</th>
+                <th>Carried Out</th>
+                <th>Surveyor</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -525,12 +509,8 @@ export default function ConditionSurveyReport(): React.JSX.Element {
                     <td
                       colSpan={8}
                       style={{
-                        padding: '8px 12px',
-                        background: isLight
-                          ? 'rgba(0,150,200,0.07)'
-                          : 'rgba(var(--accent-primary-rgb), 0.05)',
-                        borderTop: '1px solid var(--table-border)',
-                        borderBottom: '1px solid var(--table-border)',
+                        padding: '8px 14px',
+                        background: 'var(--row-selected)',
                         fontWeight: 700,
                         fontSize: '0.8rem',
                         color: 'var(--accent-primary)',
@@ -550,20 +530,15 @@ export default function ConditionSurveyReport(): React.JSX.Element {
                     </td>
                   </tr>
                   {g.rows.map((r, ri) => (
-                    <tr
-                      key={`${g.key}-${ri}`}
-                      style={{ borderBottom: '1px solid var(--table-border)' }}
-                    >
+                    <tr key={`${g.key}-${ri}`}>
                       <td style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }}>
                         {r.vesselName}
                       </td>
-                      <td
-                        style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}
-                      >
-                        {r.imo}
+                      <td className="muted" style={tdStyle}>
+                        <span className="mono">{r.imo}</span>
                       </td>
-                      <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.policyType}</td>
-                      <td style={{ ...tdStyle, fontSize: '0.8rem' }}>{r.description}</td>
+                      <td style={tdStyle}>{r.policyType}</td>
+                      <td style={tdStyle}>{r.description}</td>
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                         {r.dueDate ? (
                           fmtDate(r.dueDate)
@@ -574,24 +549,13 @@ export default function ConditionSurveyReport(): React.JSX.Element {
                         )}
                       </td>
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(r.surveyDate)}</td>
-                      <td
-                        style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}
-                      >
+                      <td className="muted" style={tdStyle}>
                         {r.surveyor}
                       </td>
                       <td style={tdStyle}>
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            background: (STATUS_META[r.status]?.color || '#888') + '22',
-                            color: STATUS_META[r.status]?.color || 'var(--text-secondary)'
-                          }}
-                        >
+                        <Badge tone={STATUS_TONE[r.status] || 'neutral'}>
                           {STATUS_META[r.status]?.label || r.status}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -605,12 +569,4 @@ export default function ConditionSurveyReport(): React.JSX.Element {
   )
 }
 
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '10px 12px',
-  fontWeight: 500,
-  color: 'var(--text-secondary)',
-  fontSize: '0.78rem',
-  whiteSpace: 'nowrap'
-}
-const tdStyle: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' }
+const tdStyle: React.CSSProperties = { verticalAlign: 'top' }

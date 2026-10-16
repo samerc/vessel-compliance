@@ -17,13 +17,12 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { getReportSettings } from '../services/ReportSettingsService'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { PageHeader } from './ui'
+import { PageHeader, EmptyState } from './ui'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   CREATE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
@@ -74,33 +73,11 @@ export default function ActivityLog(): React.JSX.Element {
   const { hasPermission } = useAuth()
   if (!hasPermission('admin:activityLog')) {
     return (
-      <div
-        style={{
-          padding: '64px',
-          textAlign: 'center',
-          background: 'var(--bg-card)',
-          borderRadius: '12px'
-        }}
-      >
-        <ShieldAlert
-          size={48}
-          color="var(--text-secondary)"
-          style={{ marginBottom: '16px', opacity: 0.3 }}
-        />
-        <div
-          style={{
-            fontSize: '1.1rem',
-            fontWeight: '600',
-            color: 'var(--text-primary)',
-            marginBottom: '8px'
-          }}
-        >
-          Access Denied
-        </div>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          You do not have permission to view the activity log.
-        </p>
-      </div>
+      <EmptyState
+        icon={<ShieldAlert size={40} />}
+        title="Access Denied"
+        text="You do not have permission to view the activity log."
+      />
     )
   }
   return <ActivityLogView />
@@ -108,9 +85,7 @@ export default function ActivityLog(): React.JSX.Element {
 
 function ActivityLogView(): React.JSX.Element {
   const { user } = useAuth()
-  const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   // Column preferences
   const ACTIVITY_COLUMNS: ColumnDef[] = [
@@ -341,20 +316,8 @@ function ActivityLogView(): React.JSX.Element {
     }
   }
 
-  const selectStyle: React.CSSProperties = {
-    padding: '6px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    fontSize: '0.82rem',
-    minWidth: '120px'
-  }
-
-  const inputStyle: React.CSSProperties = {
-    ...selectStyle,
-    minWidth: '100px'
-  }
+  const selectStyle: React.CSSProperties = { minWidth: '120px' }
+  const inputStyle: React.CSSProperties = { minWidth: '100px' }
 
   return (
     <div className="fade-in page">
@@ -402,9 +365,9 @@ function ActivityLogView(): React.JSX.Element {
           alignItems: 'center',
           padding: '12px 16px',
           marginBottom: '16px',
-          borderRadius: '8px',
-          background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-          border: '1px solid var(--glass-border-color)'
+          borderRadius: '12px',
+          background: 'var(--bg-card)',
+          border: 'var(--glass-border)'
         }}
       >
         <Filter size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
@@ -503,41 +466,17 @@ function ActivityLogView(): React.JSX.Element {
         </div>
 
         {(moduleFilter || actionFilter || userFilter || dateFrom || dateTo || search) && (
-          <button
-            onClick={handleReset}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              fontSize: '0.78rem'
-            }}
-            className="hover-effect"
-          >
+          <button onClick={handleReset} className="btn-ghost btn-sm">
             Clear
           </button>
         )}
       </div>
 
       {/* Table */}
-      <div
-        style={{
-          borderRadius: '10px',
-          border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
-          overflow: 'hidden',
-          background: isLight ? '#ffffff' : 'var(--bg-card)'
-        }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="table-wrap">
+        <table className="data-table">
           <thead>
-            <tr
-              style={{
-                background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
-                borderBottom: `2px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`
-              }}
-            >
+            <tr>
               {[
                 { id: 'date', label: 'Date / Time', width: '155px' },
                 { id: 'user', label: 'User', width: '110px' },
@@ -548,23 +487,11 @@ function ActivityLogView(): React.JSX.Element {
               ]
                 .filter((h) => actVisibleSet.has(h.id))
                 .map((h) => (
-                  <th
-                    key={h.id}
-                    style={{
-                      padding: '11px 16px',
-                      textAlign: 'left',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.6px',
-                      color: isLight ? '#64748b' : 'var(--text-secondary)',
-                      width: h.width
-                    }}
-                  >
+                  <th key={h.id} style={{ width: h.width }}>
                     {h.label}
                   </th>
                 ))}
-              <th style={{ padding: '11px 8px', textAlign: 'right', width: '40px' }}>
+              <th style={{ textAlign: 'right', width: '40px' }}>
                 <ColumnSelector
                   pageKey="activity-log"
                   allColumns={ACTIVITY_COLUMNS}
@@ -579,92 +506,51 @@ function ActivityLogView(): React.JSX.Element {
               <tr>
                 <td
                   colSpan={actVisibleCols.length + 1}
-                  style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                  className="muted"
+                  style={{ padding: '48px', textAlign: 'center' }}
                 >
                   Loading...
                 </td>
               </tr>
             ) : entries.length === 0 ? (
               <tr>
-                <td
-                  colSpan={actVisibleCols.length + 1}
-                  style={{ padding: '64px 20px', textAlign: 'center' }}
-                >
-                  <ScrollText
-                    size={36}
-                    style={{ color: 'var(--text-secondary)', opacity: 0.2, marginBottom: '12px' }}
+                <td colSpan={actVisibleCols.length + 1}>
+                  <EmptyState
+                    icon={<ScrollText size={36} />}
+                    title="No activity entries found"
+                    text={
+                      total === 0 &&
+                      !moduleFilter &&
+                      !actionFilter &&
+                      !userFilter &&
+                      !dateFrom &&
+                      !dateTo &&
+                      !search
+                        ? 'Activity will appear here as actions are logged across the system.'
+                        : 'Try adjusting your filters to see more results.'
+                    }
                   />
-                  <div
-                    style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}
-                  >
-                    No activity entries found
-                  </div>
-                  <div
-                    style={{
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.78rem',
-                      opacity: 0.6,
-                      marginTop: '4px'
-                    }}
-                  >
-                    {total === 0 &&
-                    !moduleFilter &&
-                    !actionFilter &&
-                    !userFilter &&
-                    !dateFrom &&
-                    !dateTo &&
-                    !search
-                      ? 'Activity will appear here as actions are logged across the system.'
-                      : 'Try adjusting your filters to see more results.'}
-                  </div>
                 </td>
               </tr>
             ) : (
-              entries.map((entry, idx) => {
+              entries.map((entry) => {
                 const actionStyle = getActionStyle(entry.action)
                 const moduleColor = getModuleColor(entry.module)
                 return (
-                  <tr
-                    key={entry.id}
-                    style={{
-                      borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'}`,
-                      background:
-                        idx % 2 === 0
-                          ? 'transparent'
-                          : isLight
-                            ? '#fafbfc'
-                            : 'rgba(255,255,255,0.015)',
-                      transition: 'background 0.15s'
-                    }}
-                  >
+                  <tr key={entry.id}>
                     {actVisibleSet.has('date') && (
                       <td
-                        style={{
-                          padding: '10px 16px',
-                          fontSize: '0.8rem',
-                          whiteSpace: 'nowrap',
-                          color: isLight ? '#64748b' : 'var(--text-secondary)',
-                          fontFamily: 'monospace',
-                          letterSpacing: '-0.3px'
-                        }}
+                        className="muted mono"
+                        style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                       >
                         {formatDateTime(entry.createdAt)}
                       </td>
                     )}
                     {actVisibleSet.has('user') && (
-                      <td
-                        style={{
-                          padding: '10px 16px',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          color: 'var(--text-primary)'
-                        }}
-                      >
-                        {entry.username}
-                      </td>
+                      <td style={{ fontWeight: 600 }}>{entry.username}</td>
                     )}
                     {actVisibleSet.has('module') && (
-                      <td style={{ padding: '10px 16px' }}>
+                      <td>
                         <span
                           style={{
                             display: 'inline-block',
@@ -673,7 +559,7 @@ function ActivityLogView(): React.JSX.Element {
                             fontSize: '0.7rem',
                             fontWeight: 600,
                             background: `${moduleColor}15`,
-                            color: isLight ? moduleColor : moduleColor,
+                            color: moduleColor,
                             border: `1px solid ${moduleColor}30`,
                             whiteSpace: 'nowrap'
                           }}
@@ -683,7 +569,7 @@ function ActivityLogView(): React.JSX.Element {
                       </td>
                     )}
                     {actVisibleSet.has('action') && (
-                      <td style={{ padding: '10px 16px' }}>
+                      <td>
                         <span
                           style={{
                             display: 'inline-block',
@@ -694,7 +580,7 @@ function ActivityLogView(): React.JSX.Element {
                             textTransform: 'uppercase',
                             letterSpacing: '0.3px',
                             background: actionStyle.bg,
-                            color: isLight ? actionStyle.color : actionStyle.color
+                            color: actionStyle.color
                           }}
                         >
                           {entry.action.replace(/_/g, ' ')}
@@ -702,13 +588,7 @@ function ActivityLogView(): React.JSX.Element {
                       </td>
                     )}
                     {actVisibleSet.has('entity') && (
-                      <td
-                        style={{
-                          padding: '10px 16px',
-                          fontSize: '0.82rem',
-                          color: 'var(--text-primary)'
-                        }}
-                      >
+                      <td>
                         {entry.entityName ? (
                           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                             {entry.entityName}
@@ -726,10 +606,9 @@ function ActivityLogView(): React.JSX.Element {
                     )}
                     {actVisibleSet.has('details') && (
                       <td
+                        className="muted"
                         style={{
-                          padding: '10px 16px',
                           fontSize: '0.8rem',
-                          color: isLight ? '#64748b' : 'var(--text-secondary)',
                           maxWidth: '350px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -764,16 +643,7 @@ function ActivityLogView(): React.JSX.Element {
           <button
             onClick={() => setPage(1)}
             disabled={page === 1}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              padding: '5px 8px',
-              cursor: page === 1 ? 'default' : 'pointer',
-              color: 'var(--text-secondary)',
-              opacity: page === 1 ? 0.4 : 1
-            }}
-            className="hover-effect"
+            className="btn-secondary btn-sm btn-icon"
           >
             <ChevronsLeft size={14} />
           </button>
@@ -782,16 +652,7 @@ function ActivityLogView(): React.JSX.Element {
             aria-label="Previous"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              padding: '5px 8px',
-              cursor: page === 1 ? 'default' : 'pointer',
-              color: 'var(--text-secondary)',
-              opacity: page === 1 ? 0.4 : 1
-            }}
-            className="hover-effect"
+            className="btn-secondary btn-sm btn-icon"
           >
             <ChevronLeft size={14} />
           </button>
@@ -803,32 +664,14 @@ function ActivityLogView(): React.JSX.Element {
             aria-label="Next"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              padding: '5px 8px',
-              cursor: page === totalPages ? 'default' : 'pointer',
-              color: 'var(--text-secondary)',
-              opacity: page === totalPages ? 0.4 : 1
-            }}
-            className="hover-effect"
+            className="btn-secondary btn-sm btn-icon"
           >
             <ChevronRight size={14} />
           </button>
           <button
             onClick={() => setPage(totalPages)}
             disabled={page === totalPages}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              padding: '5px 8px',
-              cursor: page === totalPages ? 'default' : 'pointer',
-              color: 'var(--text-secondary)',
-              opacity: page === totalPages ? 0.4 : 1
-            }}
-            className="hover-effect"
+            className="btn-secondary btn-sm btn-icon"
           >
             <ChevronsRight size={14} />
           </button>

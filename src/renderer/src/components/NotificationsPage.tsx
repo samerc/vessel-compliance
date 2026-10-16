@@ -13,8 +13,7 @@ import {
   Filter,
   Inbox
 } from 'lucide-react'
-import { PageHeader, Badge } from './ui'
-import { useTheme } from '../contexts/ThemeContext'
+import { PageHeader, Badge, SegmentedControl, EmptyState } from './ui'
 import type { Notification } from '../../../shared/types'
 
 interface NotificationsPageProps {
@@ -103,8 +102,6 @@ function relativeTime(dateStr: string): string {
 export default function NotificationsPage({
   onNavigate
 }: NotificationsPageProps): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
@@ -194,41 +191,12 @@ export default function NotificationsPage({
       />
 
       {/* Filter Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '16px',
-          padding: '4px',
-          borderRadius: '8px',
-          background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'
-        }}
-      >
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveFilter(tab.id)}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.82rem',
-              fontWeight: activeFilter === tab.id ? 600 : 400,
-              background:
-                activeFilter === tab.id
-                  ? isLight
-                    ? '#fff'
-                    : 'rgba(255,255,255,0.1)'
-                  : 'transparent',
-              color: activeFilter === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              boxShadow: activeFilter === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{ marginBottom: '16px' }}>
+        <SegmentedControl
+          value={activeFilter}
+          onChange={setActiveFilter}
+          items={FILTER_TABS.map((t) => ({ key: t.id, label: t.label }))}
+        />
       </div>
 
       {/* List */}
@@ -237,31 +205,15 @@ export default function NotificationsPage({
           Loading...
         </div>
       ) : filtered.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '60px 20px',
-            color: 'var(--text-secondary)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px'
-          }}
-        >
-          {activeFilter === 'all' ? (
-            <Inbox size={48} style={{ opacity: 0.3 }} />
-          ) : (
-            <Filter size={48} style={{ opacity: 0.3 }} />
-          )}
-          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>
-            {activeFilter === 'unread' ? 'All caught up!' : 'No notifications'}
-          </div>
-          <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-            {activeFilter === 'unread'
+        <EmptyState
+          icon={activeFilter === 'all' ? <Inbox size={40} /> : <Filter size={40} />}
+          title={activeFilter === 'unread' ? 'All caught up!' : 'No notifications'}
+          text={
+            activeFilter === 'unread'
               ? 'You have no unread notifications'
-              : 'Nothing to show here yet'}
-          </div>
-        </div>
+              : 'Nothing to show here yet'
+          }
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {filtered.map((notif) => {
@@ -278,11 +230,7 @@ export default function NotificationsPage({
                   borderRadius: '8px',
                   cursor: notif.linkType ? 'pointer' : 'default',
                   borderLeft: notif.isRead ? '3px solid transparent' : `3px solid ${typeColor}`,
-                  background: notif.isRead
-                    ? 'transparent'
-                    : isLight
-                      ? 'rgba(var(--accent-primary-rgb), 0.04)'
-                      : 'rgba(var(--accent-primary-rgb), 0.06)',
+                  background: notif.isRead ? 'transparent' : 'var(--row-hover)',
                   transition: 'background 0.15s ease'
                 }}
                 className="hover-effect"

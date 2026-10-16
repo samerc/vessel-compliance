@@ -1,13 +1,11 @@
 import { useState, useMemo } from 'react'
-import { useTheme } from '../contexts/ThemeContext'
 import { StrMoneyInput } from './quotation-tabs/shared'
+import { Field } from './ui'
 
 export default function TLORateCalculator(): React.JSX.Element {
   const [currentValue, setCurrentValue] = useState('')
   const [premium, setPremium] = useState('')
   const [newValue, setNewValue] = useState('')
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const calculation = useMemo(() => {
     const cv = parseFloat(currentValue) || 0
@@ -44,8 +42,16 @@ export default function TLORateCalculator(): React.JSX.Element {
   const cardStyle = {
     padding: '16px 20px',
     borderRadius: '12px',
-    background: isLight ? 'rgba(0, 119, 163, 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)',
-    border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`
+    background: 'var(--accent-tint)',
+    border: '1px solid var(--accent-border)'
+  }
+
+  const stepStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    background: 'var(--table-header-bg)'
   }
 
   return (
@@ -56,68 +62,31 @@ export default function TLORateCalculator(): React.JSX.Element {
       </p>
 
       {/* Inputs */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '28px'
-        }}
-      >
-        <div>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '0.85rem',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Current Vessel Value
-          </label>
+      <div className="form-grid" style={{ marginBottom: '28px' }}>
+        <Field label="Current vessel value">
           <StrMoneyInput
             value={currentValue}
             onChange={(s) => setCurrentValue(s)}
             placeholder="e.g. 5,000,000"
             style={{ width: '100%' }}
           />
-        </div>
-        <div>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '0.85rem',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Current Premium
-          </label>
+        </Field>
+        <Field label="Current premium">
           <StrMoneyInput
             value={premium}
             onChange={(s) => setPremium(s)}
             placeholder="e.g. 25,000"
             style={{ width: '100%' }}
           />
-        </div>
-        <div>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '0.85rem',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            New Vessel Value
-          </label>
+        </Field>
+        <Field label="New vessel value">
           <StrMoneyInput
             value={newValue}
             onChange={(s) => setNewValue(s)}
             placeholder="e.g. 6,000,000"
             style={{ width: '100%' }}
           />
-        </div>
+        </Field>
       </div>
 
       {/* Results */}
@@ -154,7 +123,7 @@ export default function TLORateCalculator(): React.JSX.Element {
                 style={{
                   fontSize: '1.5rem',
                   fontWeight: '700',
-                  color: calculation.additionalPremium >= 0 ? 'var(--danger)' : '#22c55e'
+                  color: calculation.additionalPremium >= 0 ? 'var(--danger)' : 'var(--success)'
                 }}
               >
                 {calculation.additionalPremium >= 0 ? '+' : ''}
@@ -174,112 +143,59 @@ export default function TLORateCalculator(): React.JSX.Element {
           </div>
 
           {/* Calculation Steps */}
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', color: 'var(--text-secondary)' }}>
-            Calculation Steps
-          </h3>
+          <h4 className="form-section-title">Calculation steps</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
+            <div style={stepStyle}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Step 1: Current TLO Rate = (Premium / Current Value) x 100
               </span>
-              <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>
+              <span className="mono" style={{ fontWeight: '600' }}>
                 {fmtRate(calculation.rate)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
+            <div style={stepStyle}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Step 2: Adjusted Rate = TLO Rate / 3
               </span>
-              <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>
+              <span className="mono" style={{ fontWeight: '600' }}>
                 {fmtRate(calculation.rateDiv3)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
+            <div style={stepStyle}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Step 3: Value Difference = New Value - Current Value
               </span>
-              <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>
+              <span className="mono" style={{ fontWeight: '600' }}>
                 {fmt(calculation.diff)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
+            <div style={stepStyle}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Step 4: Additional Premium = Value Difference x Adjusted Rate
               </span>
-              <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>
+              <span className="mono" style={{ fontWeight: '600' }}>
                 {fmt(calculation.additionalPremium)}
               </span>
             </div>
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight
-                  ? 'rgba(0,119,163,0.08)'
-                  : 'rgba(var(--accent-primary-rgb), 0.08)',
-                border: `1px solid ${isLight ? 'rgba(0,119,163,0.2)' : 'rgba(var(--accent-primary-rgb), 0.2)'}`
+                ...stepStyle,
+                background: 'var(--accent-tint)',
+                border: '1px solid var(--accent-border)'
               }}
             >
               <span style={{ fontWeight: '600' }}>
                 Step 5: New Premium = Current Premium + Additional Premium
               </span>
-              <span
-                style={{
-                  fontWeight: '700',
-                  fontFamily: 'monospace',
-                  color: 'var(--accent-primary)'
-                }}
-              >
+              <span className="mono" style={{ fontWeight: '700', color: 'var(--accent-primary)' }}>
                 {fmt(calculation.newPremium)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
+            <div style={stepStyle}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Step 6: New TLO Rate = New Premium / New Value x 100
               </span>
-              <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>
+              <span className="mono" style={{ fontWeight: '600' }}>
                 {fmtRate(calculation.newRate)}
               </span>
             </div>

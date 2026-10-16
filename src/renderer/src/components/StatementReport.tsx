@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Modal } from './ui'
+import { Modal, Field } from './ui'
 import {
   parseStatementWorkbook,
   defaultVisibleColumns,
@@ -39,14 +39,6 @@ import {
 
 const COLS_PREF_KEY = 'statement_columns'
 const ORIENTATION_KEY = 'statement_orientation'
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.85rem',
-  color: 'var(--text-secondary)',
-  marginBottom: '6px',
-  fontWeight: 500
-}
 
 const todayISO = (): string => {
   const d = new Date()
@@ -169,8 +161,8 @@ function StatementSettingsModal({
         </>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-        <div>
+      <div>
+        <div className="form-section">
           <div
             style={{
               display: 'flex',
@@ -179,7 +171,9 @@ function StatementSettingsModal({
               marginBottom: '8px'
             }}
           >
-            <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Titles</h4>
+            <h4 className="form-section-title" style={{ margin: 0 }}>
+              Titles
+            </h4>
             <button
               className="btn-secondary btn-sm"
               onClick={() =>
@@ -242,32 +236,23 @@ function StatementSettingsModal({
                     <Trash2 size={16} />
                   </button>
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '10px',
-                    marginTop: '10px'
-                  }}
-                >
-                  <div>
-                    <label style={labelStyle}>Text above the table</label>
+                <div className="form-grid cols-2" style={{ marginTop: '10px' }}>
+                  <Field label="Text above the table">
                     <textarea
                       rows={3}
                       value={t.intro}
                       onChange={(e) => setTitle(i, { intro: e.target.value })}
-                      style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                      style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Text below the table</label>
+                  </Field>
+                  <Field label="Text below the table">
                     <textarea
                       rows={3}
                       value={t.closing}
                       onChange={(e) => setTitle(i, { closing: e.target.value })}
-                      style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                      style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
-                  </div>
+                  </Field>
                 </div>
               </div>
             ))}
@@ -275,37 +260,35 @@ function StatementSettingsModal({
           <PlaceholderHint />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <label style={labelStyle}>Reference starts with</label>
-            <input
-              value={s.referencePrefix}
-              placeholder="e.g. SOA/26/"
-              onChange={(e) => setS((p) => ({ ...p, referencePrefix: e.target.value }))}
-              style={{ width: '100%' }}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Table font size (pt)</label>
-            <input
-              type="number"
-              min={6}
-              max={12}
-              step={0.5}
-              value={s.fontSize}
-              onChange={(e) =>
-                setS((p) => ({
-                  ...p,
-                  fontSize: Math.min(12, Math.max(6, Number(e.target.value) || 9))
-                }))
-              }
-              style={{ width: '100%' }}
-            />
+        <div className="form-section">
+          <div className="form-grid cols-2">
+            <Field label="Reference starts with">
+              <input
+                value={s.referencePrefix}
+                placeholder="e.g. SOA/26/"
+                onChange={(e) => setS((p) => ({ ...p, referencePrefix: e.target.value }))}
+              />
+            </Field>
+            <Field label="Table font size (pt)">
+              <input
+                type="number"
+                min={6}
+                max={12}
+                step={0.5}
+                value={s.fontSize}
+                onChange={(e) =>
+                  setS((p) => ({
+                    ...p,
+                    fontSize: Math.min(12, Math.max(6, Number(e.target.value) || 9))
+                  }))
+                }
+              />
+            </Field>
           </div>
         </div>
 
-        <div>
-          <h4 style={{ margin: '0 0 6px', fontSize: '0.9rem' }}>Column names</h4>
+        <div className="form-section">
+          <h4 className="form-section-title">Column names</h4>
           {labels.length === 0 ? (
             <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
               None yet. Rename columns on the statement page and use &quot;Save column names&quot;.
@@ -645,66 +628,46 @@ export default function StatementReport(): React.JSX.Element {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             {/* Letter details */}
             <div className="glass-card" style={{ padding: '18px' }}>
-              <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem' }}>Letter</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={labelStyle}>Title</label>
-                  <select
-                    value={titleIdx}
-                    onChange={(e) => pickTitle(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                  >
+              <h4 className="form-section-title">Letter</h4>
+              <div className="form-grid cols-2">
+                <Field label="Title">
+                  <select value={titleIdx} onChange={(e) => pickTitle(Number(e.target.value))}>
                     {settings.titles.map((t, i) => (
                       <option key={i} value={i}>
                         {t.title}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>To</label>
+                </Field>
+                <Field label="To">
                   <input
                     value={to}
                     onChange={(e) => setTo(e.target.value)}
                     placeholder="Customer / broker"
-                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Reference no.</label>
-                  <input
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                    style={{ width: '100%' }}
+                </Field>
+                <Field label="Reference no.">
+                  <input value={reference} onChange={(e) => setReference(e.target.value)} />
+                </Field>
+                <Field label="Date">
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                </Field>
+                <Field label="Text above the table" span="all">
+                  <textarea
+                    rows={2}
+                    value={intro}
+                    onChange={(e) => setIntro(e.target.value)}
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={{ width: '100%' }}
+                </Field>
+                <Field label="Text below the table" span="all">
+                  <textarea
+                    rows={2}
+                    value={closing}
+                    onChange={(e) => setClosing(e.target.value)}
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
-                </div>
-              </div>
-              <div style={{ marginTop: '12px' }}>
-                <label style={labelStyle}>Text above the table</label>
-                <textarea
-                  rows={2}
-                  value={intro}
-                  onChange={(e) => setIntro(e.target.value)}
-                  style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
-                />
-              </div>
-              <div style={{ marginTop: '10px' }}>
-                <label style={labelStyle}>Text below the table</label>
-                <textarea
-                  rows={2}
-                  value={closing}
-                  onChange={(e) => setClosing(e.target.value)}
-                  style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
-                />
+                </Field>
               </div>
               <PlaceholderHint />
             </div>
@@ -719,7 +682,9 @@ export default function StatementReport(): React.JSX.Element {
                   marginBottom: '12px'
                 }}
               >
-                <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Columns</h4>
+                <h4 className="form-section-title" style={{ margin: 0 }}>
+                  Columns
+                </h4>
                 {canConfigure && (
                   <button className="btn-ghost btn-sm" onClick={saveColumnNames}>
                     <Save size={14} /> Save column names
@@ -780,20 +745,11 @@ export default function StatementReport(): React.JSX.Element {
                   ))}
                 </div>
               )}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  marginTop: '14px'
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Total of</label>
+              <div className="form-grid cols-2" style={{ marginTop: '14px' }}>
+                <Field label="Total of">
                   <select
                     value={totalKey || ''}
                     onChange={(e) => setTotalKey(e.target.value || null)}
-                    style={{ width: '100%' }}
                   >
                     <option value="">No total</option>
                     {data.columns
@@ -804,9 +760,8 @@ export default function StatementReport(): React.JSX.Element {
                         </option>
                       ))}
                   </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Page</label>
+                </Field>
+                <Field label="Page">
                   <select
                     value={orientation}
                     onChange={(e) => {
@@ -818,13 +773,12 @@ export default function StatementReport(): React.JSX.Element {
                         /* per-viewer convenience only */
                       }
                     }}
-                    style={{ width: '100%' }}
                   >
                     <option value="portrait">Portrait</option>
                     <option value="landscape">Landscape</option>
                     <option value="auto">Automatic (portrait if it fits)</option>
                   </select>
-                </div>
+                </Field>
               </div>
               {data.groups.length > 0 && (
                 <label
@@ -883,7 +837,10 @@ export default function StatementReport(): React.JSX.Element {
                   ]
                 })}
                 {totals.map((t) => (
-                  <tr key={`t${t.currency}`} style={{ fontWeight: 700 }}>
+                  <tr
+                    key={`t${t.currency}`}
+                    style={{ fontWeight: 600, background: 'var(--table-header-bg)' }}
+                  >
                     {ordered.map((k, i) => (
                       <td key={k} className={isRight(k) ? 'num' : undefined}>
                         {k === totalKey

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Download, Search, Ship, Layers, X, FileText } from 'lucide-react'
+import { Download, Search, Ship, Layers, X, FileText, Users } from 'lucide-react'
+import { EmptyState } from './ui'
 import { Vessel, Entity, VesselAssured, Fleet, AssuredRole } from '../../../shared/types'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { jsPDF } from 'jspdf'
@@ -23,8 +23,6 @@ interface AssuredRow {
 }
 
 export default function AssuredReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -404,23 +402,8 @@ export default function AssuredReport(): React.JSX.Element {
                 setVesselSearch('')
                 setFleetSearch('')
               }}
-              style={{
-                padding: '7px 16px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                border:
-                  filterMode === mode
-                    ? '2px solid var(--accent-primary)'
-                    : '1px solid var(--glass-border-color)',
-                background:
-                  filterMode === mode ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
-                color: filterMode === mode ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontWeight: filterMode === mode ? 600 : 400,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
+              className={`chip${filterMode === mode ? ' active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               {mode === 'all' && (
                 <>
@@ -466,7 +449,7 @@ export default function AssuredReport(): React.JSX.Element {
                   marginTop: '4px',
                   maxHeight: '200px',
                   overflowY: 'auto',
-                  background: isLight ? '#ffffff' : '#1a1d28',
+                  background: 'var(--bg-primary)',
                   border: '1px solid var(--glass-border-color)',
                   borderRadius: '8px',
                   zIndex: 100,
@@ -490,11 +473,7 @@ export default function AssuredReport(): React.JSX.Element {
                       color:
                         selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)'
                     }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = isLight
-                        ? 'rgba(0,150,200,0.06)'
-                        : 'rgba(var(--accent-primary-rgb), 0.06)')
-                    }
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     {f.name}
@@ -522,9 +501,9 @@ export default function AssuredReport(): React.JSX.Element {
                       borderRadius: '6px',
                       fontSize: '0.78rem',
                       fontWeight: 600,
-                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                      background: 'var(--accent-tint)',
                       color: 'var(--accent-primary)',
-                      border: '1px solid rgba(var(--accent-primary-rgb), 0.25)'
+                      border: '1px solid var(--accent-border)'
                     }}
                   >
                     {v.name}
@@ -578,7 +557,7 @@ export default function AssuredReport(): React.JSX.Element {
                     marginTop: '4px',
                     maxHeight: '200px',
                     overflowY: 'auto',
-                    background: isLight ? '#ffffff' : '#1a1d28',
+                    background: 'var(--bg-primary)',
                     border: '1px solid var(--glass-border-color)',
                     borderRadius: '8px',
                     zIndex: 100,
@@ -599,11 +578,7 @@ export default function AssuredReport(): React.JSX.Element {
                         fontSize: '0.85rem',
                         borderBottom: '1px solid var(--table-border)'
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = isLight
-                          ? 'rgba(0,150,200,0.06)'
-                          : 'rgba(var(--accent-primary-rgb), 0.06)')
-                      }
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <span style={{ fontWeight: 600 }}>{v.name}</span>
@@ -708,51 +683,37 @@ export default function AssuredReport(): React.JSX.Element {
 
       {/* Report Table */}
       {groupedByVessel.length === 0 ? (
-        <div
-          className="glass-card"
-          style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}
-        >
-          {filterMode === 'vessels' && selectedVesselIds.size === 0
-            ? 'Select vessels to generate the report'
-            : filterMode === 'fleet' && !selectedFleetId
-              ? 'Select a fleet to generate the report'
-              : 'No assureds found for the selected vessels'}
+        <div className="table-wrap">
+          <EmptyState
+            icon={<Users size={40} />}
+            title={
+              filterMode === 'vessels' && selectedVesselIds.size === 0
+                ? 'Select vessels to generate the report'
+                : filterMode === 'fleet' && !selectedFleetId
+                  ? 'Select a fleet to generate the report'
+                  : 'No assureds found for the selected vessels'
+            }
+          />
         </div>
       ) : (
-        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr
-                style={{
-                  background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)',
-                  borderBottom: '2px solid var(--table-border)'
-                }}
-              >
-                <th style={thStyle}>Vessel</th>
-                <th style={thStyle}>IMO</th>
-                <th style={thStyle}>Fleet</th>
-                <th style={thStyle}>Assured</th>
-                <th style={thStyle}>Role</th>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Phone</th>
+              <tr>
+                <th>Vessel</th>
+                <th>IMO</th>
+                <th>Fleet</th>
+                <th>Assured</th>
+                <th>Role</th>
+                <th>Type</th>
+                <th>Email</th>
+                <th>Phone</th>
               </tr>
             </thead>
             <tbody>
               {groupedByVessel.map((group, gi) =>
                 group.assureds.map((r, ri) => (
-                  <tr
-                    key={`${gi}-${ri}`}
-                    style={{
-                      borderBottom: '1px solid var(--table-border)',
-                      background:
-                        ri === 0 && gi % 2 === 0
-                          ? isLight
-                            ? 'rgba(0,150,200,0.02)'
-                            : 'rgba(var(--accent-primary-rgb), 0.015)'
-                          : 'transparent'
-                    }}
-                  >
+                  <tr key={`${gi}-${ri}`}>
                     {ri === 0 ? (
                       <>
                         <td
@@ -761,20 +722,10 @@ export default function AssuredReport(): React.JSX.Element {
                         >
                           {group.vessel}
                         </td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            fontSize: '0.78rem',
-                            color: 'var(--text-secondary)'
-                          }}
-                          rowSpan={group.assureds.length}
-                        >
-                          {group.imo}
+                        <td className="muted" style={tdStyle} rowSpan={group.assureds.length}>
+                          <span className="mono">{group.imo}</span>
                         </td>
-                        <td
-                          style={{ ...tdStyle, fontSize: '0.78rem' }}
-                          rowSpan={group.assureds.length}
-                        >
+                        <td style={tdStyle} rowSpan={group.assureds.length}>
                           {group.fleet}
                         </td>
                       </>
@@ -792,7 +743,7 @@ export default function AssuredReport(): React.JSX.Element {
                           style={{
                             padding: '1px 6px',
                             borderRadius: '6px',
-                            background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                            background: 'var(--accent-tint)',
                             color: 'var(--accent-primary)',
                             fontSize: '0.75rem'
                           }}
@@ -801,11 +752,11 @@ export default function AssuredReport(): React.JSX.Element {
                         </span>
                       )}
                     </td>
-                    <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    <td className="muted" style={tdStyle}>
                       {r.entityType}
                     </td>
-                    <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.email}</td>
-                    <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.phone}</td>
+                    <td style={tdStyle}>{r.email}</td>
+                    <td style={tdStyle}>{r.phone}</td>
                   </tr>
                 ))
               )}
@@ -817,12 +768,4 @@ export default function AssuredReport(): React.JSX.Element {
   )
 }
 
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '10px 12px',
-  fontWeight: 500,
-  color: 'var(--text-secondary)',
-  fontSize: '0.78rem',
-  whiteSpace: 'nowrap'
-}
-const tdStyle: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' }
+const tdStyle: React.CSSProperties = { verticalAlign: 'top' }

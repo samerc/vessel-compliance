@@ -20,6 +20,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 import { asArray } from '../utils/ipc'
 import { StrMoneyInput } from './quotation-tabs/shared'
+import { Field, Modal, EmptyState } from './ui'
 import type { WarBreachRecord } from '../../../shared/types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -584,30 +585,9 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const cellInput: React.CSSProperties = {
-    padding: '5px 7px',
-    fontSize: '0.82rem',
-    borderRadius: '6px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    width: '100%'
-  }
-
-  const accentBg = isLight ? 'rgba(0,119,163,0.07)' : 'rgba(var(--accent-primary-rgb), 0.07)'
-  const accentBorder = isLight ? 'rgba(0,119,163,0.18)' : 'rgba(var(--accent-primary-rgb), 0.18)'
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '6px',
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase'
-  }
-
-  const inputBg = isLight ? '#ffffff' : 'rgba(255,255,255,0.04)'
+  const accentBg = 'rgba(var(--accent-primary-rgb), 0.07)'
+  const accentBorder = 'var(--accent-border)'
+  const dateScheme: React.CSSProperties = { colorScheme: isLight ? 'light' : 'dark' }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -632,126 +612,66 @@ export default function WarBreachCalculator(): React.JSX.Element {
           <button
             onClick={() => setShowHistory((v) => !v)}
             className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: showHistory
-                ? isLight
-                  ? 'rgba(0,119,163,0.1)'
-                  : 'rgba(var(--accent-primary-rgb), 0.1)'
-                : undefined
-            }}
+            style={showHistory ? { background: 'var(--accent-tint)' } : undefined}
           >
             <History size={16} /> History
           </button>
-          <button
-            onClick={clearAll}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            title="Clear all fields"
-          >
+          <button onClick={clearAll} className="btn-secondary" title="Clear all fields">
             <RotateCcw size={16} /> Clear
           </button>
           <button
             onClick={handleSaveRecord}
             disabled={!hasAnyResult || saving}
             className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              opacity: hasAnyResult ? 1 : 0.4
-            }}
           >
             <Save size={16} /> {saving ? 'Saving...' : 'Save'}
           </button>
-          <button
-            onClick={exportToExcel}
-            disabled={!hasAnyResult}
-            className="btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              opacity: hasAnyResult ? 1 : 0.4
-            }}
-          >
+          <button onClick={exportToExcel} disabled={!hasAnyResult} className="btn-secondary">
             <FileSpreadsheet size={16} /> Export Excel
           </button>
-          <button
-            onClick={handleCopy}
-            disabled={!hasAnyResult}
-            className="btn-primary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              opacity: hasAnyResult ? 1 : 0.4
-            }}
-          >
+          <button onClick={handleCopy} disabled={!hasAnyResult} className="btn-primary">
             {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
             {copied ? 'Copied!' : 'Copy for Email'}
           </button>
         </div>
       </div>
 
-      {/* ── Cover Note header — 2×2 grid ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 2fr 1fr',
-          gridTemplateRows: 'auto auto',
-          gap: '16px 20px',
-          marginBottom: '20px',
-          padding: '18px 20px',
-          borderRadius: '10px',
-          background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-          border: '1px solid var(--table-border)'
-        }}
-      >
-        {/* Row 1 */}
-        <div>
-          <label style={labelStyle}>Cover Note No.</label>
-          <input
-            type="text"
-            value={coverNoteNo}
-            onChange={(e) => setCoverNoteNo(e.target.value)}
-            placeholder="e.g. RMAMW2204174"
-            style={{ width: '100%' }}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Breach Details</label>
-          <input
-            type="text"
-            value={breachDetails}
-            onChange={(e) => setBreachDetails(e.target.value)}
-            placeholder="e.g. Gulf of Aden transit"
-            style={{ width: '100%' }}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Base Days</label>
-          <input
-            type="number"
-            value={baseDays}
-            onChange={(e) => setBaseDays(parseInt(e.target.value) || 7)}
-            min="1"
-            step="1"
-            style={{ width: '100%' }}
-          />
-        </div>
-        {/* Row 2 */}
-        <div>
-          <label style={labelStyle}>Currency</label>
-          <input
-            type="text"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            placeholder="e.g. US DOLLARS"
-            style={{ width: '100%' }}
-          />
+      {/* ── Cover note ── */}
+      <div className="form-section" style={{ marginBottom: '20px' }}>
+        <div className="form-grid">
+          <Field label="Cover note no.">
+            <input
+              type="text"
+              value={coverNoteNo}
+              onChange={(e) => setCoverNoteNo(e.target.value)}
+              placeholder="e.g. RMAMW2204174"
+            />
+          </Field>
+          <Field label="Breach details">
+            <input
+              type="text"
+              value={breachDetails}
+              onChange={(e) => setBreachDetails(e.target.value)}
+              placeholder="e.g. Gulf of Aden transit"
+            />
+          </Field>
+          <Field label="Base days">
+            <input
+              type="number"
+              value={baseDays}
+              onChange={(e) => setBaseDays(parseInt(e.target.value) || 7)}
+              min="1"
+              step="1"
+            />
+          </Field>
+          <Field label="Currency">
+            <input
+              type="text"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              placeholder="e.g. US DOLLARS"
+            />
+          </Field>
         </div>
       </div>
 
@@ -774,7 +694,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
             padding: '11px 16px',
             border: 'none',
             cursor: 'pointer',
-            background: isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.025)',
+            background: 'var(--table-header-bg)',
             color: 'var(--text-secondary)',
             fontSize: '0.875rem',
             fontFamily: 'inherit',
@@ -783,7 +703,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
         >
           {showSettings ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           <Settings size={14} />
-          Tax Settings (Lebanese Government Taxes)
+          Tax settings (Lebanese government taxes)
           <span style={{ marginLeft: 'auto', fontSize: '0.78rem', opacity: 0.7 }}>
             Rate {settings.exchangeRate.toLocaleString()} LBP/USD · Commission{' '}
             {settings.commissionPct}% · NR Tax {settings.nrTaxPct}%
@@ -792,55 +712,48 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
         {showSettings && (
           <div style={{ padding: '16px', borderTop: '1px solid var(--table-border)' }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '14px',
-                marginBottom: '14px'
-              }}
-            >
+            <div className="form-grid" style={{ marginBottom: '14px' }}>
               {(
                 [
                   {
-                    label: 'Exchange Rate (LBP/USD)',
+                    label: 'Exchange rate (LBP/USD)',
                     field: 'exchangeRate',
                     step: '500',
                     note: 'e.g. 89 500'
                   },
                   {
-                    label: 'Net Premium % of Gross',
+                    label: 'Net premium % of gross',
                     field: 'netPremiumPct',
                     step: '1',
                     note: 'default 55%'
                   },
                   {
-                    label: 'Cost of Policy (LBP)',
+                    label: 'Cost of policy (LBP)',
                     field: 'costOfPolicy',
                     step: '100000',
                     note: 'default 17 900 000'
                   },
                   {
-                    label: 'Proportional Stamps %',
+                    label: 'Proportional stamps %',
                     field: 'propStampsPct',
                     step: '0.1',
                     note: 'default 3%'
                   },
                   {
-                    label: 'Fixed Stamps (LBP)',
+                    label: 'Fixed stamps (LBP)',
                     field: 'fixedStamps',
                     step: '1000',
                     note: 'default 200 000 for war'
                   },
                   {
-                    label: 'Municipal Tax %',
+                    label: 'Municipal tax %',
                     field: 'muniTaxPct',
                     step: '0.1',
                     note: 'default 6%'
                   },
-                  { label: 'Fees Rate', field: 'feesRate', step: '0.0001', note: 'default 0.4005' },
+                  { label: 'Fees rate', field: 'feesRate', step: '0.0001', note: 'default 0.4005' },
                   {
-                    label: 'Fees Divisor',
+                    label: 'Fees divisor',
                     field: 'feesDivisor',
                     step: '0.01',
                     note: 'default 1.09'
@@ -852,43 +765,25 @@ export default function WarBreachCalculator(): React.JSX.Element {
                     note: 'broker commission'
                   },
                   {
-                    label: 'Non-Resident Tax %',
+                    label: 'Non-resident tax %',
                     field: 'nrTaxPct',
                     step: '0.01',
                     note: 'default 2.25%'
                   }
                 ] as { label: string; field: keyof TaxSettings; step: string; note: string }[]
               ).map(({ label, field, step, note }) => (
-                <div key={field}>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {label}
-                    <span style={{ marginLeft: '6px', fontSize: '0.72rem', opacity: 0.6 }}>
-                      ({note})
-                    </span>
-                  </label>
+                <Field key={field} label={label} hint={note}>
                   <input
                     type="number"
                     value={settings[field]}
                     onChange={(e) => updateSetting(field, parseFloat(e.target.value) || 0)}
                     step={step}
                     min="0"
-                    style={{ width: '100%' }}
                   />
-                </div>
+                </Field>
               ))}
             </div>
-            <button
-              onClick={resetSettings}
-              className="btn-secondary"
-              style={{ fontSize: '0.82rem', padding: '5px 12px' }}
-            >
+            <button onClick={resetSettings} className="btn-secondary btn-sm">
               Reset to Defaults
             </button>
           </div>
@@ -901,11 +796,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
           const c = calculations[idx]?.calc
           const rawDays = getTotalDays(v.periodFrom, v.periodTo)
           const dateError = !!(v.periodFrom && v.periodTo && rawDays < 0)
-          const borderColor = dateError
-            ? 'rgba(255,77,77,0.4)'
-            : c
-              ? accentBorder
-              : 'var(--table-border)'
+          const borderColor = dateError ? 'var(--danger)' : c ? accentBorder : 'var(--table-border)'
           return (
             <div
               key={v.id}
@@ -913,7 +804,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
                 borderRadius: '10px',
                 border: `1px solid ${borderColor}`,
                 overflow: 'hidden',
-                background: inputBg
+                background: 'var(--bg-card)'
               }}
             >
               {/* ── Input row ── */}
@@ -927,32 +818,16 @@ export default function WarBreachCalculator(): React.JSX.Element {
                     marginBottom: '12px'
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: 'var(--text-secondary)',
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase'
-                    }}
-                  >
+                  <h4 className="form-section-title" style={{ margin: 0 }}>
                     Vessel {idx + 1}
                     {v.vessel ? ` — ${v.vessel.toUpperCase()}` : ''}
-                  </span>
+                  </h4>
                   <button
                     onClick={() => removeVessel(v.id)}
                     disabled={vessels.length === 1}
                     title="Remove vessel"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: vessels.length === 1 ? 'default' : 'pointer',
-                      color: 'var(--danger)',
-                      opacity: vessels.length === 1 ? 0.12 : 0.5,
-                      padding: '2px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
+                    className="btn-ghost btn-icon btn-sm"
+                    style={{ color: 'var(--danger)' }}
                   >
                     <X size={15} />
                   </button>
@@ -960,66 +835,55 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
                 {/* Row 1: Policy No | Vessel Name | From | To */}
                 <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 2fr 1fr 1fr',
-                    gap: '12px',
-                    marginBottom: '10px'
-                  }}
+                  className="form-grid"
+                  style={{ gridTemplateColumns: '1fr 2fr 1fr 1fr', marginBottom: '14px' }}
                 >
-                  <div>
-                    <label style={labelStyle}>Policy No.</label>
+                  <Field label="Policy no.">
                     <input
-                      style={cellInput}
                       placeholder="W25209161E2"
                       value={v.policyNo}
                       onChange={(e) => updateVessel(v.id, 'policyNo', e.target.value)}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Vessel Name</label>
+                  </Field>
+                  <Field label="Vessel name">
                     <input
-                      style={{ ...cellInput, textTransform: 'uppercase' }}
+                      style={{ textTransform: 'uppercase' }}
                       placeholder="e.g. ATLANTIC PRIDE"
                       value={v.vessel}
                       onChange={(e) => updateVessel(v.id, 'vessel', e.target.value)}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>From</label>
+                  </Field>
+                  <Field label="From">
                     <input
-                      style={{ ...cellInput, colorScheme: isLight ? 'light' : 'dark' }}
+                      style={dateScheme}
                       type="date"
                       value={v.periodFrom}
                       onChange={(e) => updateVessel(v.id, 'periodFrom', e.target.value)}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>To</label>
+                  </Field>
+                  <Field label="To">
                     <input
-                      style={{ ...cellInput, colorScheme: isLight ? 'light' : 'dark' }}
+                      style={dateScheme}
                       type="date"
                       value={v.periodTo}
                       onChange={(e) => updateVessel(v.id, 'periodTo', e.target.value)}
                     />
-                  </div>
+                  </Field>
                 </div>
 
                 {/* Row 2: Sum Insured | Rate % | NCB % */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={labelStyle}>Sum Insured (USD)</label>
+                <div className="form-grid" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+                  <Field label="Sum insured (USD)">
                     <StrMoneyInput
                       value={v.sumInsured}
                       onChange={(s) => updateVessel(v.id, 'sumInsured', s)}
                       placeholder="0"
-                      style={{ ...cellInput, textAlign: 'right' }}
+                      style={{ width: '100%', boxSizing: 'border-box', textAlign: 'right' }}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Rate %</label>
+                  </Field>
+                  <Field label="Rate %">
                     <input
-                      style={{ ...cellInput, textAlign: 'right' }}
+                      style={{ textAlign: 'right' }}
                       type="number"
                       placeholder="1.000"
                       value={v.rate}
@@ -1027,11 +891,10 @@ export default function WarBreachCalculator(): React.JSX.Element {
                       min="0"
                       step="0.001"
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>NCB Discount %</label>
+                  </Field>
+                  <Field label="NCB discount %">
                     <input
-                      style={{ ...cellInput, textAlign: 'right' }}
+                      style={{ textAlign: 'right' }}
                       type="number"
                       placeholder="0"
                       value={v.ncbDiscount}
@@ -1040,7 +903,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
                       max="99"
                       step="5"
                     />
-                  </div>
+                  </Field>
                 </div>
               </div>
 
@@ -1090,8 +953,8 @@ export default function WarBreachCalculator(): React.JSX.Element {
                         {item.label}
                       </div>
                       <div
+                        className="mono"
                         style={{
-                          fontFamily: 'monospace',
                           fontWeight: item.weight ?? 400,
                           fontSize: item.large ? '1rem' : '0.85rem',
                           color: item.color ?? 'var(--text-primary)',
@@ -1107,7 +970,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
                 <div
                   style={{
                     padding: '8px 16px',
-                    borderTop: '1px solid rgba(255,77,77,0.3)',
+                    borderTop: '1px solid var(--danger)',
                     color: 'var(--danger)',
                     fontSize: '0.75rem',
                     fontWeight: 600,
@@ -1137,11 +1000,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
       {/* ── Footer: Add vessel + total ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button
-          onClick={addVessel}
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
+        <button onClick={addVessel} className="btn-secondary">
           <Plus size={16} /> Add Vessel
         </button>
 
@@ -1161,11 +1020,11 @@ export default function WarBreachCalculator(): React.JSX.Element {
               Net Due to R/I
             </div>
             <div
+              className="mono"
               style={{
                 fontSize: '1.5rem',
                 fontWeight: 700,
                 color: 'var(--accent-primary)',
-                fontFamily: 'monospace',
                 letterSpacing: '0.02em'
               }}
             >
@@ -1177,213 +1036,150 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
       {/* ── History Panel ── */}
       {showHistory && (
-        <div
-          style={{
-            marginTop: '28px',
-            border: '1px solid var(--table-border)',
-            borderRadius: '10px',
-            overflow: 'hidden'
-          }}
-        >
-          <div
-            style={{
-              padding: '12px 16px',
-              background: isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.025)',
-              borderBottom: '1px solid var(--table-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
+        <div style={{ marginTop: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
             <History size={15} color="var(--text-secondary)" />
-            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Saved Records</span>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Saved records</span>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 4 }}>
               ({historyRecords.length})
             </span>
           </div>
           {historyRecords.length === 0 ? (
-            <div
-              style={{
-                padding: '36px',
-                textAlign: 'center',
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem'
-              }}
-            >
-              No saved records yet. Complete a calculation and click Save.
+            <div className="table-wrap">
+              <EmptyState
+                compact
+                icon={<History size={28} />}
+                title="No saved records yet"
+                text="Complete a calculation and click Save."
+              />
             </div>
           ) : (
-            <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
-              {historyRecords.map((rec, idx) => {
-                const vessels: SavedVesselRow[] = (() => {
-                  try {
-                    return JSON.parse(rec.vesselsJson)
-                  } catch {
-                    return []
-                  }
-                })()
-                const vesselCount = vessels.filter((v) => v.calc !== null).length
-                const date = formatDateShort(rec.createdAt)
-                const isConfirming = deleteConfirmId === rec.id
-                return (
-                  <div
-                    key={rec.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '14px',
-                      padding: '12px 16px',
-                      borderBottom:
-                        idx < historyRecords.length - 1 ? '1px solid var(--table-border)' : 'none',
-                      background:
-                        idx % 2 === 1
-                          ? isLight
-                            ? 'rgba(0,0,0,0.015)'
-                            : 'rgba(255,255,255,0.015)'
-                          : 'transparent'
-                    }}
-                  >
-                    {/* Date */}
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)',
-                        minWidth: 90,
-                        flexShrink: 0
-                      }}
-                    >
-                      {date}
-                    </div>
-                    {/* Vessel name(s) */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: '0.85rem',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {vessels
-                          .filter((v) => v.vesselName)
-                          .map((v) => v.vesselName)
-                          .join(', ') ||
-                          rec.coverNoteNo || (
-                            <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                              No vessel
-                            </span>
+            <div className="table-wrap" style={{ maxHeight: '420px' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 110 }}>Date</th>
+                    <th>Vessel / cover note</th>
+                    <th style={{ width: 90 }}>Vessels</th>
+                    <th className="num" style={{ width: 130 }}>
+                      Net due
+                    </th>
+                    <th style={{ width: 150 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRecords.map((rec) => {
+                    const vessels: SavedVesselRow[] = (() => {
+                      try {
+                        return JSON.parse(rec.vesselsJson)
+                      } catch {
+                        return []
+                      }
+                    })()
+                    const vesselCount = vessels.filter((v) => v.calc !== null).length
+                    const date = formatDateShort(rec.createdAt)
+                    const isConfirming = deleteConfirmId === rec.id
+                    return (
+                      <tr key={rec.id}>
+                        <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                          {date}
+                        </td>
+                        <td style={{ maxWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {vessels
+                              .filter((v) => v.vesselName)
+                              .map((v) => v.vesselName)
+                              .join(', ') ||
+                              rec.coverNoteNo || (
+                                <span
+                                  style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}
+                                >
+                                  No vessel
+                                </span>
+                              )}
+                          </div>
+                          {rec.breachDetails && (
+                            <div
+                              style={{
+                                fontSize: '0.78rem',
+                                color: 'var(--text-secondary)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {rec.breachDetails}
+                            </div>
                           )}
-                      </div>
-                      {rec.breachDetails && (
-                        <div
-                          style={{
-                            fontSize: '0.74rem',
-                            color: 'var(--text-secondary)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
+                        </td>
+                        <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                          {vesselCount} vessel{vesselCount !== 1 ? 's' : ''}
+                        </td>
+                        <td
+                          className="num mono"
+                          style={{ fontWeight: 700, color: 'var(--accent-primary)' }}
                         >
-                          {rec.breachDetails}
-                        </div>
-                      )}
-                    </div>
-                    {/* Vessel count */}
-                    <div
-                      style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0 }}
-                    >
-                      {vesselCount} vessel{vesselCount !== 1 ? 's' : ''}
-                    </div>
-                    {/* Net due */}
-                    <div
-                      style={{
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        color: 'var(--accent-primary)',
-                        minWidth: 100,
-                        textAlign: 'right',
-                        flexShrink: 0
-                      }}
-                    >
-                      {fmt(parseFloat(rec.totalNetDue))}
-                    </div>
-                    {/* View */}
-                    <button
-                      onClick={() => setViewingRecord(rec)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--accent-primary)',
-                        opacity: 0.7,
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        flexShrink: 0
-                      }}
-                      title="View calculations"
-                    >
-                      <Eye size={14} />
-                    </button>
-                    {/* Delete */}
-                    {isConfirming ? (
-                      <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
-                      >
-                        <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>Delete?</span>
-                        <button
-                          onClick={() => handleDeleteRecord(rec.id)}
-                          style={{
-                            background: 'rgba(255,77,77,0.1)',
-                            border: '1px solid rgba(255,77,77,0.3)',
-                            color: 'var(--danger)',
-                            borderRadius: '6px',
-                            padding: '3px 8px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmId(null)}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid var(--table-border)',
-                            borderRadius: '6px',
-                            padding: '3px 8px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            color: 'var(--text-secondary)'
-                          }}
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setDeleteConfirmId(rec.id)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--danger)',
-                          opacity: 0.5,
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          flexShrink: 0
-                        }}
-                        title="Delete record"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
+                          {fmt(parseFloat(rec.totalNetDue))}
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-end',
+                              gap: '6px'
+                            }}
+                          >
+                            <button
+                              onClick={() => setViewingRecord(rec)}
+                              className="btn-ghost btn-icon btn-sm"
+                              style={{ color: 'var(--accent-primary)' }}
+                              title="View calculations"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            {isConfirming ? (
+                              <>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>
+                                  Delete?
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteRecord(rec.id)}
+                                  className="btn-danger btn-sm"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirmId(null)}
+                                  className="btn-secondary btn-sm"
+                                >
+                                  No
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteConfirmId(rec.id)}
+                                className="btn-ghost btn-icon btn-sm"
+                                style={{ color: 'var(--danger)' }}
+                                title="Delete record"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -1633,276 +1429,167 @@ export default function WarBreachCalculator(): React.JSX.Element {
           }
 
           return (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.55)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-                padding: '20px'
-              }}
-            >
-              <div
-                style={{
-                  background: isLight ? '#ffffff' : '#1a1d28',
-                  borderRadius: '16px',
-                  padding: '28px',
-                  width: '100%',
-                  maxWidth: '1100px',
-                  maxHeight: '85vh',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: '0 24px 80px rgba(0,0,0,0.4)'
-                }}
-              >
-                {/* Modal header */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '14px',
-                    marginBottom: '20px'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '10px',
-                      background:
-                        'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}
-                  >
-                    <History size={20} color="white" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h2 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: '700' }}>
-                      {cvn || 'No Cover Note'}
-                    </h2>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                      Saved {date}
-                    </p>
-                  </div>
-                  <button
-                    title="Close"
-                    aria-label="Close"
-                    onClick={() => setViewingRecord(null)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      padding: '4px'
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Meta strip */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '24px',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    background: 'var(--table-header-bg)',
-                    marginBottom: '20px',
-                    flexWrap: 'wrap',
-                    fontSize: '0.83rem'
-                  }}
-                >
-                  {[
-                    { label: 'Currency', value: curr },
-                    { label: 'Base Days', value: bd },
-                    { label: 'Breach Details', value: bdet || '—' },
-                    { label: 'Commission', value: `${recSettings.commissionPct}%` },
-                    { label: 'NR Tax', value: `${recSettings.nrTaxPct}%` }
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <div
-                        style={{
-                          fontSize: '0.72rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '2px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}
-                      >
-                        {label}
-                      </div>
-                      <div style={{ fontWeight: '600' }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Calculations table */}
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table
-                      style={{ borderCollapse: 'collapse', fontSize: '0.8rem', width: '100%' }}
-                    >
-                      <thead>
-                        <tr style={{ background: isLight ? '#cce0f5' : '#1a3a5c' }}>
-                          {[
-                            'POL. N°',
-                            'VESSEL',
-                            'FROM',
-                            'TO',
-                            'SUM INS.',
-                            'RATE %',
-                            'NCB',
-                            'GROSS PREM.',
-                            'TAXES GOV.',
-                            'NET',
-                            `Comm. ${recSettings.commissionPct}%`,
-                            'NR Tax',
-                            'NET DUE'
-                          ].map((h, i) => (
-                            <th
-                              key={h}
-                              style={{
-                                padding: '8px 10px',
-                                border: `1px solid ${isLight ? '#8aaac8' : 'rgba(255,255,255,0.1)'}`,
-                                textAlign: i < 4 ? 'left' : 'right',
-                                whiteSpace: 'nowrap',
-                                fontWeight: 700,
-                                color: isLight ? '#0a2040' : 'var(--text-primary)'
-                              }}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recVessels.map((v, i) => {
-                          const c = v.calc
-                          if (!c) return null
-                          const ncbLabel =
-                            (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : '-'
-                          const rowBg =
-                            i % 2 === 1
-                              ? isLight
-                                ? 'rgba(0,0,0,0.025)'
-                                : 'rgba(255,255,255,0.025)'
-                              : 'transparent'
-                          const cell: React.CSSProperties = {
-                            padding: '7px 10px',
-                            border: '1px solid var(--table-border)',
-                            background: rowBg,
-                            whiteSpace: 'nowrap'
-                          }
-                          const num: React.CSSProperties = {
-                            ...cell,
-                            textAlign: 'right',
-                            fontFamily: 'monospace'
-                          }
-                          return (
-                            <tr key={v.id}>
-                              <td style={cell}>{v.policyNo}</td>
-                              <td style={{ ...cell, fontWeight: 600 }}>{v.vessel.toUpperCase()}</td>
-                              <td style={cell}>{fmtDate(v.periodFrom)}</td>
-                              <td style={cell}>{fmtDate(v.periodTo)}</td>
-                              <td style={num}>{fmt(parseFloat(v.sumInsured) || 0)}</td>
-                              <td style={num}>{(parseFloat(v.rate) || 0).toFixed(3)}%</td>
-                              <td style={{ ...num, textAlign: 'center' }}>{ncbLabel}</td>
-                              <td
-                                style={{
-                                  ...num,
-                                  fontWeight: 700,
-                                  borderLeft: `2px solid ${accentBorder}`
-                                }}
-                              >
-                                {fmt(c.grossPrem)}
-                              </td>
-                              <td style={{ ...num, color: 'var(--danger)' }}>{fmt(c.taxesGov)}</td>
-                              <td style={num}>{fmt(c.net)}</td>
-                              <td style={{ ...num, color: 'var(--text-secondary)' }}>
-                                {fmt(c.commission)}
-                              </td>
-                              <td style={{ ...num, color: 'var(--text-secondary)' }}>
-                                {fmt(c.nrTax)}
-                              </td>
-                              <td
-                                style={{ ...num, fontWeight: 700, color: 'var(--accent-primary)' }}
-                              >
-                                {fmt(c.netDue)}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                        <tr
-                          style={{ background: accentBg, borderTop: `2px solid ${accentBorder}` }}
-                        >
-                          <td
-                            colSpan={12}
-                            style={{
-                              padding: '9px 10px',
-                              border: '1px solid var(--table-border)',
-                              textAlign: 'right',
-                              fontWeight: 700,
-                              background: accentBg
-                            }}
-                          >
-                            NET DUE TO R/I:
-                          </td>
-                          <td
-                            style={{
-                              padding: '9px 10px',
-                              border: '1px solid var(--table-border)',
-                              textAlign: 'right',
-                              fontFamily: 'monospace',
-                              fontWeight: 700,
-                              fontSize: '1rem',
-                              color: 'var(--accent-primary)',
-                              background: accentBg
-                            }}
-                          >
-                            {fmt(recTotal)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '8px',
-                    justifyContent: 'flex-end',
-                    marginTop: '18px'
-                  }}
-                >
+            <Modal
+              title={cvn || 'No Cover Note'}
+              icon={<History size={18} />}
+              onClose={() => setViewingRecord(null)}
+              width={1100}
+              closeOnOverlay={false}
+              footer={
+                <>
                   <button onClick={() => setViewingRecord(null)} className="btn-secondary">
                     Close
                   </button>
-                  <button
-                    onClick={modalExportToExcel}
-                    className="btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
+                  <button onClick={modalExportToExcel} className="btn-secondary">
                     <FileSpreadsheet size={16} /> Export Excel
                   </button>
-                  <button
-                    onClick={handleModalCopy}
-                    className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
+                  <button onClick={handleModalCopy} className="btn-primary">
                     {copiedModal ? <CheckCircle size={16} /> : <Copy size={16} />}
                     {copiedModal ? 'Copied!' : 'Copy for Email'}
                   </button>
-                </div>
+                </>
+              }
+            >
+              <p
+                style={{ margin: '0 0 14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
+              >
+                Saved {date}
+              </p>
+
+              {/* Meta strip */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '24px',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  background: 'var(--table-header-bg)',
+                  marginBottom: '20px',
+                  flexWrap: 'wrap',
+                  fontSize: '0.83rem'
+                }}
+              >
+                {[
+                  { label: 'Currency', value: curr },
+                  { label: 'Base days', value: bd },
+                  { label: 'Breach details', value: bdet || '—' },
+                  { label: 'Commission', value: `${recSettings.commissionPct}%` },
+                  { label: 'NR tax', value: `${recSettings.nrTaxPct}%` }
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div style={{ fontWeight: '600' }}>{value}</div>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {/* Calculations table */}
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      {[
+                        'POL. N°',
+                        'VESSEL',
+                        'FROM',
+                        'TO',
+                        'SUM INS.',
+                        'RATE %',
+                        'NCB',
+                        'GROSS PREM.',
+                        'TAXES GOV.',
+                        'NET',
+                        `Comm. ${recSettings.commissionPct}%`,
+                        'NR Tax',
+                        'NET DUE'
+                      ].map((h, i) => (
+                        <th key={h} style={{ textAlign: i < 4 ? 'left' : 'right' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recVessels.map((v) => {
+                      const c = v.calc
+                      if (!c) return null
+                      const ncbLabel =
+                        (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : '-'
+                      const nowrap: React.CSSProperties = { whiteSpace: 'nowrap' }
+                      return (
+                        <tr key={v.id}>
+                          <td style={nowrap}>{v.policyNo}</td>
+                          <td style={{ ...nowrap, fontWeight: 600 }}>{v.vessel.toUpperCase()}</td>
+                          <td style={nowrap}>{fmtDate(v.periodFrom)}</td>
+                          <td style={nowrap}>{fmtDate(v.periodTo)}</td>
+                          <td className="num mono" style={nowrap}>
+                            {fmt(parseFloat(v.sumInsured) || 0)}
+                          </td>
+                          <td className="num mono" style={nowrap}>
+                            {(parseFloat(v.rate) || 0).toFixed(3)}%
+                          </td>
+                          <td className="mono" style={{ ...nowrap, textAlign: 'center' }}>
+                            {ncbLabel}
+                          </td>
+                          <td
+                            className="num mono"
+                            style={{
+                              ...nowrap,
+                              fontWeight: 700,
+                              borderLeft: `2px solid ${accentBorder}`
+                            }}
+                          >
+                            {fmt(c.grossPrem)}
+                          </td>
+                          <td className="num mono" style={{ ...nowrap, color: 'var(--danger)' }}>
+                            {fmt(c.taxesGov)}
+                          </td>
+                          <td className="num mono" style={nowrap}>
+                            {fmt(c.net)}
+                          </td>
+                          <td className="num mono muted" style={nowrap}>
+                            {fmt(c.commission)}
+                          </td>
+                          <td className="num mono muted" style={nowrap}>
+                            {fmt(c.nrTax)}
+                          </td>
+                          <td
+                            className="num mono"
+                            style={{ ...nowrap, fontWeight: 700, color: 'var(--accent-primary)' }}
+                          >
+                            {fmt(c.netDue)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    <tr style={{ fontWeight: 600, background: 'var(--table-header-bg)' }}>
+                      <td colSpan={12} style={{ textAlign: 'right' }}>
+                        NET DUE TO R/I:
+                      </td>
+                      <td
+                        className="num mono"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '1rem',
+                          color: 'var(--accent-primary)',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {fmt(recTotal)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Modal>
           )
         })()}
 
@@ -1925,19 +1612,10 @@ export default function WarBreachCalculator(): React.JSX.Element {
             </span>
           </div>
 
-          <div
-            style={{
-              borderRadius: '10px',
-              border: '1px solid var(--table-border)',
-              padding: '18px 20px',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-              overflowX: 'auto'
-            }}
-          >
-            {/* Preview table */}
-            <table style={{ borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <div className="table-wrap">
+            <table className="data-table">
               <thead>
-                <tr style={{ background: '#cce0f5' }}>
+                <tr>
                   {[
                     'POL. N°',
                     'VESSEL',
@@ -1953,18 +1631,7 @@ export default function WarBreachCalculator(): React.JSX.Element {
                     'Tax Non-Resident',
                     'NET DUE'
                   ].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: '7px 10px',
-                        border: '1px solid #8aaac8',
-                        color: '#0a2040',
-                        textAlign: i < 4 ? 'left' : 'right',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 700,
-                        ...(i === 7 ? { borderLeft: '2px solid #4a9fd4' } : {})
-                      }}
-                    >
+                    <th key={h} style={{ textAlign: i < 4 ? 'left' : 'right' }}>
                       {h}
                     </th>
                   ))}
@@ -1975,71 +1642,63 @@ export default function WarBreachCalculator(): React.JSX.Element {
                   const c = calculations[i]?.calc
                   if (!c) return null
                   const ncbLabel = (parseFloat(v.ncbDiscount) || 0) > 0 ? `${v.ncbDiscount}%` : '-'
-                  const rowBg =
-                    i % 2 === 1
-                      ? isLight
-                        ? 'rgba(0,0,0,0.03)'
-                        : 'rgba(255,255,255,0.03)'
-                      : 'transparent'
-                  const cell: React.CSSProperties = {
-                    padding: '6px 10px',
-                    border: '1px solid var(--table-border)',
-                    background: rowBg,
-                    whiteSpace: 'nowrap'
-                  }
-                  const num: React.CSSProperties = {
-                    ...cell,
-                    textAlign: 'right',
-                    fontFamily: 'monospace'
-                  }
+                  const nowrap: React.CSSProperties = { whiteSpace: 'nowrap' }
                   return (
                     <tr key={v.id}>
-                      <td style={cell}>{v.policyNo}</td>
-                      <td style={{ ...cell, fontWeight: 600 }}>{v.vessel.toUpperCase()}</td>
-                      <td style={cell}>{fmtDate(v.periodFrom)}</td>
-                      <td style={cell}>{fmtDate(v.periodTo)}</td>
-                      <td style={num}>{fmt(parseFloat(v.sumInsured) || 0)}</td>
-                      <td style={num}>{(parseFloat(v.rate) || 0).toFixed(3)}%</td>
-                      <td style={{ ...num, textAlign: 'center' }}>{ncbLabel}</td>
+                      <td style={nowrap}>{v.policyNo}</td>
+                      <td style={{ ...nowrap, fontWeight: 600 }}>{v.vessel.toUpperCase()}</td>
+                      <td style={nowrap}>{fmtDate(v.periodFrom)}</td>
+                      <td style={nowrap}>{fmtDate(v.periodTo)}</td>
+                      <td className="num mono" style={nowrap}>
+                        {fmt(parseFloat(v.sumInsured) || 0)}
+                      </td>
+                      <td className="num mono" style={nowrap}>
+                        {(parseFloat(v.rate) || 0).toFixed(3)}%
+                      </td>
+                      <td className="mono" style={{ ...nowrap, textAlign: 'center' }}>
+                        {ncbLabel}
+                      </td>
                       <td
-                        style={{ ...num, fontWeight: 700, borderLeft: `2px solid ${accentBorder}` }}
+                        className="num mono"
+                        style={{
+                          ...nowrap,
+                          fontWeight: 700,
+                          borderLeft: `2px solid ${accentBorder}`
+                        }}
                       >
                         {fmt(c.grossPrem)}
                       </td>
-                      <td style={{ ...num, color: 'var(--danger)' }}>{fmt(c.taxesGov)}</td>
-                      <td style={num}>{fmt(c.net)}</td>
-                      <td style={{ ...num, color: 'var(--text-secondary)' }}>
+                      <td className="num mono" style={{ ...nowrap, color: 'var(--danger)' }}>
+                        {fmt(c.taxesGov)}
+                      </td>
+                      <td className="num mono" style={nowrap}>
+                        {fmt(c.net)}
+                      </td>
+                      <td className="num mono muted" style={nowrap}>
                         {fmt(c.commission)}
                       </td>
-                      <td style={{ ...num, color: 'var(--text-secondary)' }}>{fmt(c.nrTax)}</td>
-                      <td style={{ ...num, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                      <td className="num mono muted" style={nowrap}>
+                        {fmt(c.nrTax)}
+                      </td>
+                      <td
+                        className="num mono"
+                        style={{ ...nowrap, fontWeight: 700, color: 'var(--accent-primary)' }}
+                      >
                         {fmt(c.netDue)}
                       </td>
                     </tr>
                   )
                 })}
-                <tr style={{ background: accentBg, borderTop: `2px solid ${accentBorder}` }}>
-                  <td
-                    colSpan={12}
-                    style={{
-                      padding: '7px 10px',
-                      border: '1px solid var(--table-border)',
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      background: accentBg
-                    }}
-                  >
+                <tr style={{ fontWeight: 600, background: 'var(--table-header-bg)' }}>
+                  <td colSpan={12} style={{ textAlign: 'right' }}>
                     NET DUE TO R/I:
                   </td>
                   <td
+                    className="num mono"
                     style={{
-                      padding: '7px 10px',
-                      border: '1px solid var(--table-border)',
-                      textAlign: 'right',
-                      fontFamily: 'monospace',
                       fontWeight: 700,
                       color: 'var(--accent-primary)',
-                      background: accentBg
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     {fmt(totalNetDue)}

@@ -6,20 +6,18 @@ import {
   ChevronUp,
   ChevronDown,
   Tag,
-  X,
   Plus,
   Copy,
   FileDown,
   Mail
 } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import type { DocumentTemplate } from '../../../shared/types'
 import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/types'
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
-import { PageHeader } from './ui'
+import { PageHeader, Modal, Field, EmptyState } from './ui'
 import {
   resolveTemplatePlaceholders,
   htmlToPlainText,
@@ -55,10 +53,8 @@ const PLACEHOLDER_ITEMS = TEMPLATE_PLACEHOLDERS.map((p) => ({
 }))
 
 export default function DocumentTemplateManager(): React.JSX.Element {
-  const { theme } = useTheme()
   const { hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light' || theme === 'aurora'
   const canManage = hasPermission('admin:settings')
 
   const [templates, setTemplates] = useState<DocumentTemplate[]>([])
@@ -275,22 +271,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               setActiveCategory(cat.id)
               setSelectedId(null)
             }}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '8px',
-              border:
-                activeCategory === cat.id
-                  ? '1px solid var(--accent-primary)'
-                  : '1px solid var(--input-border)',
-              background:
-                activeCategory === cat.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
-              color: activeCategory === cat.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: '0.82rem',
-              fontWeight: activeCategory === cat.id ? 600 : 400,
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-effect"
+            className={activeCategory === cat.id ? 'chip active' : 'chip'}
           >
             {cat.label}
           </button>
@@ -315,15 +296,12 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               Loading...
             </div>
           ) : filteredTemplates.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <FileText size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p>No templates found</p>
-              {canManage && (
-                <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-                  Click &quot;New Template&quot; to get started
-                </p>
-              )}
-            </div>
+            <EmptyState
+              compact
+              icon={<FileText size={32} />}
+              title="No templates found"
+              text={canManage ? 'Click "New Template" to get started' : undefined}
+            />
           ) : (
             <div style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
               {filteredTemplates.map((t, i) => (
@@ -334,8 +312,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     padding: '12px 16px',
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--table-border)',
-                    background:
-                      selectedId === t.id ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
+                    background: selectedId === t.id ? 'var(--row-selected)' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
@@ -466,32 +443,19 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '100%',
-                color: 'var(--text-secondary)',
-                flexDirection: 'column',
-                gap: '8px'
+                height: '100%'
               }}
             >
-              <FileText size={40} style={{ opacity: 0.2 }} />
-              <p>Select a template to view details</p>
+              <EmptyState icon={<FileText size={40} />} title="Select a template to view details" />
             </div>
           ) : (
             <div style={{ padding: '24px', maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
               {/* Template Info */}
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <label
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      marginBottom: '4px',
-                      display: 'block'
-                    }}
-                  >
-                    Template Name
-                  </label>
+              <div
+                className="form-grid"
+                style={{ gridTemplateColumns: 'minmax(0, 1fr) 140px', marginBottom: '16px' }}
+              >
+                <Field label="Template name">
                   <input
                     type="text"
                     value={editName}
@@ -500,31 +464,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       trackDirty({ name: e.target.value })
                     }}
                     disabled={!canManage}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--input-border)',
-                      borderRadius: '8px',
-                      color: 'var(--text-primary)',
-                      fontSize: '1rem',
-                      fontWeight: 500
-                    }}
+                    style={{ fontSize: '1rem', fontWeight: 500 }}
                   />
-                </div>
-                <div style={{ width: '140px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      marginBottom: '4px',
-                      display: 'block'
-                    }}
-                  >
-                    Category
-                  </label>
+                </Field>
+                <Field label="Category">
                   <select
                     value={editCategory}
                     onChange={(e) => {
@@ -532,15 +475,6 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       trackDirty({ category: e.target.value })
                     }}
                     disabled={!canManage}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--input-border)',
-                      borderRadius: '8px',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.88rem'
-                    }}
                   >
                     {TEMPLATE_CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -548,93 +482,48 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Description
-                </label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => {
-                    setEditDescription(e.target.value)
-                    trackDirty({ description: e.target.value })
-                  }}
-                  disabled={!canManage}
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    background: 'var(--input-bg)',
-                    border: '1px solid var(--input-border)',
-                    borderRadius: '8px',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.88rem',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              {/* Rich Text Body */}
-              <div style={{ marginBottom: '16px' }}>
-                <label
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Template Body
-                </label>
-                <RichTextEditor
-                  value={editBody}
-                  onChange={(html) => {
-                    setEditBody(html)
-                    trackDirty({ body: html })
-                  }}
-                  placeholder="Write your template content here... Use Insert Field to add placeholders."
-                  minHeight={250}
-                  showFontSize
-                  showFontFamily
-                  showAlignment
-                  showLineSpacing
-                  showPlaceholders
-                  placeholderItems={PLACEHOLDER_ITEMS}
-                />
+                </Field>
+                <Field label="Description" span="all">
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => {
+                      setEditDescription(e.target.value)
+                      trackDirty({ description: e.target.value })
+                    }}
+                    disabled={!canManage}
+                    rows={2}
+                    style={{ resize: 'vertical' }}
+                  />
+                </Field>
+                {/* Rich Text Body */}
+                <Field label="Template body" span="all">
+                  <RichTextEditor
+                    value={editBody}
+                    onChange={(html) => {
+                      setEditBody(html)
+                      trackDirty({ body: html })
+                    }}
+                    placeholder="Write your template content here... Use Insert Field to add placeholders."
+                    minHeight={250}
+                    showFontSize
+                    showFontFamily
+                    showAlignment
+                    showLineSpacing
+                    showPlaceholders
+                    placeholderItems={PLACEHOLDER_ITEMS}
+                  />
+                </Field>
               </div>
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
                 {canManage && dirty && (
-                  <button
-                    className="btn-primary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.85rem'
-                    }}
-                    onClick={handleSave}
-                  >
+                  <button className="btn-primary btn-sm" onClick={handleSave}>
                     <Save size={14} /> Save Changes
                   </button>
                 )}
                 <button
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  className="btn-secondary btn-sm"
                   onClick={() => {
                     setGenerateMode('docx')
                     setShowGenerate(true)
@@ -644,8 +533,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   <FileDown size={14} /> Generate DOCX
                 </button>
                 <button
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  className="btn-secondary btn-sm"
                   onClick={() => {
                     setGenerateMode('copy')
                     setShowGenerate(true)
@@ -656,14 +544,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 </button>
                 {canManage && (
                   <button
-                    className="btn-secondary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.85rem',
-                      color: 'var(--danger)'
-                    }}
+                    className="btn-secondary btn-sm"
+                    style={{ color: 'var(--danger)' }}
                     onClick={handleDelete}
                   >
                     <Trash2 size={14} /> Delete
@@ -729,147 +611,14 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
       {/* Create Modal */}
       {showCreate && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '460px',
-              maxWidth: '90vw',
-              border: 'var(--glass-border)'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-              }}
-            >
-              <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={20} /> New Template
-              </h2>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowCreate(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '4px',
-                  display: 'block'
-                }}
-              >
-                Name
-              </label>
-              <input
-                type="text"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="Template name"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '4px',
-                  display: 'block'
-                }}
-              >
-                Description (optional)
-              </label>
-              <textarea
-                value={createDescription}
-                onChange={(e) => setCreateDescription(e.target.value)}
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '4px',
-                  display: 'block'
-                }}
-              >
-                Category
-              </label>
-              <select
-                value={createCategory}
-                onChange={(e) => setCreateCategory(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem'
-                }}
-              >
-                {TEMPLATE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c.charAt(0).toUpperCase() + c.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <Modal
+          title="New Template"
+          icon={<Plus size={18} />}
+          onClose={() => setShowCreate(false)}
+          width={460}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setShowCreate(false)}>
                 Cancel
               </button>
@@ -877,7 +626,6 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 className="btn-primary"
                 onClick={handleCreate}
                 disabled={creating || !createName.trim()}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 {creating ? (
                   'Creating...'
@@ -887,15 +635,42 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   </>
                 )}
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid cols-2">
+            <Field label="Name" span="all">
+              <input
+                type="text"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="Template name"
+              />
+            </Field>
+            <Field label="Description (optional)" span="all">
+              <textarea
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+                rows={2}
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
+            <Field label="Category">
+              <select value={createCategory} onChange={(e) => setCreateCategory(e.target.value)}>
+                {TEMPLATE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c.charAt(0).toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Generate / Copy Modal */}
       {showGenerate && selected && (
         <GenerateModal
-          isLight={isLight}
           mode={generateMode}
           templateName={selected.name}
           bodyHtml={editBody}
@@ -910,7 +685,6 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
 // Separate generate/copy modal component
 function GenerateModal({
-  isLight,
   mode,
   templateName,
   bodyHtml,
@@ -918,7 +692,6 @@ function GenerateModal({
   showSuccess,
   showError
 }: {
-  isLight: boolean
   mode: 'docx' | 'copy'
   templateName: string
   bodyHtml: string
@@ -995,187 +768,19 @@ function GenerateModal({
     }
   }
 
-  const selectStyle = {
-    width: '100%',
-    padding: '8px 12px',
-    background: 'var(--input-bg)',
-    border: '1px solid var(--input-border)',
-    borderRadius: '8px',
-    color: 'var(--text-primary)',
-    fontSize: '0.88rem'
-  }
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-    >
-      <div
-        style={{
-          background: isLight ? '#ffffff' : '#1a1d28',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '480px',
-          maxWidth: '90vw',
-          border: 'var(--glass-border)'
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '20px'
-          }}
-        >
-          <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {mode === 'docx' ? (
-              <>
-                <FileDown size={20} /> Generate DOCX
-              </>
-            ) : (
-              <>
-                <Copy size={20} /> Copy Text
-              </>
-            )}
-          </h2>
-          <button
-            title="Close"
-            aria-label="Close"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div
-          style={{
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: 'var(--input-bg)',
-            marginBottom: '16px',
-            fontSize: '0.88rem'
-          }}
-        >
-          <strong>{templateName}</strong>
-        </div>
-
-        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-          Select context data to fill template placeholders. Leave empty for blank values.
-        </p>
-
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            style={{
-              fontSize: '0.75rem',
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '4px',
-              display: 'block'
-            }}
-          >
-            Vessel
-          </label>
-          <select
-            value={selectedVesselId}
-            onChange={(e) => {
-              setSelectedVesselId(e.target.value)
-              if (!e.target.value) {
-                setPolicies([])
-                setSelectedPolicyId('')
-              }
-            }}
-            style={selectStyle}
-          >
-            <option value="">-- None --</option>
-            {vessels.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {policies.length > 0 && (
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                marginBottom: '4px',
-                display: 'block'
-              }}
-            >
-              Policy
-            </label>
-            <select
-              value={selectedPolicyId}
-              onChange={(e) => setSelectedPolicyId(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="">-- None --</option>
-              {policies.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              fontSize: '0.75rem',
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '4px',
-              display: 'block'
-            }}
-          >
-            Entity
-          </label>
-          <select
-            value={selectedEntityId}
-            onChange={(e) => setSelectedEntityId(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">-- None --</option>
-            {entities.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+    <Modal
+      title={mode === 'docx' ? 'Generate DOCX' : 'Copy Text'}
+      icon={mode === 'docx' ? <FileDown size={18} /> : <Copy size={18} />}
+      onClose={onClose}
+      width={480}
+      closeOnOverlay={false}
+      footer={
+        <>
           <button className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn-primary"
-            disabled={processing}
-            onClick={handleAction}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
+          <button className="btn-primary" disabled={processing} onClick={handleAction}>
             {processing ? (
               mode === 'docx' ? (
                 'Generating...'
@@ -1192,8 +797,70 @@ function GenerateModal({
               </>
             )}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div
+        style={{
+          padding: '10px 14px',
+          borderRadius: '8px',
+          background: 'var(--input-bg)',
+          marginBottom: '16px',
+          fontSize: '0.88rem'
+        }}
+      >
+        <strong>{templateName}</strong>
       </div>
-    </div>
+
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+        Select context data to fill template placeholders. Leave empty for blank values.
+      </p>
+
+      <div className="form-grid cols-2">
+        <Field label="Vessel" span="all">
+          <select
+            value={selectedVesselId}
+            onChange={(e) => {
+              setSelectedVesselId(e.target.value)
+              if (!e.target.value) {
+                setPolicies([])
+                setSelectedPolicyId('')
+              }
+            }}
+          >
+            <option value="">-- None --</option>
+            {vessels.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {policies.length > 0 && (
+          <Field label="Policy" span="all">
+            <select value={selectedPolicyId} onChange={(e) => setSelectedPolicyId(e.target.value)}>
+              <option value="">-- None --</option>
+              {policies.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <Field label="Entity" span="all">
+          <select value={selectedEntityId} onChange={(e) => setSelectedEntityId(e.target.value)}>
+            <option value="">-- None --</option>
+            {entities.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+    </Modal>
   )
 }

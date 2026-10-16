@@ -16,9 +16,9 @@ import {
   Filter,
   Columns3,
   Database,
-  X,
   FolderOpen
 } from 'lucide-react'
+import { Modal, Field, Badge, EmptyState, SegmentedControl } from './ui'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
@@ -545,8 +545,6 @@ const CHART_METRICS: Record<string, { value: string; label: string; field?: stri
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function ReportBuilder(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   // State
@@ -947,21 +945,7 @@ export default function ReportBuilder(): React.JSX.Element {
     padding: '3px 0'
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '7px 10px',
-    borderRadius: '8px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    fontSize: '0.82rem',
-    outline: 'none'
-  }
-
-  const selectStyle: React.CSSProperties = {
-    ...inputStyle,
-    appearance: 'none' as const
-  }
+  const selectStyle: React.CSSProperties = { width: '100%' }
 
   // ── Render ──────────────────────────────────────────────────────────────
 
@@ -990,7 +974,7 @@ export default function ReportBuilder(): React.JSX.Element {
               justifyContent: 'center'
             }}
           >
-            <Database size={22} color="#fff" />
+            <Database size={22} color="var(--accent-contrast)" />
           </div>
           <div>
             <h2 style={{ fontSize: '1.3rem', fontWeight: '700', margin: 0 }}>Report Builder</h2>
@@ -1032,7 +1016,7 @@ export default function ReportBuilder(): React.JSX.Element {
                   minWidth: '280px',
                   maxHeight: '300px',
                   overflowY: 'auto',
-                  background: isLight ? '#ffffff' : '#1a1d28',
+                  background: 'var(--bg-primary)',
                   border: 'var(--glass-border)',
                   borderRadius: '10px',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
@@ -1177,19 +1161,9 @@ export default function ReportBuilder(): React.JSX.Element {
               )}
               <Columns3 size={14} style={{ color: 'var(--accent-primary)' }} />
               Columns
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  fontSize: '0.7rem',
-                  padding: '1px 8px',
-                  borderRadius: '10px',
-                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                  color: 'var(--accent-primary)',
-                  fontWeight: '600'
-                }}
-              >
+              <Badge tone="accent" style={{ marginLeft: 'auto' }}>
                 {selectedColumns.size}/{sourceDef.columns.length}
-              </span>
+              </Badge>
             </div>
             {!collapsedSections.has('columns') && (
               <>
@@ -1250,24 +1224,13 @@ export default function ReportBuilder(): React.JSX.Element {
               Filters
             </div>
             {!collapsedSections.has('filters') && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="form-grid">
                 {sourceDef.filters.map((f) => (
-                  <div key={f.key}>
-                    <label
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '3px',
-                        display: 'block'
-                      }}
-                    >
-                      {f.label}
-                    </label>
+                  <Field key={f.key} label={f.label}>
                     {f.type === 'select' && (
                       <select
                         value={filters[f.key] || 'all'}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
-                        style={selectStyle}
                       >
                         {(f.options || dynamicOptions[f.key] || []).map((o) => (
                           <option key={o.value} value={o.value}>
@@ -1282,7 +1245,6 @@ export default function ReportBuilder(): React.JSX.Element {
                         value={filters[f.key] || ''}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
                         placeholder={f.placeholder || 'Search...'}
-                        style={inputStyle}
                       />
                     )}
                     {f.type === 'date' && (
@@ -1290,10 +1252,9 @@ export default function ReportBuilder(): React.JSX.Element {
                         type="date"
                         value={filters[f.key] || ''}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
-                        style={inputStyle}
                       />
                     )}
-                  </div>
+                  </Field>
                 ))}
               </div>
             )}
@@ -1413,89 +1374,36 @@ export default function ReportBuilder(): React.JSX.Element {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Results</span>
               {hasRun && (
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '2px 10px',
-                    borderRadius: '10px',
-                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                    color: 'var(--accent-primary)',
-                    fontWeight: '600'
-                  }}
-                >
+                <Badge tone="accent">
                   {results.length > ROWS_PER_PAGE && !groupBy
                     ? `Showing ${(currentPage - 1) * ROWS_PER_PAGE + 1}-${Math.min(currentPage * ROWS_PER_PAGE, results.length)} of ${results.length} rows`
                     : `${results.length} rows`}
-                </span>
+                </Badge>
               )}
               {groupBy && hasRun && (
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '2px 10px',
-                    borderRadius: '10px',
-                    background: 'rgba(99,102,241,0.1)',
-                    color: isLight ? '#4f46e5' : '#818cf8',
-                    fontWeight: '600'
-                  }}
-                >
+                <Badge tone="violet">
                   Grouped by: {sourceDef.groupBy.find((g) => g.key === groupBy)?.label || groupBy}
-                </span>
+                </Badge>
               )}
             </div>
             {hasRun && results.length > 0 && (
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {/* View mode toggle */}
-                <div
-                  style={{
-                    display: 'flex',
-                    borderRadius: '8px',
-                    border: '1px solid var(--input-border)',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <button
-                    onClick={() => setViewMode('table')}
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: viewMode === 'table' ? 'var(--accent-primary)' : 'transparent',
-                      color: viewMode === 'table' ? '#fff' : 'var(--text-secondary)'
-                    }}
-                  >
-                    Table
-                  </button>
-                  <button
-                    onClick={() => setViewMode('chart')}
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      border: 'none',
-                      borderLeft: '1px solid var(--input-border)',
-                      cursor: 'pointer',
-                      background: viewMode === 'chart' ? 'var(--accent-primary)' : 'transparent',
-                      color: viewMode === 'chart' ? '#fff' : 'var(--text-secondary)'
-                    }}
-                  >
-                    Chart
-                  </button>
-                </div>
+                <SegmentedControl
+                  items={[
+                    { key: 'table', label: 'Table' },
+                    { key: 'chart', label: 'Chart' }
+                  ]}
+                  value={viewMode}
+                  onChange={setViewMode}
+                />
 
                 {/* Chart metric selector */}
                 {viewMode === 'chart' && groupBy && (
                   <select
                     value={chartMetric}
                     onChange={(e) => setChartMetric(e.target.value as typeof chartMetric)}
-                    style={{
-                      ...selectStyle,
-                      width: 'auto',
-                      padding: '5px 8px',
-                      fontSize: '0.75rem'
-                    }}
+                    style={{ padding: '6px 8px', fontSize: '0.8rem' }}
                   >
                     {(CHART_METRICS[dataSource] || [{ value: 'count', label: 'Count' }]).map(
                       (m) => (
@@ -1542,45 +1450,19 @@ export default function ReportBuilder(): React.JSX.Element {
           {/* Table Container */}
           <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
             {!hasRun && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '60px 20px',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <Database size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                <p style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '4px' }}>
-                  No report generated yet
-                </p>
-                <p style={{ fontSize: '0.8rem' }}>
-                  Configure your data source, columns, and filters, then click Run Report
-                </p>
-              </div>
+              <EmptyState
+                icon={<Database size={48} />}
+                title="No report generated yet"
+                text="Configure your data source, columns, and filters, then click Run Report"
+              />
             )}
 
             {hasRun && results.length === 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '60px 20px',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <Filter size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                <p style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '4px' }}>
-                  No results found
-                </p>
-                <p style={{ fontSize: '0.8rem' }}>
-                  Try adjusting your filters or selecting different columns
-                </p>
-              </div>
+              <EmptyState
+                icon={<Filter size={48} />}
+                title="No results found"
+                text="Try adjusting your filters or selecting different columns"
+              />
             )}
 
             {/* Chart View */}
@@ -1666,24 +1548,11 @@ export default function ReportBuilder(): React.JSX.Element {
             )}
 
             {hasRun && results.length > 0 && viewMode === 'chart' && !groupBy && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '60px 20px',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <Layers size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                <p style={{ fontSize: '0.95rem', fontWeight: '500', marginBottom: '4px' }}>
-                  No grouping selected
-                </p>
-                <p style={{ fontSize: '0.8rem' }}>
-                  Select a Group By field in the sidebar to generate a chart
-                </p>
-              </div>
+              <EmptyState
+                icon={<Layers size={48} />}
+                title="No grouping selected"
+                text="Select a Group By field in the sidebar to generate a chart"
+              />
             )}
 
             {/* Table View */}
@@ -1692,7 +1561,6 @@ export default function ReportBuilder(): React.JSX.Element {
                 <ResultsTable
                   columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
                   rows={paginatedResults}
-                  isLight={isLight}
                 />
                 {totalPages > 1 && (
                   <div
@@ -1763,7 +1631,7 @@ export default function ReportBuilder(): React.JSX.Element {
                     <div
                       style={{
                         padding: '8px 16px',
-                        background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         borderBottom: '1px solid var(--table-border)',
                         display: 'flex',
                         alignItems: 'center',
@@ -1771,23 +1639,11 @@ export default function ReportBuilder(): React.JSX.Element {
                       }}
                     >
                       <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{group}</span>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          padding: '1px 8px',
-                          borderRadius: '10px',
-                          background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                          color: 'var(--accent-primary)',
-                          fontWeight: '600'
-                        }}
-                      >
-                        {rows.length}
-                      </span>
+                      <Badge tone="accent">{rows.length}</Badge>
                     </div>
                     <ResultsTable
                       columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
                       rows={rows}
-                      isLight={isLight}
                     />
                   </div>
                 ))}
@@ -1799,136 +1655,54 @@ export default function ReportBuilder(): React.JSX.Element {
 
       {/* Save Modal */}
       {saveModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setSaveModalOpen(false)}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '400px',
-              maxWidth: '90vw',
-              border: 'var(--glass-border)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '16px'
-              }}
-            >
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '600', margin: 0 }}>
-                {editingReportId ? 'Update Report' : 'Save Report'}
-              </h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setSaveModalOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Report Name *
-                </label>
-                <input
-                  type="text"
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  placeholder="e.g. Active Vessels by Fleet"
-                  style={inputStyle}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={saveDescription}
-                  onChange={(e) => setSaveDescription(e.target.value)}
-                  placeholder="Optional description"
-                  style={inputStyle}
-                />
-              </div>
-              <label style={{ ...checkboxLabelStyle, fontSize: '0.82rem' }}>
-                <input
-                  type="checkbox"
-                  checked={saveShared}
-                  onChange={(e) => setSaveShared(e.target.checked)}
-                  style={{ accentColor: 'var(--accent-primary)' }}
-                />
-                <Share2 size={14} />
-                Share with all users
-              </label>
-            </div>
-
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
-              <button
-                className="btn-secondary"
-                onClick={() => setSaveModalOpen(false)}
-                style={{ padding: '8px 16px', fontSize: '0.82rem' }}
-              >
+        <Modal
+          title={editingReportId ? 'Update Report' : 'Save Report'}
+          icon={<Save size={18} />}
+          onClose={() => setSaveModalOpen(false)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setSaveModalOpen(false)}>
                 Cancel
               </button>
-              <button
-                className="btn-primary"
-                onClick={handleSave}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  fontSize: '0.82rem'
-                }}
-              >
+              <button className="btn-primary" onClick={handleSave}>
                 <Save size={14} />
                 {editingReportId ? 'Update' : 'Save'}
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Report name" required span="all">
+              <input
+                type="text"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="e.g. Active Vessels by Fleet"
+                autoFocus
+              />
+            </Field>
+            <Field label="Description" span="all">
+              <input
+                type="text"
+                value={saveDescription}
+                onChange={(e) => setSaveDescription(e.target.value)}
+                placeholder="Optional description"
+              />
+            </Field>
+            <label style={{ ...checkboxLabelStyle, gridColumn: '1 / -1' }}>
+              <input
+                type="checkbox"
+                checked={saveShared}
+                onChange={(e) => setSaveShared(e.target.checked)}
+                style={{ accentColor: 'var(--accent-primary)' }}
+              />
+              <Share2 size={14} />
+              Share with all users
+            </label>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -1936,133 +1710,66 @@ export default function ReportBuilder(): React.JSX.Element {
 
 // ── Results Table Sub-Component ──────────────────────────────────────────
 
+function statusTone(val: unknown): 'success' | 'warning' | 'danger' | 'accent' {
+  if (val === 'active' || val === 'Closed' || val === 'completed') return 'success'
+  if (val === 'draft' || val === 'pending' || val === 'Open') return 'warning'
+  if (val === 'inactive' || val === 'cancelled' || val === 'superseded') return 'danger'
+  return 'accent'
+}
+
 function ResultsTable({
   columns,
-  rows,
-  isLight
+  rows
 }: {
   columns: ColumnDef[]
   rows: ReportResultRow[]
-  isLight: boolean
 }): React.JSX.Element {
+  const { theme } = useTheme()
+  const isLight = theme === 'light' || theme === 'aurora'
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+    <table className="data-table">
       <thead>
         <tr>
           {columns.map((col) => (
-            <th
-              key={col.key}
-              style={{
-                padding: '8px 12px',
-                textAlign: 'left',
-                fontWeight: '600',
-                fontSize: '0.72rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: 'var(--text-secondary)',
-                borderBottom: '1px solid var(--table-border)',
-                background: isLight ? '#eef0f3' : '#181b24',
-                position: 'sticky',
-                top: 0,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {col.label}
-            </th>
+            <th key={col.key}>{col.label}</th>
           ))}
         </tr>
       </thead>
       <tbody>
         {rows.map((row, i) => (
-          <tr
-            key={i}
-            style={{
-              borderBottom: '1px solid var(--table-border)',
-              background:
-                i % 2 === 0
-                  ? 'transparent'
-                  : isLight
-                    ? 'rgba(0,0,0,0.015)'
-                    : 'rgba(255,255,255,0.015)'
-            }}
-          >
+          <tr key={i}>
             {columns.map((col) => {
               const val = row[col.key]
               // daysUntilExpiry color coding
               if (col.key === 'daysUntilExpiry' && val !== null && val !== undefined) {
                 const n = Number(val)
-                let bg = 'rgba(0,255,136,0.1)'
-                let fg = isLight ? '#008c46' : '#00ff88'
-                if (n < 0) {
-                  bg = 'rgba(255,77,77,0.1)'
-                  fg = 'var(--danger)'
-                } else if (n < 30) {
-                  bg = 'rgba(255,160,0,0.1)'
-                  fg = isLight ? '#b45309' : '#ffaa00'
-                } else if (n < 60) {
-                  bg = 'rgba(255,204,0,0.1)'
-                  fg = isLight ? '#92700c' : '#ffcc00'
-                }
                 return (
-                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600',
-                        background: bg,
-                        color: fg
-                      }}
-                    >
-                      {n < 0 ? `${Math.abs(n)}d overdue` : `${n}d`}
-                    </span>
+                  <td key={col.key} style={{ whiteSpace: 'nowrap' }}>
+                    {n < 0 ? (
+                      <Badge tone="danger">{Math.abs(n)}d overdue</Badge>
+                    ) : n < 30 ? (
+                      <Badge tone="warning">{n}d</Badge>
+                    ) : n < 60 ? (
+                      <Badge color={isLight ? '#92700c' : '#ffcc00'}>{n}d</Badge>
+                    ) : (
+                      <Badge tone="success">{n}d</Badge>
+                    )}
                   </td>
                 )
               }
               // fileStatus badge
               if (col.key === 'fileStatus') {
-                const linked = val === 'Linked'
                 return (
-                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600',
-                        background: linked ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
-                        color: linked ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
-                      }}
-                    >
-                      {val || ''}
-                    </span>
+                  <td key={col.key} style={{ whiteSpace: 'nowrap' }}>
+                    <Badge tone={val === 'Linked' ? 'success' : 'danger'}>{val || ''}</Badge>
                   </td>
                 )
               }
               // requirement badge
               if (col.key === 'requirement') {
-                const mandatory = val === 'Mandatory'
                 return (
-                  <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600',
-                        background: mandatory
-                          ? 'rgba(255,160,0,0.1)'
-                          : 'rgba(var(--accent-primary-rgb), 0.1)',
-                        color: mandatory
-                          ? isLight
-                            ? '#b45309'
-                            : '#ffaa00'
-                          : 'var(--accent-primary)'
-                      }}
-                    >
-                      {val || ''}
-                    </span>
+                  <td key={col.key} style={{ whiteSpace: 'nowrap' }}>
+                    <Badge tone={val === 'Mandatory' ? 'warning' : 'accent'}>{val || ''}</Badge>
                   </td>
                 )
               }
@@ -2070,7 +1777,6 @@ function ResultsTable({
                 <td
                   key={col.key}
                   style={{
-                    padding: '7px 12px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -2078,49 +1784,9 @@ function ResultsTable({
                   }}
                 >
                   {col.key === 'isActive' ? (
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600',
-                        background: val ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
-                        color: val ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
-                      }}
-                    >
-                      {val ? 'Active' : 'Inactive'}
-                    </span>
+                    <Badge tone={val ? 'success' : 'danger'}>{val ? 'Active' : 'Inactive'}</Badge>
                   ) : col.key === 'status' ? (
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.72rem',
-                        fontWeight: '600',
-                        background:
-                          val === 'active' || val === 'Closed' || val === 'completed'
-                            ? 'rgba(0,255,136,0.1)'
-                            : val === 'draft' || val === 'pending' || val === 'Open'
-                              ? 'rgba(255,204,0,0.1)'
-                              : val === 'inactive' || val === 'cancelled' || val === 'superseded'
-                                ? 'rgba(255,77,77,0.1)'
-                                : 'rgba(var(--accent-primary-rgb), 0.1)',
-                        color:
-                          val === 'active' || val === 'Closed' || val === 'completed'
-                            ? isLight
-                              ? '#008c46'
-                              : '#00ff88'
-                            : val === 'draft' || val === 'pending' || val === 'Open'
-                              ? isLight
-                                ? '#b45309'
-                                : '#ffcc00'
-                              : val === 'inactive' || val === 'cancelled' || val === 'superseded'
-                                ? 'var(--danger)'
-                                : 'var(--accent-primary)'
-                      }}
-                    >
-                      {val || ''}
-                    </span>
+                    <Badge tone={statusTone(val)}>{val || ''}</Badge>
                   ) : (
                     formatCellValue(val, col.key)
                   )}

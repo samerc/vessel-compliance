@@ -3,7 +3,6 @@ import XLSX from 'xlsx-js-style'
 import { jsPDF } from 'jspdf'
 import autoTable, { type RowInput, type Styles } from 'jspdf-autotable'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
 import type { ReportSettings } from '../../../shared/types'
@@ -486,8 +485,6 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts): 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LossRecordReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [data, setData] = useState<LossUWY[] | null>(null)
@@ -568,7 +565,7 @@ export default function LossRecordReport(): React.JSX.Element {
       }
     : null
 
-  const border = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
+  const border = 'var(--glass-border)'
 
   return (
     <div>
@@ -583,16 +580,12 @@ export default function LossRecordReport(): React.JSX.Element {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           style={{
-            border: `2px dashed ${dragging ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+            border: `2px dashed ${dragging ? 'var(--accent-primary)' : 'var(--glass-border-color)'}`,
             borderRadius: '16px',
             padding: '64px 32px',
             textAlign: 'center',
             cursor: 'pointer',
-            background: dragging
-              ? isLight
-                ? 'rgba(26,115,232,0.05)'
-                : 'rgba(var(--accent-primary-rgb), 0.04)'
-              : 'var(--bg-card)',
+            background: dragging ? 'var(--row-hover)' : 'var(--bg-card)',
             transition: 'var(--transition)'
           }}
         >
@@ -651,18 +644,7 @@ export default function LossRecordReport(): React.JSX.Element {
             >
               {fileName}
             </span>
-            <button
-              onClick={clearData}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-secondary)',
-                display: 'flex',
-                padding: '4px'
-              }}
-              title="Remove file"
-            >
+            <button onClick={clearData} className="btn-ghost btn-icon" title="Remove file">
               <X size={16} />
             </button>
           </div>
@@ -707,14 +689,7 @@ export default function LossRecordReport(): React.JSX.Element {
           )}
 
           {/* UWY breakdown preview */}
-          <div
-            style={{
-              background: 'var(--bg-card)',
-              borderRadius: '12px',
-              border,
-              overflow: 'hidden'
-            }}
-          >
+          <div className="table-wrap">
             <div
               style={{
                 padding: '14px 18px',
@@ -726,9 +701,9 @@ export default function LossRecordReport(): React.JSX.Element {
             >
               Preview
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="data-table">
               <thead>
-                <tr style={{ background: 'var(--table-header-bg)' }}>
+                <tr>
                   {[
                     'UWY',
                     'Vessel',
@@ -738,17 +713,7 @@ export default function LossRecordReport(): React.JSX.Element {
                     'Reserves (USD)',
                     'Total Incurred (USD)'
                   ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: '10px 14px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: 'var(--text-secondary)',
-                        textAlign: h.includes('(USD)') ? 'right' : 'left',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
+                    <th key={h} className={h.includes('(USD)') ? 'num' : undefined}>
                       {h}
                     </th>
                   ))}
@@ -757,77 +722,16 @@ export default function LossRecordReport(): React.JSX.Element {
               <tbody>
                 {data.flatMap((uwy) =>
                   uwy.vessels.map((v, vi) => (
-                    <tr
-                      key={`${uwy.year}-${v.vesselName}`}
-                      style={{ borderTop: '1px solid var(--table-border)' }}
-                    >
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {vi === 0 ? uwy.year : ''}
+                    <tr key={`${uwy.year}-${v.vesselName}`}>
+                      <td className="muted">{vi === 0 ? uwy.year : ''}</td>
+                      <td style={{ fontWeight: '600' }}>{v.vesselName}</td>
+                      <td className="muted">
+                        <span className="mono">{v.policyId}</span>
                       </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontWeight: '600',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {v.vesselName}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.82rem',
-                          fontFamily: 'monospace'
-                        }}
-                      >
-                        {v.policyId}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {v.claims.length}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          textAlign: 'right'
-                        }}
-                      >
-                        {fmt(v.totalPaid)}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          textAlign: 'right'
-                        }}
-                      >
-                        {fmt(v.totalReserves)}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontWeight: '600',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          textAlign: 'right'
-                        }}
-                      >
+                      <td>{v.claims.length}</td>
+                      <td className="num">{fmt(v.totalPaid)}</td>
+                      <td className="num">{fmt(v.totalReserves)}</td>
+                      <td className="num" style={{ fontWeight: '600' }}>
                         {fmt(v.totalIncurred)}
                       </td>
                     </tr>
@@ -856,18 +760,7 @@ export default function LossRecordReport(): React.JSX.Element {
               >
                 Currency
               </label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem'
-                }}
-              >
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
                 <option value="GBP">GBP</option>
@@ -940,8 +833,8 @@ export default function LossRecordReport(): React.JSX.Element {
             gap: '10px',
             padding: '12px 16px',
             borderRadius: '8px',
-            background: 'rgba(255,77,77,0.1)',
-            border: '1px solid rgba(255,77,77,0.3)',
+            background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
             color: 'var(--danger)'
           }}
         >
