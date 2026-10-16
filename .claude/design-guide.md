@@ -35,24 +35,28 @@ Fixed hex is still right for **identity colors** that must not follow the theme:
 
 Always use CSS variables — never hardcode colors for themeable surfaces.
 
+Redesign (2026-10): two themes, dark (`:root`) and light (`.light`); the retired Frost (`.premium`) and Aurora (`.aurora`) map to them. Solid surfaces, no glass blur or background gradients. Font IBM Plex Sans (`--font-family`), IBM Plex Mono (`--font-mono`) for references / IMO / codes; both bundled via @fontsource (latin + latin-ext). The accent is chosen per user (`users.accent_color`): `utils/accent.ts` `applyAccent` sets `--accent-primary`, `--accent-primary-rgb`, `--accent-secondary` and `--accent-contrast` on `<body>`, lightened in dark mode. Text on an accent fill uses `var(--accent-contrast)`, not `white`. Status colors never follow the accent.
+
 | Variable | Dark | Light | Usage |
 |---|---|---|---|
-| `--bg-dark` | `#0f1218` | `#f0f2f5` | Page background |
-| `--bg-card` | `rgba(255,255,255,0.05)` | `rgba(255,255,255,0.7)` | Card/section surface |
-| `--bg-card-hover` | `rgba(255,255,255,0.08)` | `rgba(255,255,255,0.9)` | Card hover state |
-| `--bg-sidebar` | `rgba(0,0,0,0.4)` | `#ffffff` | Sidebar background |
-| `--accent-primary` | `#00d2ff` | `#1a73e8` | CTA, focus ring, icons |
-| `--accent-secondary` | `#3a7bd5` | `#0d47a1` | Gradient pair |
-| `--text-primary` | `#ffffff` | `#1c1e21` | Body text, labels |
-| `--text-secondary` | `rgba(255,255,255,0.6)` | `#606770` | Hints, metadata |
-| `--input-bg` | `rgba(255,255,255,0.05)` | `#ffffff` | Input backgrounds |
-| `--input-border` | `rgba(255,255,255,0.1)` | `rgba(0,0,0,0.15)` | Input default border |
-| `--table-header-bg` | `rgba(255,255,255,0.02)` | `rgba(0,0,0,0.02)` | Table header fill |
-| `--table-border` | `rgba(255,255,255,0.1)` | `rgba(0,0,0,0.1)` | Table row dividers |
-| `--glass-border` | `1px solid rgba(255,255,255,0.1)` | `1px solid rgba(0,0,0,0.1)` | Card/modal borders |
-| `--danger` | `#ff4d4d` | `#ff4d4d` | Destructive actions |
-| `--success` | `#00ff88` | `#00ff88` | Positive feedback |
-| `--warning` | `#ffcc00` | `#ffcc00` | Caution/alerts |
+| `--bg-dark` | `#0f141b` | `#f4f6f8` | Page background |
+| `--bg-primary` | `#18202b` | `#ffffff` | Solid surface: dropdowns, popovers, modals |
+| `--bg-card` | `#161d27` | `#ffffff` | Card/section surface |
+| `--bg-card-hover` | `#1b2430` | `#fbfcfd` | Hover state |
+| `--bg-sidebar` | `#121922` | `#ffffff` | Sidebar background |
+| `--accent-primary` | user accent, lightened | user accent (default `#1f4e9c`) | CTA, active nav/tab, focus ring, links |
+| `--accent-secondary` | lighter variant | darker variant | Hover of an accent fill |
+| `--accent-contrast` | auto | `#ffffff` | Text/icons on an accent fill |
+| `--text-primary` | `#e6ebf1` | `#0f1e2e` | Body text, labels |
+| `--text-secondary` | `#9aa8b8` | `#5f6f82` | Hints, metadata |
+| `--input-bg` | `#111821` | `#ffffff` | Input backgrounds |
+| `--input-border` | `rgba(255,255,255,0.14)` | `#cbd4dd` | Input default border |
+| `--table-header-bg` | `rgba(255,255,255,0.03)` | `#f8fafb` | Table header fill |
+| `--table-border` | `rgba(255,255,255,0.08)` | `#e3e8ee` | Table row dividers |
+| `--glass-border` | `1px solid rgba(255,255,255,0.08)` | `1px solid #e3e8ee` | Card/modal borders (full shorthand) |
+| `--danger` | `#f97066` | `#b42318` | Destructive actions, expired |
+| `--success` | `#4cc38a` | `#17663f` | Positive, valid |
+| `--warning` | `#f2b44c` | `#a15c07` | Caution, due soon |
 
 **Hardcoded exceptions** (theme-invariant structural colors, in styled constants only):
 - Modals: `background: isLight ? '#ffffff' : '#1a1d28'`

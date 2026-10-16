@@ -383,6 +383,8 @@ export interface Api {
 
   themeGet: () => Promise<'light' | 'dark' | 'premium' | 'aurora'>
   themeSet: (theme: 'light' | 'dark' | 'premium' | 'aurora') => Promise<void>
+  accentGet: () => Promise<string | null>
+  accentSet: (color: string | null) => Promise<void>
 
   windowGetPreferences: () => Promise<{
     width: number

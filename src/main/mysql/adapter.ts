@@ -787,6 +787,12 @@ export class MySQLAdapter {
           "ALTER TABLE users ADD COLUMN theme_preference VARCHAR(10) DEFAULT 'dark' AFTER role"
         )
       }
+      // Migration: per-user accent colour ('#RRGGBB', NULL = the default blue)
+      if (!userColNames.includes('accent_color')) {
+        await this.pool.query(
+          'ALTER TABLE users ADD COLUMN accent_color VARCHAR(7) DEFAULT NULL AFTER theme_preference'
+        )
+      }
 
       // Migration: Add window preferences to users (handled in schema.sql for new installs)
 
@@ -7888,7 +7894,7 @@ export class MySQLAdapter {
   async getUser(username: string): Promise<User | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
+      'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, accent_color as accentColor, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
       [username]
     )
     return rows.length > 0 ? (rows[0] as User) : null
@@ -7911,7 +7917,7 @@ export class MySQLAdapter {
   async getUsers(): Promise<User[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, username, full_name as fullName, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
+      'SELECT id, username, full_name as fullName, role, theme_preference as themePreference, accent_color as accentColor, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users ORDER BY username ASC'
     )
     // Return without passwordHash
     return rows as User[]
@@ -8018,6 +8024,11 @@ export class MySQLAdapter {
     await this.pool.execute('UPDATE users SET theme_preference = ? WHERE id = ?', [theme, userId])
   }
 
+  async updateUserAccentColor(userId: string, color: string | null): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute('UPDATE users SET accent_color = ? WHERE id = ?', [color, userId])
+  }
+
   async updateUserWindowPreferences(
     userId: string,
     width: number,
@@ -8068,7 +8079,7 @@ export class MySQLAdapter {
   async getUserById(userId: string): Promise<User | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
+      'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, accent_color as accentColor, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
       [userId]
     )
     return rows.length > 0 ? (rows[0] as User) : null

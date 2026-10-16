@@ -169,6 +169,7 @@ export interface User {
   passwordHash: string
   role: 'admin' | 'user'
   themePreference?: 'light' | 'dark'
+  accentColor?: string | null // '#RRGGBB', null = default blue
   sanctionsThreshold?: number // 0-100
   lastAppVersion?: string
   windowWidth?: number

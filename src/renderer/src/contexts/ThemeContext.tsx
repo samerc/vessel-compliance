@@ -9,6 +9,9 @@ export interface ThemeContextType {
   isLight: boolean
   toggleTheme: () => void
   setThemeTo: (t: Theme) => void
+  /** The user's accent colour ('#RRGGBB'), null = the default blue */
+  accent: string | null
+  setAccent: (hex: string | null) => void
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined)

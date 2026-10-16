@@ -855,6 +855,25 @@ app.whenReady().then(() => {
     }
   })
 
+  // Accent colour (user-specific): '#RRGGBB', or null for the default blue
+  safeHandle('accent:get', async (event) => {
+    const windowId = BrowserWindow.fromWebContents(event.sender)?.id
+    if (!windowId) return null
+    const user = auth.getCurrentUser(windowSessions.get(windowId))
+    return user?.accentColor || null
+  })
+
+  safeHandle('accent:set', async (event, color: string | null) => {
+    const user = requireSession(event)
+    const value = typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null
+    await db.updateUserAccentColor(user.id, value)
+    const windowId = BrowserWindow.fromWebContents(event.sender)?.id
+    if (windowId) {
+      const session = auth.getSessionData(windowSessions.get(windowId))
+      if (session) session.user.accentColor = value
+    }
+  })
+
   // Window Preferences Handlers (user-specific, session required)
   safeHandle('window:getPreferences', async (event) => {
     const webContents = event.sender

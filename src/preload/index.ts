@@ -228,6 +228,8 @@ const api: Api = {
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
+  accentGet: () => ipcRenderer.invoke('accent:get'),
+  accentSet: (color) => ipcRenderer.invoke('accent:set', color),
   updateSanctionsThreshold: (threshold: number) =>
     ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
   updateUserAppVersion: (version: string) => ipcRenderer.invoke('users:updateAppVersion', version),

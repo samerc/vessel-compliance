@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(50) NOT NULL, -- 'admin' or 'user'
   theme_preference VARCHAR(10) DEFAULT 'dark', -- 'light' or 'dark'
+  accent_color VARCHAR(7) DEFAULT NULL, -- '#RRGGBB', NULL = default blue
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

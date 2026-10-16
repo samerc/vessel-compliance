@@ -24,7 +24,6 @@ import {
   Layers,
   FileWarning,
   BarChart2,
-  Crown,
   ScrollText,
   Mail,
   FileCheck,
@@ -53,6 +52,7 @@ import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
 import GlobalSearch from './components/GlobalSearch'
 import { PageHeader, SegmentedControl } from './components/ui'
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from './utils/accent'
 import { useToast } from './contexts/ToastContext'
 import { AppTab, AppAction, NavTarget, visibleFeatures, FEATURES } from './features'
 import type { RecentItem } from '../../shared/types'
@@ -97,7 +97,7 @@ function App(): React.JSX.Element {
   const [showWhatsNew, setShowWhatsNew] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { isAuthenticated, isAdmin, logout, user, hasPermission } = useAuth()
-  const { theme, setThemeTo } = useTheme()
+  const { isLight, setThemeTo, accent, setAccent } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | undefined
@@ -146,7 +146,6 @@ function App(): React.JSX.Element {
   const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>(() => {
     return (localStorage.getItem('tableDensity') as 'compact' | 'normal' | 'spacious') || 'normal'
   })
-  const isLight = theme === 'light' || theme === 'aurora'
 
   // Hot-update notification
   const [hotUpdateAvailable, setHotUpdateAvailable] = useState(false)
@@ -303,10 +302,6 @@ function App(): React.JSX.Element {
           return setThemeTo('dark')
         case 'theme-light':
           return setThemeTo('light')
-        case 'theme-premium':
-          return setThemeTo('premium')
-        case 'theme-aurora':
-          return setThemeTo('aurora')
         case 'density-compact':
           return setDensity('compact')
         case 'density-normal':
@@ -934,56 +929,75 @@ function App(): React.JSX.Element {
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {(
                       [
-                        { id: 'dark' as const, icon: <Moon size={13} />, label: 'Dark' },
                         { id: 'light' as const, icon: <Sun size={13} />, label: 'Light' },
-                        { id: 'premium' as const, icon: <Crown size={13} />, label: 'Frost' },
-                        { id: 'aurora' as const, icon: <Sparkles size={13} />, label: 'Aurora' }
+                        { id: 'dark' as const, icon: <Moon size={13} />, label: 'Dark' }
                       ] as const
                     ).map((t) => {
-                      const accentMap: Record<string, string> = {
-                        premium: '#7c8cf8',
-                        aurora: '#7c6cef'
-                      }
-                      const accent = accentMap[t.id]
+                      // Frost and Aurora were retired: they now show as Dark and Light
+                      const active = t.id === 'light' ? isLight : !isLight
                       return (
                         <button
                           key={t.id}
-                          onClick={() => {
-                            setThemeTo(t.id)
-                            setShowUserMenu(false)
-                          }}
+                          onClick={() => setThemeTo(t.id)}
+                          aria-pressed={active}
                           style={{
                             flex: 1,
-                            padding: '5px 4px',
+                            padding: '6px 4px',
                             display: 'flex',
-                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '2px',
-                            background:
-                              theme === t.id
-                                ? accent
-                                  ? `${accent}18`
-                                  : 'rgba(var(--accent-primary-rgb), 0.1)'
-                                : 'transparent',
-                            border:
-                              theme === t.id
-                                ? accent
-                                  ? `1px solid ${accent}50`
-                                  : '1px solid var(--accent-primary)'
-                                : '1px solid transparent',
-                            borderRadius: '6px',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: active ? 'var(--accent-tint)' : 'transparent',
+                            border: active
+                              ? '1px solid var(--accent-primary)'
+                              : '1px solid var(--glass-border-color)',
+                            borderRadius: '8px',
                             cursor: 'pointer',
-                            color:
-                              theme === t.id
-                                ? accent || 'var(--accent-primary)'
-                                : 'var(--text-secondary)',
-                            fontSize: '0.72rem',
-                            fontWeight: theme === t.id ? 600 : 400
+                            color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            fontSize: '0.78rem',
+                            fontWeight: active ? 600 : 500
                           }}
                         >
                           {t.icon}
                           {t.label}
                         </button>
+                      )
+                    })}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      margin: '10px 0 6px'
+                    }}
+                  >
+                    Accent colour
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {ACCENT_PRESETS.map((a) => {
+                      const active =
+                        (accent || DEFAULT_ACCENT).toLowerCase() === a.hex.toLowerCase()
+                      return (
+                        <button
+                          key={a.hex}
+                          title={a.label}
+                          aria-label={`${a.label} accent`}
+                          aria-pressed={active}
+                          onClick={() => setAccent(a.hex === DEFAULT_ACCENT ? null : a.hex)}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            padding: 0,
+                            borderRadius: '50%',
+                            background: a.hex,
+                            border: '2px solid var(--bg-primary)',
+                            boxShadow: active ? `0 0 0 2px ${a.hex}` : 'none',
+                            cursor: 'pointer'
+                          }}
+                        />
                       )
                     })}
                   </div>

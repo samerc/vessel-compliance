@@ -1,3 +1,14 @@
+// App font (bundled: works offline). Latin + Latin Extended only; other scripts fall back
+import '@fontsource/ibm-plex-sans/latin-400.css'
+import '@fontsource/ibm-plex-sans/latin-ext-400.css'
+import '@fontsource/ibm-plex-sans/latin-500.css'
+import '@fontsource/ibm-plex-sans/latin-ext-500.css'
+import '@fontsource/ibm-plex-sans/latin-600.css'
+import '@fontsource/ibm-plex-sans/latin-ext-600.css'
+import '@fontsource/ibm-plex-sans/latin-700.css'
+import '@fontsource/ibm-plex-sans/latin-ext-700.css'
+import '@fontsource/ibm-plex-mono/latin-400.css'
+import '@fontsource/ibm-plex-mono/latin-500.css'
 import './assets/main.css'
 
 import { StrictMode } from 'react'

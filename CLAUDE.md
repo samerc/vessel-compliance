@@ -89,6 +89,8 @@ Global notification system for user feedback:
 
 ### Theme System
 - **User-Specific Themes**: Each user's theme preference (light/dark) is stored in the database (`users.theme_preference`)
+- **Accent colour (per user)**: `users.accent_color` ('#RRGGBB', NULL = default blue `#1F4E9C`), picked from 6 swatches in the user menu under Light/Dark. IPC `accent:get` / `accent:set` (session cache updated). `ThemeProvider` calls `applyAccent` (`utils/accent.ts`) on theme or accent change: it sets `--accent-primary` / `-rgb` / `--accent-secondary` / `--accent-contrast` inline on `<body>`, lightened for dark mode
+- **Design tokens / font**: see `.claude/design-guide.md` section 1 (redesign 2026-10: solid surfaces, IBM Plex Sans + Mono bundled via @fontsource)
 - **Context Integration**: `ThemeContext` watches for user changes via `AuthContext` to reload themes on login/logout
 - **CSS Variables**: Theme styles use CSS custom properties (`var(--text-primary)`, `var(--bg-primary)`, etc.) that adapt to current theme
 - **Light Mode**: Activated by adding `.light` class to document.body, all components use theme-aware variables
@@ -1459,7 +1461,6 @@ Configurable subjectivity compliance period per quotation and policy:
 
 ### Theme System
 
-- **Light themes**: `light`, `aurora` — use light backgrounds, dark text, visible borders
-- **Dark themes**: `dark`, `premium` (Frost) — use dark backgrounds, light text
+- **Two themes**: `light` and `dark`. Frost (`premium`) and Aurora (`aurora`) were retired in the redesign: still accepted as stored values, they render as dark and light (the user menu offers only Light / Dark)
 - **`isLight` check**: `theme === 'light' || theme === 'aurora'` — used across all 48+ components for conditional styling
 - **Cargo warranties/exclusions**: Only visible when cargo quotation type OR cargo clause selected in P&I conditions

@@ -48,6 +48,8 @@
     "@electron-toolkit/eslint-config-prettier": "^3.0.1",
     "@electron-toolkit/eslint-config-ts": "^4.0.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
     "@tiptap/extension-link": "^3.21.0",
     "@tiptap/extension-text-align": "^3.21.0",
     "@tiptap/extension-text-style": "^3.21.0",

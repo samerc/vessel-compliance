@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { ThemeContext, type Theme } from './ThemeContext'
+import { applyAccent } from '../utils/accent'
 
 const THEME_CYCLE: Theme[] = ['dark', 'light', 'premium', 'aurora']
 
@@ -13,8 +14,15 @@ function applyTheme(t: Theme): void {
 
 export function ThemeProvider({ children }: { children: ReactNode }): ReactElement | null {
   const [theme, setTheme] = useState<Theme>('dark')
+  const [accent, setAccentState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const { user, isAuthenticated } = useAuth()
+  const isLight = theme === 'light' || theme === 'aurora'
+
+  // The accent has a light and a dark variant: re-apply when either changes
+  useEffect(() => {
+    applyAccent(accent, isLight)
+  }, [accent, isLight])
 
   useEffect(() => {
     let alive = true
@@ -44,13 +52,18 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
         // Reset to dark theme on logout
         setTheme('dark')
         applyTheme('dark')
+        setAccentState(null)
         return
       }
       try {
-        const savedTheme = await window.api.themeGet()
+        const [savedTheme, savedAccent] = await Promise.all([
+          window.api.themeGet(),
+          window.api.accentGet()
+        ])
         if (!alive) return
         setTheme(savedTheme)
         applyTheme(savedTheme)
+        setAccentState(typeof savedAccent === 'string' ? savedAccent : null)
       } catch (err) {
         console.error('Failed to reload theme:', err)
       }
@@ -67,6 +80,11 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
     await window.api.themeSet(t)
   }
 
+  const setAccent = async (hex: string | null): Promise<void> => {
+    setAccentState(hex)
+    await window.api.accentSet(hex)
+  }
+
   const toggleTheme = async (): Promise<void> => {
     const idx = THEME_CYCLE.indexOf(theme)
     await setThemeTo(THEME_CYCLE[(idx + 1) % THEME_CYCLE.length])
@@ -75,9 +93,7 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
   if (loading) return null
 
   return (
-    <ThemeContext.Provider
-      value={{ theme, isLight: theme === 'light' || theme === 'aurora', toggleTheme, setThemeTo }}
-    >
+    <ThemeContext.Provider value={{ theme, isLight, toggleTheme, setThemeTo, accent, setAccent }}>
       {children}
     </ThemeContext.Provider>
   )

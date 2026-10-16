@@ -40,8 +40,6 @@ export type AppAction =
   | 'check-updates'
   | 'theme-dark'
   | 'theme-light'
-  | 'theme-premium'
-  | 'theme-aurora'
   | 'density-compact'
   | 'density-normal'
   | 'density-spacious'
@@ -728,8 +726,8 @@ export const FEATURES: Feature[] = [
     area: 'Personal',
     kind: 'action',
     target: { action: 'theme-dark' },
-    description: 'Switch to the dark theme.',
-    keywords: 'appearance'
+    description: 'Switch to the dark theme. Your accent colour is in the user menu.',
+    keywords: 'appearance accent colour color frost premium'
   },
   {
     id: 'theme-light',
@@ -737,26 +735,8 @@ export const FEATURES: Feature[] = [
     area: 'Personal',
     kind: 'action',
     target: { action: 'theme-light' },
-    description: 'Switch to the light theme.',
-    keywords: 'appearance'
-  },
-  {
-    id: 'theme-premium',
-    title: 'Theme: Frost',
-    area: 'Personal',
-    kind: 'action',
-    target: { action: 'theme-premium' },
-    description: 'Switch to the Frost theme.',
-    keywords: 'appearance premium'
-  },
-  {
-    id: 'theme-aurora',
-    title: 'Theme: Aurora',
-    area: 'Personal',
-    kind: 'action',
-    target: { action: 'theme-aurora' },
-    description: 'Switch to the Aurora theme.',
-    keywords: 'appearance'
+    description: 'Switch to the light theme. Your accent colour is in the user menu.',
+    keywords: 'appearance accent colour color aurora'
   },
   {
     id: 'density-compact',
