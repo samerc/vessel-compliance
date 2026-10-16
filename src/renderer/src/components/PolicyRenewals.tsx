@@ -1109,6 +1109,33 @@ export default function PolicyRenewals({
               colorScheme: isLight ? 'light' : 'dark'
             }}
           />
+          {/* The renewal already in progress (or the policy that renewed it) */}
+          {(r.renewedByPolicyNumber || r.renewalQuotationRef) && (
+            <button
+              type="button"
+              className="mono"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (r.renewalQuotationId) onCreateRenewalQuotation?.(r.renewalQuotationId)
+              }}
+              title={r.renewalQuotationId ? 'Open the renewal quotation' : undefined}
+              style={{
+                display: 'block',
+                marginTop: '4px',
+                padding: 0,
+                border: 'none',
+                background: 'none',
+                color: r.renewedByPolicyNumber ? 'var(--success)' : 'var(--accent-primary)',
+                fontSize: '0.75rem',
+                cursor: r.renewalQuotationId ? 'pointer' : 'default',
+                textAlign: 'left'
+              }}
+            >
+              {r.renewedByPolicyNumber
+                ? `Renewed: ${r.renewedByPolicyNumber}`
+                : `${r.renewalQuotationRef}${r.renewalQuotationStep ? ` · ${r.renewalQuotationStep}` : ''}`}
+            </button>
+          )}
         </td>
       )}
       {rnVisSet.has('actions') && (
@@ -1182,6 +1209,11 @@ export default function PolicyRenewals({
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
+                  // A renewal quotation exists already: open it instead of making a second one
+                  if (r.renewalQuotationId) {
+                    onCreateRenewalQuotation?.(r.renewalQuotationId)
+                    return
+                  }
                   if (!r.fleetName) {
                     handleRenew(r, false)
                   } else {
@@ -1215,7 +1247,11 @@ export default function PolicyRenewals({
                   gap: '1px',
                   transition: 'background 0.12s'
                 }}
-                title="Create renewal quotation"
+                title={
+                  r.renewalQuotationId
+                    ? `Open renewal quotation ${r.renewalQuotationRef || ''}`.trim()
+                    : 'Create renewal quotation'
+                }
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)'
                 }}

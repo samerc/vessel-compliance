@@ -2065,6 +2065,12 @@ export interface PolicyRenewalRow {
   quotationSentDate?: string | null
   /** policies:getRenewalsByMonth only */
   noteCount?: number
+  /** policies:getRenewalsByMonth only: the renewal quotation already made for this vessel and
+   *  type (latest one dated from 4 months before the end date), and the policy that renewed it */
+  renewalQuotationId?: string | null
+  renewalQuotationRef?: string | null
+  renewalQuotationStep?: string | null
+  renewedByPolicyNumber?: string | null
   /** renewals:getPipeline only */
   status?: string
 }

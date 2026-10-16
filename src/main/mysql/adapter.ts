@@ -12690,8 +12690,38 @@ export class MySQLAdapter {
     } as Quotation
   }
 
+  /**
+   * The first export of a quotation fills the Renewals "quotation sent" date of the vessel
+   * policies it renews (same vessel and type, ending from 1 month before to 6 months after the
+   * quotation date) when that date is still empty.
+   */
+  private async markRenewalQuotationSent(quotationId: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.query(
+      `UPDATE vessel_dynamic_policies vdp
+         JOIN quotations q ON q.id = ? AND q.quotation_type_id = vdp.policy_type_id
+         JOIN quotation_vessels qv ON qv.quotation_id = q.id AND qv.vessel_id = vdp.vessel_id
+          SET vdp.quotation_sent_date = CURDATE()
+        WHERE vdp.quotation_sent_date IS NULL
+          AND COALESCE(vdp.status, '') <> 'cancelled'
+          AND EXISTS (
+            SELECT 1 FROM vessel_policy_values vpv
+            JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+            WHERE vpv.policy_id = vdp.id AND ptc.field_type = 'date'
+              AND LOWER(ptc.name) LIKE '%end%' AND vpv.value_date IS NOT NULL
+              AND vpv.value_date BETWEEN DATE_SUB(COALESCE(q.quotation_date, CURDATE()), INTERVAL 1 MONTH)
+                                     AND DATE_ADD(COALESCE(q.quotation_date, CURDATE()), INTERVAL 6 MONTH))`,
+      [quotationId]
+    )
+  }
+
   async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {
     if (!this.pool) return
+    if (updates.status === 'exported') {
+      await this.markRenewalQuotationSent(id).catch((e) =>
+        console.error('[updateQuotation] quotation sent date:', e)
+      )
+    }
     const fieldMap: Record<string, string> = {
       referenceNumber: 'reference_number',
       quotationTypeId: 'quotation_type_id',
@@ -18875,6 +18905,9 @@ export class MySQLAdapter {
                     rst.name as renewalStatusName, rst.color as renewalStatusColor,
                     vdp.quotation_sent_date as quotationSentDate,
                     COALESCE(rn.cnt, 0) as noteCount,
+                    rq.id as renewalQuotationId, rq.reference_number as renewalQuotationRef,
+                    rws.name as renewalQuotationStep,
+                    rpd.policy_number as renewedByPolicyNumber,
                     (SELECT vpv2.value_amount FROM vessel_policy_values vpv2
                      JOIN policy_type_characteristics ptc2 ON vpv2.characteristic_id = ptc2.id
                      WHERE vpv2.policy_id = vdp.id AND ptc2.field_type = 'amount'
@@ -18893,6 +18926,14 @@ export class MySQLAdapter {
                  FROM policy_renewal_notes
                  GROUP BY policy_id, policy_number
              ) rn ON rn.policy_id = vdp.id AND rn.policy_number = COALESCE(vdp.policy_number, '')
+             LEFT JOIN quotations rq ON rq.id = (
+                 SELECT q2.id FROM quotations q2
+                 JOIN quotation_vessels qv2 ON qv2.quotation_id = q2.id AND qv2.vessel_id = vdp.vessel_id
+                 WHERE q2.quotation_type_id = vdp.policy_type_id AND q2.deleted_at IS NULL
+                   AND q2.quotation_date >= DATE_SUB(vpv.value_date, INTERVAL 4 MONTH)
+                 ORDER BY q2.quotation_date DESC, q2.created_at DESC LIMIT 1)
+             LEFT JOIN quotation_workflow_steps rws ON rws.id = rq.workflow_step_id
+             LEFT JOIN policy_documents rpd ON rpd.id = vdp.expired_by_policy_document_id
              WHERE v.is_active = TRUE
                AND COALESCE(vdp.status, '') <> 'cancelled'
                AND ptc.field_type = 'date'
