@@ -23,7 +23,8 @@ import {
   List,
   Layers,
   Search,
-  FileText
+  FileText,
+  Briefcase
 } from 'lucide-react'
 import {
   Vessel,
@@ -48,6 +49,7 @@ import { ok } from '../utils/ipc'
 import { confirmDialog, promptDialog } from './DialogHost'
 import { PageHeader, Tabs, Badge, Field } from './ui'
 import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
+import AlertsByCustomer from './AlertsByCustomer'
 
 const STATIC_RULES = [
   {
@@ -176,7 +178,7 @@ interface DocAlert {
 type VesselSection = 'documents' | 'assureds' | 'surveys' | 'policies'
 
 /** Vessel tab that shows what an alert is about (entity documents live with the assureds) */
-const alertSection = (alert: DocAlert): VesselSection =>
+const alertSection = (alert: Pick<DocAlert, 'category'>): VesselSection =>
   alert.category === 'entity'
     ? 'assureds'
     : alert.category === 'endorsement'
@@ -207,7 +209,9 @@ export default function ComplianceCenter({
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
   const [allAssureds, setAllAssureds] = useState<AssuredRow[]>([])
   const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-  const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
+  const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat' | 'customer'>(
+    'vessel'
+  )
   const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
   const [docSearch, setDocSearch] = useState('')
   const [endorsementsDue, setEndorsementsDue] = useState<EndorsementDueRow[]>([])
@@ -879,7 +883,7 @@ export default function ComplianceCenter({
                 borderRadius: '8px'
               }}
             >
-              {(['vessel', 'document', 'flat'] as const).map((mode) => (
+              {(['vessel', 'document', 'flat', 'customer'] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setDocViewMode(mode)}
@@ -912,6 +916,11 @@ export default function ComplianceCenter({
                       <List size={13} /> Flat
                     </>
                   )}
+                  {mode === 'customer' && (
+                    <>
+                      <Briefcase size={13} /> Customer
+                    </>
+                  )}
                 </button>
               ))}
             </div>
@@ -936,7 +945,13 @@ export default function ComplianceCenter({
             </div>
           </div>
 
-          {docViewMode === 'vessel' ? (
+          {docViewMode === 'customer' ? (
+            /* Grouped by customer / broker (vessels' active policies) */
+            <AlertsByCustomer
+              alerts={alerts}
+              onOpenAlert={(alert) => onNavigateToVessel?.(alert.vesselId, alertSection(alert))}
+            />
+          ) : docViewMode === 'vessel' ? (
             /* Grouped by vessel view */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {vesselGroups.map((group) => {

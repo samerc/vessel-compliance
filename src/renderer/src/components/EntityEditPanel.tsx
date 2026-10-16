@@ -32,6 +32,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
+import EntityBusinessSection from './EntityBusinessSection'
 import { CaseToggleBtn } from './CaseToggle'
 import MissingFilePath from './MissingFilePath'
 import { confirmDialog } from './DialogHost'
@@ -1264,6 +1265,9 @@ export default function EntityEditPanel({
           </div>
         )}
       </div>
+
+      {/* Quotations, policies, vessels and receipts where this entity is the customer */}
+      <EntityBusinessSection entityId={entity.id} sectionLabel={sectionLabel} />
 
       {/* Commission overrides — collapsed by default, at the bottom */}
       {showCommissions && policyTypes.length > 0 && (

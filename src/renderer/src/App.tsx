@@ -1,4 +1,12 @@
-import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useCallback
+} from 'react'
 import {
   House,
   Ship,
@@ -544,6 +552,35 @@ function App(): React.JSX.Element {
   useEffect(() => {
     loadRecentItems()
   }, [loadRecentItems])
+
+  // Records opened from inside a panel (entity Business section): vessel, quotation or policy
+  const onOpenRecord = useEffectEvent((type: string, id: string): void => {
+    if (type === 'vessel') {
+      leaveThen(() => {
+        setNavigateToVesselId(id)
+        setNavigateToVesselSection(undefined)
+        setNavigateBackTab(activeTab !== 'vessels' ? activeTab : undefined)
+        setActiveTab('vessels')
+      })
+    } else if (type === 'quotation' || type === 'policy') {
+      openRecentItem({
+        id,
+        userId: '',
+        itemType: type,
+        itemId: id,
+        itemLabel: '',
+        viewedAt: ''
+      })
+    }
+  })
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const d = (e as CustomEvent<{ type: string; id: string }>).detail
+      if (d?.id) onOpenRecord(d.type, d.id)
+    }
+    window.addEventListener('app-open-record', handler)
+    return () => window.removeEventListener('app-open-record', handler)
+  }, [])
 
   // Listen for recent-item-added custom event from child components
   useEffect(() => {
