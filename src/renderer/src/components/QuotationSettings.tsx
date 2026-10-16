@@ -76,6 +76,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
+import { Modal, Field } from './ui'
 
 import { StickyNote } from 'lucide-react'
 
@@ -567,29 +568,21 @@ function CollapsibleStandardTexts({
             <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Loading...</div>
           ) : (
             <>
-              {fields.map((field) => (
-                <div key={field.key} style={{ marginBottom: '12px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    {field.label}
-                  </label>
-                  <RichTextEditor
-                    value={String(texts[field.key] || '')}
-                    onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
-                    minHeight={Math.max(60, (field.rows || 3) * 22)}
-                    showFontSize
-                    showFontFamily
-                    showAlignment
-                    showLineSpacing
-                  />
-                </div>
-              ))}
+              <div className="form-grid" style={{ marginBottom: '12px' }}>
+                {fields.map((field) => (
+                  <Field key={field.key} label={field.label} span="all">
+                    <RichTextEditor
+                      value={String(texts[field.key] || '')}
+                      onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
+                      minHeight={Math.max(60, (field.rows || 3) * 22)}
+                      showFontSize
+                      showFontFamily
+                      showAlignment
+                      showLineSpacing
+                    />
+                  </Field>
+                ))}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={handleSave}
@@ -768,177 +761,139 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps): React.JSX.Elem
       </div>
 
       {/* Types list */}
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-            <th
-              style={{
-                padding: '10px 12px',
-                textAlign: 'left',
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                fontWeight: 600
-              }}
-            >
-              Order
-            </th>
-            <th
-              style={{
-                padding: '10px 12px',
-                textAlign: 'left',
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                fontWeight: 600
-              }}
-            >
-              Name
-            </th>
-            <th
-              style={{
-                padding: '10px 12px',
-                textAlign: 'left',
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                fontWeight: 600
-              }}
-            >
-              Code
-            </th>
-            <th
-              style={{
-                padding: '10px 12px',
-                textAlign: 'right',
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                fontWeight: 600
-              }}
-            >
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {types.map((t, i) => (
-            <tr key={t.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-              <td style={{ padding: '10px 12px' }}>
-                <div style={{ display: 'flex', gap: '2px' }}>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => moveType(i, -1)}
-                    disabled={i === 0}
-                    className="btn-secondary"
-                    style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => moveType(i, 1)}
-                    disabled={i === types.length - 1}
-                    className="btn-secondary"
-                    style={{ padding: '2px 6px', opacity: i === types.length - 1 ? 0.3 : 1 }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
-              </td>
-              <td style={{ padding: '10px 12px' }}>
-                {editId === t.id ? (
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    style={{ padding: '4px 8px', borderRadius: '4px', width: '100%' }}
-                  />
-                ) : (
-                  t.name
-                )}
-              </td>
-              <td style={{ padding: '10px 12px' }}>
-                {editId === t.id ? (
-                  <input
-                    type="text"
-                    value={editCode}
-                    onChange={(e) => setEditCode(e.target.value.slice(0, 5))}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      width: '80px',
-                      textTransform: 'uppercase'
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                      color: 'var(--accent-primary)'
-                    }}
-                  >
-                    {t.code}
-                  </span>
-                )}
-              </td>
-              <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                  {editId === t.id ? (
-                    <>
-                      <button
-                        title="Save"
-                        aria-label="Save"
-                        onClick={() => handleSave(t.id)}
-                        className="btn-primary"
-                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                      >
-                        <Save size={13} />
-                      </button>
-                      <button
-                        title="Cancel"
-                        aria-label="Cancel"
-                        onClick={() => setEditId(null)}
-                        className="btn-secondary"
-                        style={{ padding: '4px 8px' }}
-                      >
-                        <X size={13} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        title="Edit"
-                        aria-label="Edit"
-                        onClick={() => {
-                          setEditId(t.id)
-                          setEditName(t.name)
-                          setEditCode(t.code)
-                        }}
-                        className="btn-secondary"
-                        style={{ padding: '4px 8px' }}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        title="Delete"
-                        aria-label="Delete"
-                        onClick={() => handleDelete(t.id)}
-                        className="btn-secondary"
-                        style={{ padding: '4px 8px', color: 'var(--danger)' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </td>
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Name</th>
+              <th>Code</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {types.map((t, i) => (
+              <tr key={t.id}>
+                <td>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    <button
+                      title="Move up"
+                      aria-label="Move up"
+                      onClick={() => moveType(i, -1)}
+                      disabled={i === 0}
+                      className="btn-secondary"
+                      style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      title="Move down"
+                      aria-label="Move down"
+                      onClick={() => moveType(i, 1)}
+                      disabled={i === types.length - 1}
+                      className="btn-secondary"
+                      style={{ padding: '2px 6px', opacity: i === types.length - 1 ? 0.3 : 1 }}
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                </td>
+                <td>
+                  {editId === t.id ? (
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{ padding: '4px 8px', borderRadius: '4px', width: '100%' }}
+                    />
+                  ) : (
+                    t.name
+                  )}
+                </td>
+                <td>
+                  {editId === t.id ? (
+                    <input
+                      type="text"
+                      value={editCode}
+                      onChange={(e) => setEditCode(e.target.value.slice(0, 5))}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        width: '80px',
+                        textTransform: 'uppercase'
+                      }}
+                    />
+                  ) : (
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                        color: 'var(--accent-primary)'
+                      }}
+                    >
+                      {t.code}
+                    </span>
+                  )}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                    {editId === t.id ? (
+                      <>
+                        <button
+                          title="Save"
+                          aria-label="Save"
+                          onClick={() => handleSave(t.id)}
+                          className="btn-primary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                        >
+                          <Save size={13} />
+                        </button>
+                        <button
+                          title="Cancel"
+                          aria-label="Cancel"
+                          onClick={() => setEditId(null)}
+                          className="btn-secondary"
+                          style={{ padding: '4px 8px' }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          title="Edit"
+                          aria-label="Edit"
+                          onClick={() => {
+                            setEditId(t.id)
+                            setEditName(t.name)
+                            setEditCode(t.code)
+                          }}
+                          className="btn-secondary"
+                          style={{ padding: '4px 8px' }}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          title="Delete"
+                          aria-label="Delete"
+                          onClick={() => handleDelete(t.id)}
+                          className="btn-secondary"
+                          style={{ padding: '4px 8px', color: 'var(--danger)' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div
         style={{
@@ -1233,232 +1188,180 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
         </form>
 
         {clauses.length > 0 && (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                <th
-                  style={{
-                    padding: '8px',
-                    textAlign: 'left',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    width: '50px'
-                  }}
-                >
-                  #
-                </th>
-                <th
-                  style={{
-                    padding: '8px',
-                    textAlign: 'left',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Name
-                </th>
-                <th
-                  style={{
-                    padding: '8px',
-                    textAlign: 'left',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Description
-                </th>
-                <th
-                  style={{
-                    padding: '8px',
-                    textAlign: 'center',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    width: '60px'
-                  }}
-                >
-                  Cargo
-                </th>
-                <th
-                  style={{
-                    padding: '8px',
-                    textAlign: 'right',
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    width: '120px'
-                  }}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {clauses.map((c, i) => (
-                <tr key={c.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                  {editingId === c.id ? (
-                    <>
-                      <td style={{ padding: '6px 8px' }}>
-                        <input
-                          type="number"
-                          value={editNumber}
-                          onChange={(e) => setEditNumber(e.target.value)}
-                          style={{ width: '50px' }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <input
-                          type="text"
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={editCargo}
-                          onChange={(e) => setEditCargo(e.target.checked)}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            accentColor: 'var(--accent-primary)'
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                          <button
-                            title="Save"
-                            aria-label="Save"
-                            onClick={() => saveEdit(c.id)}
-                            className="btn-primary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                          >
-                            <Save size={12} />
-                          </button>
-                          <button
-                            title="Cancel"
-                            aria-label="Cancel"
-                            onClick={() => setEditingId(null)}
-                            className="btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={{ padding: '8px', fontWeight: 600, fontSize: '0.85rem' }}>
-                        {c.clauseNumber}
-                      </td>
-                      <td style={{ padding: '8px', fontSize: '0.85rem' }}>{c.name}</td>
-                      <td
-                        style={{
-                          padding: '8px',
-                          fontSize: '0.82rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {c.description || '-'}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        {c.isCargoRelated && (
-                          <span
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '50px' }}>#</th>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'center', width: '60px' }}>Cargo</th>
+                  <th style={{ textAlign: 'right', width: '120px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clauses.map((c, i) => (
+                  <tr key={c.id}>
+                    {editingId === c.id ? (
+                      <>
+                        <td>
+                          <input
+                            type="number"
+                            value={editNumber}
+                            onChange={(e) => setEditNumber(e.target.value)}
+                            style={{ width: '50px' }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            style={{ width: '100%' }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={editDesc}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            style={{ width: '100%' }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={editCargo}
+                            onChange={(e) => setEditCargo(e.target.checked)}
                             style={{
-                              fontSize: '0.7rem',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'rgba(255, 180, 0, 0.15)',
-                              color: '#ffb400'
-                            }}
-                          >
-                            Cargo
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'right' }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            gap: '2px',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <TypeScopeToggle
-                            scope={c.typeScope}
-                            onChange={async (sc) => {
-                              await window.api.piSetItemTypeScope('clause', c.id, sc)
-                              loadData()
+                              width: '16px',
+                              height: '16px',
+                              accentColor: 'var(--accent-primary)'
                             }}
                           />
-                          <button
-                            title="Move up"
-                            aria-label="Move up"
-                            onClick={() => handleMove(i, 'up')}
-                            disabled={i === 0}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                            <button
+                              title="Save"
+                              aria-label="Save"
+                              onClick={() => saveEdit(c.id)}
+                              className="btn-primary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                            >
+                              <Save size={12} />
+                            </button>
+                            <button
+                              title="Cancel"
+                              aria-label="Cancel"
+                              onClick={() => setEditingId(null)}
+                              className="btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{ fontWeight: 600 }}>{c.clauseNumber}</td>
+                        <td>{c.name}</td>
+                        <td className="muted">{c.description || '-'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {c.isCargoRelated && (
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(255, 180, 0, 0.15)',
+                                color: '#ffb400'
+                              }}
+                            >
+                              Cargo
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div
                             style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '2px',
-                              color: 'var(--text-secondary)',
-                              opacity: i === 0 ? 0.3 : 1
+                              display: 'flex',
+                              justifyContent: 'flex-end',
+                              gap: '2px',
+                              alignItems: 'center'
                             }}
                           >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            title="Move down"
-                            aria-label="Move down"
-                            onClick={() => handleMove(i, 'down')}
-                            disabled={i === clauses.length - 1}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '2px',
-                              color: 'var(--text-secondary)',
-                              opacity: i === clauses.length - 1 ? 0.3 : 1
-                            }}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                          <button
-                            title="Edit"
-                            aria-label="Edit"
-                            onClick={() => startEdit(c)}
-                            className="btn-secondary"
-                            style={{ padding: '4px', fontSize: '0.75rem' }}
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            title="Delete"
-                            aria-label="Delete"
-                            onClick={() => handleDelete(c.id)}
-                            className="btn-secondary"
-                            style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                            <TypeScopeToggle
+                              scope={c.typeScope}
+                              onChange={async (sc) => {
+                                await window.api.piSetItemTypeScope('clause', c.id, sc)
+                                loadData()
+                              }}
+                            />
+                            <button
+                              title="Move up"
+                              aria-label="Move up"
+                              onClick={() => handleMove(i, 'up')}
+                              disabled={i === 0}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                color: 'var(--text-secondary)',
+                                opacity: i === 0 ? 0.3 : 1
+                              }}
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              title="Move down"
+                              aria-label="Move down"
+                              onClick={() => handleMove(i, 'down')}
+                              disabled={i === clauses.length - 1}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                color: 'var(--text-secondary)',
+                                opacity: i === clauses.length - 1 ? 0.3 : 1
+                              }}
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                            <button
+                              title="Edit"
+                              aria-label="Edit"
+                              onClick={() => startEdit(c)}
+                              className="btn-secondary"
+                              style={{ padding: '4px', fontSize: '0.75rem' }}
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              title="Delete"
+                              aria-label="Delete"
+                              onClick={() => handleDelete(c.id)}
+                              className="btn-secondary"
+                              style={{
+                                padding: '4px',
+                                fontSize: '0.75rem',
+                                color: 'var(--danger)'
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -1585,14 +1488,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
               placeholder="Set name (e.g., Standard Cover, Restricted Cover)"
               style={{ width: '100%', marginBottom: '12px' }}
             />
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px',
-                display: 'block'
-              }}
-            >
+            <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
               Select which clauses to include in this set:
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
@@ -1718,7 +1614,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
 
 // ==================== Warranties Tab ====================
 
-function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
+function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [warranties, setWarranties] = useState<PIWarranty[]>([])
   const [tags, setTags] = useState<PIWarrantyTag[]>([])
   const [warrantySets, setWarrantySets] = useState<PIWarrantySet[]>([])
@@ -2295,8 +2191,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                     fontSize: '0.65rem',
                     padding: '1px 5px',
                     borderRadius: '4px',
-                    background: 'rgba(0, 200, 100, 0.15)',
-                    color: '#00c864'
+                    background: 'color-mix(in srgb, var(--success) 15%, transparent)',
+                    color: 'var(--success)'
                   }}
                 >
                   Default
@@ -2474,7 +2370,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                   padding: '2px 8px',
                   borderRadius: '10px',
                   cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                  background: 'rgba(255, 80, 80, 0.1)',
+                  background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
                   border: '1px solid var(--danger)',
                   color: 'var(--danger)',
                   opacity: bulkSelected.size > 0 ? 1 : 0.4
@@ -2508,7 +2404,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                 padding: '2px 8px',
                 borderRadius: '10px',
                 cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                background: 'rgba(255, 80, 80, 0.1)',
+                background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
                 border: '1px solid var(--danger)',
                 color: 'var(--danger)',
                 opacity: bulkSelected.size > 0 ? 1 : 0.4
@@ -2523,9 +2419,9 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                 padding: '2px 8px',
                 borderRadius: '10px',
                 cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                background: 'rgba(0, 200, 100, 0.12)',
-                border: '1px solid #00c864',
-                color: '#00c864',
+                background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+                border: '1px solid var(--success)',
+                color: 'var(--success)',
                 opacity: bulkSelected.size > 0 ? 1 : 0.4
               }}
             >
@@ -2538,7 +2434,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                 padding: '2px 8px',
                 borderRadius: '10px',
                 cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                background: 'rgba(255, 80, 80, 0.1)',
+                background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
                 border: '1px solid var(--danger)',
                 color: 'var(--danger)',
                 opacity: bulkSelected.size > 0 ? 1 : 0.4
@@ -2828,8 +2724,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                           fontSize: '0.68rem',
                           padding: '1px 6px',
                           borderRadius: '4px',
-                          background: 'rgba(0, 200, 100, 0.15)',
-                          color: '#00c864'
+                          background: 'color-mix(in srgb, var(--success) 15%, transparent)',
+                          color: 'var(--success)'
                         }}
                       >
                         Default
@@ -2948,114 +2844,70 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
 
       {/* Import Modal */}
       {showImport && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '600px',
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '12px'
-              }}
-            >
-              <h3 style={{ fontSize: '1rem' }}>Import Warranties</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowImport(false)}
+        <Modal
+          title="Import Warranties"
+          icon={<Upload size={18} />}
+          width={600}
+          closeOnOverlay={false}
+          onClose={() => setShowImport(false)}
+          footer={
+            <>
+              <span
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  marginRight: 'auto'
                 }}
               >
-                <X size={18} />
-              </button>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-              Paste warranties below (one per line). Bullet points, dashes, and leading symbols will
-              be stripped automatically.
-            </p>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '10px',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)'
-              }}
-            >
-              <strong>Tip:</strong> Copy warranty text from a Word document or PDF and paste it
-              here. Each line becomes a separate warranty. Bullets, dashes, and numbers at the start
-              of lines are automatically stripped.
-            </div>
-            <textarea
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder={'- First warranty text\n- Second warranty text\n• Third warranty text'}
-              style={{
-                flex: 1,
-                minHeight: '300px',
-                resize: 'vertical',
-                marginBottom: '12px',
-                fontFamily: 'monospace',
-                fontSize: '0.85rem'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                 {
                   importText
                     .split('\n')
-                    .map((l) => l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
+                    .map((l) => l.replace(/^[\s•\-*•‣◦⁃∙]+/, '').trim())
                     .filter((l) => l.length > 0).length
                 }{' '}
                 warranties detected
               </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setShowImport(false)}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.82rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImport}
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem' }}
-                >
-                  Import
-                </button>
-              </div>
-            </div>
+              <button onClick={() => setShowImport(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleImport} className="btn-primary">
+                Import
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+            Paste warranties below (one per line). Bullet points, dashes, and leading symbols will
+            be stripped automatically.
+          </p>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '10px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              background: 'var(--bg-card-hover)'
+            }}
+          >
+            <strong>Tip:</strong> Copy warranty text from a Word document or PDF and paste it here.
+            Each line becomes a separate warranty. Bullets, dashes, and numbers at the start of
+            lines are automatically stripped.
           </div>
-        </div>
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder={'- First warranty text\n- Second warranty text\n• Third warranty text'}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '300px',
+              resize: 'vertical',
+              fontFamily: 'monospace',
+              fontSize: '0.85rem'
+            }}
+          />
+        </Modal>
       )}
     </div>
   )
@@ -3639,8 +3491,8 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                         fontSize: '0.65rem',
                         padding: '1px 5px',
                         borderRadius: '4px',
-                        background: 'rgba(0, 200, 100, 0.15)',
-                        color: '#00c864',
+                        background: 'color-mix(in srgb, var(--success) 15%, transparent)',
+                        color: 'var(--success)',
                         marginTop: '4px',
                         display: 'inline-block'
                       }}
@@ -3733,7 +3585,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
 
 // ==================== Exclusions Tab ====================
 
-function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
+function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [exclusions, setExclusions] = useState<PIExclusion[]>([])
   const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
   const [newText, setNewText] = useState('')
@@ -3990,7 +3842,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
               padding: '2px 8px',
               borderRadius: '10px',
               cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-              background: 'rgba(255, 80, 80, 0.1)',
+              background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
               border: '1px solid var(--danger)',
               color: 'var(--danger)',
               opacity: bulkSelected.size > 0 ? 1 : 0.4
@@ -4036,7 +3888,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
                     padding: '2px 8px',
                     borderRadius: '10px',
                     cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                    background: 'rgba(255, 80, 80, 0.1)',
+                    background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
                     border: '1px solid var(--danger)',
                     color: 'var(--danger)',
                     opacity: bulkSelected.size > 0 ? 1 : 0.4
@@ -4284,80 +4136,38 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
       ))}
 
       {showImport && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '500px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Import Exclusions</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowImport(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p
-              style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}
-            >
-              Paste exclusions (one per line). Bullets, dashes, and numbering will be stripped.
-            </p>
-            <textarea
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder="Paste exclusions here..."
-              style={{
-                width: '100%',
-                minHeight: '200px',
-                resize: 'vertical',
-                marginBottom: '12px'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <Modal
+          title="Import Exclusions"
+          icon={<Upload size={18} />}
+          width={500}
+          closeOnOverlay={false}
+          onClose={() => setShowImport(false)}
+          footer={
+            <>
               <button onClick={() => setShowImport(false)} className="btn-secondary">
                 Cancel
               </button>
               <button onClick={handleImport} className="btn-primary" disabled={!importText.trim()}>
                 Import
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            Paste exclusions (one per line). Bullets, dashes, and numbering will be stripped.
+          </p>
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder="Paste exclusions here..."
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '200px',
+              resize: 'vertical'
+            }}
+          />
+        </Modal>
       )}
     </section>
   )
@@ -5619,7 +5429,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps): Rea
             style={{
               fontSize: '1rem',
               marginBottom: '14px',
-              color: isLight ? '#8a6d00' : '#ffc107'
+              color: 'var(--warning)'
             }}
           >
             DDQ Required Countries
@@ -5877,14 +5687,7 @@ function DefaultExcludedCountriesPerType({
 
           {excluded.length > 0 && (
             <div style={{ marginBottom: '12px' }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '6px'
-                }}
-              >
+              <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
                 Excluded
               </label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -5926,15 +5729,8 @@ function DefaultExcludedCountriesPerType({
 
           {ddq.length > 0 && (
             <div>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '6px'
-                }}
-              >
-                DDQ Required
+              <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                DDQ required
               </label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {ddq.map((c) => (
@@ -6077,117 +5873,57 @@ function TradingWarrantyTab({ showSuccess }: TabProps): React.JSX.Element {
       </div>
 
       {/* 1) DDQ Countries Intro */}
-      <div
-        style={{
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          color: 'var(--accent-primary)',
-          marginBottom: '8px',
-          borderBottom: '1px solid var(--table-border)',
-          paddingBottom: '4px'
-        }}
-      >
-        1) DDQ Countries Intro
-      </div>
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Text shown with the DDQ country list ({'{ddq_countries}'} placeholder)
-        </label>
-        <RichTextEditor
-          value={texts.ddqCountriesIntro || ''}
-          onChange={(val) => setTexts((prev) => ({ ...prev, ddqCountriesIntro: val }))}
-          minHeight={60}
-        />
+      <div className="form-section">
+        <h4 className="form-section-title">1) DDQ countries intro</h4>
+        <div className="form-grid">
+          <Field
+            label={<>Text shown with the DDQ country list ({'{ddq_countries}'} placeholder)</>}
+            span="all"
+          >
+            <RichTextEditor
+              value={texts.ddqCountriesIntro || ''}
+              onChange={(val) => setTexts((prev) => ({ ...prev, ddqCountriesIntro: val }))}
+              minHeight={60}
+            />
+          </Field>
+        </div>
       </div>
 
       {/* 2) Trading Conditions */}
-      <div
-        style={{
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          color: 'var(--accent-primary)',
-          marginTop: '16px',
-          marginBottom: '8px',
-          borderBottom: '1px solid var(--table-border)',
-          paddingBottom: '4px'
-        }}
-      >
-        2) Trading Conditions
-      </div>
-      <div style={{ marginBottom: '12px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Intro paragraph
-        </label>
-        <RichTextEditor
-          value={texts.tradingConditionA || ''}
-          onChange={(val) => setTexts((prev) => ({ ...prev, tradingConditionA: val }))}
-          minHeight={60}
-        />
-      </div>
-      {TRADING_CONDITION_SUB_FIELDS.map((field) => (
-        <div key={field.key} style={{ marginBottom: '12px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            {field.label}
-          </label>
-          <RichTextEditor
-            value={texts[field.key] || ''}
-            onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
-            minHeight={60}
-          />
+      <div className="form-section">
+        <h4 className="form-section-title">2) Trading conditions</h4>
+        <div className="form-grid">
+          <Field label="Intro paragraph" span="all">
+            <RichTextEditor
+              value={texts.tradingConditionA || ''}
+              onChange={(val) => setTexts((prev) => ({ ...prev, tradingConditionA: val }))}
+              minHeight={60}
+            />
+          </Field>
+          {TRADING_CONDITION_SUB_FIELDS.map((field) => (
+            <Field key={field.key} label={field.label} span="all">
+              <RichTextEditor
+                value={texts[field.key] || ''}
+                onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
+                minHeight={60}
+              />
+            </Field>
+          ))}
         </div>
-      ))}
+      </div>
 
       {/* Israel Warranty */}
-      <div
-        style={{
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          color: 'var(--accent-primary)',
-          marginTop: '16px',
-          marginBottom: '8px',
-          borderBottom: '1px solid var(--table-border)',
-          paddingBottom: '4px'
-        }}
-      >
-        3) Israel Warranty
-      </div>
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Israel Exclusion Text
-        </label>
-        <RichTextEditor
-          value={texts.tradingIsrael || ''}
-          onChange={(val) => setTexts((prev) => ({ ...prev, tradingIsrael: val }))}
-          minHeight={60}
-        />
+      <div className="form-section">
+        <h4 className="form-section-title">3) Israel warranty</h4>
+        <div className="form-grid">
+          <Field label="Israel exclusion text" span="all">
+            <RichTextEditor
+              value={texts.tradingIsrael || ''}
+              onChange={(val) => setTexts((prev) => ({ ...prev, tradingIsrael: val }))}
+              minHeight={60}
+            />
+          </Field>
+        </div>
       </div>
     </section>
   )
@@ -6203,8 +5939,6 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
   const [editName, setEditName] = useState('')
   const [editText, setEditText] = useState('')
   const [showAdd, setShowAdd] = useState(false)
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.piGetTradingWarrantyTemplates()
@@ -6306,7 +6040,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
             padding: '14px 16px',
             borderRadius: '8px',
             border: '1px solid var(--accent-primary)',
-            background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)',
+            background: 'var(--row-selected)',
             marginBottom: '16px'
           }}
         >
@@ -6365,12 +6099,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
             borderRadius: '8px',
             border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
             marginBottom: '8px',
-            background:
-              editingId === t.id
-                ? isLight
-                  ? '#f0faff'
-                  : 'rgba(var(--accent-primary-rgb), 0.06)'
-                : 'transparent'
+            background: editingId === t.id ? 'var(--row-selected)' : 'transparent'
           }}
         >
           {editingId === t.id ? (
@@ -6601,7 +6330,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
             padding: '14px 16px',
             borderRadius: '8px',
             border: '1px solid var(--accent-primary)',
-            background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)',
+            background: 'var(--row-selected)',
             marginBottom: '16px'
           }}
         >
@@ -6938,7 +6667,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
               padding: '14px 16px',
               borderRadius: '8px',
               border: '1px solid var(--accent-primary)',
-              background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)',
+              background: 'var(--row-selected)',
               marginBottom: '16px'
             }}
           >
@@ -7001,12 +6730,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
               borderRadius: '8px',
               border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
               marginBottom: '8px',
-              background:
-                editingId === t.id
-                  ? isLight
-                    ? '#f0faff'
-                    : 'rgba(var(--accent-primary-rgb), 0.06)'
-                  : 'transparent'
+              background: editingId === t.id ? 'var(--row-selected)' : 'transparent'
             }}
           >
             {editingId === t.id ? (
@@ -7258,14 +6982,6 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
     setIds(ids.includes(dtId) ? ids.filter((id) => id !== dtId) : [...ids, dtId])
   }
 
-  const inputStyle = {
-    padding: '8px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--bg-input, var(--table-header-bg))',
-    color: 'var(--text-primary)',
-    fontSize: '0.82rem'
-  }
   const chipStyle = (
     selected: boolean
   ): {
@@ -7310,21 +7026,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
             placeholder="Subjectivity text..."
-            style={{ ...inputStyle, width: '100%', marginBottom: '8px' }}
+            style={{ width: '100%', marginBottom: '8px' }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleAdd()
             }}
           />
           <div style={{ marginBottom: '8px' }}>
-            <label
-              style={{
-                fontSize: '0.72rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              Linked Document Types (triggers auto-populate when missing/expiring)
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Linked document types (triggers auto-populate when missing/expiring)
             </label>
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
               {docTypes.map((dt) => (
@@ -7383,18 +7092,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
                   <input
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
-                    style={{ ...inputStyle, width: '100%', marginBottom: '8px' }}
+                    style={{ width: '100%', marginBottom: '8px' }}
                   />
                   <div style={{ marginBottom: '8px' }}>
                     <label
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        display: 'block',
-                        marginBottom: '4px'
-                      }}
+                      className="field-label"
+                      style={{ display: 'block', marginBottom: '4px' }}
                     >
-                      Linked Document Types
+                      Linked document types
                     </label>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {docTypes.map((dt) => (
@@ -7700,15 +7405,6 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
     await window.api.piReorderSanctionsVersions(arr.map((v) => v.id))
   }
 
-  const inputStyle = {
-    padding: '8px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--glass-border-color)',
-    background: 'var(--bg-input, var(--table-header-bg))',
-    color: 'var(--text-primary)',
-    fontSize: '0.82rem'
-  }
-
   return (
     <div>
       <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
@@ -7724,13 +7420,13 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Version name (e.g. Standard)"
-              style={{ ...inputStyle, flex: 1 }}
+              style={{ flex: 1 }}
             />
             <input
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               placeholder="Key (e.g. standard)"
-              style={{ ...inputStyle, width: '160px' }}
+              style={{ width: '160px' }}
             />
             <button
               type="submit"
@@ -7770,12 +7466,12 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
                     <input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      style={{ ...inputStyle, flex: 1 }}
+                      style={{ flex: 1 }}
                     />
                     <input
                       value={editKey}
                       onChange={(e) => setEditKey(e.target.value)}
-                      style={{ ...inputStyle, width: '160px' }}
+                      style={{ width: '160px' }}
                     />
                     <button
                       onClick={handleUpdateNameKey}
@@ -8027,8 +7723,6 @@ function StandardTextsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [texts, setTexts] = useState<PISectionTexts>({})
   const [loaded, setLoaded] = useState(false)
   const [activeSection, setActiveSection] = useState(STANDARD_TEXT_SECTIONS[0])
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionTexts()
@@ -8100,8 +7794,8 @@ function StandardTextsTab({ showSuccess }: TabProps): React.JSX.Element {
             fontWeight: 600,
             padding: '8px 14px',
             borderRadius: '8px',
-            border: `2px solid ${isLight ? 'rgba(var(--accent-primary-rgb), 0.3)' : 'rgba(var(--accent-primary-rgb), 0.2)'}`,
-            background: isLight ? '#f0f8ff' : 'rgba(var(--accent-primary-rgb), 0.06)',
+            border: '2px solid var(--accent-border)',
+            background: 'var(--row-selected)',
             color: 'var(--text-primary)',
             cursor: 'pointer',
             minWidth: '220px'
@@ -8126,149 +7820,108 @@ function StandardTextsTab({ showSuccess }: TabProps): React.JSX.Element {
             Rich text for the Word document header and footer. Supports different font sizes,
             alignment, bold/italic, and Arabic text.
           </p>
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              Document Header
-            </label>
-            <RichTextEditor
-              value={texts.docHeader || ''}
-              onChange={(val) => setTexts((prev) => ({ ...prev, docHeader: val }))}
-              minHeight={60}
-              showFontSize
-              showFontFamily
-              showAlignment
-              showLineSpacing
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <label
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Default line spacing:
-              </label>
-              <select
-                value={texts.docHeaderSpacing ?? 1}
-                onChange={(e) =>
-                  setTexts((prev) => ({ ...prev, docHeaderSpacing: parseFloat(e.target.value) }))
-                }
-                style={{
-                  fontSize: '0.78rem',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))',
-                  color: 'var(--text-primary)',
-                  width: '70px'
-                }}
-              >
-                <option value={0.9}>None</option>
-                <option value={1}>1.0</option>
-                <option value={1.15}>1.15</option>
-                <option value={1.5}>1.5</option>
-                <option value={2}>2.0</option>
-                <option value={2.5}>2.5</option>
-                <option value={3}>3.0</option>
-              </select>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                (applied when no per-line spacing is set)
-              </span>
-            </div>
-          </div>
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              Document Footer
-            </label>
-            <RichTextEditor
-              value={texts.docFooter || ''}
-              onChange={(val) => setTexts((prev) => ({ ...prev, docFooter: val }))}
-              minHeight={60}
-              showFontSize
-              showFontFamily
-              showAlignment
-              showLineSpacing
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <label
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Default line spacing:
-              </label>
-              <select
-                value={texts.docFooterSpacing ?? 1}
-                onChange={(e) =>
-                  setTexts((prev) => ({ ...prev, docFooterSpacing: parseFloat(e.target.value) }))
-                }
-                style={{
-                  fontSize: '0.78rem',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))',
-                  color: 'var(--text-primary)',
-                  width: '70px'
-                }}
-              >
-                <option value={0.9}>None</option>
-                <option value={1}>1.0</option>
-                <option value={1.15}>1.15</option>
-                <option value={1.5}>1.5</option>
-                <option value={2}>2.0</option>
-                <option value={2.5}>2.5</option>
-                <option value={3}>3.0</option>
-              </select>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                (applied when no per-line spacing is set)
-              </span>
-            </div>
+          <div className="form-grid" style={{ marginBottom: '16px' }}>
+            <Field label="Document header" span="all">
+              <RichTextEditor
+                value={texts.docHeader || ''}
+                onChange={(val) => setTexts((prev) => ({ ...prev, docHeader: val }))}
+                minHeight={60}
+                showFontSize
+                showFontFamily
+                showAlignment
+                showLineSpacing
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                <label
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Default line spacing:
+                </label>
+                <select
+                  value={texts.docHeaderSpacing ?? 1}
+                  onChange={(e) =>
+                    setTexts((prev) => ({ ...prev, docHeaderSpacing: parseFloat(e.target.value) }))
+                  }
+                  style={{ fontSize: '0.78rem', padding: '2px 6px', width: '70px' }}
+                >
+                  <option value={0.9}>None</option>
+                  <option value={1}>1.0</option>
+                  <option value={1.15}>1.15</option>
+                  <option value={1.5}>1.5</option>
+                  <option value={2}>2.0</option>
+                  <option value={2.5}>2.5</option>
+                  <option value={3}>3.0</option>
+                </select>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  (applied when no per-line spacing is set)
+                </span>
+              </div>
+            </Field>
+            <Field label="Document footer" span="all">
+              <RichTextEditor
+                value={texts.docFooter || ''}
+                onChange={(val) => setTexts((prev) => ({ ...prev, docFooter: val }))}
+                minHeight={60}
+                showFontSize
+                showFontFamily
+                showAlignment
+                showLineSpacing
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                <label
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Default line spacing:
+                </label>
+                <select
+                  value={texts.docFooterSpacing ?? 1}
+                  onChange={(e) =>
+                    setTexts((prev) => ({ ...prev, docFooterSpacing: parseFloat(e.target.value) }))
+                  }
+                  style={{ fontSize: '0.78rem', padding: '2px 6px', width: '70px' }}
+                >
+                  <option value={0.9}>None</option>
+                  <option value={1}>1.0</option>
+                  <option value={1.15}>1.15</option>
+                  <option value={1.5}>1.5</option>
+                  <option value={2}>2.0</option>
+                  <option value={2.5}>2.5</option>
+                  <option value={3}>3.0</option>
+                </select>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  (applied when no per-line spacing is set)
+                </span>
+              </div>
+            </Field>
           </div>
         </>
       )}
 
       {/* Dynamic section fields */}
-      {activeSection !== 'Document Header & Footer' &&
-        filteredFields.map((field) => (
-          <div key={field.key} style={{ marginBottom: '12px' }}>
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              {field.label}
-            </label>
-            <RichTextEditor
-              value={String(texts[field.key] || '')}
-              onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
-              minHeight={Math.max(60, (field.rows || 3) * 22)}
-              showFontSize
-              showAlignment
-              showLineSpacing
-            />
-          </div>
-        ))}
+      {activeSection !== 'Document Header & Footer' && (
+        <div className="form-grid">
+          {filteredFields.map((field) => (
+            <Field key={field.key} label={field.label} span="all">
+              <RichTextEditor
+                value={String(texts[field.key] || '')}
+                onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
+                minHeight={Math.max(60, (field.rows || 3) * 22)}
+                showFontSize
+                showAlignment
+                showLineSpacing
+              />
+            </Field>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -10193,7 +9846,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
 
 // ==================== War Conditions Tab ====================
 
-function WarConditionsTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
+function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [conditions, setConditions] = useState<WarCondition[]>([])
   const [newText, setNewText] = useState('')
   const [newDefault, setNewDefault] = useState(false)
@@ -10522,93 +10175,26 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps): React.
 
       {/* Bulk Import Modal */}
       {showImport && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
+        <Modal
+          title="Bulk Import War Conditions"
+          icon={<Upload size={18} />}
+          width={600}
+          closeOnOverlay={false}
+          onClose={() => {
+            setShowImport(false)
+            setImportText('')
+            setImportParsed([])
           }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '600px',
-              maxHeight: '80vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Bulk Import War Conditions</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
-              Paste conditions below, one per line. Bullets, dashes, and numbering are automatically
-              stripped.
-            </p>
-            <textarea
-              value={importText}
-              onChange={(e) => {
-                setImportText(e.target.value)
-                parseImportText(e.target.value)
-              }}
-              placeholder="- Institute War and Strikes Clause CL. 281 dated 1/10/83&#10;- Violent Theft, Piracy and Barratry Extension Clause JW 2005-002&#10;- ..."
-              style={{
-                width: '100%',
-                minHeight: '160px',
-                fontSize: '0.84rem',
-                padding: '10px',
-                marginBottom: '10px'
-              }}
-            />
-            {importParsed.length > 0 && (
-              <div style={{ marginBottom: '12px' }}>
-                <p style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '6px' }}>
-                  {importParsed.length} condition{importParsed.length !== 1 ? 's' : ''} parsed:
-                </p>
-                <div
-                  style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    border: '1px solid var(--table-border)',
-                    borderRadius: '6px',
-                    padding: '8px'
-                  }}
-                >
-                  {importParsed.map((t, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: '0.78rem',
-                        padding: '4px 0',
-                        borderBottom:
-                          i < importParsed.length - 1 ? '1px solid var(--table-border)' : 'none',
-                        color: 'var(--text-primary)'
-                      }}
-                    >
-                      <span style={{ color: 'var(--text-secondary)', marginRight: '6px' }}>
-                        {i + 1}.
-                      </span>
-                      {t}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          footer={
+            <>
               <label
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
                   fontSize: '0.8rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  marginRight: 'auto'
                 }}
               >
                 <input
@@ -10619,31 +10205,81 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps): React.
                 />{' '}
                 Set all as default
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => {
-                    setShowImport(false)
-                    setImportText('')
-                    setImportParsed([])
-                  }}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.82rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBulkImport}
-                  className="btn-primary"
-                  disabled={importParsed.length === 0}
-                  style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Plus size={14} /> Import{' '}
-                  {importParsed.length > 0 ? `${importParsed.length} Conditions` : ''}
-                </button>
+              <button
+                onClick={() => {
+                  setShowImport(false)
+                  setImportText('')
+                  setImportParsed([])
+                }}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkImport}
+                className="btn-primary"
+                disabled={importParsed.length === 0}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Plus size={14} /> Import{' '}
+                {importParsed.length > 0 ? `${importParsed.length} Conditions` : ''}
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+            Paste conditions below, one per line. Bullets, dashes, and numbering are automatically
+            stripped.
+          </p>
+          <textarea
+            value={importText}
+            onChange={(e) => {
+              setImportText(e.target.value)
+              parseImportText(e.target.value)
+            }}
+            placeholder="- Institute War and Strikes Clause CL. 281 dated 1/10/83&#10;- Violent Theft, Piracy and Barratry Extension Clause JW 2005-002&#10;- ..."
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '160px',
+              marginBottom: '10px'
+            }}
+          />
+          {importParsed.length > 0 && (
+            <div>
+              <p style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '6px' }}>
+                {importParsed.length} condition{importParsed.length !== 1 ? 's' : ''} parsed:
+              </p>
+              <div
+                style={{
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  border: '1px solid var(--table-border)',
+                  borderRadius: '6px',
+                  padding: '8px'
+                }}
+              >
+                {importParsed.map((t, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '4px 0',
+                      borderBottom:
+                        i < importParsed.length - 1 ? '1px solid var(--table-border)' : 'none',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-secondary)', marginRight: '6px' }}>
+                      {i + 1}.
+                    </span>
+                    {t}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </Modal>
       )}
     </section>
   )
@@ -10693,61 +10329,25 @@ function WarSettingsTab({ showSuccess, showError }: TabProps): React.JSX.Element
         War Risk quotations.
       </p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '14px',
-          marginBottom: '16px'
-        }}
-      >
-        <div>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            JWLA Code
-          </label>
+      <div className="form-grid cols-3" style={{ marginBottom: '16px' }}>
+        <Field label="JWLA code">
           <input
             value={settings.jwlaCode}
             onChange={(e) => setSettings({ ...settings, jwlaCode: e.target.value })}
             placeholder="e.g., JWLA032"
-            style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
           />
-        </div>
-        <div>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            JWLA Date
-          </label>
+        </Field>
+        <Field label="JWLA date">
           <input
             value={settings.jwlaDate}
             onChange={(e) => setSettings({ ...settings, jwlaDate: e.target.value })}
             placeholder="e.g., December 18, 2023"
-            style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
           />
-        </div>
-        <div>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Default Rate (per mille ‰)
-          </label>
+        </Field>
+        <Field
+          label="Default rate (per mille ‰)"
+          hint={<>Premium = Sum Insured &times; Rate / 1000</>}
+        >
           <input
             type="number"
             step="0.001"
@@ -10759,85 +10359,68 @@ function WarSettingsTab({ showSuccess, showError }: TabProps): React.JSX.Element
               })
             }
             placeholder="e.g., 0.30"
-            style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
           />
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Premium = Sum Insured &times; Rate / 1000
-          </p>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
+        </Field>
+        <Field
+          label="Terms & conditions text"
+          span="all"
+          hint={
+            <>
+              This text is rendered as a standalone line in the Conditions section. Use{' '}
+              <code
+                style={{
+                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                  padding: '1px 4px',
+                  borderRadius: '3px'
+                }}
+              >
+                {'{tc_text}'}
+              </code>{' '}
+              placeholder in conditions to reference it.
+            </>
+          }
         >
-          Terms &amp; Conditions Text
-        </label>
-        <input
-          value={settings.tcText}
-          onChange={(e) => setSettings({ ...settings, tcText: e.target.value })}
-          placeholder="e.g., Al-Bahriah Hull War Terms & Conditions 01 January 2025"
-          style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
-        />
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          This text is rendered as a standalone line in the Conditions section. Use{' '}
-          <code
-            style={{
-              background: 'rgba(var(--accent-primary-rgb), 0.1)',
-              padding: '1px 4px',
-              borderRadius: '3px'
-            }}
-          >
-            {'{tc_text}'}
-          </code>{' '}
-          placeholder in conditions to reference it.
-        </p>
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
+          <input
+            value={settings.tcText}
+            onChange={(e) => setSettings({ ...settings, tcText: e.target.value })}
+            placeholder="e.g., Al-Bahriah Hull War Terms & Conditions 01 January 2025"
+          />
+        </Field>
+        <Field
+          label="Trading warranty text"
+          span="all"
+          hint={
+            <>
+              Placeholders:{' '}
+              <code
+                style={{
+                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                  padding: '1px 4px',
+                  borderRadius: '3px'
+                }}
+              >
+                {'{jwla_code}'}
+              </code>
+              ,{' '}
+              <code
+                style={{
+                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                  padding: '1px 4px',
+                  borderRadius: '3px'
+                }}
+              >
+                {'{jwla_date}'}
+              </code>
+            </>
+          }
         >
-          Trading Warranty Text
-        </label>
-        <textarea
-          value={settings.tradingWarrantyText}
-          onChange={(e) => setSettings({ ...settings, tradingWarrantyText: e.target.value })}
-          placeholder="Trading warranty text with {jwla_code} and {jwla_date} placeholders..."
-          style={{ width: '100%', minHeight: '80px', fontSize: '0.85rem', padding: '8px 10px' }}
-        />
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Placeholders:{' '}
-          <code
-            style={{
-              background: 'rgba(var(--accent-primary-rgb), 0.1)',
-              padding: '1px 4px',
-              borderRadius: '3px'
-            }}
-          >
-            {'{jwla_code}'}
-          </code>
-          ,{' '}
-          <code
-            style={{
-              background: 'rgba(var(--accent-primary-rgb), 0.1)',
-              padding: '1px 4px',
-              borderRadius: '3px'
-            }}
-          >
-            {'{jwla_date}'}
-          </code>
-        </p>
+          <textarea
+            value={settings.tradingWarrantyText}
+            onChange={(e) => setSettings({ ...settings, tradingWarrantyText: e.target.value })}
+            placeholder="Trading warranty text with {jwla_code} and {jwla_date} placeholders..."
+            style={{ minHeight: '80px' }}
+          />
+        </Field>
       </div>
 
       <button
@@ -10926,7 +10509,7 @@ const ToggleCheckbox = ({
   </label>
 )
 
-function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
+function WorkflowDesignerTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [steps, setSteps] = useState<WorkflowStep[]>([])
   const [transitions, setTransitions] = useState<WorkflowTransition[]>([])
   const [editingStep, setEditingStep] = useState<string | null>(null)
@@ -11076,15 +10659,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
     })
   }
 
-  const thStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    textAlign: 'left',
-    fontSize: '0.78rem',
-    color: 'var(--text-secondary)',
-    fontWeight: 600
-  }
-  const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem' }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Section 1: Steps */}
@@ -11114,7 +10688,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
               gap: '8px',
               padding: '16px 20px',
               marginBottom: '20px',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              background: 'var(--bg-card-hover)',
               borderRadius: '10px',
               overflowX: 'auto'
             }}
@@ -11174,174 +10748,178 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
         )}
 
         {/* Steps table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-              <th style={thStyle}>Order</th>
-              <th style={thStyle}>Step</th>
-              <th style={thStyle}>Color</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Can Edit</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Lock Point</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Initial</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {steps.map((step, i) => (
-              <tr key={step.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                <td style={tdStyle}>
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    <button
-                      title="Move up"
-                      aria-label="Move up"
-                      onClick={() => moveStep(i, -1)}
-                      disabled={i === 0}
-                      className="btn-secondary"
-                      style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      title="Move down"
-                      aria-label="Move down"
-                      onClick={() => moveStep(i, 1)}
-                      disabled={i === steps.length - 1}
-                      className="btn-secondary"
-                      style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}
-                    >
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-                </td>
-                <td style={tdStyle}>
-                  {editingStep === step.id ? (
-                    <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      style={{ padding: '4px 8px', borderRadius: '4px', width: '100%' }}
-                    />
-                  ) : (
-                    <span style={{ fontWeight: 500 }}>{step.name}</span>
-                  )}
-                </td>
-                <td style={tdStyle}>
-                  {editingStep === step.id ? (
-                    <ColorPicker
-                      value={editForm.color}
-                      onChange={(c) => setEditForm({ ...editForm, color: c })}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: '50%',
-                        background: step.color,
-                        border: '2px solid rgba(255,255,255,0.2)'
-                      }}
-                    />
-                  )}
-                </td>
-                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                  {editingStep === step.id ? (
-                    <input
-                      type="checkbox"
-                      checked={editForm.canEdit}
-                      onChange={(e) => setEditForm({ ...editForm, canEdit: e.target.checked })}
-                    />
-                  ) : step.canEdit ? (
-                    <Check size={16} style={{ color: '#22c55e' }} />
-                  ) : (
-                    <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
-                  )}
-                </td>
-                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                  {editingStep === step.id ? (
-                    <input
-                      type="checkbox"
-                      checked={editForm.isLockPoint}
-                      onChange={(e) => setEditForm({ ...editForm, isLockPoint: e.target.checked })}
-                    />
-                  ) : step.isLockPoint ? (
-                    <Check size={16} style={{ color: '#3b82f6' }} />
-                  ) : (
-                    <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
-                  )}
-                </td>
-                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                  {editingStep === step.id ? (
-                    <input
-                      type="checkbox"
-                      checked={editForm.isInitial}
-                      onChange={(e) => setEditForm({ ...editForm, isInitial: e.target.checked })}
-                    />
-                  ) : step.isInitial ? (
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      INITIAL
-                    </span>
-                  ) : null}
-                </td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                    {editingStep === step.id ? (
-                      <>
-                        <button
-                          title="Save"
-                          aria-label="Save"
-                          onClick={() => handleUpdateStep(step.id)}
-                          className="btn-primary"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                        >
-                          <Save size={13} />
-                        </button>
-                        <button
-                          title="Cancel"
-                          aria-label="Cancel"
-                          onClick={() => setEditingStep(null)}
-                          className="btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          title="Edit"
-                          aria-label="Edit"
-                          onClick={() => startEdit(step)}
-                          className="btn-secondary"
-                          style={{ padding: '4px 8px' }}
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          title="Delete"
-                          aria-label="Delete"
-                          onClick={() => handleDeleteStep(step.id)}
-                          className="btn-secondary"
-                          style={{ padding: '4px 8px', color: 'var(--danger)' }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Step</th>
+                <th>Color</th>
+                <th style={{ textAlign: 'center' }}>Can Edit</th>
+                <th style={{ textAlign: 'center' }}>Lock Point</th>
+                <th style={{ textAlign: 'center' }}>Initial</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {steps.map((step, i) => (
+                <tr key={step.id}>
+                  <td>
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <button
+                        title="Move up"
+                        aria-label="Move up"
+                        onClick={() => moveStep(i, -1)}
+                        disabled={i === 0}
+                        className="btn-secondary"
+                        style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
+                      >
+                        <ChevronUp size={14} />
+                      </button>
+                      <button
+                        title="Move down"
+                        aria-label="Move down"
+                        onClick={() => moveStep(i, 1)}
+                        disabled={i === steps.length - 1}
+                        className="btn-secondary"
+                        style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}
+                      >
+                        <ChevronDown size={14} />
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    {editingStep === step.id ? (
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        style={{ width: '100%' }}
+                      />
+                    ) : (
+                      <span style={{ fontWeight: 500 }}>{step.name}</span>
+                    )}
+                  </td>
+                  <td>
+                    {editingStep === step.id ? (
+                      <ColorPicker
+                        value={editForm.color}
+                        onChange={(c) => setEditForm({ ...editForm, color: c })}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: step.color,
+                          border: '2px solid rgba(255,255,255,0.2)'
+                        }}
+                      />
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {editingStep === step.id ? (
+                      <input
+                        type="checkbox"
+                        checked={editForm.canEdit}
+                        onChange={(e) => setEditForm({ ...editForm, canEdit: e.target.checked })}
+                      />
+                    ) : step.canEdit ? (
+                      <Check size={16} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {editingStep === step.id ? (
+                      <input
+                        type="checkbox"
+                        checked={editForm.isLockPoint}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, isLockPoint: e.target.checked })
+                        }
+                      />
+                    ) : step.isLockPoint ? (
+                      <Check size={16} style={{ color: '#3b82f6' }} />
+                    ) : (
+                      <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {editingStep === step.id ? (
+                      <input
+                        type="checkbox"
+                        checked={editForm.isInitial}
+                        onChange={(e) => setEditForm({ ...editForm, isInitial: e.target.checked })}
+                      />
+                    ) : step.isInitial ? (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                          color: 'var(--accent-primary)'
+                        }}
+                      >
+                        INITIAL
+                      </span>
+                    ) : null}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                      {editingStep === step.id ? (
+                        <>
+                          <button
+                            title="Save"
+                            aria-label="Save"
+                            onClick={() => handleUpdateStep(step.id)}
+                            className="btn-primary"
+                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                          >
+                            <Save size={13} />
+                          </button>
+                          <button
+                            title="Cancel"
+                            aria-label="Cancel"
+                            onClick={() => setEditingStep(null)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            title="Edit"
+                            aria-label="Edit"
+                            onClick={() => startEdit(step)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 8px' }}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            title="Delete"
+                            aria-label="Delete"
+                            onClick={() => handleDeleteStep(step.id)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 8px', color: 'var(--danger)' }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* Add step form */}
         {addingStep ? (
@@ -11349,7 +10927,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
             style={{
               marginTop: '16px',
               padding: '16px',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              background: 'var(--bg-card-hover)',
               borderRadius: '8px',
               border: '1px solid var(--glass-border-color)'
             }}
@@ -11361,26 +10939,16 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
                   value={newStep.name}
                   onChange={(e) => setNewStep({ ...newStep, name: e.target.value })}
                   placeholder="Step name"
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '6px' }}
+                  style={{ flex: 1 }}
                   autoFocus
                 />
               </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '6px',
-                    display: 'block'
-                  }}
-                >
-                  Color
-                </label>
+              <Field label="Color">
                 <ColorPicker
                   value={newStep.color}
                   onChange={(c) => setNewStep({ ...newStep, color: c })}
                 />
-              </div>
+              </Field>
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <ToggleCheckbox
                   checked={newStep.canEdit}
@@ -11458,110 +11026,108 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
           user&quot; means no special permission is needed.
         </p>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-              <th style={thStyle}>From</th>
-              <th style={{ ...thStyle, textAlign: 'center', width: '40px' }}></th>
-              <th style={thStyle}>To</th>
-              <th style={thStyle}>Permission</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Auto-Revision</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transitions.map((t) => {
-              const fromStep = steps.find((s) => s.id === t.fromStepId)
-              const toStep = steps.find((s) => s.id === t.toStepId)
-              return (
-                <tr key={t.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                  <td style={tdStyle}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <div
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>From</th>
+                <th style={{ textAlign: 'center', width: '40px' }}></th>
+                <th>To</th>
+                <th>Permission</th>
+                <th style={{ textAlign: 'center' }}>Auto-Revision</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transitions.map((t) => {
+                const fromStep = steps.find((s) => s.id === t.fromStepId)
+                const toStep = steps.find((s) => s.id === t.toStepId)
+                return (
+                  <tr key={t.id}>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <div
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            background: fromStep?.color || '#6b7280',
+                            flexShrink: 0
+                          }}
+                        />
+                        {t.fromStepName || fromStep?.name || '—'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <ArrowRight size={14} style={{ color: 'var(--text-secondary)' }} />
+                    </td>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <div
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            background: toStep?.color || '#6b7280',
+                            flexShrink: 0
+                          }}
+                        />
+                        {t.toStepName || toStep?.name || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <span
                         style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: '50%',
-                          background: fromStep?.color || '#6b7280',
-                          flexShrink: 0
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.78rem',
+                          background: t.permissionKey
+                            ? 'rgba(139, 92, 246, 0.1)'
+                            : 'rgba(107, 114, 128, 0.1)',
+                          color: t.permissionKey ? '#8b5cf6' : 'var(--text-secondary)'
                         }}
-                      />
-                      {t.fromStepName || fromStep?.name || '—'}
-                    </span>
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <ArrowRight size={14} style={{ color: 'var(--text-secondary)' }} />
-                  </td>
-                  <td style={tdStyle}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <div
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: '50%',
-                          background: toStep?.color || '#6b7280',
-                          flexShrink: 0
-                        }}
-                      />
-                      {t.toStepName || toStep?.name || '—'}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.78rem',
-                        background: t.permissionKey
-                          ? 'rgba(139, 92, 246, 0.1)'
-                          : 'rgba(107, 114, 128, 0.1)',
-                        color: t.permissionKey ? '#8b5cf6' : 'var(--text-secondary)'
-                      }}
-                    >
-                      {t.permissionKey
-                        ? ALL_PERMISSIONS.find((p) => p.key === t.permissionKey)?.label ||
-                          t.permissionKey
-                        : 'Any user'}
-                    </span>
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    {t.autoCreateRevision ? (
-                      <Check size={16} style={{ color: '#22c55e' }} />
-                    ) : (
-                      <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <button
-                      title="Delete"
-                      aria-label="Delete"
-                      onClick={() => handleDeleteTransition(t.id)}
-                      className="btn-secondary"
-                      style={{ padding: '4px 8px', color: 'var(--danger)' }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                      >
+                        {t.permissionKey
+                          ? ALL_PERMISSIONS.find((p) => p.key === t.permissionKey)?.label ||
+                            t.permissionKey
+                          : 'Any user'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {t.autoCreateRevision ? (
+                        <Check size={16} style={{ color: 'var(--success)' }} />
+                      ) : (
+                        <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        title="Delete"
+                        aria-label="Delete"
+                        onClick={() => handleDeleteTransition(t.id)}
+                        className="btn-secondary"
+                        style={{ padding: '4px 8px', color: 'var(--danger)' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {transitions.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="muted"
+                    style={{ textAlign: 'center', padding: '24px 12px' }}
+                  >
+                    No transitions defined. Add steps first, then create transitions between them.
                   </td>
                 </tr>
-              )
-            })}
-            {transitions.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  style={{
-                    ...tdStyle,
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    padding: '24px 12px'
-                  }}
-                >
-                  No transitions defined. Add steps first, then create transitions between them.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Add transition form */}
         {addingTransition ? (
@@ -11569,30 +11135,22 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
             style={{
               marginTop: '16px',
               padding: '16px',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              background: 'var(--bg-card-hover)',
               borderRadius: '8px',
               border: '1px solid var(--glass-border-color)'
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px',
-                      display: 'block'
-                    }}
-                  >
-                    From Step
-                  </label>
+              <div
+                className="form-grid"
+                style={{ gridTemplateColumns: '1fr auto 1fr', alignItems: 'end' }}
+              >
+                <Field label="From step">
                   <select
                     value={newTransition.fromStepId}
                     onChange={(e) =>
                       setNewTransition({ ...newTransition, fromStepId: e.target.value })
                     }
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
                   >
                     <option value="">Select step...</option>
                     {steps.map((s) => (
@@ -11601,28 +11159,17 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
                 <ArrowRight
                   size={18}
-                  style={{ color: 'var(--text-secondary)', marginTop: '18px' }}
+                  style={{ color: 'var(--text-secondary)', marginBottom: '10px' }}
                 />
-                <div style={{ flex: 1 }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px',
-                      display: 'block'
-                    }}
-                  >
-                    To Step
-                  </label>
+                <Field label="To step">
                   <select
                     value={newTransition.toStepId}
                     onChange={(e) =>
                       setNewTransition({ ...newTransition, toStepId: e.target.value })
                     }
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
                   >
                     <option value="">Select step...</option>
                     {steps.map((s) => (
@@ -11631,25 +11178,14 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
               </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Permission Required
-                </label>
+              <Field label="Permission required">
                 <select
                   value={newTransition.permissionKey || ''}
                   onChange={(e) =>
                     setNewTransition({ ...newTransition, permissionKey: e.target.value || null })
                   }
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px' }}
                 >
                   <option value="">Any user</option>
                   {ALL_PERMISSIONS.map((p) => (
@@ -11658,7 +11194,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): Rea
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
               <ToggleCheckbox
                 checked={newTransition.autoCreateRevision}
                 onChange={(v) => setNewTransition({ ...newTransition, autoCreateRevision: v })}
@@ -13475,127 +13011,23 @@ function CargoClausesTab({
         </form>
 
         {showBulkImport && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(0,0,0,0.5)'
+          <Modal
+            title={<>Bulk Import — {sectionLabel}</>}
+            icon={<Upload size={18} />}
+            width={600}
+            closeOnOverlay={false}
+            onClose={() => {
+              setShowBulkImport(false)
+              setBulkText('')
             }}
-          >
-            <div
-              style={{
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '12px',
-                padding: '24px',
-                width: '600px',
-                maxHeight: '80vh',
-                overflow: 'auto',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>
-                Bulk Import — {sectionLabel}
-              </h3>
-              <p
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  marginBottom: '14px'
-                }}
-              >
-                Paste one clause per line. Bullets/dashes are stripped automatically.
-              </p>
-              <textarea
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                placeholder={
-                  '- Institute Cargo Clauses (B) CL. 383 1/1/2009\n- Cargo ISM Endorsement JC 98/019\n- Custom clause text here'
-                }
-                rows={12}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  resize: 'vertical',
-                  fontFamily: 'monospace'
-                }}
-              />
-              {bulkText.trim() &&
-                (() => {
-                  const parsed = parseBulkLines(bulkText)
-                  return (
-                    <div
-                      style={{
-                        marginTop: '12px',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-                        border: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: '0.75rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '6px'
-                        }}
-                      >
-                        Preview: {parsed.length} clause(s)
-                      </p>
-                      {parsed.slice(0, 8).map((item, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            fontSize: '0.78rem',
-                            marginBottom: '3px',
-                            display: 'flex',
-                            gap: '6px'
-                          }}
-                        >
-                          {item.code && (
-                            <span style={{ color: '#32b886', fontWeight: 600 }}>{item.code}</span>
-                          )}
-                          <span>{item.title}</span>
-                        </div>
-                      ))}
-                      {parsed.length > 8 && (
-                        <p
-                          style={{
-                            fontSize: '0.72rem',
-                            color: 'var(--text-secondary)',
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          ...and {parsed.length - 8} more
-                        </p>
-                      )}
-                    </div>
-                  )
-                })()}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  justifyContent: 'flex-end',
-                  marginTop: '16px'
-                }}
-              >
+            footer={
+              <>
                 <button
                   onClick={() => {
                     setShowBulkImport(false)
                     setBulkText('')
                   }}
                   className="btn-secondary"
-                  style={{ padding: '8px 16px', fontSize: '0.82rem' }}
                 >
                   Cancel
                 </button>
@@ -13603,14 +13035,89 @@ function CargoClausesTab({
                   onClick={handleBulkImport}
                   disabled={!bulkText.trim()}
                   className="btn-primary"
-                  style={{ padding: '8px 16px', fontSize: '0.82rem' }}
                 >
                   Import {parseBulkLines(bulkText).length} Clause
                   {parseBulkLines(bulkText).length !== 1 ? 's' : ''}
                 </button>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            <p
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '14px'
+              }}
+            >
+              Paste one clause per line. Bullets/dashes are stripped automatically.
+            </p>
+            <textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={
+                '- Institute Cargo Clauses (B) CL. 383 1/1/2009\n- Cargo ISM Endorsement JC 98/019\n- Custom clause text here'
+              }
+              rows={12}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                resize: 'vertical',
+                fontFamily: 'monospace'
+              }}
+            />
+            {bulkText.trim() &&
+              (() => {
+                const parsed = parseBulkLines(bulkText)
+                return (
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-card-hover)',
+                      border: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '6px'
+                      }}
+                    >
+                      Preview: {parsed.length} clause(s)
+                    </p>
+                    {parsed.slice(0, 8).map((item, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          fontSize: '0.78rem',
+                          marginBottom: '3px',
+                          display: 'flex',
+                          gap: '6px'
+                        }}
+                      >
+                        {item.code && (
+                          <span style={{ color: '#32b886', fontWeight: 600 }}>{item.code}</span>
+                        )}
+                        <span>{item.title}</span>
+                      </div>
+                    ))}
+                    {parsed.length > 8 && (
+                      <p
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-secondary)',
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        ...and {parsed.length - 8} more
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
+          </Modal>
         )}
 
         {clauses.map((c, i) => (
