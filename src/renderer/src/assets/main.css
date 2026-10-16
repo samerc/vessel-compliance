@@ -104,6 +104,9 @@ kbd,
 }
 
 /* Home page: clickable rows and attention cards */
+.vessel-tile:not(:disabled):hover {
+  border-color: var(--accent-border) !important;
+}
 .home-row:hover {
   background: var(--row-hover);
 }
@@ -1024,23 +1027,6 @@ a:focus-visible {
 .sidebar button[style*='textTransform'] {
   letter-spacing: 0.5px;
   transition: color 0.2s ease;
-}
-
-/* Page header subtle bottom accent */
-header h1 {
-  position: relative;
-  padding-bottom: 8px;
-}
-
-header h1::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent-primary), transparent);
-  border-radius: 2px;
 }
 
 /* Stat card number animation */

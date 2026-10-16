@@ -65,6 +65,7 @@ import XLSX from 'xlsx-js-style'
 import { ReportService } from '../services/ReportService'
 import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
+import VesselSummaryTiles from './VesselSummaryTiles'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
@@ -1053,19 +1054,24 @@ export default function VesselDetail({
       <button
         onClick={onBack}
         className="btn-secondary"
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}
       >
         <ArrowLeft size={18} /> {backLabel}
       </button>
 
+      {/* Record header: name, key facts, actions, then one tile per related area */}
       <header
         style={{
-          marginBottom: '32px',
+          marginBottom: '20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
           flexWrap: 'wrap',
-          gap: '16px'
+          gap: '16px 18px',
+          padding: '22px 24px',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--glass-border-color)',
+          borderRadius: 'var(--radius-card)'
         }}
       >
         <div>
@@ -1783,98 +1789,102 @@ export default function VesselDetail({
             </div>
           ) : (
             <>
-              <h1
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <h1
+                  style={{
+                    fontSize: '1.65rem',
+                    fontWeight: 600,
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  {vessel.name}
+                  {(() => {
+                    const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
+                    const flagCls = currentFlag ? getFlagClass(currentFlag.iso3Code) : ''
+                    return flagCls ? (
+                      <span
+                        className={flagCls}
+                        title={`${currentFlag!.name} (${currentFlag!.iso3Code})`}
+                        style={{ fontSize: '1.3rem', cursor: 'help' }}
+                      ></span>
+                    ) : null
+                  })()}
+                </h1>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    padding: '3px 9px',
+                    borderRadius: '999px',
+                    background: vesselActive
+                      ? 'color-mix(in srgb, var(--success) 15%, transparent)'
+                      : 'color-mix(in srgb, var(--text-secondary) 15%, transparent)',
+                    color: vesselActive ? 'var(--success)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {vesselActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              {/* Key facts, each with its label */}
+              <div
                 style={{
-                  fontSize: '1.75rem',
-                  marginBottom: '8px',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
+                  flexWrap: 'wrap',
+                  gap: '6px 18px',
+                  marginTop: '10px',
+                  fontSize: '0.88rem',
+                  color: 'var(--text-secondary)'
                 }}
               >
-                {vessel.name}
                 {(() => {
-                  const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
-                  const flagCls = currentFlag ? getFlagClass(currentFlag.iso3Code) : ''
-                  return flagCls ? (
-                    <span
-                      className={flagCls}
-                      title={`${currentFlag!.name} (${currentFlag!.iso3Code})`}
-                      style={{ fontSize: '1.4rem', cursor: 'help' }}
-                    ></span>
-                  ) : null
-                })()}
-              </h1>
-              <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
-              {(vessel.builtYear ||
-                vessel.rebuiltYear ||
-                vessel.grossTonnage ||
-                vessel.vesselType ||
-                vesselClassificationIds.size > 0 ||
-                vessel.classificationSociety ||
-                vessel.callSign) && (
-                <p
-                  style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}
-                >
-                  {[
-                    vessel.builtYear &&
-                      (vessel.rebuiltYear
-                        ? `Built ${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}`
-                        : `Built ${vessel.builtYear}`),
-                    vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
-                    (vessel.vesselTypeId || vessel.vesselType) &&
-                      (() => {
-                        const vt = vessel.vesselTypeId
-                          ? vesselTypes.find((t) => t.id === vessel.vesselTypeId)
-                          : vesselTypes.find((t) => t.name === vessel.vesselType)
-                        return vt?.description
-                          ? `${vt.name} (${vt.description})`
-                          : vt?.name || vessel.vesselType
-                      })(),
-                    vesselClassificationIds.size > 0
-                      ? `Class: ${classSocieties
-                          .filter((cs) => vesselClassificationIds.has(cs.id))
-                          .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
-                          .map((cs) => cs.abbreviation || cs.name)
-                          .join(' / ')}`
-                      : vessel.classificationSociety && `Class: ${vessel.classificationSociety}`,
-                    vessel.callSign && `Call Sign: ${vessel.callSign}`
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-              )}
-              <button
-                onClick={() => {
+                  const strong = (v: React.ReactNode): React.JSX.Element => (
+                    <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v}</strong>
+                  )
+                  const flag = flagStates.find((f) => f.id === selectedFlagStateId)
                   const vt = vessel.vesselTypeId
                     ? vesselTypes.find((t) => t.id === vessel.vesselTypeId)
                     : vesselTypes.find((t) => t.name === vessel.vesselType)
-                  const typeName = vt?.name || vessel.vesselType || ''
-                  const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
-                  const flagName = currentFlag?.name || ''
-                  const built = vessel.rebuiltYear
-                    ? `${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}`
-                    : vessel.builtYear || ''
-                  const gt = vessel.grossTonnage ? vessel.grossTonnage.toLocaleString('en-US') : ''
-                  const text = `M/V ${vessel.name}, Type ${typeName}, Flag ${flagName}, Built ${built}, GT ${gt}, IMO ${vessel.imoNumber || ''}`
-                  navigator.clipboard.writeText(text)
-                  showSuccess('Vessel details copied')
-                }}
-                className="btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 10px',
-                  fontSize: '0.78rem',
-                  marginTop: '8px'
-                }}
-                title="Copy vessel details"
-              >
-                <Copy size={13} /> Copy details
-              </button>
+                  const typeName = vt?.description
+                    ? `${vt.name} (${vt.description})`
+                    : vt?.name || vessel.vesselType
+                  const cls =
+                    vesselClassificationIds.size > 0
+                      ? classSocieties
+                          .filter((cs) => vesselClassificationIds.has(cs.id))
+                          .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
+                          .map((cs) => cs.abbreviation || cs.name)
+                          .join(' / ')
+                      : vessel.classificationSociety
+                  return (
+                    <>
+                      {flag && <span>Flag {strong(flag.name)}</span>}
+                      <span>
+                        IMO{' '}
+                        <span className="mono" style={{ color: 'var(--text-primary)' }}>
+                          {vessel.imoNumber || '-'}
+                        </span>
+                      </span>
+                      {typeName && <span>{strong(typeName)}</span>}
+                      {vessel.builtYear && (
+                        <span>
+                          Built {strong(vessel.builtYear)}
+                          {vessel.rebuiltYear && <> / Rebuilt {strong(vessel.rebuiltYear)}</>}
+                        </span>
+                      )}
+                      {vessel.grossTonnage && (
+                        <span>GT {strong(vessel.grossTonnage.toLocaleString('en-US'))}</span>
+                      )}
+                      {cls && <span>Class {strong(cls)}</span>}
+                      {vessel.callSign && <span>Call sign {strong(vessel.callSign)}</span>}
+                    </>
+                  )
+                })()}
+              </div>
               {nameHistory.length > 0 && (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
                   Former name{nameHistory.length > 1 ? 's' : ''}:{' '}
                   {nameHistory.map((h, i) => (
                     <span key={h.id}>
@@ -1892,6 +1902,36 @@ export default function VesselDetail({
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {!isEditing && (
+            <button
+              onClick={() => {
+                const vt = vessel.vesselTypeId
+                  ? vesselTypes.find((t) => t.id === vessel.vesselTypeId)
+                  : vesselTypes.find((t) => t.name === vessel.vesselType)
+                const typeName = vt?.name || vessel.vesselType || ''
+                const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
+                const flagName = currentFlag?.name || ''
+                const built = vessel.rebuiltYear
+                  ? `${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}`
+                  : vessel.builtYear || ''
+                const gt = vessel.grossTonnage ? vessel.grossTonnage.toLocaleString('en-US') : ''
+                const text = `M/V ${vessel.name}, Type ${typeName}, Flag ${flagName}, Built ${built}, GT ${gt}, IMO ${vessel.imoNumber || ''}`
+                navigator.clipboard.writeText(text)
+                showSuccess('Vessel details copied')
+              }}
+              className="btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '0.82rem'
+              }}
+              title="Copy vessel details"
+            >
+              <Copy size={15} /> Copy details
+            </button>
+          )}
           {isEditing ? (
             <>
               <button
@@ -1950,11 +1990,11 @@ export default function VesselDetail({
                   gap: '6px',
                   padding: '6px 12px',
                   fontSize: '0.82rem',
-                  color: vesselActive ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                  color: 'var(--text-primary)'
                 }}
               >
                 {vesselActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                {vesselActive ? 'Active' : 'Inactive'}
+                {vesselActive ? 'Set inactive' : 'Set active'}
               </button>
               <button
                 onClick={handleOpenVesselNotes}
@@ -2292,14 +2332,32 @@ export default function VesselDetail({
             </>
           )}
         </div>
+        {!isEditing && (
+          <div style={{ flexBasis: '100%' }}>
+            <VesselSummaryTiles
+              vessel={vessel}
+              docTypes={docTypes}
+              vesselDocs={vesselDocs}
+              customDocTypes={customDocTypes}
+              dynamicPolicies={dynamicPolicies}
+              onOpen={(tab) => {
+                setDetailView(tab)
+                if (tab === 'policies' || tab === 'surveys') loadDynamicPolicies()
+              }}
+            />
+          </div>
+        )}
       </header>
 
       {/* Section navigation tabs */}
       <div
+        role="tablist"
+        aria-label="Vessel sections"
         style={{
           display: 'flex',
-          gap: '0',
-          borderBottom: '2px solid var(--table-border)',
+          flexWrap: 'wrap',
+          gap: '4px',
+          borderBottom: '1px solid var(--glass-border-color)',
           marginBottom: '16px',
           alignItems: 'center'
         }}
@@ -2317,6 +2375,8 @@ export default function VesselDetail({
         ).map((view) => (
           <button
             key={view}
+            role="tab"
+            aria-selected={detailView === view}
             onClick={() => {
               setDetailView(view)
               if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
@@ -2324,27 +2384,28 @@ export default function VesselDetail({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '10px 20px',
+              gap: '7px',
+              padding: '10px 14px',
               background: 'transparent',
               border: 'none',
+              borderRadius: 0,
               borderBottom:
                 detailView === view ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              marginBottom: '-2px',
-              color: detailView === view ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              fontWeight: detailView === view ? '600' : '400',
-              fontSize: '0.9rem',
+              marginBottom: '-1px',
+              color: detailView === view ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontWeight: detailView === view ? 600 : 500,
+              fontSize: '0.88rem',
               cursor: 'pointer',
               transition: 'var(--transition)'
             }}
           >
-            {view === 'documents' && <FileText size={18} />}
-            {view === 'assureds' && <Users size={18} />}
-            {view === 'surveys' && <ClipboardList size={18} />}
-            {view === 'policies' && <Shield size={18} />}
-            {view === 'quotations' && <Hash size={18} />}
-            {view === 'payments' && <Receipt size={18} />}
-            {view === 'timeline' && <Clock size={18} />}
+            {view === 'documents' && <FileText size={16} />}
+            {view === 'assureds' && <Users size={16} />}
+            {view === 'surveys' && <ClipboardList size={16} />}
+            {view === 'policies' && <Shield size={16} />}
+            {view === 'quotations' && <Hash size={16} />}
+            {view === 'payments' && <Receipt size={16} />}
+            {view === 'timeline' && <Clock size={16} />}
             {view === 'assureds'
               ? 'Assured'
               : view === 'timeline'
