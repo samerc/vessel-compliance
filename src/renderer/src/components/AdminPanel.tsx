@@ -114,10 +114,9 @@ const SECTION_KEYWORDS: Record<string, string> = {
   logRetention: 'activity log cleanup',
   reminders: 'grace annual renewal'
 }
-import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog } from './DialogHost'
-import { PageHeader } from './ui'
+import { PageHeader, Modal, Field } from './ui'
 import type { SubTabProps } from '../utils/useRequestedSubTab'
 import type { NavTarget } from '../features'
 import { ok } from '../utils/ipc'
@@ -1497,40 +1496,24 @@ export default function AdminPanel({
             <p>No vessels found with this role.</p>
           </div>
         ) : (
-          <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-wrap">
+            <table className="data-table">
               <caption className="sr-only">Vessels with role {roleVesselPopup.roleName}</caption>
               <thead>
-                <tr
-                  style={{
-                    textAlign: 'left',
-                    background: 'var(--table-header-bg)',
-                    borderBottom: '1px solid var(--table-border)'
-                  }}
-                >
-                  <th scope="col" style={{ padding: '16px' }}>
-                    Vessel Name
-                  </th>
-                  <th scope="col" style={{ padding: '16px' }}>
-                    IMO Number
-                  </th>
-                  <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                <tr>
+                  <th scope="col">Vessel Name</th>
+                  <th scope="col">IMO Number</th>
+                  <th scope="col" style={{ textAlign: 'right' }}>
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {roleVesselPopup.vessels.map((v) => (
-                  <tr
-                    key={v.id}
-                    style={{ borderBottom: '1px solid var(--table-border)' }}
-                    className="hover-effect"
-                  >
-                    <td style={{ padding: '16px', fontWeight: '600' }}>{v.name}</td>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                      {v.imoNumber}
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                  <tr key={v.id}>
+                    <td style={{ fontWeight: '600' }}>{v.name}</td>
+                    <td className="muted">{v.imoNumber}</td>
+                    <td style={{ textAlign: 'right' }}>
                       {onNavigateToVessel && (
                         <button
                           onClick={() => {
@@ -1968,7 +1951,7 @@ export default function AdminPanel({
                       border: '1px solid var(--table-border)',
                       cursor: 'pointer',
                       background: userSectionAccess.includes(sec.id)
-                        ? 'rgba(var(--accent-primary-rgb,0,210,255),0.06)'
+                        ? 'var(--row-selected)'
                         : 'transparent'
                     }}
                   >
@@ -2013,41 +1996,25 @@ export default function AdminPanel({
                 style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}
               >
                 <div style={{ flex: '1 1 300px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    style={{ width: '100%', marginBottom: '12px' }}
-                    placeholder="e.g. Safety Management Certificate"
-                    aria-label="Document type name"
-                  />
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    style={{ width: '100%', minHeight: '60px', resize: 'vertical' }}
-                    placeholder="Brief description of the document purposes..."
-                    aria-label="Document type description"
-                  />
+                  <Field label="Name">
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      style={{ marginBottom: '12px' }}
+                      placeholder="e.g. Safety Management Certificate"
+                      aria-label="Document type name"
+                    />
+                  </Field>
+                  <Field label="Description (optional)">
+                    <textarea
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      style={{ minHeight: '60px', resize: 'vertical' }}
+                      placeholder="Brief description of the document purposes..."
+                      aria-label="Document type description"
+                    />
+                  </Field>
                 </div>
                 <div style={{ width: '1px' }}></div>
                 <div
@@ -2203,33 +2170,17 @@ export default function AdminPanel({
                 )}
               </form>
 
-              <div
-                style={{
-                  overflow: 'hidden',
-                  borderRadius: '8px',
-                  border: '1px solid var(--table-border)'
-                }}
-              >
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="data-table">
                   <caption className="sr-only">Document types configuration</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <th scope="col" style={{ padding: '16px', width: '60px' }}>
+                    <tr>
+                      <th scope="col" style={{ width: '60px' }}>
                         #
                       </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Document Type
-                      </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Status
-                      </th>
-                      <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                      <th scope="col">Document Type</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
                       </th>
                     </tr>
@@ -2249,7 +2200,6 @@ export default function AdminPanel({
                           setDragOverDocIndex(null)
                         }}
                         style={{
-                          borderBottom: '1px solid var(--table-border)',
                           opacity: draggingDocIndex === index ? 0.5 : 1,
                           background:
                             dragOverDocIndex === index
@@ -2258,7 +2208,7 @@ export default function AdminPanel({
                           cursor: 'grab'
                         }}
                       >
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <GripVertical
                               size={16}
@@ -2277,7 +2227,7 @@ export default function AdminPanel({
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           {editingDocId === doc.id ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <input
@@ -2426,7 +2376,7 @@ export default function AdminPanel({
                                       padding: '1px 6px',
                                       borderRadius: '3px',
                                       background: 'rgba(0,200,100,0.1)',
-                                      color: '#00c864'
+                                      color: 'var(--success)'
                                     }}
                                   >
                                     All Types
@@ -2454,7 +2404,7 @@ export default function AdminPanel({
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           <span
                             onClick={() => handleToggleDocRequired(doc)}
                             style={{
@@ -2495,7 +2445,7 @@ export default function AdminPanel({
                             {doc.annualRenewal ? 'ANNUAL' : 'ONE-TIME'}
                           </span>
                         </td>
-                        <td style={{ padding: '20px 16px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <button
                             onClick={() => handleDeleteDocType(doc.id)}
                             style={{
@@ -2530,39 +2480,23 @@ export default function AdminPanel({
                 style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}
               >
                 <div style={{ flex: '1 1 300px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newEdtName}
-                    onChange={(e) => setNewEdtName(e.target.value)}
-                    style={{ width: '100%', marginBottom: '12px' }}
-                    placeholder="e.g. Power of Attorney"
-                  />
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={newEdtDescription}
-                    onChange={(e) => setNewEdtDescription(e.target.value)}
-                    style={{ width: '100%', minHeight: '50px', resize: 'vertical' }}
-                    placeholder="Brief description..."
-                  />
+                  <Field label="Name">
+                    <input
+                      type="text"
+                      value={newEdtName}
+                      onChange={(e) => setNewEdtName(e.target.value)}
+                      style={{ marginBottom: '12px' }}
+                      placeholder="e.g. Power of Attorney"
+                    />
+                  </Field>
+                  <Field label="Description (optional)">
+                    <textarea
+                      value={newEdtDescription}
+                      onChange={(e) => setNewEdtDescription(e.target.value)}
+                      style={{ minHeight: '50px', resize: 'vertical' }}
+                      placeholder="Brief description..."
+                    />
+                  </Field>
                 </div>
                 <div style={{ width: '1px' }}></div>
                 <div
@@ -2643,36 +2577,18 @@ export default function AdminPanel({
                 </div>
               </form>
 
-              <div
-                style={{
-                  overflow: 'hidden',
-                  borderRadius: '8px',
-                  border: '1px solid var(--table-border)'
-                }}
-              >
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="data-table">
                   <caption className="sr-only">Entity document types configuration</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <th scope="col" style={{ padding: '16px', width: '60px' }}>
+                    <tr>
+                      <th scope="col" style={{ width: '60px' }}>
                         #
                       </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Document Type
-                      </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Scope
-                      </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Status
-                      </th>
-                      <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                      <th scope="col">Document Type</th>
+                      <th scope="col">Scope</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
                       </th>
                     </tr>
@@ -2692,7 +2608,6 @@ export default function AdminPanel({
                           setDragOverEdtIndex(null)
                         }}
                         style={{
-                          borderBottom: '1px solid var(--table-border)',
                           opacity: draggingEdtIndex === index ? 0.5 : 1,
                           background:
                             dragOverEdtIndex === index
@@ -2701,7 +2616,7 @@ export default function AdminPanel({
                           cursor: 'grab'
                         }}
                       >
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <GripVertical
                               size={16}
@@ -2720,7 +2635,7 @@ export default function AdminPanel({
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           {editingEdtId === edt.id ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                               <input
@@ -2835,7 +2750,7 @@ export default function AdminPanel({
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           <span
                             style={{
                               padding: '2px 8px',
@@ -2860,7 +2775,7 @@ export default function AdminPanel({
                             {edt.entityScope}
                           </span>
                         </td>
-                        <td style={{ padding: '20px 16px' }}>
+                        <td>
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <span
                               style={{
@@ -2890,14 +2805,14 @@ export default function AdminPanel({
                                 background: edt.isActive
                                   ? 'rgba(0,200,100,0.1)'
                                   : 'rgba(255,77,77,0.1)',
-                                color: edt.isActive ? '#00c864' : 'var(--danger)'
+                                color: edt.isActive ? 'var(--success)' : 'var(--danger)'
                               }}
                             >
                               {edt.isActive ? 'ACTIVE' : 'INACTIVE'}
                             </button>
                           </div>
                         </td>
-                        <td style={{ padding: '20px 16px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             <button
                               title="Edit"
@@ -2970,33 +2885,19 @@ export default function AdminPanel({
                 </button>
               </form>
 
-              <div
-                style={{
-                  overflow: 'hidden',
-                  borderRadius: '8px',
-                  border: '1px solid var(--table-border)'
-                }}
-              >
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="data-table">
                   <caption className="sr-only">Assured roles</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <th scope="col" style={{ padding: '16px', width: '60px' }}>
+                    <tr>
+                      <th scope="col" style={{ width: '60px' }}>
                         #
                       </th>
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Role
-                      </th>
-                      <th scope="col" style={{ padding: '16px', width: '120px' }}>
+                      <th scope="col">Role</th>
+                      <th scope="col" style={{ width: '120px' }}>
                         Vessels
                       </th>
-                      <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
                       </th>
                     </tr>
@@ -3016,7 +2917,6 @@ export default function AdminPanel({
                           setDragOverRoleIndex(null)
                         }}
                         style={{
-                          borderBottom: '1px solid var(--table-border)',
                           opacity: draggingRoleIndex === index ? 0.5 : 1,
                           background:
                             dragOverRoleIndex === index
@@ -3025,7 +2925,7 @@ export default function AdminPanel({
                           cursor: 'grab'
                         }}
                       >
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <GripVertical
                               size={16}
@@ -3044,7 +2944,7 @@ export default function AdminPanel({
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           {editingRoleId === role.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <input
@@ -3083,7 +2983,7 @@ export default function AdminPanel({
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           <span
                             onClick={() => handleShowRoleVessels(role)}
                             style={{
@@ -3100,7 +3000,7 @@ export default function AdminPanel({
                             {role.vesselCount || 0}
                           </span>
                         </td>
-                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <button
                             onClick={() => handleDeleteRole(role.id)}
                             style={{
@@ -3151,36 +3051,22 @@ export default function AdminPanel({
                 </button>
               </form>
 
-              <div
-                style={{
-                  overflow: 'hidden',
-                  borderRadius: '8px',
-                  border: '1px solid var(--table-border)'
-                }}
-              >
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="data-table">
                   <caption className="sr-only">Condition survey types</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <th scope="col" style={{ padding: '16px' }}>
-                        Survey Type
-                      </th>
-                      <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                    <tr>
+                      <th scope="col">Survey Type</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {surveyTypes.map((type) => (
-                      <tr key={type.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                        <td style={{ padding: '16px' }}>{type.name}</td>
-                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <tr key={type.id}>
+                        <td>{type.name}</td>
+                        <td style={{ textAlign: 'right' }}>
                           <button
                             onClick={() => handleDeleteSurveyType(type.id)}
                             style={{
@@ -3248,25 +3134,8 @@ export default function AdminPanel({
                     </label>
                   </div>
 
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '16px',
-                      marginBottom: '16px'
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '6px'
-                        }}
-                      >
-                        Day of Week
-                      </label>
+                  <div className="form-grid cols-2" style={{ marginBottom: '16px' }}>
+                    <Field label="Day of week">
                       <select
                         value={complianceSettings.dayOfWeek}
                         onChange={(e) =>
@@ -3275,14 +3144,6 @@ export default function AdminPanel({
                             dayOfWeek: parseInt(e.target.value)
                           })
                         }
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          background: 'var(--input-bg)',
-                          border: '1px solid var(--input-border)',
-                          color: 'var(--text-primary)'
-                        }}
                         disabled={!complianceSettings.enabled}
                         aria-label="Day of week"
                       >
@@ -3292,18 +3153,8 @@ export default function AdminPanel({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '6px'
-                        }}
-                      >
-                        Time
-                      </label>
+                    </Field>
+                    <Field label="Time">
                       <input
                         type="time"
                         value={complianceSettings.timeOfDay}
@@ -3313,47 +3164,31 @@ export default function AdminPanel({
                             timeOfDay: e.target.value
                           })
                         }
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          background: 'var(--input-bg)',
-                          border: '1px solid var(--input-border)',
-                          color: 'var(--text-primary)'
-                        }}
                         disabled={!complianceSettings.enabled}
                         aria-label="Time of day"
                       />
-                    </div>
+                    </Field>
                   </div>
 
                   <div style={{ marginBottom: '16px' }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '6px'
-                      }}
-                    >
-                      Match Score Threshold: {complianceSettings.threshold}%
-                    </label>
-                    <input
-                      type="range"
-                      min="50"
-                      max="100"
-                      step="5"
-                      value={complianceSettings.threshold}
-                      onChange={(e) =>
-                        setComplianceSettings({
-                          ...complianceSettings,
-                          threshold: parseInt(e.target.value)
-                        })
-                      }
-                      style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
-                      disabled={!complianceSettings.enabled}
-                      aria-label="Match score threshold"
-                    />
+                    <Field label={<>Match score threshold: {complianceSettings.threshold}%</>}>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        value={complianceSettings.threshold}
+                        onChange={(e) =>
+                          setComplianceSettings({
+                            ...complianceSettings,
+                            threshold: parseInt(e.target.value)
+                          })
+                        }
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                        disabled={!complianceSettings.enabled}
+                        aria-label="Match score threshold"
+                      />
+                    </Field>
                     <div
                       style={{
                         display: 'flex',
@@ -3620,33 +3455,16 @@ export default function AdminPanel({
                 }}
               >
                 <div>
-                  <label
-                    htmlFor="admin-annual-grace"
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    Annual Doc Grace (days)
-                  </label>
-                  <input
-                    id="admin-annual-grace"
-                    type="number"
-                    min={30}
-                    max={180}
-                    value={annualGraceDays}
-                    onChange={(e) => setAnnualGraceDays(Number(e.target.value) || 90)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--input-border)',
-                      borderRadius: '8px',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
+                  <Field label="Annual doc grace (days)" htmlFor="admin-annual-grace">
+                    <input
+                      id="admin-annual-grace"
+                      type="number"
+                      min={30}
+                      max={180}
+                      value={annualGraceDays}
+                      onChange={(e) => setAnnualGraceDays(Number(e.target.value) || 90)}
+                    />
+                  </Field>
                   <p
                     style={{
                       fontSize: '0.75rem',
@@ -3687,57 +3505,24 @@ export default function AdminPanel({
               >
                 Configure branding settings applied to all generated PDF reports.
               </p>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '20px',
-                  marginBottom: '20px'
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.82rem',
-                      fontWeight: '600',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    Company Name
-                  </label>
+              <div className="form-grid cols-2" style={{ marginBottom: '20px' }}>
+                <Field label="Company name">
                   <input
                     type="text"
                     value={reportSettings.companyName}
                     onChange={(e) =>
                       setReportSettings({ ...reportSettings, companyName: e.target.value })
                     }
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box'
-                    }}
                   />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.82rem',
-                      fontWeight: '600',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    Company Subtitle{' '}
-                    <span style={{ fontWeight: '400', opacity: 0.6 }}>(optional)</span>
-                  </label>
+                </Field>
+                <Field
+                  label={
+                    <>
+                      Company subtitle{' '}
+                      <span style={{ fontWeight: '400', opacity: 0.6 }}>(optional)</span>
+                    </>
+                  }
+                >
                   <input
                     type="text"
                     value={reportSettings.companySubtitle}
@@ -3745,60 +3530,20 @@ export default function AdminPanel({
                       setReportSettings({ ...reportSettings, companySubtitle: e.target.value })
                     }
                     placeholder="e.g. Marine Division"
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box'
-                    }}
                   />
-                </div>
+                </Field>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.82rem',
-                      fontWeight: '600',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    Footer Text
-                  </label>
-                  <input
-                    type="text"
-                    value={reportSettings.footerText}
-                    onChange={(e) =>
-                      setReportSettings({ ...reportSettings, footerText: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                  <Field label="Footer text">
+                    <input
+                      type="text"
+                      value={reportSettings.footerText}
+                      onChange={(e) =>
+                        setReportSettings({ ...reportSettings, footerText: e.target.value })
+                      }
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.82rem',
-                      fontWeight: '600',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    Primary Color
-                  </label>
+                <Field label="Primary color">
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input
                       type="color"
@@ -3834,7 +3579,7 @@ export default function AdminPanel({
                       rgb({reportSettings.primaryColor.join(', ')})
                     </span>
                   </div>
-                </div>
+                </Field>
               </div>
 
               {/* Per-report intro / end text */}
@@ -3871,69 +3616,25 @@ export default function AdminPanel({
                       <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>
                         {report.label}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                        <div>
-                          <label
-                            style={{
-                              display: 'block',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              color: 'var(--text-secondary)',
-                              marginBottom: '6px'
-                            }}
-                          >
-                            Intro Text
-                          </label>
+                      <div className="form-grid cols-2">
+                        <Field label="Intro text">
                           <textarea
                             value={texts.intro}
                             onChange={(e) => setReportText('intro', e.target.value)}
                             rows={4}
                             placeholder="Shown before the report content. One paragraph per line."
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid var(--input-border)',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.88rem',
-                              boxSizing: 'border-box',
-                              resize: 'vertical',
-                              fontFamily: 'inherit'
-                            }}
+                            style={{ resize: 'vertical', fontFamily: 'inherit' }}
                           />
-                        </div>
-                        <div>
-                          <label
-                            style={{
-                              display: 'block',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              color: 'var(--text-secondary)',
-                              marginBottom: '6px'
-                            }}
-                          >
-                            End Text
-                          </label>
+                        </Field>
+                        <Field label="End text">
                           <textarea
                             value={texts.end}
                             onChange={(e) => setReportText('end', e.target.value)}
                             rows={4}
                             placeholder="Shown at the end of the report. One paragraph per line."
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid var(--input-border)',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.88rem',
-                              boxSizing: 'border-box',
-                              resize: 'vertical',
-                              fontFamily: 'inherit'
-                            }}
+                            style={{ resize: 'vertical', fontFamily: 'inherit' }}
                           />
-                        </div>
+                        </Field>
                       </div>
                     </div>
                   )
@@ -4198,39 +3899,30 @@ export default function AdminPanel({
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                    color: 'var(--text-primary)',
-                    marginBottom: '8px'
-                  }}
-                >
-                  Retention Period
-                </label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {[
-                    { label: '90 days', value: 90 },
-                    { label: '180 days', value: 180 },
-                    { label: '365 days', value: 365 },
-                    { label: 'Never', value: 0 }
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => handleSaveRetention(opt.value)}
-                      disabled={savingRetention}
-                      className={logRetentionDays === opt.value ? 'btn-primary' : 'btn-secondary'}
-                      style={{
-                        padding: '8px 20px',
-                        fontSize: '0.85rem',
-                        ...(logRetentionDays === opt.value ? {} : { opacity: 0.7 })
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                <Field label="Retention period">
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { label: '90 days', value: 90 },
+                      { label: '180 days', value: 180 },
+                      { label: '365 days', value: 365 },
+                      { label: 'Never', value: 0 }
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleSaveRetention(opt.value)}
+                        disabled={savingRetention}
+                        className={logRetentionDays === opt.value ? 'btn-primary' : 'btn-secondary'}
+                        style={{
+                          padding: '8px 20px',
+                          fontSize: '0.85rem',
+                          ...(logRetentionDays === opt.value ? {} : { opacity: 0.7 })
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
               </div>
 
               <button
@@ -4358,7 +4050,7 @@ export default function AdminPanel({
                 <AlertTriangle
                   size={16}
                   style={{ flexShrink: 0, marginTop: '1px' }}
-                  color="rgb(255, 165, 0)"
+                  color="var(--warning)"
                 />
                 <span>
                   Restoring a backup will replace all current data (except user accounts) with the
@@ -4368,78 +4060,39 @@ export default function AdminPanel({
 
               {/* Restore confirmation modal */}
               {showRestoreConfirm && (
-                <div
-                  style={{
-                    position: 'fixed',
-                    inset: 0,
-                    background: 'rgba(0,0,0,0.6)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                  }}
-                  onClick={() => setShowRestoreConfirm(false)}
-                >
-                  <div
-                    style={{
-                      background: 'var(--bg-primary)',
-                      borderRadius: '12px',
-                      padding: '28px',
-                      maxWidth: '440px',
-                      width: '90%',
-                      border: '1px solid var(--glass-border-color)'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        marginBottom: '16px'
-                      }}
-                    >
-                      <AlertTriangle size={24} color="var(--danger)" />
-                      <h3 style={{ margin: 0 }}>Confirm Restore</h3>
-                    </div>
-                    <p
-                      style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.9rem',
-                        marginBottom: '8px'
-                      }}
-                    >
-                      This will replace all current data with the backup contents. User accounts
-                      will not be affected.
-                    </p>
-                    <p
-                      style={{
-                        color: 'var(--danger)',
-                        fontSize: '0.85rem',
-                        fontWeight: '600',
-                        marginBottom: '24px'
-                      }}
-                    >
-                      This action cannot be undone.
-                    </p>
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <Modal
+                  title="Confirm restore"
+                  icon={<AlertTriangle size={18} color="var(--danger)" />}
+                  onClose={() => setShowRestoreConfirm(false)}
+                  width={440}
+                  footer={
+                    <>
                       <button
                         onClick={() => setShowRestoreConfirm(false)}
                         className="btn-secondary"
-                        style={{ padding: '8px 20px' }}
                       >
                         Cancel
                       </button>
-                      <button
-                        onClick={handleRestore}
-                        className="btn-primary"
-                        style={{ padding: '8px 20px', background: 'var(--danger)' }}
-                      >
+                      <button onClick={handleRestore} className="btn-danger">
                         Restore
                       </button>
-                    </div>
-                  </div>
-                </div>
+                    </>
+                  }
+                >
+                  <p
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.9rem',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    This will replace all current data with the backup contents. User accounts will
+                    not be affected.
+                  </p>
+                  <p style={{ color: 'var(--danger)', fontSize: '0.85rem', fontWeight: '600' }}>
+                    This action cannot be undone.
+                  </p>
+                </Modal>
               )}
             </section>
           )}
@@ -4527,9 +4180,9 @@ export default function AdminPanel({
                             width: '10px',
                             height: '10px',
                             borderRadius: '50%',
-                            background: dbHealth.connected ? '#22c55e' : 'var(--danger)',
+                            background: dbHealth.connected ? 'var(--success)' : 'var(--danger)',
                             boxShadow: dbHealth.connected
-                              ? '0 0 6px #22c55e'
+                              ? '0 0 6px var(--success)'
                               : '0 0 6px var(--danger)'
                           }}
                         />
@@ -4537,7 +4190,7 @@ export default function AdminPanel({
                           style={{
                             fontWeight: 600,
                             fontSize: '1rem',
-                            color: dbHealth.connected ? '#22c55e' : 'var(--danger)'
+                            color: dbHealth.connected ? 'var(--success)' : 'var(--danger)'
                           }}
                         >
                           {dbHealth.connected ? 'Connected' : 'Disconnected'}
@@ -4625,79 +4278,30 @@ export default function AdminPanel({
                       >
                         Top 10 Largest Tables
                       </h4>
-                      <div
-                        style={{
-                          overflow: 'hidden',
-                          borderRadius: '8px',
-                          border: '1px solid var(--table-border)'
-                        }}
-                      >
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <div className="table-wrap">
+                        <table className="data-table">
                           <caption className="sr-only">Largest database tables</caption>
                           <thead>
-                            <tr
-                              style={{
-                                textAlign: 'left',
-                                background: 'var(--table-header-bg)',
-                                borderBottom: '1px solid var(--table-border)'
-                              }}
-                            >
-                              <th scope="col" style={{ padding: '12px 16px' }}>
-                                #
-                              </th>
-                              <th scope="col" style={{ padding: '12px 16px' }}>
-                                Table
-                              </th>
-                              <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <tr>
+                              <th scope="col">#</th>
+                              <th scope="col">Table</th>
+                              <th scope="col" style={{ textAlign: 'right' }}>
                                 Rows
                               </th>
-                              <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <th scope="col" style={{ textAlign: 'right' }}>
                                 Size (MB)
                               </th>
                             </tr>
                           </thead>
                           <tbody>
                             {dbHealth.largestTables.map((t, i) => (
-                              <tr
-                                key={t.name}
-                                style={{ borderBottom: '1px solid var(--table-border)' }}
-                              >
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {i + 1}
+                              <tr key={t.name}>
+                                <td className="muted">{i + 1}</td>
+                                <td>
+                                  <span className="mono">{t.name}</span>
                                 </td>
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {t.name}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    textAlign: 'right',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {t.rows.toLocaleString()}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    textAlign: 'right',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {t.sizeMB.toFixed(2)}
-                                </td>
+                                <td className="num">{t.rows.toLocaleString()}</td>
+                                <td className="num">{t.sizeMB.toFixed(2)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -4875,41 +4479,27 @@ export default function AdminPanel({
                 </button>
               </form>
               {vesselTypes.length > 0 && (
-                <div
-                  style={{
-                    overflow: 'hidden',
-                    borderRadius: '8px',
-                    border: '1px solid var(--table-border)'
-                  }}
-                >
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <caption className="sr-only">Vessel types</caption>
                     <thead>
-                      <tr
-                        style={{
-                          textAlign: 'left',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        <th scope="col" style={{ padding: '16px', width: '60px' }}>
+                      <tr>
+                        <th scope="col" style={{ width: '60px' }}>
                           #
                         </th>
-                        <th scope="col" style={{ padding: '16px', width: '120px' }}>
+                        <th scope="col" style={{ width: '120px' }}>
                           Name
                         </th>
-                        <th scope="col" style={{ padding: '16px' }}>
-                          Full Name / Description
-                        </th>
-                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                        <th scope="col">Full Name / Description</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>
                           Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {vesselTypes.map((vt, index) => (
-                        <tr key={vt.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                          <td style={{ padding: '16px' }}>
+                        <tr key={vt.id}>
+                          <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <button
@@ -4947,14 +4537,7 @@ export default function AdminPanel({
                               </span>
                             </div>
                           </td>
-                          <td
-                            style={{
-                              padding: '16px',
-                              fontFamily: 'monospace',
-                              fontWeight: '600',
-                              fontSize: '0.9rem'
-                            }}
-                          >
+                          <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>
                             {editingVesselTypeId === vt.id ? (
                               <input
                                 type="text"
@@ -4967,13 +4550,7 @@ export default function AdminPanel({
                               vt.name
                             )}
                           </td>
-                          <td
-                            style={{
-                              padding: '16px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.88rem'
-                            }}
-                          >
+                          <td className="muted">
                             {editingVesselTypeId === vt.id ? (
                               <input
                                 type="text"
@@ -4989,7 +4566,7 @@ export default function AdminPanel({
                               )
                             )}
                           </td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <div
                               style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                             >
@@ -5111,44 +4688,26 @@ export default function AdminPanel({
                 </button>
               </form>
               {classSocieties.length > 0 && (
-                <div
-                  style={{
-                    overflow: 'hidden',
-                    borderRadius: '8px',
-                    border: '1px solid var(--table-border)'
-                  }}
-                >
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <caption className="sr-only">Classification societies</caption>
                     <thead>
-                      <tr
-                        style={{
-                          textAlign: 'left',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        <th scope="col" style={{ padding: '16px', width: '60px' }}>
+                      <tr>
+                        <th scope="col" style={{ width: '60px' }}>
                           #
                         </th>
-                        <th scope="col" style={{ padding: '16px' }}>
-                          Name
-                        </th>
-                        <th scope="col" style={{ padding: '16px' }}>
-                          Abbreviation
-                        </th>
-                        <th scope="col" style={{ padding: '16px' }}>
-                          IACS
-                        </th>
-                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                        <th scope="col">Name</th>
+                        <th scope="col">Abbreviation</th>
+                        <th scope="col">IACS</th>
+                        <th scope="col" style={{ textAlign: 'right' }}>
                           Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {classSocieties.map((cs, index) => (
-                        <tr key={cs.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                          <td style={{ padding: '16px' }}>
+                        <tr key={cs.id}>
+                          <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 <button
@@ -5186,7 +4745,7 @@ export default function AdminPanel({
                               </span>
                             </div>
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {editingClassId === cs.id ? (
                               <input
                                 type="text"
@@ -5200,7 +4759,7 @@ export default function AdminPanel({
                               cs.name
                             )}
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {editingClassId === cs.id ? (
                               <input
                                 type="text"
@@ -5212,7 +4771,7 @@ export default function AdminPanel({
                               cs.abbreviation
                             )}
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {editingClassId === cs.id ? (
                               <input
                                 type="checkbox"
@@ -5225,7 +4784,7 @@ export default function AdminPanel({
                               'No'
                             )}
                           </td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <div
                               style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                             >
@@ -5771,42 +5330,24 @@ export default function AdminPanel({
                 }}
               >
                 <div style={{ flex: '1 1 200px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Group Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="e.g. Underwriters"
-                    style={{ width: '100%' }}
-                  />
+                  <Field label="Group name">
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="e.g. Underwriters"
+                    />
+                  </Field>
                 </div>
                 <div style={{ flex: '2 1 300px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Description (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={newGroupDescription}
-                    onChange={(e) => setNewGroupDescription(e.target.value)}
-                    placeholder="Brief description of the group"
-                    style={{ width: '100%' }}
-                  />
+                  <Field label="Description (optional)">
+                    <input
+                      type="text"
+                      value={newGroupDescription}
+                      onChange={(e) => setNewGroupDescription(e.target.value)}
+                      placeholder="Brief description of the group"
+                    />
+                  </Field>
                 </div>
                 <button
                   type="submit"
@@ -5832,7 +5373,7 @@ export default function AdminPanel({
                           ? '1px solid var(--accent-primary)'
                           : '1px solid var(--table-border)',
                         background: isSelected
-                          ? 'rgba(var(--accent-primary-rgb,0,210,255),0.04)'
+                          ? 'rgba(var(--accent-primary-rgb), 0.04)'
                           : 'transparent',
                         overflow: 'hidden'
                       }}
@@ -6167,42 +5708,24 @@ export default function AdminPanel({
                 }}
               >
                 <div style={{ flex: '1 1 200px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Group Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newNotifGroupName}
-                    onChange={(e) => setNewNotifGroupName(e.target.value)}
-                    placeholder="e.g. Compliance Team"
-                    style={{ width: '100%' }}
-                  />
+                  <Field label="Group name">
+                    <input
+                      type="text"
+                      value={newNotifGroupName}
+                      onChange={(e) => setNewNotifGroupName(e.target.value)}
+                      placeholder="e.g. Compliance Team"
+                    />
+                  </Field>
                 </div>
                 <div style={{ flex: '2 1 300px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={newNotifGroupDesc}
-                    onChange={(e) => setNewNotifGroupDesc(e.target.value)}
-                    placeholder="Optional description"
-                    style={{ width: '100%' }}
-                  />
+                  <Field label="Description">
+                    <input
+                      type="text"
+                      value={newNotifGroupDesc}
+                      onChange={(e) => setNewNotifGroupDesc(e.target.value)}
+                      placeholder="Optional description"
+                    />
+                  </Field>
                 </div>
                 <button
                   type="submit"
@@ -6589,17 +6112,7 @@ export default function AdminPanel({
                   marginBottom: '20px'
                 }}
               >
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Run Time
-                  </label>
+                <Field label="Run time">
                   <input
                     type="time"
                     value={dailyAlertsTime}
@@ -6607,9 +6120,8 @@ export default function AdminPanel({
                       setDailyAlertsTime(e.target.value)
                       await saveDailyAlertSetting('daily_alerts_time', e.target.value)
                     }}
-                    style={{ width: '100%' }}
                   />
-                </div>
+                </Field>
               </div>
 
               {/* Threshold inputs */}
@@ -6621,17 +6133,7 @@ export default function AdminPanel({
                   marginBottom: '24px'
                 }}
               >
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Document expiry (days)
-                  </label>
+                <Field label="Document expiry (days)">
                   <input
                     type="number"
                     min={1}
@@ -6642,20 +6144,9 @@ export default function AdminPanel({
                       setDailyAlertsDocDays(v)
                       await saveDailyAlertSetting('daily_alerts_doc_expiry_days', String(v))
                     }}
-                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Policy expiry (days)
-                  </label>
+                </Field>
+                <Field label="Policy expiry (days)">
                   <input
                     type="number"
                     min={1}
@@ -6666,20 +6157,9 @@ export default function AdminPanel({
                       setDailyAlertsPolicyDays(v)
                       await saveDailyAlertSetting('daily_alerts_policy_expiry_days', String(v))
                     }}
-                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Blue card expiry (days)
-                  </label>
+                </Field>
+                <Field label="Blue card expiry (days)">
                   <input
                     type="number"
                     min={1}
@@ -6690,20 +6170,9 @@ export default function AdminPanel({
                       setDailyAlertsBlueCardDays(v)
                       await saveDailyAlertSetting('daily_alerts_blue_card_days', String(v))
                     }}
-                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Warranty deadline (days)
-                  </label>
+                </Field>
+                <Field label="Warranty deadline (days)">
                   <input
                     type="number"
                     min={1}
@@ -6714,9 +6183,8 @@ export default function AdminPanel({
                       setDailyAlertsWarrantyDays(v)
                       await saveDailyAlertSetting('daily_alerts_warranty_days', String(v))
                     }}
-                    style={{ width: '100%' }}
                   />
-                </div>
+                </Field>
               </div>
 
               {/* Run Now + Last Run */}
@@ -6809,45 +6277,27 @@ function FilePathSettingsSection({
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '600px' }}>
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '4px'
-            }}
-          >
-            Local Path (server)
-          </label>
-          <input
-            type="text"
-            value={localPath}
-            onChange={(e) => setLocalPath(e.target.value)}
-            placeholder="e.g. C:\folder1"
-            style={{ width: '100%' }}
-          />
+          <Field label="Local path (server)">
+            <input
+              type="text"
+              value={localPath}
+              onChange={(e) => setLocalPath(e.target.value)}
+              placeholder="e.g. C:\folder1"
+            />
+          </Field>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
             The path as seen on the server where the database runs.
           </span>
         </div>
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '4px'
-            }}
-          >
-            Network Path (UNC share)
-          </label>
-          <input
-            type="text"
-            value={networkPath}
-            onChange={(e) => setNetworkPath(e.target.value)}
-            placeholder="e.g. \\192.168.10.1\folder1"
-            style={{ width: '100%' }}
-          />
+          <Field label="Network path (UNC share)">
+            <input
+              type="text"
+              value={networkPath}
+              onChange={(e) => setNetworkPath(e.target.value)}
+              placeholder="e.g. \\192.168.10.1\folder1"
+            />
+          </Field>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
             The UNC path used by remote/VPN users to access the same folder.
           </span>
@@ -6985,13 +6435,13 @@ function FilePathSettingsSection({
             </span>
             {hotUpdateInfo.availableBuild !== null &&
               hotUpdateInfo.availableBuild > hotUpdateInfo.currentBuild && (
-                <span style={{ color: '#22c55e' }}>
+                <span style={{ color: 'var(--success)' }}>
                   Update available (build {hotUpdateInfo.availableBuild})
                 </span>
               )}
             {hotUpdateInfo.availableBuild !== null &&
               hotUpdateInfo.availableBuild <= hotUpdateInfo.currentBuild && (
-                <span style={{ color: '#22c55e' }}>Up to date</span>
+                <span style={{ color: 'var(--success)' }}>Up to date</span>
               )}
           </div>
         )}
@@ -7049,8 +6499,6 @@ function SanctionsDataSection({
 }): React.JSX.Element {
   const [status, setStatus] = useState<SanctionsStatus | null>(null)
   const [refreshing, setRefreshing] = useState<string | null>(null) // source name or 'ALL'
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadStatus = async (): Promise<void> => {
     try {
@@ -7189,8 +6637,8 @@ function SanctionsDataSection({
               style={{
                 padding: '14px 16px',
                 borderRadius: '10px',
-                border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
-                background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.02)'
+                border: '1px solid var(--glass-border-color)',
+                background: 'var(--bg-card)'
               }}
             >
               <div

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { X, KeyRound, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { useEscapeKey } from '../hooks/useEscapeKey'
+import { KeyRound, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Modal, Field } from './ui'
 
 interface ResetPasswordModalProps {
   username: string
@@ -22,8 +22,6 @@ export default function ResetPasswordModal({
   const [mustChange, setMustChange] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  useEscapeKey(onClose)
 
   const typedProblem =
     mode !== 'type'
@@ -58,12 +56,6 @@ export default function ResetPasswordModal({
     }
   }
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.85rem',
-    color: 'var(--text-secondary)',
-    marginBottom: '6px'
-  }
   const modeButton = (m: 'type' | 'generate', label: string): React.JSX.Element => (
     <button
       type="button"
@@ -86,56 +78,28 @@ export default function ResetPasswordModal({
   )
 
   return (
-    <div
-      className="modal-overlay"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1100,
-        backdropFilter: 'blur(4px)'
-      }}
+    <Modal
+      title="Reset password"
+      icon={<KeyRound size={18} />}
+      onClose={onClose}
+      width={420}
+      closeOnOverlay={false}
+      footer={
+        <>
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" form="reset-pw-form" className="btn-primary" disabled={!canSave}>
+            {saving && <Loader2 size={14} className="spin" />} Reset password
+          </button>
+        </>
+      }
     >
       <form
+        id="reset-pw-form"
         onSubmit={handleSave}
-        className="fade-in"
-        style={{
-          width: '100%',
-          maxWidth: '420px',
-          padding: '28px',
-          position: 'relative',
-          background: 'var(--bg-primary)',
-          borderRadius: '16px',
-          boxShadow: 'var(--shadow-lg)',
-          border: 'var(--glass-border)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
-        }}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          style={{
-            position: 'absolute',
-            top: '14px',
-            right: '14px',
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer'
-          }}
-        >
-          <X size={20} />
-        </button>
-
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <KeyRound size={18} color="var(--accent-primary)" /> Reset password
-        </h3>
         <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
           New password for <strong style={{ color: 'var(--text-primary)' }}>{username}</strong>.
           Their remembered logins end, so they sign in again with it.
@@ -148,10 +112,7 @@ export default function ResetPasswordModal({
 
         {mode === 'type' ? (
           <>
-            <div>
-              <label style={labelStyle} htmlFor="reset-pw">
-                New password
-              </label>
+            <Field label="New password" htmlFor="reset-pw">
               <div style={{ position: 'relative' }}>
                 <input
                   id="reset-pw"
@@ -182,20 +143,16 @@ export default function ResetPasswordModal({
                   {show ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
-            <div>
-              <label style={labelStyle} htmlFor="reset-pw-confirm">
-                Confirm password
-              </label>
+            </Field>
+            <Field label="Confirm password" htmlFor="reset-pw-confirm">
               <input
                 id="reset-pw-confirm"
                 type={show ? 'text' : 'password'}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
-                style={{ width: '100%' }}
               />
-            </div>
+            </Field>
             {typedProblem && (
               <div style={{ fontSize: '0.8rem', color: 'var(--danger)' }}>{typedProblem}</div>
             )}
@@ -226,21 +183,7 @@ export default function ResetPasswordModal({
         </label>
 
         {error && <div style={{ fontSize: '0.83rem', color: 'var(--danger)' }}>{error}</div>}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button type="button" className="btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={!canSave}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            {saving && <Loader2 size={14} className="spin" />} Reset password
-          </button>
-        </div>
       </form>
-    </div>
+    </Modal>
   )
 }

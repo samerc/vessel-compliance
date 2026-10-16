@@ -21,9 +21,9 @@ import {
   XCircle
 } from 'lucide-react'
 import { FileNode } from '../../../shared/types'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort } from '../utils/dateUtils'
+import { Modal, Field } from './ui'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +77,6 @@ interface TreeNodeProps {
   onSelect: (path: string) => void
   onToggle: (path: string) => void
   onContextMenu: (e: React.MouseEvent, path: string) => void
-  isLight: boolean
 }
 
 function TreeNode({
@@ -87,8 +86,7 @@ function TreeNode({
   expandedPaths,
   onSelect,
   onToggle,
-  onContextMenu,
-  isLight
+  onContextMenu
 }: TreeNodeProps): React.JSX.Element | null {
   if (!node.isDirectory) return null
   const isExpanded = expandedPaths.has(node.path)
@@ -158,7 +156,6 @@ function TreeNode({
               onSelect={onSelect}
               onToggle={onToggle}
               onContextMenu={onContextMenu}
-              isLight={isLight}
             />
           ))}
     </>
@@ -170,8 +167,6 @@ function TreeNode({
 // ---------------------------------------------------------------------------
 
 export default function FileManager(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError, showToast } = useToast()
 
   // Core state
@@ -557,56 +552,6 @@ export default function FileManager(): React.JSX.Element {
     })
 
   // -------------------------------------------------------------------------
-  // Modal backdrop style
-  // -------------------------------------------------------------------------
-
-  const modalBackdrop: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  }
-
-  const modalBox: React.CSSProperties = {
-    background: isLight ? '#ffffff' : '#1a1d28',
-    borderRadius: 12,
-    padding: 24,
-    minWidth: 400,
-    maxWidth: 560,
-    width: '90%',
-    border: 'var(--glass-border)',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-  }
-
-  const modalTitle: React.CSSProperties = {
-    fontSize: '1.1rem',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-    marginBottom: 16,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    borderRadius: 8,
-    border: `1px solid var(--input-border)`,
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    fontSize: '0.9rem',
-    outline: 'none',
-    boxSizing: 'border-box'
-  }
-
-  // -------------------------------------------------------------------------
   // First-time setup
   // -------------------------------------------------------------------------
 
@@ -684,7 +629,7 @@ export default function FileManager(): React.JSX.Element {
               value={newRootInput}
               onChange={(e) => setNewRootInput(e.target.value)}
               placeholder="C:\Documents\Vessels"
-              style={{ ...inputStyle, width: 280 }}
+              style={{ width: 280 }}
             />
             <button className="btn-secondary" onClick={handleBrowseRoot}>
               Browse
@@ -861,8 +806,7 @@ export default function FileManager(): React.JSX.Element {
             minWidth: 260,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            background: isLight ? '#f4f6fb' : '#14172a'
+            overflow: 'hidden'
           }}
         >
           <div
@@ -914,7 +858,6 @@ export default function FileManager(): React.JSX.Element {
                 onSelect={handleSelectFolder}
                 onToggle={handleToggleExpand}
                 onContextMenu={handleTreeContextMenu}
-                isLight={isLight}
               />
             ) : null}
           </div>
@@ -1025,9 +968,7 @@ export default function FileManager(): React.JSX.Element {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter..."
                 style={{
-                  ...inputStyle,
                   width: 180,
-                  paddingLeft: 30,
                   padding: '5px 12px 5px 30px',
                   fontSize: '0.83rem'
                 }}
@@ -1035,32 +976,8 @@ export default function FileManager(): React.JSX.Element {
             </div>
           </div>
 
-          {/* File list — modern table */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
-            {/* Table header */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 100px 150px 160px',
-                padding: '12px 20px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-                borderBottom: '1px solid var(--table-border)',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                position: 'sticky',
-                top: 0,
-                zIndex: 1
-              }}
-            >
-              <span>Name</span>
-              <span style={{ textAlign: 'right' }}>Size</span>
-              <span style={{ textAlign: 'right' }}>Modified</span>
-              <span style={{ textAlign: 'center' }}>Actions</span>
-            </div>
-
+          {/* File list */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             {filteredContents.length === 0 ? (
               <div
                 style={{
@@ -1084,194 +1001,131 @@ export default function FileManager(): React.JSX.Element {
                 </div>
               </div>
             ) : (
-              filteredContents.map((item, idx) => {
-                const btnStyle = (color: string): React.CSSProperties => ({
-                  background: 'none' as const,
-                  border: 'none' as const,
-                  cursor: 'pointer' as const,
-                  color,
-                  padding: '6px 8px',
-                  borderRadius: 6,
-                  display: 'flex' as const,
-                  alignItems: 'center' as const,
-                  transition: 'background 0.12s'
-                })
-                return (
-                  <div
-                    key={item.path}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 100px 150px 160px',
-                      padding: '10px 20px',
-                      borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)'}`,
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                      color: 'var(--text-primary)',
-                      transition: 'background 0.12s',
-                      background:
-                        idx % 2 === 0
-                          ? 'transparent'
-                          : isLight
-                            ? 'rgba(0,0,0,0.015)'
-                            : 'rgba(255,255,255,0.015)',
-                      alignItems: 'center',
-                      minHeight: 48
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = isLight
-                        ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                        : 'rgba(var(--accent-primary-rgb), 0.06)')
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background =
-                        idx % 2 === 0
-                          ? 'transparent'
-                          : isLight
-                            ? 'rgba(0,0,0,0.015)'
-                            : 'rgba(255,255,255,0.015)')
-                    }
-                    onDoubleClick={() => handleDoubleClickItem(item)}
-                    onContextMenu={(e) => handleContentsContextMenu(e, item.path, item.isDirectory)}
-                  >
-                    {/* Name + icon */}
-                    <span
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}
+              <table className="data-table" style={{ tableLayout: 'fixed' }}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className="num" style={{ width: 100 }}>
+                      Size
+                    </th>
+                    <th className="num" style={{ width: 150 }}>
+                      Modified
+                    </th>
+                    <th style={{ width: 160, textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredContents.map((item) => (
+                    <tr
+                      key={item.path}
+                      className="clickable"
+                      onDoubleClick={() => handleDoubleClickItem(item)}
+                      onContextMenu={(e) =>
+                        handleContentsContextMenu(e, item.path, item.isDirectory)
+                      }
                     >
-                      <span
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          background: item.isDirectory
-                            ? 'rgba(255,176,32,0.12)'
-                            : isLight
-                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                              : 'rgba(var(--accent-primary-rgb), 0.08)'
-                        }}
-                      >
-                        {item.isDirectory ? (
-                          <Folder size={18} style={{ color: '#ffb020' }} />
-                        ) : (
-                          getFileIcon(item.name)
-                        )}
-                      </span>
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontWeight: item.isDirectory ? 600 : 400
-                        }}
-                      >
-                        {item.name}
-                      </span>
-                    </span>
-
-                    {/* Size */}
-                    <span
-                      style={{
-                        textAlign: 'right',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
-                    </span>
-
-                    {/* Modified */}
-                    <span
-                      style={{
-                        textAlign: 'right',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      {formatDate(item.modified)}
-                    </span>
-
-                    {/* Action buttons */}
-                    <span
-                      style={{ display: 'flex', gap: 2, justifyContent: 'center' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {!item.isDirectory ? (
-                        <button
-                          onClick={() => handleOpenFile(item.path)}
-                          title="Open file"
-                          style={btnStyle('var(--accent-primary)')}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = isLight
-                              ? 'rgba(var(--accent-primary-rgb), 0.12)'
-                              : 'rgba(var(--accent-primary-rgb), 0.12)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      {/* Name + icon */}
+                      <td>
+                        <span
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            overflow: 'hidden'
+                          }}
                         >
-                          <ExternalLink size={15} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSelectFolder(item.path)}
-                          title="Open folder"
-                          style={btnStyle('#ffb020')}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'rgba(255,176,32,0.12)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                        >
-                          <FolderOpen size={15} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setRenameModal({ path: item.path, name: item.name })
-                        }}
-                        title="Rename"
-                        style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = isLight
-                            ? 'rgba(0,0,0,0.06)'
-                            : 'rgba(255,255,255,0.08)')
-                        }
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                      >
-                        <Edit3 size={15} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setMoveModal({ sourcePath: item.path })
-                        }}
-                        title="Move"
-                        style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = isLight
-                            ? 'rgba(0,0,0,0.06)'
-                            : 'rgba(255,255,255,0.08)')
-                        }
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                      >
-                        <Move size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleOpenInExplorer(item.path)}
-                        title="Show in Explorer"
-                        style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = isLight
-                            ? 'rgba(0,0,0,0.06)'
-                            : 'rgba(255,255,255,0.08)')
-                        }
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                      >
-                        <HardDrive size={15} />
-                      </button>
-                    </span>
-                  </div>
-                )
-              })
+                          <span
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              background: item.isDirectory
+                                ? 'rgba(255,176,32,0.12)'
+                                : 'rgba(var(--accent-primary-rgb), 0.08)'
+                            }}
+                          >
+                            {item.isDirectory ? (
+                              <Folder size={18} style={{ color: '#ffb020' }} />
+                            ) : (
+                              getFileIcon(item.name)
+                            )}
+                          </span>
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              fontWeight: item.isDirectory ? 600 : 400
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        </span>
+                      </td>
+
+                      <td className="num muted">
+                        {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
+                      </td>
+
+                      <td className="num muted">{formatDate(item.modified)}</td>
+
+                      {/* Action buttons */}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <span style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                          {!item.isDirectory ? (
+                            <button
+                              className="btn-ghost btn-icon btn-sm"
+                              onClick={() => handleOpenFile(item.path)}
+                              title="Open file"
+                              style={{ color: 'var(--accent-primary)' }}
+                            >
+                              <ExternalLink size={15} />
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-ghost btn-icon btn-sm"
+                              onClick={() => handleSelectFolder(item.path)}
+                              title="Open folder"
+                              style={{ color: '#ffb020' }}
+                            >
+                              <FolderOpen size={15} />
+                            </button>
+                          )}
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => {
+                              setRenameModal({ path: item.path, name: item.name })
+                            }}
+                            title="Rename"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => {
+                              setMoveModal({ sourcePath: item.path })
+                            }}
+                            title="Move"
+                          >
+                            <Move size={15} />
+                          </button>
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => handleOpenInExplorer(item.path)}
+                            title="Show in Explorer"
+                          >
+                            <HardDrive size={15} />
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 
@@ -1284,7 +1138,7 @@ export default function FileManager(): React.JSX.Element {
               color: 'var(--text-secondary)',
               display: 'flex',
               gap: 16,
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+              background: 'var(--table-header-bg)'
             }}
           >
             <span>
@@ -1307,7 +1161,7 @@ export default function FileManager(): React.JSX.Element {
             position: 'fixed',
             left: contextMenu.x,
             top: contextMenu.y,
-            background: isLight ? '#ffffff' : '#1a1d28',
+            background: 'var(--bg-primary)',
             border: 'var(--glass-border)',
             borderRadius: 8,
             boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
@@ -1401,188 +1255,149 @@ export default function FileManager(): React.JSX.Element {
 
       {/* ======================== Rename Modal ======================== */}
       {renameModal && (
-        <div style={modalBackdrop}>
-          <div style={modalBox} onClick={(e) => e.stopPropagation()}>
-            <div style={modalTitle}>
-              <Edit3 size={18} style={{ color: 'var(--accent-primary)' }} />
-              Rename
-            </div>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 12px'
-              }}
-            >
-              Enter a new name for <strong>{renameModal.name}</strong>
-            </p>
-            <input
-              ref={renameInputRef}
-              type="text"
-              defaultValue={renameModal.name}
-              style={inputStyle}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleRename()
-                if (e.key === 'Escape') setRenameModal(null)
-              }}
-            />
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.8rem',
-                margin: '8px 0 0',
-                fontStyle: 'italic'
-              }}
-            >
-              Any file links pointing to this folder will be automatically updated.
-            </p>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 20
-              }}
-            >
+        <Modal
+          title="Rename"
+          icon={<Edit3 size={18} />}
+          onClose={() => setRenameModal(null)}
+          width={480}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setRenameModal(null)}>
                 Cancel
               </button>
               <button className="btn-primary" onClick={handleRename}>
                 Rename
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: '0 0 12px'
+            }}
+          >
+            Enter a new name for <strong>{renameModal.name}</strong>
+          </p>
+          <input
+            ref={renameInputRef}
+            type="text"
+            defaultValue={renameModal.name}
+            style={{ width: '100%' }}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename()
+              if (e.key === 'Escape') setRenameModal(null)
+            }}
+          />
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
+              margin: '8px 0 0',
+              fontStyle: 'italic'
+            }}
+          >
+            Any file links pointing to this folder will be automatically updated.
+          </p>
+        </Modal>
       )}
 
       {/* ======================== Move Modal ======================== */}
       {moveModal && (
-        <div style={modalBackdrop}>
-          <div style={{ ...modalBox, maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <div style={modalTitle}>
-              <Move size={18} style={{ color: 'var(--accent-primary)' }} />
-              Move Folder
-            </div>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 12px'
-              }}
-            >
-              Moving <strong>{baseName(moveModal.sourcePath)}</strong>. Select a destination folder:
-            </p>
-
-            <div
-              style={{
-                border: '1px solid var(--input-border)',
-                borderRadius: 8,
-                maxHeight: 300,
-                overflowY: 'auto',
-                padding: '6px 4px',
-                background: 'var(--input-bg)'
-              }}
-            >
-              {tree ? (
-                <MoveTreeNode node={tree} depth={0} sourcePath={moveModal.sourcePath} />
-              ) : (
-                <div
-                  style={{
-                    padding: 16,
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  Loading tree...
-                </div>
-              )}
-            </div>
-
-            {moveDestination && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                  border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
-                  fontSize: '0.83rem',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <strong>Destination:</strong> {moveDestination}
-              </div>
-            )}
-
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.8rem',
-                margin: '8px 0 0',
-                fontStyle: 'italic'
-              }}
-            >
-              File links under this folder will be automatically remapped.
-            </p>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 20
-              }}
-            >
+        <Modal
+          title="Move folder"
+          icon={<Move size={18} />}
+          onClose={() => setMoveModal(null)}
+          width={520}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setMoveModal(null)}>
                 Cancel
               </button>
               <button className="btn-primary" onClick={handleMove} disabled={!moveDestination}>
                 Move
               </button>
-            </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: '0 0 12px'
+            }}
+          >
+            Moving <strong>{baseName(moveModal.sourcePath)}</strong>. Select a destination folder:
+          </p>
+
+          <div
+            style={{
+              border: '1px solid var(--input-border)',
+              borderRadius: 8,
+              maxHeight: 300,
+              overflowY: 'auto',
+              padding: '6px 4px',
+              background: 'var(--input-bg)'
+            }}
+          >
+            {tree ? (
+              <MoveTreeNode node={tree} depth={0} sourcePath={moveModal.sourcePath} />
+            ) : (
+              <div
+                style={{
+                  padding: 16,
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                Loading tree...
+              </div>
+            )}
           </div>
-        </div>
+
+          {moveDestination && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '8px 12px',
+                borderRadius: 8,
+                background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
+                fontSize: '0.83rem',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <strong>Destination:</strong> {moveDestination}
+            </div>
+          )}
+
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
+              margin: '8px 0 0',
+              fontStyle: 'italic'
+            }}
+          >
+            File links under this folder will be automatically remapped.
+          </p>
+        </Modal>
       )}
 
       {/* ======================== New Folder Modal ======================== */}
       {newFolderModal && (
-        <div style={modalBackdrop}>
-          <div style={modalBox} onClick={(e) => e.stopPropagation()}>
-            <div style={modalTitle}>
-              <FolderPlus size={18} style={{ color: 'var(--accent-primary)' }} />
-              New Folder
-            </div>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 12px'
-              }}
-            >
-              Create a new folder in <strong>{baseName(newFolderModal)}</strong>
-            </p>
-            <input
-              ref={newFolderInputRef}
-              type="text"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="Folder name"
-              style={inputStyle}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateFolder()
-                if (e.key === 'Escape') setNewFolderModal(null)
-              }}
-            />
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 20
-              }}
-            >
+        <Modal
+          title="New folder"
+          icon={<FolderPlus size={18} />}
+          onClose={() => setNewFolderModal(null)}
+          width={480}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setNewFolderModal(null)}>
                 Cancel
               </button>
@@ -1593,256 +1408,194 @@ export default function FileManager(): React.JSX.Element {
               >
                 Create
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: '0 0 12px'
+            }}
+          >
+            Create a new folder in <strong>{baseName(newFolderModal)}</strong>
+          </p>
+          <input
+            ref={newFolderInputRef}
+            type="text"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Folder name"
+            style={{ width: '100%' }}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateFolder()
+              if (e.key === 'Escape') setNewFolderModal(null)
+            }}
+          />
+        </Modal>
       )}
 
       {/* ======================== Health Check Modal ======================== */}
       {healthCheckResults && (
-        <div style={modalBackdrop} onClick={() => setHealthCheckResults(null)}>
+        <Modal
+          title="File link health check"
+          icon={<Activity size={18} />}
+          onClose={() => setHealthCheckResults(null)}
+          width={640}
+          footer={
+            <button className="btn-secondary" onClick={() => setHealthCheckResults(null)}>
+              Close
+            </button>
+          }
+        >
+          {/* Summary */}
           <div
             style={{
-              ...modalBox,
-              maxWidth: 640,
-              maxHeight: '80vh',
               display: 'flex',
-              flexDirection: 'column'
+              gap: 12,
+              marginBottom: 16
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div style={modalTitle}>
-              <Activity size={18} style={{ color: 'var(--accent-primary)' }} />
-              File Link Health Check
-            </div>
-
-            {/* Summary */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 12,
-                marginBottom: 16
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: 'rgba(0,255,136,0.08)',
-                  border: '1px solid rgba(0,255,136,0.2)',
-                  textAlign: 'center'
-                }}
-              >
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--success)' }}>
-                  {healthOk}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>OK</div>
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: healthBroken > 0 ? 'rgba(255,77,77,0.08)' : 'rgba(0,255,136,0.08)',
-                  border: `1px solid ${healthBroken > 0 ? 'rgba(255,77,77,0.2)' : 'rgba(0,255,136,0.2)'}`,
-                  textAlign: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '1.3rem',
-                    fontWeight: 700,
-                    color: healthBroken > 0 ? 'var(--danger)' : 'var(--success)'
-                  }}
-                >
-                  {healthBroken}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Broken</div>
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background: 'var(--bg-card)',
-                  border: 'var(--glass-border)',
-                  textAlign: 'center'
-                }}
-              >
-                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {healthTotal}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total</div>
-              </div>
-            </div>
-
-            {/* Results list */}
             <div
               style={{
                 flex: 1,
-                overflowY: 'auto',
-                border: '1px solid var(--input-border)',
+                padding: '10px 14px',
                 borderRadius: 8,
-                background: 'var(--input-bg)'
+                background: 'rgba(0,255,136,0.08)',
+                border: '1px solid rgba(0,255,136,0.2)',
+                textAlign: 'center'
               }}
             >
-              {healthTotal === 0 ? (
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--success)' }}>
+                {healthOk}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>OK</div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: healthBroken > 0 ? 'rgba(255,77,77,0.08)' : 'rgba(0,255,136,0.08)',
+                border: `1px solid ${healthBroken > 0 ? 'rgba(255,77,77,0.2)' : 'rgba(0,255,136,0.2)'}`,
+                textAlign: 'center'
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '1.3rem',
+                  fontWeight: 700,
+                  color: healthBroken > 0 ? 'var(--danger)' : 'var(--success)'
+                }}
+              >
+                {healthBroken}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Broken</div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: 'var(--bg-card)',
+                border: 'var(--glass-border)',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {healthTotal}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total</div>
+            </div>
+          </div>
+
+          {/* Results list */}
+          <div className="table-wrap">
+            {healthTotal === 0 ? (
+              <div
+                style={{
+                  padding: 24,
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                No file links found in the database.
+              </div>
+            ) : (
+              healthCheckResults.map((r, i) => (
                 <div
+                  key={`${r.table}-${r.id}-${r.column}-${i}`}
                   style={{
-                    padding: 24,
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 12px',
+                    borderBottom:
+                      i < healthCheckResults.length - 1 ? '1px solid var(--table-border)' : 'none',
+                    fontSize: '0.83rem'
                   }}
                 >
-                  No file links found in the database.
-                </div>
-              ) : (
-                healthCheckResults.map((r, i) => (
-                  <div
-                    key={`${r.table}-${r.id}-${r.column}-${i}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '6px 12px',
-                      borderBottom:
-                        i < healthCheckResults.length - 1
-                          ? '1px solid var(--table-border)'
-                          : 'none',
-                      fontSize: '0.83rem'
-                    }}
-                  >
-                    {r.exists ? (
-                      <CheckCircle size={15} style={{ color: 'var(--success)', flexShrink: 0 }} />
-                    ) : (
-                      <XCircle size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          color: 'var(--text-primary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                        title={r.path}
-                      >
-                        {r.label || baseName(r.path)}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.76rem',
-                          color: 'var(--text-secondary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                        title={r.path}
-                      >
-                        {r.path}
-                      </div>
+                  {r.exists ? (
+                    <CheckCircle size={15} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  ) : (
+                    <XCircle size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        color: 'var(--text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title={r.path}
+                    >
+                      {r.label || baseName(r.path)}
                     </div>
                     <div
                       style={{
-                        fontSize: '0.72rem',
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        background: r.exists ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
-                        color: r.exists ? 'var(--success)' : 'var(--danger)',
-                        fontWeight: 600,
-                        flexShrink: 0
+                        fontSize: '0.76rem',
+                        color: 'var(--text-secondary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}
+                      title={r.path}
                     >
-                      {r.exists ? 'OK' : 'MISSING'}
+                      {r.path}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                marginTop: 16
-              }}
-            >
-              <button className="btn-secondary" onClick={() => setHealthCheckResults(null)}>
-                Close
-              </button>
-            </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: r.exists ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
+                      color: r.exists ? 'var(--success)' : 'var(--danger)',
+                      fontWeight: 600,
+                      flexShrink: 0
+                    }}
+                  >
+                    {r.exists ? 'OK' : 'MISSING'}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ======================== Settings Modal ======================== */}
       {showSettings && (
-        <div style={modalBackdrop} onClick={() => setShowSettings(false)}>
-          <div style={modalBox} onClick={(e) => e.stopPropagation()}>
-            <div style={modalTitle}>
-              <Settings size={18} style={{ color: 'var(--accent-primary)' }} />
-              File Manager Settings
-            </div>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 16px'
-              }}
-            >
-              Configure the root document folder. All files and folders will be displayed relative
-              to this path.
-            </p>
-
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: 6,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
-              }}
-            >
-              Root Folder Path
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                value={newRootInput}
-                onChange={(e) => setNewRootInput(e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveRoot()
-                }}
-              />
-              <button className="btn-secondary" onClick={handleBrowseRoot}>
-                Browse
-              </button>
-            </div>
-
-            {rootPath && (
-              <p
-                style={{
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.8rem',
-                  margin: '8px 0 0'
-                }}
-              >
-                Current: <code style={{ color: 'var(--accent-primary)' }}>{rootPath}</code>
-              </p>
-            )}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 24
-              }}
-            >
+        <Modal
+          title="File Manager settings"
+          icon={<Settings size={18} />}
+          onClose={() => setShowSettings(false)}
+          width={520}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>
                 Cancel
               </button>
@@ -1853,9 +1606,49 @@ export default function FileManager(): React.JSX.Element {
               >
                 Save
               </button>
-            </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: '0 0 16px'
+            }}
+          >
+            Configure the root document folder. All files and folders will be displayed relative to
+            this path.
+          </p>
+
+          <div className="form-grid">
+            <Field
+              label="Root folder path"
+              span="all"
+              hint={
+                rootPath ? (
+                  <>
+                    Current: <code style={{ color: 'var(--accent-primary)' }}>{rootPath}</code>
+                  </>
+                ) : undefined
+              }
+            >
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={newRootInput}
+                  onChange={(e) => setNewRootInput(e.target.value)}
+                  style={{ flex: 1 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveRoot()
+                  }}
+                />
+                <button className="btn-secondary" onClick={handleBrowseRoot}>
+                  Browse
+                </button>
+              </div>
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

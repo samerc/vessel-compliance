@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 
 interface ConfirmationModalProps {
   title: string
@@ -21,8 +20,6 @@ export default function ConfirmationModal({
   onConfirm,
   onCancel
 }: ConfirmationModalProps): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,6 +41,8 @@ export default function ConfirmationModal({
 
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
+        // Only this dialog closes, not a Modal underneath
+        e.stopPropagation()
         onCancel()
         return
       }
@@ -67,101 +66,32 @@ export default function ConfirmationModal({
   }, [onCancel, isDangerous])
 
   return (
-    <div
-      role="presentation"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1200
-      }}
-      onClick={onCancel}
-    >
+    <div role="presentation" className="modal-overlay" style={{ zIndex: 1200 }} onClick={onCancel}>
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirmation-modal-title"
-        style={{
-          background: 'var(--bg-primary)',
-          border: 'var(--glass-border)',
-          borderRadius: '16px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
-          width: '90%',
-          maxWidth: '500px',
-          display: 'flex',
-          flexDirection: 'column',
-          color: 'var(--text-primary)'
-        }}
+        className="modal-dialog"
+        style={{ width: 500 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            padding: '24px 24px 10px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}
-        >
-          <div
-            style={{
-              background: isDangerous ? 'rgba(255, 77, 77, 0.1)' : 'rgba(255, 193, 7, 0.1)',
-              padding: '10px',
-              borderRadius: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <AlertTriangle size={24} color={isDangerous ? 'var(--danger)' : 'var(--warning)'} />
-          </div>
-          <h3 id="confirmation-modal-title" style={{ margin: 0, fontSize: '1.2rem' }}>
+        <div className="modal-header">
+          <h3 id="confirmation-modal-title">
+            <AlertTriangle size={18} color={isDangerous ? 'var(--danger)' : 'var(--warning)'} />
             {title}
           </h3>
         </div>
 
-        <div style={{ padding: '10px 24px 24px 24px', flex: 1 }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.95rem',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.5
-            }}
-          >
-            {message}
-          </p>
+        <div className="modal-body">
+          <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{message}</p>
         </div>
 
-        <div
-          style={{
-            padding: '16px 24px',
-            background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
-            borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '12px'
-          }}
-        >
-          <button onClick={onCancel} className="btn-secondary" style={{ padding: '8px 16px' }}>
+        <div className="modal-footer">
+          <button onClick={onCancel} className="btn-secondary">
             {cancelLabel}
           </button>
-          <button
-            onClick={onConfirm}
-            className="btn-primary"
-            style={{
-              padding: '8px 16px',
-              background: isDangerous ? 'var(--danger)' : 'var(--accent-primary)',
-              borderColor: isDangerous ? 'var(--danger)' : 'var(--accent-primary)'
-            }}
-          >
+          <button onClick={onConfirm} className={isDangerous ? 'btn-danger' : 'btn-primary'}>
             {confirmLabel}
           </button>
         </div>

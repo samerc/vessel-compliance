@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Sparkles, Loader2 } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
+import { Sparkles, Loader2 } from 'lucide-react'
+import { Modal, Badge, type BadgeTone } from './ui'
 import { WHATS_NEW, WhatsNewTag } from '../whatsNew'
 import { changelogService } from '../services/ChangelogService'
 import { FEATURES } from '../features'
@@ -19,28 +19,10 @@ type ParsedItem =
   | { kind: 'bullet'; text: string; featureId?: string }
   | { kind: 'heading'; text: string }
 
-const TAG_STYLES: Record<
-  WhatsNewTag,
-  { bg: string; color: string; lightBg: string; lightColor: string }
-> = {
-  New: {
-    bg: 'rgba(0,200,100,0.15)',
-    color: '#00c853',
-    lightBg: 'rgba(0,140,70,0.1)',
-    lightColor: '#007a3d'
-  },
-  Improved: {
-    bg: 'rgba(var(--accent-primary-rgb), 0.15)',
-    color: 'var(--accent-primary)',
-    lightBg: 'rgba(0,119,163,0.1)',
-    lightColor: 'var(--accent-primary)'
-  },
-  Fixed: {
-    bg: 'rgba(255,193,7,0.15)',
-    color: '#ffc107',
-    lightBg: 'rgba(200,130,0,0.1)',
-    lightColor: '#a06000'
-  }
+const TAG_TONES: Record<WhatsNewTag, BadgeTone> = {
+  New: 'success',
+  Improved: 'accent',
+  Fixed: 'warning'
 }
 
 /**
@@ -102,9 +84,6 @@ export default function WhatsNewModal({
   appVersion,
   onTry
 }: WhatsNewModalProps): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
-
   // Remote data from GitHub
   const [version, setVersion] = useState('')
   const [date, setDate] = useState('')
@@ -181,214 +160,20 @@ export default function WhatsNewModal({
     ) : null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1100,
-        padding: '20px'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        style={{
-          background: isLight ? '#ffffff' : '#1a1d28',
-          borderRadius: '18px',
-          padding: '32px',
-          width: '100%',
-          maxWidth: '520px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 32px 96px rgba(0,0,0,0.45)',
-          position: 'relative'
-        }}
-      >
-        {/* Close */}
-        <button
-          title="Close"
-          aria-label="Close"
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-            padding: '4px',
-            display: 'flex'
-          }}
-        >
-          <X size={18} />
-        </button>
-
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            marginBottom: '22px',
-            flexShrink: 0
-          }}
-        >
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <Sparkles size={22} color="white" />
-          </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700' }}>What&apos;s New</h2>
-            {!loading && version && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                <span
-                  style={{
-                    padding: '2px 10px',
-                    borderRadius: '20px',
-                    fontSize: '0.72rem',
-                    fontWeight: '700',
-                    background:
-                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                    color: 'white'
-                  }}
-                >
-                  v{version}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{date}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', marginBottom: '22px' }}>
-          {loading ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                color: 'var(--text-secondary)',
-                padding: '24px 0'
-              }}
-            >
-              <Loader2 size={18} className="spinner" /> Loading release notes…
-            </div>
-          ) : items.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.88rem' }}>
-              No release notes for this version yet. Earlier changes are in the release history.
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {items.map((item, i) => {
-                if (item.kind === 'heading') {
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: '0.78rem',
-                        fontWeight: '700',
-                        color: 'var(--text-secondary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        marginTop: i > 0 ? '8px' : 0
-                      }}
-                    >
-                      {item.text}
-                    </div>
-                  )
-                }
-                if (item.kind === 'tagged') {
-                  const s = TAG_STYLES[item.tag]
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span
-                        style={{
-                          flexShrink: 0,
-                          marginTop: '2px',
-                          padding: '2px 9px',
-                          borderRadius: '20px',
-                          fontSize: '0.68rem',
-                          fontWeight: '700',
-                          letterSpacing: '0.04em',
-                          background: isLight ? s.lightBg : s.bg,
-                          color: isLight ? s.lightColor : s.color,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {item.tag}
-                      </span>
-                      <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>
-                        {item.text}
-                      </span>
-                      {tryButton(item.featureId)}
-                    </div>
-                  )
-                }
-                // plain bullet
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      paddingLeft: '4px'
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: 'var(--accent-primary)',
-                        marginTop: '5px',
-                        flexShrink: 0,
-                        fontSize: '0.6rem'
-                      }}
-                    >
-                      ●
-                    </span>
-                    <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>
-                      {item.text}
-                    </span>
-                    {tryButton(item.featureId)}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0
-          }}
-        >
+    <Modal
+      title="What's new"
+      icon={<Sparkles size={18} />}
+      onClose={onClose}
+      width={520}
+      footer={
+        <>
           <button
             onClick={() => {
               onClose()
               onViewChangelog()
             }}
             style={{
+              marginRight: 'auto',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -404,8 +189,98 @@ export default function WhatsNewModal({
           <button onClick={onClose} className="btn-primary" style={{ padding: '10px 28px' }}>
             Got it
           </button>
+        </>
+      }
+    >
+      {!loading && version && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <Badge tone="accent">v{version}</Badge>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{date}</span>
         </div>
+      )}
+
+      {/* Body */}
+      <div>
+        {loading ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: 'var(--text-secondary)',
+              padding: '24px 0'
+            }}
+          >
+            <Loader2 size={18} className="spinner" /> Loading release notes…
+          </div>
+        ) : items.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.88rem' }}>
+            No release notes for this version yet. Earlier changes are in the release history.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {items.map((item, i) => {
+              if (item.kind === 'heading') {
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: '0.78rem',
+                      fontWeight: '700',
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      marginTop: i > 0 ? '8px' : 0
+                    }}
+                  >
+                    {item.text}
+                  </div>
+                )
+              }
+              if (item.kind === 'tagged') {
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <Badge tone={TAG_TONES[item.tag]} style={{ flexShrink: 0, marginTop: '2px' }}>
+                      {item.tag}
+                    </Badge>
+                    <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>
+                      {item.text}
+                    </span>
+                    {tryButton(item.featureId)}
+                  </div>
+                )
+              }
+              // plain bullet
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    paddingLeft: '4px'
+                  }}
+                >
+                  <span
+                    style={{
+                      color: 'var(--accent-primary)',
+                      marginTop: '5px',
+                      flexShrink: 0,
+                      fontSize: '0.6rem'
+                    }}
+                  >
+                    ●
+                  </span>
+                  <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>
+                    {item.text}
+                  </span>
+                  {tryButton(item.featureId)}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
