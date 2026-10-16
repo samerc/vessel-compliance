@@ -204,16 +204,7 @@ export default function LiabilityTab({
                     })
                     .then(ok)
                 }
-                style={{
-                  width: '60px',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  textAlign: 'center'
-                }}
+                style={{ width: '60px', fontSize: '0.85rem', textAlign: 'center' }}
               />
               <MoneyInput
                 value={alt.lolAmount}
@@ -228,17 +219,7 @@ export default function LiabilityTab({
                     .then(ok)
                 }
                 placeholder="LOL Amount"
-                style={{
-                  flex: 1,
-                  maxWidth: '200px',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  textAlign: 'right'
-                }}
+                style={{ flex: 1, maxWidth: '200px', fontSize: '0.85rem', textAlign: 'right' }}
               />
             </div>
           ))}
@@ -477,16 +458,7 @@ export default function LiabilityTab({
                     setQ((p) => ({ ...p, limitOfLiabilityVesselAmounts: newVal }))
                     updateField('limitOfLiabilityVesselAmounts', newVal)
                   }}
-                  style={{
-                    width: '160px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    textAlign: 'right'
-                  }}
+                  style={{ width: '160px', fontSize: '0.85rem', textAlign: 'right' }}
                 />
               </div>
             )
@@ -605,16 +577,7 @@ export default function LiabilityTab({
                 e.target.value = ''
               }
             }}
-            style={{
-              flex: 1,
-              maxWidth: '420px',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)',
-              fontSize: '0.83rem'
-            }}
+            style={{ flex: 1, maxWidth: '420px', fontSize: '0.83rem' }}
           >
             <option value="">Pick a template…</option>
             {templates.map((t) => (

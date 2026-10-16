@@ -1,5 +1,6 @@
 import { useState, useEffect, useEffectEvent } from 'react'
 import { Quotation, WarSettings } from '../../../../shared/types'
+import { Field } from '../ui'
 
 export default function WarTradingTab({
   quotation,
@@ -70,18 +71,16 @@ export default function WarTradingTab({
         Trading warranty text for this War Risk quotation. Defaults from War Settings.
       </p>
 
-      <textarea
-        value={customText}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={handleBlur}
-        style={{
-          width: '100%',
-          minHeight: '100px',
-          fontSize: '0.88rem',
-          padding: '10px 12px',
-          marginBottom: '10px'
-        }}
-      />
+      <div className="form-grid" style={{ marginBottom: '10px' }}>
+        <Field label="Trading warranty text" span="all">
+          <textarea
+            value={customText}
+            onChange={(e) => handleChange(e.target.value)}
+            onBlur={handleBlur}
+            style={{ minHeight: '100px', fontSize: '0.88rem' }}
+          />
+        </Field>
+      </div>
 
       {warSettings && (
         <button

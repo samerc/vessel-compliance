@@ -8,8 +8,7 @@ import { isIpcError } from '../../utils/ipc'
 export default function CustomSectionsTab({
   quotation,
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   quotation: Quotation
   showSuccess: (m: string) => void
@@ -148,11 +147,7 @@ export default function CustomSectionsTab({
             border: '1px solid var(--table-border)',
             marginBottom: '12px',
             background:
-              editingId === section.id
-                ? isLight
-                  ? '#f0f4ff'
-                  : 'rgba(0,150,255,0.05)'
-                : 'transparent'
+              editingId === section.id ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'transparent'
           }}
         >
           {editingId === section.id ? (

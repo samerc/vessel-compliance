@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
 import { warSectionTexts } from '../../utils/warTexts'
+import { Field } from '../ui'
 
 /** Format a number with thousand separators for display in text inputs */
 function fmtNum(val: number | undefined | null): string {
@@ -174,36 +175,15 @@ export default function SumInsuredTab({
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
         The sum insured for this War Risk quotation.
       </p>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1, maxWidth: '260px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Amount
-          </label>
+      <div className="form-grid" style={{ gridTemplateColumns: 'minmax(0, 260px) 100px' }}>
+        <Field label="Amount">
           <MoneyInput
             value={quotation.agreedValue}
             onChange={(val) => handleSumInsuredChange(val)}
             placeholder="e.g., 800,000"
-            style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
           />
-        </div>
-        <div style={{ width: '100px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Currency
-          </label>
+        </Field>
+        <Field label="Currency">
           <input
             value={quotation.agreedValueCurrency || 'USD'}
             onChange={(e) => {
@@ -211,90 +191,80 @@ export default function SumInsuredTab({
               updateField('agreedValueCurrency', e.target.value)
             }}
             placeholder="USD"
-            style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
           />
-        </div>
+        </Field>
       </div>
 
       {/* Per-vessel hull values */}
       {qVessels.length >= 2 && (
         <div style={{ marginTop: '16px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '8px'
-            }}
-          >
-            Per-Vessel Sum Insured (leave blank to use the amount above)
-          </label>
-          {qVessels.map((v) => (
-            <div
-              key={v.id}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}
-            >
-              <span
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  minWidth: '24px',
-                  color: 'var(--accent-primary)'
-                }}
-              >
-                {v.vesselLabel}
-              </span>
-              <span
-                style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '120px' }}
-              >
-                {(v.name || v.vesselLabel).toUpperCase()}
-              </span>
-              <MoneyInput
-                value={v.agreedValue}
-                placeholder={fmtNum(quotation.agreedValue) || '0'}
-                onChange={(val) =>
-                  setQVessels((prev) =>
-                    prev.map((qv) => (qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))
-                  )
-                }
-                onBlur={(val) => {
-                  window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null })
-                  // Recalculate premium from per-vessel values × rate
-                  const rate = getEffectiveRate()
-                  if (rate) {
-                    const updatedVessels = qVessels.map((qv) =>
-                      qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv
-                    )
-                    const newTotal = updatedVessels.reduce(
-                      (s, qv) => s + (qv.agreedValue ?? quotation.agreedValue ?? 0),
-                      0
-                    )
-                    if (newTotal > 0) {
-                      const premium = Math.round(((newTotal * rate) / 100) * 100) / 100
-                      setQ((q) => ({ ...q, premiumAmount: premium }))
-                      updateField('premiumAmount', premium)
-                      // Also set per-vessel premium for each vessel
-                      for (const qv of updatedVessels) {
-                        const si = qv.agreedValue ?? quotation.agreedValue ?? 0
-                        const vPrem = Math.round(((si * rate) / 100) * 100) / 100
-                        window.api.updateQuotationVessel(qv.id, { premiumAmount: vPrem })
-                      }
+          <Field label="Per-vessel sum insured (leave blank to use the amount above)">
+            <div>
+              {qVessels.map((v) => (
+                <div
+                  key={v.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}
+                >
+                  <span
+                    style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      minWidth: '24px',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    {v.vesselLabel}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      minWidth: '120px'
+                    }}
+                  >
+                    {(v.name || v.vesselLabel).toUpperCase()}
+                  </span>
+                  <MoneyInput
+                    value={v.agreedValue}
+                    placeholder={fmtNum(quotation.agreedValue) || '0'}
+                    onChange={(val) =>
+                      setQVessels((prev) =>
+                        prev.map((qv) =>
+                          qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv
+                        )
+                      )
                     }
-                  }
-                }}
-                style={{
-                  width: '160px',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  textAlign: 'right'
-                }}
-              />
+                    onBlur={(val) => {
+                      window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null })
+                      // Recalculate premium from per-vessel values × rate
+                      const rate = getEffectiveRate()
+                      if (rate) {
+                        const updatedVessels = qVessels.map((qv) =>
+                          qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv
+                        )
+                        const newTotal = updatedVessels.reduce(
+                          (s, qv) => s + (qv.agreedValue ?? quotation.agreedValue ?? 0),
+                          0
+                        )
+                        if (newTotal > 0) {
+                          const premium = Math.round(((newTotal * rate) / 100) * 100) / 100
+                          setQ((q) => ({ ...q, premiumAmount: premium }))
+                          updateField('premiumAmount', premium)
+                          // Also set per-vessel premium for each vessel
+                          for (const qv of updatedVessels) {
+                            const si = qv.agreedValue ?? quotation.agreedValue ?? 0
+                            const vPrem = Math.round(((si * rate) / 100) * 100) / 100
+                            window.api.updateQuotationVessel(qv.id, { premiumAmount: vPrem })
+                          }
+                        }
+                      }
+                    }}
+                    style={{ width: '160px', textAlign: 'right' }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </Field>
         </div>
       )}
 
@@ -309,18 +279,11 @@ export default function SumInsuredTab({
           ? ` Default rate: ${warSettings.defaultRate}%`
           : ''}
       </p>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1, maxWidth: '180px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Rate (%)
-          </label>
+      <div
+        className="form-grid"
+        style={{ gridTemplateColumns: 'minmax(0, 180px) minmax(0, 220px) auto', alignItems: 'end' }}
+      >
+        <Field label="Rate (%)">
           <div style={{ position: 'relative' }}>
             <input
               type="number"
@@ -331,7 +294,7 @@ export default function SumInsuredTab({
                 handleRateChange(val)
               }}
               placeholder="e.g., 0.35"
-              style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
+              style={{ width: '100%', boxSizing: 'border-box', paddingRight: '32px' }}
             />
             <span
               style={{
@@ -347,26 +310,15 @@ export default function SumInsuredTab({
               %
             </span>
           </div>
-        </div>
+        </Field>
         {!quotation.warExcessEnabled && (
-          <div style={{ flex: 1, maxWidth: '220px' }}>
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              Premium
-            </label>
+          <Field label="Premium">
             <MoneyInput
               value={quotation.premiumAmount}
               onChange={(val) => handlePremiumChange(val)}
               placeholder="Auto-calculated"
-              style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
             />
-          </div>
+          </Field>
         )}
         {!quotation.warExcessEnabled && (
           <div
@@ -450,38 +402,21 @@ export default function SumInsuredTab({
               </span>
             </label>
             <div
-              style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '16px' }}
+              className="form-grid"
+              style={{
+                gridTemplateColumns: 'minmax(0, 260px) minmax(0, 180px)',
+                marginBottom: '16px'
+              }}
             >
-              <div style={{ flex: 1, maxWidth: '260px' }}>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Section 2 Amount (default for all vessels)
-                </label>
+              <Field label="Section 2 amount (default for all vessels)">
                 <MoneyInput
                   value={quotation.warExcessAmount}
                   onChange={(val) => setQ((q) => ({ ...q, warExcessAmount: val }))}
                   onBlur={(val) => updateField('warExcessAmount', val ?? null)}
                   placeholder="e.g., 25,000,000"
-                  style={{ width: '100%', fontSize: '0.9rem', padding: '8px 10px' }}
                 />
-              </div>
-              <div style={{ flex: 1, maxWidth: '180px' }}>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Section 2 Rate (%)
-                </label>
+              </Field>
+              <Field label="Section 2 rate (%)">
                 <div style={{ position: 'relative' }}>
                   <input
                     type="number"
@@ -493,7 +428,7 @@ export default function SumInsuredTab({
                       updateField('warExcessRate', val ?? null)
                     }}
                     placeholder=""
-                    style={{ width: '100%', fontSize: '0.9rem', padding: '8px 32px 8px 10px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', paddingRight: '32px' }}
                   />
                   <span
                     style={{
@@ -509,145 +444,99 @@ export default function SumInsuredTab({
                     %
                   </span>
                 </div>
-              </div>
+              </Field>
             </div>
 
             {/* Per-vessel Section 2 overrides */}
             {qVessels.length >= 2 && (
               <div style={{ marginBottom: '16px' }}>
-                <label
-                  style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '8px'
-                  }}
-                >
-                  Per-Vessel Section 2 Override (leave blank to use the default above)
-                </label>
-                {qVessels.map((v) => (
-                  <div
-                    key={v.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        minWidth: '24px',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {v.vesselLabel}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '0.78rem',
-                        color: 'var(--text-secondary)',
-                        minWidth: '120px'
-                      }}
-                    >
-                      {(v.name || v.vesselLabel).toUpperCase()}
-                    </span>
-                    <MoneyInput
-                      value={v.warExcessAmount}
-                      placeholder={fmtNum(quotation.warExcessAmount) || '0'}
-                      onChange={(val) =>
-                        setQVessels((prev) =>
-                          prev.map((qv) =>
-                            qv.id === v.id ? { ...qv, warExcessAmount: val ?? null } : qv
-                          )
-                        )
-                      }
-                      onBlur={(val) =>
-                        window.api.updateQuotationVessel(v.id, {
-                          warExcessAmount: val ?? null
-                        })
-                      }
-                      style={{
-                        width: '160px',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem',
-                        textAlign: 'right'
-                      }}
-                    />
+                <Field label="Per-vessel Section 2 override (leave blank to use the default above)">
+                  <div>
+                    {qVessels.map((v) => (
+                      <div
+                        key={v.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            minWidth: '24px',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
+                          {v.vesselLabel}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            color: 'var(--text-secondary)',
+                            minWidth: '120px'
+                          }}
+                        >
+                          {(v.name || v.vesselLabel).toUpperCase()}
+                        </span>
+                        <MoneyInput
+                          value={v.warExcessAmount}
+                          placeholder={fmtNum(quotation.warExcessAmount) || '0'}
+                          onChange={(val) =>
+                            setQVessels((prev) =>
+                              prev.map((qv) =>
+                                qv.id === v.id ? { ...qv, warExcessAmount: val ?? null } : qv
+                              )
+                            )
+                          }
+                          onBlur={(val) =>
+                            window.api.updateQuotationVessel(v.id, {
+                              warExcessAmount: val ?? null
+                            })
+                          }
+                          style={{ width: '160px', textAlign: 'right' }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </Field>
               </div>
             )}
 
-            <div style={{ marginBottom: '12px' }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                Section 1 Description
-              </label>
-              <input
-                type="text"
-                value={warSectionTexts(quotation, warSettings).section1}
-                onChange={(e) => {
-                  setQ((q) => ({ ...q, warSection1Text: e.target.value }))
-                }}
-                onBlur={(e) => updateField('warSection1Text', e.target.value || null)}
-                style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
-              />
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                Section 2 Description
-              </label>
-              <input
-                type="text"
-                value={warSectionTexts(quotation, warSettings).section2}
-                onChange={(e) => {
-                  setQ((q) => ({ ...q, warSection2Text: e.target.value }))
-                }}
-                onBlur={(e) => updateField('warSection2Text', e.target.value || null)}
-                style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                Combined Limit Text
-              </label>
-              <input
-                type="text"
-                value={warSectionTexts(quotation, warSettings).combinedLimit}
-                onChange={(e) => {
-                  setQ((q) => ({ ...q, warCombinedLimitText: e.target.value }))
-                }}
-                onBlur={(e) => updateField('warCombinedLimitText', e.target.value || null)}
-                placeholder="{amount} will be replaced with the Section 2 amount"
-                style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
-              />
+            <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <Field label="Section 1 description">
+                <input
+                  type="text"
+                  value={warSectionTexts(quotation, warSettings).section1}
+                  onChange={(e) => {
+                    setQ((q) => ({ ...q, warSection1Text: e.target.value }))
+                  }}
+                  onBlur={(e) => updateField('warSection1Text', e.target.value || null)}
+                />
+              </Field>
+              <Field label="Section 2 description">
+                <input
+                  type="text"
+                  value={warSectionTexts(quotation, warSettings).section2}
+                  onChange={(e) => {
+                    setQ((q) => ({ ...q, warSection2Text: e.target.value }))
+                  }}
+                  onBlur={(e) => updateField('warSection2Text', e.target.value || null)}
+                />
+              </Field>
+              <Field label="Combined limit text">
+                <input
+                  type="text"
+                  value={warSectionTexts(quotation, warSettings).combinedLimit}
+                  onChange={(e) => {
+                    setQ((q) => ({ ...q, warCombinedLimitText: e.target.value }))
+                  }}
+                  onBlur={(e) => updateField('warCombinedLimitText', e.target.value || null)}
+                  placeholder="{amount} will be replaced with the Section 2 amount"
+                />
+              </Field>
             </div>
           </>
         )}

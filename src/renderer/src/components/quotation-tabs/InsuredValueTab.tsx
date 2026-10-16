@@ -1,5 +1,6 @@
 import { Quotation } from '../../../../shared/types'
 import { MoneyInput } from './shared'
+import { Field } from '../ui'
 
 export default function InsuredValueTab({
   quotation,
@@ -13,91 +14,34 @@ export default function InsuredValueTab({
   return (
     <div>
       <h3 style={{ fontSize: '1rem', marginBottom: '16px' }}>Insured Value</h3>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-        <div style={{ flex: 1 }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Currency
-          </label>
+      <div className="form-grid" style={{ gridTemplateColumns: '1fr 3fr' }}>
+        <Field label="Currency">
           <input
             value={quotation.insuredValueCurrency || 'USD'}
             onChange={(e) => setQ((prev) => ({ ...prev, insuredValueCurrency: e.target.value }))}
             onBlur={(e) => updateField('insuredValueCurrency', e.target.value)}
-            style={{
-              width: '80px',
-              padding: '8px 10px',
-              borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              fontSize: '0.88rem'
-            }}
+            style={{ width: '80px' }}
           />
-        </div>
-        <div style={{ flex: 3 }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Amount
-          </label>
+        </Field>
+        <Field label="Amount">
           <MoneyInput
             value={quotation.insuredValueAmount}
             onChange={(val) => setQ((prev) => ({ ...prev, insuredValueAmount: val }))}
             onBlur={(val) => updateField('insuredValueAmount', val ?? null)}
             placeholder="0.00"
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              fontSize: '0.88rem'
-            }}
             showZero
           />
-        </div>
-      </div>
-      <div>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Description
-        </label>
-        <textarea
-          value={quotation.insuredValueText || ''}
-          onChange={(e) => setQ((prev) => ({ ...prev, insuredValueText: e.target.value }))}
-          onBlur={(e) => updateField('insuredValueText', e.target.value || null)}
-          placeholder="e.g. Total Contract Value"
-          rows={3}
-          style={{
-            width: '100%',
-            padding: '8px 10px',
-            borderRadius: '6px',
-            border: '1px solid var(--input-border)',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            fontSize: '0.85rem',
-            resize: 'vertical',
-            fontFamily: 'inherit'
-          }}
-        />
+        </Field>
+        <Field label="Description" span="all">
+          <textarea
+            value={quotation.insuredValueText || ''}
+            onChange={(e) => setQ((prev) => ({ ...prev, insuredValueText: e.target.value }))}
+            onBlur={(e) => updateField('insuredValueText', e.target.value || null)}
+            placeholder="e.g. Total Contract Value"
+            rows={3}
+            style={{ resize: 'vertical' }}
+          />
+        </Field>
       </div>
     </div>
   )

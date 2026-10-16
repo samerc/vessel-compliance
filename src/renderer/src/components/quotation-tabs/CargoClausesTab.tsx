@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ok } from '../../utils/ipc'
+import { Field } from '../ui'
 
 const SECTION_LABELS: Record<string, string> = {
   conditions: 'Conditions',
@@ -56,7 +57,7 @@ function InstituteClauseDropdown({
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
-  const bg = isLight ? '#ffffff' : '#1a1d28'
+  const bg = 'var(--bg-primary)'
   const selected = clauses.find((c) => c.id === selectedId)
 
   useEffect(() => {
@@ -70,15 +71,8 @@ function InstituteClauseDropdown({
 
   return (
     <div style={{ marginBottom: '20px' }} ref={ref}>
-      <label
-        style={{
-          fontSize: '0.78rem',
-          color: 'var(--text-secondary)',
-          display: 'block',
-          marginBottom: '6px'
-        }}
-      >
-        Institute Cargo Clause
+      <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+        Institute cargo clause
       </label>
       <div style={{ position: 'relative' }}>
         <button
@@ -90,7 +84,7 @@ function InstituteClauseDropdown({
             borderRadius: '8px',
             border: '1px solid var(--input-border)',
             background: bg,
-            color: isLight ? '#1c1e21' : '#e8e8e8',
+            color: 'var(--text-primary)',
             cursor: 'pointer',
             fontSize: '0.88rem',
             fontWeight: 600,
@@ -125,7 +119,7 @@ function InstituteClauseDropdown({
               maxHeight: '300px',
               overflowY: 'auto',
               borderRadius: '8px',
-              border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+              border: '1px solid var(--glass-border-color)',
               background: bg,
               zIndex: 999,
               boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
@@ -143,7 +137,7 @@ function InstituteClauseDropdown({
                   style={{
                     padding: '10px 14px',
                     cursor: 'pointer',
-                    color: active ? 'var(--accent-primary)' : isLight ? '#1c1e21' : '#e8e8e8',
+                    color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
                     fontWeight: active ? 600 : 400,
                     fontSize: '0.85rem',
                     background: active
@@ -165,7 +159,9 @@ function InstituteClauseDropdown({
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {ic.code && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#32b886' }}>
+                      <span
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}
+                      >
                         {ic.code}
                       </span>
                     )}
@@ -447,7 +443,7 @@ export default function CargoClausesTab({
                     overflowY: 'auto',
                     borderRadius: '8px',
                     border: '1px solid var(--input-border)',
-                    background: isLight ? '#ffffff' : '#1a1d28',
+                    background: 'var(--bg-primary)',
                     zIndex: 999,
                     boxShadow: isLight
                       ? '0 8px 24px rgba(0,0,0,0.12)'
@@ -551,15 +547,8 @@ export default function CargoClausesTab({
       {/* Selected clauses */}
       {selectedClauses.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '8px'
-            }}
-          >
-            Selected Clauses
+          <label className="field-label" style={{ display: 'block', marginBottom: '8px' }}>
+            Selected clauses
           </label>
           {selectedClauses.map((sc) => {
             const def = allClauses.find((c) => c.id === sc.cargoClauseId)
@@ -651,46 +640,34 @@ export default function CargoClausesTab({
                         width: '180px',
                         padding: '5px 8px',
                         borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)',
                         fontSize: '0.82rem'
                       }}
                     />
                   </div>
                 )}
-                <label
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '2px'
-                  }}
-                >
-                  Custom wording for this quotation (leave blank to use default)
-                </label>
-                <textarea
-                  value={sc.textOverride || ''}
-                  placeholder="Leave blank to use the default wording above"
-                  rows={2}
-                  onChange={(e) =>
-                    setSelectedClauses((prev) =>
-                      prev.map((c) => (c.id === sc.id ? { ...c, textOverride: e.target.value } : c))
-                    )
-                  }
-                  onBlur={(e) => updateOverride(sc.cargoClauseId, e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'transparent',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.8rem',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                />
+                <Field label="Custom wording for this quotation (leave blank to use default)">
+                  <textarea
+                    value={sc.textOverride || ''}
+                    placeholder="Leave blank to use the default wording above"
+                    rows={2}
+                    onChange={(e) =>
+                      setSelectedClauses((prev) =>
+                        prev.map((c) =>
+                          c.id === sc.id ? { ...c, textOverride: e.target.value } : c
+                        )
+                      )
+                    }
+                    onBlur={(e) => updateOverride(sc.cargoClauseId, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </Field>
               </div>
             )
           })}
@@ -699,15 +676,8 @@ export default function CargoClausesTab({
 
       {/* Custom clauses */}
       <div>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '8px'
-          }}
-        >
-          Custom Clauses
+        <label className="field-label" style={{ display: 'block', marginBottom: '8px' }}>
+          Custom clauses
         </label>
         {customClauses.map((cc) => (
           <div
@@ -729,9 +699,6 @@ export default function CargoClausesTab({
                   flex: 1,
                   padding: '6px 8px',
                   borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
                   fontSize: '0.82rem',
                   resize: 'vertical',
                   fontFamily: 'inherit'
@@ -786,9 +753,6 @@ export default function CargoClausesTab({
               flex: 1,
               padding: '6px 8px',
               borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: 'transparent',
-              color: 'var(--text-primary)',
               fontSize: '0.82rem',
               resize: 'vertical',
               fontFamily: 'inherit'

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel } from '../../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import { fmtNiceDate } from './sharedUtils'
+import { Field } from '../ui'
 
 export default function PeriodTab({
   quotation,
@@ -81,9 +82,7 @@ export default function PeriodTab({
                 fontSize: '0.72rem',
                 color: 'var(--accent-primary)',
                 fontWeight: 600,
-                marginBottom: '3px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
+                marginBottom: '3px'
               }}
             >
               Auto-detected from P&I policies
@@ -103,24 +102,16 @@ export default function PeriodTab({
           )}
         </div>
       )}
-      <div style={{ maxWidth: '640px' }}>
-        <label
-          style={{
-            fontSize: '0.8rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Period description
-        </label>
-        <textarea
-          value={quotation.periodText || ''}
-          onChange={(e) => setQ((p) => ({ ...p, periodText: e.target.value }))}
-          onBlur={(e) => updateField('periodText', e.target.value)}
-          placeholder='e.g. "12 months from 1st January 2025 to 31st December 2025 both days inclusive"'
-          style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
-        />
+      <div className="form-grid" style={{ maxWidth: '640px', gridTemplateColumns: '1fr' }}>
+        <Field label="Period description">
+          <textarea
+            value={quotation.periodText || ''}
+            onChange={(e) => setQ((p) => ({ ...p, periodText: e.target.value }))}
+            onBlur={(e) => updateField('periodText', e.target.value)}
+            placeholder='e.g. "12 months from 1st January 2025 to 31st December 2025 both days inclusive"'
+            style={{ minHeight: '80px', resize: 'vertical' }}
+          />
+        </Field>
       </div>
     </div>
   )

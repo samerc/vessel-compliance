@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Quotation } from '../../../../shared/types'
 import { asArray } from '../../utils/ipc'
+import { Field } from '../ui'
 
 interface QuotationInfoItem {
   id: string
@@ -58,25 +59,18 @@ export default function InformationTab({
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
         Add additional information items and validity period for this quotation.
       </p>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px',
-          maxWidth: '300px'
-        }}
-      >
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Validity (days):</span>
-        <input
-          type="number"
-          value={quotation.validityDays}
-          onChange={(e) => {
-            setQ((p) => ({ ...p, validityDays: parseInt(e.target.value) || 14 }))
-          }}
-          onBlur={(e) => updateField('validityDays', parseInt(e.target.value) || 14)}
-          style={{ width: '80px' }}
-        />
+      <div className="form-grid" style={{ maxWidth: '300px', marginBottom: '16px' }}>
+        <Field label="Validity (days)">
+          <input
+            type="number"
+            value={quotation.validityDays}
+            onChange={(e) => {
+              setQ((p) => ({ ...p, validityDays: parseInt(e.target.value) || 14 }))
+            }}
+            onBlur={(e) => updateField('validityDays', parseInt(e.target.value) || 14)}
+            style={{ width: '80px' }}
+          />
+        </Field>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
@@ -90,11 +84,7 @@ export default function InformationTab({
             if (e.key === 'Enter') handleAdd()
           }}
         />
-        <button
-          onClick={handleAdd}
-          className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
+        <button onClick={handleAdd} className="btn-primary">
           <Plus size={16} /> Add
         </button>
       </div>

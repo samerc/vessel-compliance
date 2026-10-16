@@ -106,7 +106,7 @@ export function AlternativeScopeChips({
             ? '1.5px solid var(--accent-primary)'
             : '1px solid var(--input-border)',
           background: !currentAltId ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
-          color: !currentAltId ? '#00aac8' : 'var(--text-secondary)',
+          color: !currentAltId ? 'var(--accent-primary)' : 'var(--text-secondary)',
           cursor: 'pointer'
         }}
       >
@@ -184,7 +184,11 @@ export function AlternativeMultiScopeChips({
         fontSize: '0.68rem',
         fontWeight: 600,
         border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
-        background: active ? `${color}18` : 'transparent',
+        background: active
+          ? color.startsWith('var(')
+            ? 'var(--accent-tint)'
+            : `${color}18`
+          : 'transparent',
         color: active ? color : 'var(--text-secondary)',
         cursor: 'pointer'
       }}
@@ -194,7 +198,7 @@ export function AlternativeMultiScopeChips({
   )
   return (
     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-      {chip(isAll, '#00aac8', 'All', () => onChange(null))}
+      {chip(isAll, 'var(--accent-primary)', 'All', () => onChange(null))}
       {alternatives.map((alt, idx) =>
         chip(
           !isAll && set.has(alt.id),
@@ -223,7 +227,7 @@ export function PickerDropdown({
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
-  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
+  const dropdownBg = 'var(--bg-primary)'
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent): void => {
@@ -291,7 +295,7 @@ export function PickerDropdown({
                 padding: '8px 14px',
                 fontSize,
                 cursor: 'pointer',
-                color: isLight ? '#1c1e21' : '#e8e8e8',
+                color: 'var(--text-primary)',
                 borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',

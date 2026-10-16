@@ -623,10 +623,7 @@ export default function ConditionsTab({
                           width: '100%',
                           fontSize: '0.8rem',
                           padding: '4px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input, var(--table-header-bg))',
-                          color: 'var(--text-primary)'
+                          borderRadius: '4px'
                         }}
                       />
                     </div>
@@ -698,9 +695,6 @@ export default function ConditionsTab({
                     style={{
                       padding: '6px 10px',
                       borderRadius: '8px',
-                      background: 'var(--bg-input, var(--table-header-bg))',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--input-border)',
                       fontSize: '0.83rem'
                     }}
                     value=""

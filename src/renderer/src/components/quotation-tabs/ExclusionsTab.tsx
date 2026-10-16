@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, GripVertical, X, Pencil, Upload, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Pencil, Upload, AlertTriangle } from 'lucide-react'
 import {
   Quotation,
   PIClause,
@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
+import { Modal } from '../ui'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
@@ -370,7 +371,7 @@ export default function ExclusionsTab({
             border: '1px solid rgba(255, 180, 0, 0.3)',
             marginBottom: '12px',
             fontSize: '0.82rem',
-            color: '#ffb400',
+            color: 'var(--warning)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
@@ -727,54 +728,24 @@ export default function ExclusionsTab({
 
       {/* Import Modal */}
       {showImportModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '500px',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Import Custom Exclusions</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowImportModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
+        <Modal
+          title="Import Custom Exclusions"
+          icon={<Upload size={18} />}
+          onClose={() => setShowImportModal(false)}
+          width={500}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setShowImportModal(false)} className="btn-secondary">
+                Cancel
               </button>
-            </div>
+              <button onClick={handleImport} className="btn-primary" disabled={!importText.trim()}>
+                Import
+              </button>
+            </>
+          }
+        >
+          <div>
             <p
               style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}
             >
@@ -806,16 +777,8 @@ export default function ExclusionsTab({
                 exclusion(s) detected
               </p>
             )}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowImportModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-              <button onClick={handleImport} className="btn-primary" disabled={!importText.trim()}>
-                Import
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

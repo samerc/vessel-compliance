@@ -44,7 +44,7 @@ function HullClauseDropdown({
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
-  const bg = isLight ? '#ffffff' : '#1a1d28'
+  const bg = 'var(--bg-primary)'
   const selected = clauses.find((c) => c.id === selectedId)
 
   useEffect(() => {
@@ -59,15 +59,8 @@ function HullClauseDropdown({
   return (
     <div style={{ marginBottom: '20px' }} ref={ref}>
       {!hideLabel && (
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '6px'
-          }}
-        >
-          Hull Clause
+        <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+          Hull clause
         </label>
       )}
       <div style={{ position: 'relative' }}>
@@ -80,7 +73,7 @@ function HullClauseDropdown({
             borderRadius: '8px',
             border: '1px solid var(--input-border)',
             background: bg,
-            color: isLight ? '#1c1e21' : '#e8e8e8',
+            color: 'var(--text-primary)',
             cursor: 'pointer',
             fontSize: '0.88rem',
             fontWeight: 600,
@@ -113,7 +106,7 @@ function HullClauseDropdown({
               maxHeight: '300px',
               overflowY: 'auto',
               borderRadius: '8px',
-              border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+              border: '1px solid var(--glass-border-color)',
               background: bg,
               zIndex: 999,
               boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
@@ -131,7 +124,7 @@ function HullClauseDropdown({
                   style={{
                     padding: '10px 14px',
                     cursor: 'pointer',
-                    color: active ? 'var(--accent-primary)' : isLight ? '#1c1e21' : '#e8e8e8',
+                    color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
                     fontWeight: active ? 600 : 400,
                     fontSize: '0.86rem',
                     background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
@@ -269,22 +262,14 @@ function HullConditionPicker({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
-  const bg = isLight ? '#ffffff' : '#1a1d28'
+  const bg = 'var(--bg-primary)'
   const selectedItems = items.filter((i) => selectedIds.has(i.id))
   const selectedCount = selectedItems.length
 
   return (
     <div>
       {label && (
-        <label
-          style={{
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            display: 'block',
-            marginBottom: '6px',
-            color: 'var(--text-secondary)'
-          }}
-        >
+        <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
           {label}
         </label>
       )}
@@ -313,9 +298,9 @@ function HullConditionPicker({
                 width: '100%',
                 padding: '6px 10px',
                 borderRadius: '6px',
-                border: `1px solid ${isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'}`,
+                border: '1px solid var(--glass-border-color)',
                 background: bg,
-                color: isLight ? '#1c1e21' : '#e8e8e8',
+                color: 'var(--text-primary)',
                 cursor: 'pointer',
                 fontSize: '0.8rem',
                 textAlign: 'left',
@@ -352,7 +337,7 @@ function HullConditionPicker({
                     maxHeight: '280px',
                     overflowY: 'auto',
                     borderRadius: '6px',
-                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                    border: '1px solid var(--glass-border-color)',
                     background: bg,
                     zIndex: 999,
                     boxShadow: isLight ? '0 6px 20px rgba(0,0,0,0.1)' : '0 6px 20px rgba(0,0,0,0.4)'
@@ -555,10 +540,7 @@ function HullConditionPicker({
                         borderRadius: '4px',
                         fontSize: '0.78rem',
                         resize: 'vertical',
-                        fontFamily: 'inherit',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)'
+                        fontFamily: 'inherit'
                       }}
                     />
                     {item.hasAmount &&
@@ -622,10 +604,7 @@ function HullConditionPicker({
                                     width: '120px',
                                     padding: '3px 6px',
                                     borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    border: '1px solid var(--input-border)',
-                                    background: 'transparent',
-                                    color: 'var(--text-primary)'
+                                    fontSize: '0.78rem'
                                   }}
                                 />
                               </div>
@@ -659,10 +638,7 @@ function HullConditionPicker({
                               width: '120px',
                               padding: '3px 6px',
                               borderRadius: '4px',
-                              fontSize: '0.78rem',
-                              border: '1px solid var(--input-border)',
-                              background: 'transparent',
-                              color: 'var(--text-primary)'
+                              fontSize: '0.78rem'
                             }}
                           />
                         </div>
@@ -2001,8 +1977,8 @@ export default function HullConditionsTab({
                         maxHeight: '260px',
                         overflowY: 'auto',
                         borderRadius: '8px',
-                        border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
-                        background: isLight ? '#ffffff' : '#1a1d28',
+                        border: '1px solid var(--glass-border-color)',
+                        background: 'var(--bg-primary)',
                         boxShadow: isLight
                           ? '0 8px 24px rgba(0,0,0,0.12)'
                           : '0 8px 24px rgba(0,0,0,0.5)'
@@ -2019,7 +1995,7 @@ export default function HullConditionsTab({
                             padding: '8px 14px',
                             fontSize: '0.82rem',
                             cursor: 'pointer',
-                            color: isLight ? '#1c1e21' : '#e8e8e8',
+                            color: 'var(--text-primary)',
                             borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`
                           }}
                           onMouseEnter={(e) =>
@@ -2373,13 +2349,11 @@ export default function HullConditionsTab({
                       position: 'absolute',
                       top: '-10px',
                       left: '16px',
-                      background: isLight ? '#f4f6fb' : 'var(--bg-primary)',
+                      background: 'var(--bg-primary)',
                       padding: '0 8px',
                       fontSize: '0.72rem',
                       fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      color: 'var(--text-secondary)'
                     }}
                   >
                     Shared (all vessels & alternatives)
@@ -2524,9 +2498,6 @@ export default function HullConditionsTab({
                   padding: '8px 10px',
                   fontSize: '0.82rem',
                   borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
                   fontFamily: 'inherit',
                   resize: 'vertical'
                 }}
@@ -2553,17 +2524,8 @@ export default function HullConditionsTab({
                     paddingTop: '12px'
                   }}
                 >
-                  <label
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}
-                  >
-                    Conditions Order (drag to reorder)
+                  <label className="field-label" style={{ display: 'block', marginBottom: '8px' }}>
+                    Conditions order (drag to reorder)
                   </label>
                   {merged.map((item, idx) => (
                     <div
@@ -2683,9 +2645,6 @@ export default function HullConditionsTab({
                               padding: '4px 8px',
                               fontSize: '0.8rem',
                               borderRadius: '4px',
-                              border: '1px solid var(--input-border)',
-                              background: 'transparent',
-                              color: 'var(--text-primary)',
                               fontFamily: 'inherit',
                               resize: 'vertical'
                             }}

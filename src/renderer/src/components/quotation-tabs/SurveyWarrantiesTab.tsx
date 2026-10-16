@@ -12,6 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok, isIpcError, type IpcErrorValue } from '../../utils/ipc'
+import { Field } from '../ui'
 
 const DEADLINE_PRESETS = [
   'prior inception',
@@ -247,17 +248,8 @@ export default function SurveyWarrantiesTab({
             background: isLight ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.01)'
           }}
         >
-          <div
-            style={{
-              fontSize: '0.68rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.7px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              marginBottom: '8px'
-            }}
-          >
-            Available Templates
+          <div className="field-label" style={{ marginBottom: '8px' }}>
+            Available templates
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {availableTemplates.map((t) => (
@@ -318,16 +310,7 @@ export default function SurveyWarrantiesTab({
 
       {/* Selected survey warranties */}
       {items.length > 0 && (
-        <div
-          style={{
-            fontSize: '0.68rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.7px',
-            color: 'var(--text-secondary)',
-            fontWeight: 600,
-            marginBottom: '8px'
-          }}
-        >
+        <div className="field-label" style={{ marginBottom: '8px' }}>
           Selected ({items.length})
         </div>
       )}
@@ -357,7 +340,7 @@ export default function SurveyWarrantiesTab({
               background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
               borderRadius: '8px',
               border: '1px solid var(--glass-border-color)',
-              borderLeft: item.customText ? '3px solid #ffb020' : '3px solid #00aac8'
+              borderLeft: item.customText ? '3px solid #ffb020' : '3px solid var(--accent-primary)'
             }}
           >
             <div
@@ -374,9 +357,6 @@ export default function SurveyWarrantiesTab({
                         flex: 1,
                         padding: '6px 8px',
                         borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'var(--input-bg, transparent)',
-                        color: 'var(--text-primary)',
                         fontSize: '0.85rem',
                         resize: 'vertical',
                         lineHeight: 1.5
@@ -493,10 +473,6 @@ export default function SurveyWarrantiesTab({
                           }}
                           style={{
                             padding: '3px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-primary)',
                             fontSize: '0.8rem'
                           }}
                         >
@@ -520,10 +496,6 @@ export default function SurveyWarrantiesTab({
                               style={{
                                 flex: 1,
                                 padding: '3px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--input-border)',
-                                background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                                color: 'var(--text-primary)',
                                 fontSize: '0.8rem'
                               }}
                             />
@@ -550,10 +522,6 @@ export default function SurveyWarrantiesTab({
                           style={{
                             width: '100px',
                             padding: '3px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-primary)',
                             fontSize: '0.8rem'
                           }}
                         />
@@ -579,10 +547,6 @@ export default function SurveyWarrantiesTab({
                           style={{
                             flex: 1,
                             padding: '3px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-primary)',
                             fontSize: '0.8rem'
                           }}
                         />
@@ -608,10 +572,6 @@ export default function SurveyWarrantiesTab({
                           style={{
                             flex: 1,
                             padding: '3px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-primary)',
                             fontSize: '0.8rem'
                           }}
                         />
@@ -639,10 +599,6 @@ export default function SurveyWarrantiesTab({
                           style={{
                             flex: 1,
                             padding: '3px 6px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-primary)',
                             fontSize: '0.8rem'
                           }}
                         />
@@ -671,9 +627,7 @@ export default function SurveyWarrantiesTab({
                       style={{
                         fontSize: '0.68rem',
                         fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.03em',
-                        color: hasUnresolved ? '#ffb020' : '#00aac8',
+                        color: hasUnresolved ? 'var(--warning)' : 'var(--accent-primary)',
                         marginRight: '6px'
                       }}
                     >
@@ -756,43 +710,36 @@ export default function SurveyWarrantiesTab({
 
       {/* Add custom entry */}
       <div style={{ marginTop: '16px' }}>
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-          Add custom survey warranty:
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <textarea
-            value={customText}
-            onChange={(e) => setCustomText(e.target.value)}
-            placeholder="Enter custom survey warranty text..."
-            rows={2}
-            style={{
-              flex: 1,
-              padding: '6px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
-              color: 'var(--text-primary)',
-              fontSize: '0.82rem',
-              resize: 'vertical'
-            }}
-          />
-          <button
-            onClick={addCustom}
-            disabled={!customText.trim()}
-            className="btn-primary"
-            style={{
-              padding: '6px 14px',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              alignSelf: 'flex-start',
-              opacity: !customText.trim() ? 0.5 : 1
-            }}
-          >
-            <Plus size={14} /> Add
-          </button>
-        </div>
+        <Field label="Add custom survey warranty">
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              placeholder="Enter custom survey warranty text..."
+              rows={2}
+              style={{
+                flex: 1,
+                resize: 'vertical'
+              }}
+            />
+            <button
+              onClick={addCustom}
+              disabled={!customText.trim()}
+              className="btn-primary"
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                alignSelf: 'flex-start',
+                opacity: !customText.trim() ? 0.5 : 1
+              }}
+            >
+              <Plus size={14} /> Add
+            </button>
+          </div>
+        </Field>
       </div>
     </div>
   )

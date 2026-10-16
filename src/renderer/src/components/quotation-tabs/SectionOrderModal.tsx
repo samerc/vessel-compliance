@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, X } from 'lucide-react'
+import { ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
+import { Modal } from '../ui'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 
@@ -9,7 +10,6 @@ export default function SectionOrderModal({
   onSave,
   showSuccess,
   showError,
-  isLight,
   persist,
   docLabel,
   defaultsLoader
@@ -19,7 +19,8 @@ export default function SectionOrderModal({
   onSave: (order: string[]) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  isLight: boolean
+  // Kept for callers; the dialog follows the theme by itself
+  isLight?: boolean
   // Optional custom persistence (e.g. save onto a policy instead of the quotation)
   persist?: (order: string[]) => Promise<void>
   docLabel?: string
@@ -124,147 +125,106 @@ export default function SectionOrderModal({
   const isCustom = (key: string): boolean => key.startsWith('custom:')
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-    >
-      <div
-        style={{
-          background: isLight ? '#ffffff' : '#1a1d28',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '480px',
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}
-        >
-          <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Section Order</h3>
-          <button
-            title="Close"
-            aria-label="Close"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              padding: '4px'
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-          Reorder how sections appear in the exported {docLabel || 'quotation'}.
-        </p>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
-            Loading...
-          </div>
-        ) : (
-          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px' }}>
-            {order.map((key, i) => (
-              <div
-                key={key}
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: `1px solid ${isCustom(key) ? 'rgba(160,100,255,0.3)' : 'var(--table-border)'}`,
-                  marginBottom: '4px',
-                  display: 'flex',
-                  gap: '12px',
-                  alignItems: 'center',
-                  background: isCustom(key) ? 'rgba(160,100,255,0.06)' : 'transparent'
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    fontFamily: 'monospace',
-                    minWidth: '22px'
-                  }}
-                >
-                  {i + 1}.
-                </span>
-                <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>
-                  {getLabel(key)}
-                  {isCustom(key) && (
-                    <span style={{ fontSize: '0.7rem', color: '#a064ff', marginLeft: '8px' }}>
-                      (Custom)
-                    </span>
-                  )}
-                </span>
-                <div style={{ display: 'flex', gap: '2px' }}>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => handleMove(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => handleMove(i, 'down')}
-                    disabled={i === order.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === order.length - 1 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronDown size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
-          <button onClick={handleReset} className="btn-secondary" style={{ fontSize: '0.82rem' }}>
+    <Modal
+      title="Section Order"
+      icon={<ArrowUpDown size={18} />}
+      onClose={onClose}
+      width={480}
+      closeOnOverlay={false}
+      footer={
+        <>
+          <button onClick={handleReset} className="btn-secondary" style={{ marginRight: 'auto' }}>
             Reset to Defaults
           </button>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={onClose} className="btn-secondary" style={{ fontSize: '0.82rem' }}>
-              Cancel
-            </button>
-            <button onClick={handleSave} className="btn-primary" style={{ fontSize: '0.82rem' }}>
-              Save Order
-            </button>
-          </div>
+          <button onClick={onClose} className="btn-secondary">
+            Cancel
+          </button>
+          <button onClick={handleSave} className="btn-primary">
+            Save Order
+          </button>
+        </>
+      }
+    >
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+        Reorder how sections appear in the exported {docLabel || 'quotation'}.
+      </p>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+          Loading...
         </div>
-      </div>
-    </div>
+      ) : (
+        <div>
+          {order.map((key, i) => (
+            <div
+              key={key}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: `1px solid ${isCustom(key) ? 'rgba(160,100,255,0.3)' : 'var(--table-border)'}`,
+                marginBottom: '4px',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center',
+                background: isCustom(key) ? 'rgba(160,100,255,0.06)' : 'transparent'
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  fontFamily: 'var(--font-mono)',
+                  minWidth: '22px'
+                }}
+              >
+                {i + 1}.
+              </span>
+              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>
+                {getLabel(key)}
+                {isCustom(key) && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--violet)', marginLeft: '8px' }}>
+                    (Custom)
+                  </span>
+                )}
+              </span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button
+                  title="Move up"
+                  aria-label="Move up"
+                  onClick={() => handleMove(i, 'up')}
+                  disabled={i === 0}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    color: 'var(--text-secondary)',
+                    opacity: i === 0 ? 0.3 : 1
+                  }}
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  title="Move down"
+                  aria-label="Move down"
+                  onClick={() => handleMove(i, 'down')}
+                  disabled={i === order.length - 1}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    color: 'var(--text-secondary)',
+                    opacity: i === order.length - 1 ? 0.3 : 1
+                  }}
+                >
+                  <ChevronDown size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   )
 }

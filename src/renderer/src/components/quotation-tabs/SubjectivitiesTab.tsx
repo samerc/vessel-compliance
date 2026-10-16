@@ -488,16 +488,6 @@ export default function SubjectivitiesTab({
   )
   const availableMasters = masterList.filter((m) => !addedMasterIds.has(m.id))
 
-  const inputStyle = {
-    padding: '8px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--bg-input, var(--table-header-bg))',
-    color: 'var(--text-primary)',
-    fontSize: '0.85rem',
-    width: '100%'
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
@@ -570,12 +560,6 @@ export default function SubjectivitiesTab({
           }}
           style={{
             width: '60px',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--input-bg, transparent)',
-            color: 'var(--text-primary)',
-            fontSize: '0.85rem',
             textAlign: 'center'
           }}
         />
@@ -592,7 +576,7 @@ export default function SubjectivitiesTab({
             padding: '10px',
             borderRadius: '8px',
             border: '1px solid var(--accent-primary)',
-            background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.05)'
+            background: 'rgba(var(--accent-primary-rgb), 0.05)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -688,7 +672,7 @@ export default function SubjectivitiesTab({
                 <input
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
+                  style={{ flex: 1 }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleUpdate()
                     if (e.key === 'Escape') setEditingId(null)
@@ -741,7 +725,9 @@ export default function SubjectivitiesTab({
                     </span>
                   )}
                   {scopeAutoDetected && item.vesselScope && item.vesselScope.length > 0 && (
-                    <span style={{ fontSize: '0.68rem', color: '#44cc88', marginLeft: '4px' }}>
+                    <span
+                      style={{ fontSize: '0.68rem', color: 'var(--success)', marginLeft: '4px' }}
+                    >
                       (scope auto-detected)
                     </span>
                   )}
@@ -827,7 +813,7 @@ export default function SubjectivitiesTab({
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
           placeholder="Add custom subjectivity..."
-          style={inputStyle}
+          style={{ flex: 1 }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleAddCustom()
           }}

@@ -43,7 +43,6 @@ import {
   MoreHorizontal,
   Copy,
   Search,
-  X,
   History
 } from 'lucide-react'
 import { exportQuotationToWord } from '../services/QuotationExportService'
@@ -74,6 +73,7 @@ import InsuredValueTab from './quotation-tabs/InsuredValueTab'
 import VoyageTab from './quotation-tabs/VoyageTab'
 import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
+import { Modal, Field } from './ui'
 import { ok } from '../utils/ipc'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
@@ -1209,7 +1209,7 @@ export default function QuotationEditor({
                         top: (stepMenuRect?.bottom || 0) + 4,
                         left: stepMenuRect?.left || 0,
                         zIndex: 9999,
-                        backgroundColor: isLight ? '#ffffff' : '#1a1d28',
+                        backgroundColor: 'var(--bg-primary)',
                         border: `1px solid ${isLight ? '#d0d0d0' : 'rgba(255,255,255,0.1)'}`,
                         borderRadius: '10px',
                         padding: '6px',
@@ -1305,7 +1305,7 @@ export default function QuotationEditor({
                     zIndex: 200,
                     marginTop: '4px',
                     padding: '10px',
-                    background: isLight ? '#ffffff' : '#1e222a',
+                    background: 'var(--bg-primary)',
                     border: '1px solid var(--glass-border-color)',
                     borderRadius: '8px',
                     boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
@@ -1396,7 +1396,7 @@ export default function QuotationEditor({
                       left: 0,
                       marginTop: '4px',
                       zIndex: 100,
-                      background: isLight ? '#ffffff' : '#1a1d28',
+                      background: 'var(--bg-primary)',
                       border: '1px solid var(--glass-border-color)',
                       borderRadius: '10px',
                       padding: '6px',
@@ -1552,7 +1552,7 @@ export default function QuotationEditor({
                       top: (actionsRect?.bottom || 0) + 4,
                       right: window.innerWidth - (actionsRect?.right || 0),
                       zIndex: 9999,
-                      background: isLight ? '#ffffff' : '#1a1d28',
+                      background: 'var(--bg-primary)',
                       border: '1px solid var(--glass-border-color)',
                       borderRadius: '10px',
                       padding: '6px',
@@ -1711,49 +1711,17 @@ export default function QuotationEditor({
 
       {/* Step comment modal */}
       {showStepCommentModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
+        <Modal
+          title={`Move to ${reachableSteps.find((s) => s.id === showStepCommentModal)?.name ?? ''}`}
+          icon={<GitBranch size={18} />}
+          onClose={() => {
+            setShowStepCommentModal(null)
+            setStepComment('')
           }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '400px',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 16px', fontSize: '1rem' }}>
-              Move to {reachableSteps.find((s) => s.id === showStepCommentModal)?.name}
-            </h3>
-            <textarea
-              value={stepComment}
-              onChange={(e) => setStepComment(e.target.value)}
-              placeholder="Add a comment (optional)..."
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--input-bg, transparent)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-                resize: 'vertical'
-              }}
-            />
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}
-            >
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button
                 className="btn-secondary"
                 onClick={() => {
@@ -1769,47 +1737,31 @@ export default function QuotationEditor({
               >
                 Confirm
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <Field label="Comment">
+            <textarea
+              value={stepComment}
+              onChange={(e) => setStepComment(e.target.value)}
+              placeholder="Add a comment (optional)..."
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+        </Modal>
       )}
 
       {/* Draft export confirmation modal */}
       {showDraftExportModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '440px',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Quotation Not Approved</h3>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 20px',
-                lineHeight: 1.5
-              }}
-            >
-              This quotation still has a draft reference number. Would you like to approve it first
-              to assign an official number?
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <Modal
+          title="Quotation Not Approved"
+          icon={<AlertTriangle size={18} />}
+          onClose={() => setShowDraftExportModal(null)}
+          width={440}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>
                 Cancel
               </button>
@@ -1828,380 +1780,221 @@ export default function QuotationEditor({
                   {approving ? 'Approving…' : <>Approve &amp; Export</>}
                 </button>
               )}
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: 0,
+              lineHeight: 1.5
+            }}
+          >
+            This quotation still has a draft reference number. Would you like to approve it first to
+            assign an official number?
+          </p>
+        </Modal>
       )}
 
       {/* Export validation warnings modal */}
       {exportWarnings && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001
-          }}
-          onClick={() => setExportWarnings(null)}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '460px',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}
-            >
-              <div
-                style={{
-                  background: 'rgba(255, 180, 32, 0.12)',
-                  padding: '10px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <AlertTriangle size={22} color="#ffb020" />
-              </div>
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Missing Required Fields</h3>
-            </div>
-            <p
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                margin: '0 0 12px',
-                lineHeight: 1.5
-              }}
-            >
-              The following required amount fields are empty. The export may be incomplete.
-            </p>
-            <ul style={{ margin: '0 0 20px', padding: '0 0 0 20px', listStyle: 'disc' }}>
-              {exportWarnings.warnings.map((w, i) => (
-                <li
-                  key={i}
-                  style={{ color: 'var(--text-primary)', fontSize: '0.85rem', lineHeight: 1.6 }}
-                >
-                  {w}
-                </li>
-              ))}
-            </ul>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <Modal
+          title="Missing Required Fields"
+          icon={<AlertTriangle size={18} />}
+          onClose={() => setExportWarnings(null)}
+          width={460}
+          footer={
+            <>
               <button className="btn-secondary" onClick={() => setExportWarnings(null)}>
                 Cancel
               </button>
               <button className="btn-primary" onClick={handleExportWarningProceed}>
                 Export Anyway
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              margin: '0 0 12px',
+              lineHeight: 1.5
+            }}
+          >
+            The following required amount fields are empty. The export may be incomplete.
+          </p>
+          <ul style={{ margin: 0, padding: '0 0 0 20px', listStyle: 'disc' }}>
+            {exportWarnings.warnings.map((w, i) => (
+              <li
+                key={i}
+                style={{ color: 'var(--text-primary)', fontSize: '0.85rem', lineHeight: 1.6 }}
+              >
+                {w}
+              </li>
+            ))}
+          </ul>
+        </Modal>
       )}
 
       {deleteModal?.show &&
         (deleteModal.revisionCount <= 1 ? (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.7)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}
-            onClick={() => setDeleteModal(null)}
-          >
-            <div
-              style={{
-                width: '90%',
-                maxWidth: '480px',
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '14px',
-                border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.2)' : '0 10px 40px rgba(0,0,0,0.5)'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                style={{
-                  padding: '24px 24px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}
-              >
-                <div
-                  style={{
-                    background: 'rgba(255, 77, 77, 0.1)',
-                    padding: '10px',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Trash2 size={24} color="var(--danger)" />
-                </div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Delete Quotation?</h3>
-              </div>
-              <div style={{ padding: '10px 24px 24px' }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.5
-                  }}
-                >
-                  Delete quotation {q.referenceNumber || '(no ref)'}? This cannot be undone.
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: '16px 24px',
-                  background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
-                  borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '0 0 14px 14px',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px'
-                }}
-              >
-                <button
-                  onClick={() => setDeleteModal(null)}
-                  className="btn-secondary"
-                  style={{ padding: '8px 16px' }}
-                >
+          <Modal
+            title="Delete Quotation?"
+            icon={<Trash2 size={18} />}
+            onClose={() => setDeleteModal(null)}
+            width={480}
+            footer={
+              <>
+                <button onClick={() => setDeleteModal(null)} className="btn-secondary">
                   Cancel
                 </button>
-                <button
-                  onClick={handleDeleteFromEditor}
-                  className="btn-primary"
-                  style={{
-                    padding: '8px 16px',
-                    background: 'var(--danger)',
-                    borderColor: 'var(--danger)'
-                  }}
-                >
+                <button onClick={handleDeleteFromEditor} className="btn-danger">
                   Delete
                 </button>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.88rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.5
+              }}
+            >
+              Delete quotation {q.referenceNumber || '(no ref)'}? This cannot be undone.
+            </p>
+          </Modal>
         ) : (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.7)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}
-            onClick={() => setDeleteModal(null)}
-          >
-            <div
-              style={{
-                width: '90%',
-                maxWidth: '480px',
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '14px',
-                border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.2)' : '0 10px 40px rgba(0,0,0,0.5)'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                style={{
-                  padding: '24px 24px 10px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}
-              >
-                <div
-                  style={{
-                    background: 'rgba(255, 77, 77, 0.1)',
-                    padding: '10px',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Trash2 size={24} color="var(--danger)" />
-                </div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>
-                  Delete Quotation {q.referenceNumber || '(no ref)'}
-                  {(q.revisionNumber || 0) > 0 && (
-                    <span
-                      style={{
-                        marginLeft: '6px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        background: 'rgba(180, 100, 255, 0.15)',
-                        color: isLight ? '#7a3db8' : '#b464ff'
-                      }}
-                    >
-                      R{q.revisionNumber}
-                    </span>
-                  )}
-                </h3>
-              </div>
-
-              <div style={{ padding: '16px 24px 20px 24px' }}>
-                <p
-                  style={{
-                    margin: '0 0 16px',
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  This quotation has {deleteModal.revisionCount} revision
-                  {deleteModal.revisionCount > 1 ? 's' : ''}. Choose how to delete:
-                </p>
-
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    marginBottom: '8px',
-                    border:
-                      deleteModal.deleteMode === 'single'
-                        ? '2px solid var(--accent-primary)'
-                        : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
-                    background:
-                      deleteModal.deleteMode === 'single'
-                        ? isLight
-                          ? 'rgba(var(--accent-primary-rgb), 0.05)'
-                          : 'rgba(var(--accent-primary-rgb), 0.08)'
-                        : 'transparent'
-                  }}
-                  onClick={() =>
-                    setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="editorDeleteMode"
-                    checked={deleteModal.deleteMode === 'single'}
-                    onChange={() =>
-                      setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
-                    }
-                    style={{ marginTop: '2px', accentColor: 'var(--accent-primary)' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
-                      Delete this revision only
-                      {(q.revisionNumber || 0) > 0 && ` (R${q.revisionNumber})`}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      {(q.revisionNumber || 0) === 0
-                        ? 'This is the original. The next revision will become the base.'
-                        : 'The previous revision will become the latest version.'}
-                    </div>
-                  </div>
-                </label>
-
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    border:
-                      deleteModal.deleteMode === 'all'
-                        ? '2px solid var(--danger)'
-                        : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
-                    background:
-                      deleteModal.deleteMode === 'all'
-                        ? isLight
-                          ? 'rgba(255,77,77,0.05)'
-                          : 'rgba(255,77,77,0.08)'
-                        : 'transparent'
-                  }}
-                  onClick={() =>
-                    setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="editorDeleteMode"
-                    checked={deleteModal.deleteMode === 'all'}
-                    onChange={() =>
-                      setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
-                    }
-                    style={{ marginTop: '2px', accentColor: 'var(--danger)' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
-                      Delete all revisions ({deleteModal.revisionCount})
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      This will permanently remove the entire quotation history.
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              <div
-                style={{
-                  padding: '16px 24px',
-                  background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
-                  borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '0 0 14px 14px',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px'
-                }}
-              >
-                <button
-                  onClick={() => setDeleteModal(null)}
-                  className="btn-secondary"
-                  style={{ padding: '8px 16px' }}
-                >
+          <Modal
+            title={
+              <>
+                Delete Quotation {q.referenceNumber || '(no ref)'}
+                {(q.revisionNumber || 0) > 0 && (
+                  <span
+                    style={{
+                      marginLeft: '6px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      background: 'rgba(180, 100, 255, 0.15)',
+                      color: 'var(--violet)'
+                    }}
+                  >
+                    R{q.revisionNumber}
+                  </span>
+                )}
+              </>
+            }
+            icon={<Trash2 size={18} />}
+            onClose={() => setDeleteModal(null)}
+            width={480}
+            closeOnOverlay={false}
+            footer={
+              <>
+                <button onClick={() => setDeleteModal(null)} className="btn-secondary">
                   Cancel
                 </button>
-                <button
-                  onClick={handleDeleteFromEditor}
-                  className="btn-primary"
-                  style={{
-                    padding: '8px 16px',
-                    background: 'var(--danger)',
-                    borderColor: 'var(--danger)'
-                  }}
-                >
+                <button onClick={handleDeleteFromEditor} className="btn-danger">
                   Delete
                 </button>
+              </>
+            }
+          >
+            <p
+              style={{
+                margin: '0 0 16px',
+                fontSize: '0.88rem',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              This quotation has {deleteModal.revisionCount} revision
+              {deleteModal.revisionCount > 1 ? 's' : ''}. Choose how to delete:
+            </p>
+
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                marginBottom: '8px',
+                border:
+                  deleteModal.deleteMode === 'single'
+                    ? '2px solid var(--accent-primary)'
+                    : '1px solid var(--table-border)',
+                background:
+                  deleteModal.deleteMode === 'single' ? 'var(--row-selected)' : 'transparent'
+              }}
+              onClick={() =>
+                setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
+              }
+            >
+              <input
+                type="radio"
+                name="editorDeleteMode"
+                checked={deleteModal.deleteMode === 'single'}
+                onChange={() =>
+                  setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
+                }
+                style={{ marginTop: '2px', accentColor: 'var(--accent-primary)' }}
+              />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                  Delete this revision only
+                  {(q.revisionNumber || 0) > 0 && ` (R${q.revisionNumber})`}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  {(q.revisionNumber || 0) === 0
+                    ? 'This is the original. The next revision will become the base.'
+                    : 'The previous revision will become the latest version.'}
+                </div>
               </div>
-            </div>
-          </div>
+            </label>
+
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                border:
+                  deleteModal.deleteMode === 'all'
+                    ? '2px solid var(--danger)'
+                    : '1px solid var(--table-border)',
+                background:
+                  deleteModal.deleteMode === 'all' ? 'rgba(255,77,77,0.06)' : 'transparent'
+              }}
+              onClick={() =>
+                setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
+              }
+            >
+              <input
+                type="radio"
+                name="editorDeleteMode"
+                checked={deleteModal.deleteMode === 'all'}
+                onChange={() =>
+                  setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
+                }
+                style={{ marginTop: '2px', accentColor: 'var(--danger)' }}
+              />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                  Delete all revisions ({deleteModal.revisionCount})
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  This will permanently remove the entire quotation history.
+                </div>
+              </div>
+            </label>
+          </Modal>
         ))}
 
       {/* Tabs */}
@@ -2605,7 +2398,6 @@ export default function QuotationEditor({
             showSuccess('Sections copied successfully')
           }}
           showError={showError}
-          isLight={isLight}
         />
       )}
     </div>
@@ -2616,14 +2408,12 @@ function CopyFromQuotationModal({
   quotation,
   onClose,
   onCopied,
-  showError,
-  isLight
+  showError
 }: {
   quotation: Quotation
   onClose: () => void
   onCopied: () => void
   showError: (msg: string) => void
-  isLight: boolean
 }): React.JSX.Element {
   const [allQuotations, setAllQuotations] = useState<QuotationRowWithCount[]>([])
   const [searchText, setSearchText] = useState('')
@@ -2721,66 +2511,33 @@ function CopyFromQuotationModal({
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-    >
-      <div
-        style={{
-          background: isLight ? '#ffffff' : '#1a1d28',
-          borderRadius: '14px',
-          padding: '24px',
-          width: '520px',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          border: '1px solid var(--glass-border-color)'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '20px'
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Copy from Quotation</h3>
-          <button
-            title="Close"
-            aria-label="Close"
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              padding: '4px'
-            }}
-          >
-            <X size={18} />
+    <Modal
+      title="Copy from Quotation"
+      icon={<Copy size={18} />}
+      onClose={onClose}
+      width={520}
+      closeOnOverlay={false}
+      footer={
+        <>
+          <button className="btn-secondary" onClick={onClose}>
+            Cancel
           </button>
-        </div>
-
-        {/* Source quotation selector */}
-        <div style={{ marginBottom: '16px' }}>
-          <label
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '6px',
-              display: 'block'
-            }}
+          <button
+            className="btn-primary"
+            onClick={handleCopy}
+            disabled={!sourceId || selectedSections.size === 0 || loading}
           >
-            Source Quotation
-          </label>
+            <Copy size={14} />
+            {loading
+              ? 'Copying...'
+              : `Copy ${selectedSections.size} Section${selectedSections.size !== 1 ? 's' : ''}`}
+          </button>
+        </>
+      }
+    >
+      <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+        {/* Source quotation selector */}
+        <Field label="Source quotation">
           <div ref={dropdownRef} style={{ position: 'relative' }}>
             <div
               onClick={() => setShowDropdown(!showDropdown)}
@@ -2832,7 +2589,7 @@ function CopyFromQuotationModal({
                   right: 0,
                   marginTop: '4px',
                   zIndex: 10,
-                  background: isLight ? '#ffffff' : '#1a1d28',
+                  background: 'var(--bg-primary)',
                   border: '1px solid var(--glass-border-color)',
                   borderRadius: '10px',
                   boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
@@ -2845,7 +2602,7 @@ function CopyFromQuotationModal({
                     padding: '8px',
                     position: 'sticky',
                     top: 0,
-                    background: isLight ? '#ffffff' : '#1a1d28',
+                    background: 'var(--bg-primary)',
                     zIndex: 1
                   }}
                 >
@@ -2944,20 +2701,10 @@ function CopyFromQuotationModal({
               </div>
             )}
           </div>
-        </div>
+        </Field>
 
         {/* Section checkboxes */}
-        <div style={{ marginBottom: '16px' }}>
-          <label
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '8px',
-              display: 'block'
-            }}
-          >
-            Sections to Copy
-          </label>
+        <Field label="Sections to copy">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
             {sectionOptions.map((opt) => (
               <label
@@ -2987,47 +2734,29 @@ function CopyFromQuotationModal({
               </label>
             ))}
           </div>
-        </div>
-
-        {/* Warning */}
-        {selectedSections.size > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 12px',
-              borderRadius: '8px',
-              background: 'rgba(255,180,0,0.08)',
-              border: '1px solid rgba(255,180,0,0.2)',
-              marginBottom: '16px',
-              fontSize: '0.8rem',
-              color: isLight ? '#9a6700' : '#ffb020'
-            }}
-          >
-            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-            This will replace existing data in the selected sections.
-          </div>
-        )}
-
-        {/* Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button className="btn-secondary" onClick={onClose} style={{ fontSize: '0.85rem' }}>
-            Cancel
-          </button>
-          <button
-            className="btn-primary"
-            onClick={handleCopy}
-            disabled={!sourceId || selectedSections.size === 0 || loading}
-            style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Copy size={14} />
-            {loading
-              ? 'Copying...'
-              : `Copy ${selectedSections.size} Section${selectedSections.size !== 1 ? 's' : ''}`}
-          </button>
-        </div>
+        </Field>
       </div>
-    </div>
+
+      {/* Warning */}
+      {selectedSections.size > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            background: 'rgba(255,180,0,0.08)',
+            border: '1px solid rgba(255,180,0,0.2)',
+            marginTop: '16px',
+            fontSize: '0.8rem',
+            color: 'var(--warning)'
+          }}
+        >
+          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+          This will replace existing data in the selected sections.
+        </div>
+      )}
+    </Modal>
   )
 }

@@ -388,10 +388,7 @@ export default function DeductiblesTab({
                 width: '60px',
                 padding: '4px 6px',
                 fontSize: '0.82rem',
-                borderRadius: '4px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--bg-input, var(--table-header-bg))',
-                color: 'var(--text-primary)'
+                borderRadius: '4px'
               }}
             />
             <MoneyInput
@@ -406,10 +403,7 @@ export default function DeductiblesTab({
                 width: '120px',
                 padding: '4px 6px',
                 fontSize: '0.82rem',
-                borderRadius: '4px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--bg-input, var(--table-header-bg))',
-                color: 'var(--text-primary)'
+                borderRadius: '4px'
               }}
             />
             {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
@@ -427,10 +421,7 @@ export default function DeductiblesTab({
                     width: '120px',
                     padding: '4px 6px',
                     fontSize: '0.82rem',
-                    borderRadius: '4px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)'
+                    borderRadius: '4px'
                   }}
                 />
               </>
@@ -512,9 +503,7 @@ export default function DeductiblesTab({
                   padding: '3px 6px',
                   fontSize: '0.75rem',
                   color: 'var(--danger)',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))'
+                  borderRadius: '4px'
                 }}
               />
             </div>
@@ -539,9 +528,7 @@ export default function DeductiblesTab({
                     padding: '3px 6px',
                     fontSize: '0.75rem',
                     color: 'var(--danger)',
-                    borderRadius: '4px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))'
+                    borderRadius: '4px'
                   }}
                 />
               </div>
@@ -627,10 +614,7 @@ export default function DeductiblesTab({
                           width: '150px',
                           padding: '4px 8px',
                           borderRadius: '6px',
-                          fontSize: '0.82rem',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input, var(--table-header-bg))',
-                          color: 'var(--text-primary)'
+                          fontSize: '0.82rem'
                         }}
                       />
                       {hasSecondary && (
@@ -644,10 +628,7 @@ export default function DeductiblesTab({
                             width: '150px',
                             padding: '4px 8px',
                             borderRadius: '6px',
-                            fontSize: '0.82rem',
-                            border: '1px solid var(--input-border)',
-                            background: 'var(--bg-input, var(--table-header-bg))',
-                            color: 'var(--text-primary)'
+                            fontSize: '0.82rem'
                           }}
                         />
                       )}
@@ -669,10 +650,7 @@ export default function DeductiblesTab({
                   resize: 'vertical',
                   fontSize: '0.82rem',
                   padding: '4px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))',
-                  color: 'var(--text-primary)'
+                  borderRadius: '4px'
                 }}
               />
               <button
@@ -774,9 +752,6 @@ export default function DeductiblesTab({
             fontSize: '0.8rem',
             padding: '5px 8px',
             borderRadius: '6px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--bg-input, var(--table-header-bg))',
-            color: 'var(--text-primary)',
             overflow: 'auto'
           }}
           onKeyDown={(e) => {
@@ -880,10 +855,7 @@ export default function DeductiblesTab({
                     style={{
                       fontSize: '0.82rem',
                       padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--bg-input, var(--table-header-bg))',
-                      color: 'var(--text-primary)'
+                      borderRadius: '4px'
                     }}
                   />
                   <textarea
@@ -895,10 +867,7 @@ export default function DeductiblesTab({
                       resize: 'vertical',
                       fontSize: '0.82rem',
                       padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--bg-input, var(--table-header-bg))',
-                      color: 'var(--text-primary)'
+                      borderRadius: '4px'
                     }}
                   />
                 </div>
@@ -1019,10 +988,7 @@ export default function DeductiblesTab({
             style={{
               fontSize: '0.8rem',
               padding: '5px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)'
+              borderRadius: '6px'
             }}
           />
           <textarea
@@ -1041,9 +1007,6 @@ export default function DeductiblesTab({
               fontSize: '0.8rem',
               padding: '5px 8px',
               borderRadius: '6px',
-              border: '1px solid var(--input-border)',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
               overflow: 'auto'
             }}
             onKeyDown={(e) => {
@@ -1094,16 +1057,8 @@ export default function DeductiblesTab({
         </button>
         {showAdditionalText && (
           <div style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <label
-              style={{
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                display: 'block',
-                marginBottom: '4px',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              Additional Text (after deductibles)
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Additional text (after deductibles)
             </label>
             <RichTextEditor
               value={
@@ -1171,11 +1126,7 @@ export default function DeductiblesTab({
                     resize: 'vertical',
                     fontSize: '0.82rem',
                     padding: '6px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    boxSizing: 'border-box'
+                    borderRadius: '4px'
                   }}
                 />
               )}

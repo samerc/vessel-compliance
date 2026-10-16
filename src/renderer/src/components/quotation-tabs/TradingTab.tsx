@@ -201,11 +201,7 @@ export default function TradingTab({
       {/* Trading Warranty Text (intro — hidden when custom wording is active) */}
       {!quotation.tradingCustomMode && (
         <div style={sectionStyle}>
-          <label
-            style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}
-          >
-            Trading Warranty Text
-          </label>
+          <h4 className="form-section-title">Trading warranty text</h4>
 
           {/* Vessel selector for multi-vessel quotations */}
           {qVessels.length >= 2 && (
@@ -309,15 +305,7 @@ export default function TradingTab({
                     }, 0)
                   }
                 }}
-                style={{
-                  padding: '7px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.84rem',
-                  width: '100%'
-                }}
+                style={{ width: '100%' }}
               >
                 <option value="">Load from template...</option>
                 {templates.map((t) => (
@@ -564,16 +552,7 @@ export default function TradingTab({
           {/* Section E: Additional Trading Text (not for P&I) */}
           {!isPiLike(quotation.quotationTypeCode) && (
             <div style={sectionStyle}>
-              <label
-                style={{
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  display: 'block',
-                  marginBottom: '8px'
-                }}
-              >
-                Additional Trading Text
-              </label>
+              <h4 className="form-section-title">Additional trading text</h4>
               {templates.length > 0 && (
                 <div style={{ marginBottom: '10px' }}>
                   <select
@@ -585,15 +564,7 @@ export default function TradingTab({
                         updateField('tradingCustomText', tpl.text)
                       }
                     }}
-                    style={{
-                      padding: '7px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--bg-input, var(--table-header-bg))',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.84rem',
-                      width: '100%'
-                    }}
+                    style={{ width: '100%' }}
                   >
                     <option value="">Load from template...</option>
                     {templates.map((t) => (
@@ -641,13 +612,6 @@ export default function TradingTab({
             <select
               value={newCountryType}
               onChange={(e) => setNewCountryType(e.target.value as 'excluded' | 'ddq')}
-              style={{
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid var(--glass-border-color)',
-                background: 'var(--bg-input, var(--table-header-bg))',
-                color: 'var(--text-primary)'
-              }}
             >
               <option value="excluded">Excluded</option>
               <option value="ddq">DDQ</option>
@@ -738,11 +702,7 @@ export default function TradingTab({
 
       {quotation.tradingCustomMode && (
         <div style={sectionStyle}>
-          <label
-            style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}
-          >
-            Custom Trading Wording
-          </label>
+          <h4 className="form-section-title">Custom trading wording</h4>
           {customTexts.length > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <select
@@ -754,15 +714,7 @@ export default function TradingTab({
                     updateField('tradingCustomWording', ct.text)
                   }
                 }}
-                style={{
-                  padding: '7px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-input, var(--table-header-bg))',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.84rem',
-                  width: '100%'
-                }}
+                style={{ width: '100%' }}
               >
                 <option value="">Load from template...</option>
                 {customTexts.map((t) => (

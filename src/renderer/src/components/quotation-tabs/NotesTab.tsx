@@ -6,8 +6,7 @@ import { confirmDialog } from '../DialogHost'
 
 export default function NotesTab({
   quotation,
-  showSuccess,
-  isLight
+  showSuccess
 }: {
   quotation: Quotation
   showSuccess: (m: string) => void
@@ -153,7 +152,7 @@ export default function NotesTab({
           position: 'absolute',
           bottom: '100%',
           left: 0,
-          background: isLight ? '#ffffff' : '#1a1d28',
+          background: 'var(--bg-primary)',
           border: '1px solid var(--glass-border-color)',
           borderRadius: '6px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',

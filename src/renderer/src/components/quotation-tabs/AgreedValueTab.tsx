@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 import { MoneyInput } from './shared'
+import { Field } from '../ui'
 
 export default function AgreedValueTab({
   quotation,
@@ -246,15 +247,8 @@ export default function AgreedValueTab({
       {/* H&M Value + Currency */}
       {valueOptions.length > 0 ? (
         <div style={{ marginBottom: '12px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '8px'
-            }}
-          >
-            Value Options
+          <label className="field-label" style={{ display: 'block', marginBottom: '8px' }}>
+            Value options
           </label>
           {valueOptions.map((opt, idx) => (
             <div
@@ -276,10 +270,7 @@ export default function AgreedValueTab({
                   width: '120px',
                   padding: '6px 10px',
                   borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)'
+                  fontSize: '0.85rem'
                 }}
               />
               <input
@@ -297,10 +288,7 @@ export default function AgreedValueTab({
                   padding: '6px 10px',
                   borderRadius: '6px',
                   fontSize: '0.85rem',
-                  textAlign: 'center',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)'
+                  textAlign: 'center'
                 }}
               />
               <MoneyInput
@@ -318,10 +306,7 @@ export default function AgreedValueTab({
                   flex: 1,
                   padding: '6px 10px',
                   borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)'
+                  fontSize: '0.85rem'
                 }}
               />
               <button
@@ -365,15 +350,8 @@ export default function AgreedValueTab({
             style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}
           >
             <div style={{ flex: 1 }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '6px'
-                }}
-              >
-                H&M Values per Alternative
+              <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                H&M values per alternative
               </label>
               <div
                 style={{
@@ -524,15 +502,8 @@ export default function AgreedValueTab({
               {quotation.ivEnabled ? ' — adds an IV column per vessel' : ''}
             </span>
           </div>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '6px'
-            }}
-          >
-            Agreed Values per Vessel
+          <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+            Agreed values per vessel
           </label>
           <div
             style={{
@@ -697,62 +668,46 @@ export default function AgreedValueTab({
         <>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
             <div style={{ flex: 1, maxWidth: '250px' }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                H&M Value
-              </label>
-              <MoneyInput
-                value={quotation.agreedValue}
-                onChange={(val) => setQ((p) => ({ ...p, agreedValue: val }))}
-                onBlur={async (val) => {
-                  const nv = val ?? null
-                  updateField('agreedValue', nv)
-                  // Sync to single vessel record
-                  if (qVessels.length === 1) {
-                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: nv })
-                    setQVessels((prev) =>
-                      prev.map((v, i) => (i === 0 ? { ...v, agreedValue: nv } : v))
-                    )
-                  }
-                }}
-                placeholder="0.00"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem'
-                }}
-              />
+              <Field label="H&M value">
+                <MoneyInput
+                  value={quotation.agreedValue}
+                  onChange={(val) => setQ((p) => ({ ...p, agreedValue: val }))}
+                  onBlur={async (val) => {
+                    const nv = val ?? null
+                    updateField('agreedValue', nv)
+                    // Sync to single vessel record
+                    if (qVessels.length === 1) {
+                      await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: nv })
+                      setQVessels((prev) =>
+                        prev.map((v, i) => (i === 0 ? { ...v, agreedValue: nv } : v))
+                      )
+                    }
+                  }}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </Field>
             </div>
             <div style={{ maxWidth: '120px' }}>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '4px'
-                }}
-              >
-                Currency
-              </label>
-              <input
-                type="text"
-                value={quotation.agreedValueCurrency || 'USD'}
-                onChange={(e) => setQ((p) => ({ ...p, agreedValueCurrency: e.target.value }))}
-                onBlur={(e) => updateField('agreedValueCurrency', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem'
-                }}
-              />
+              <Field label="Currency">
+                <input
+                  type="text"
+                  value={quotation.agreedValueCurrency || 'USD'}
+                  onChange={(e) => setQ((p) => ({ ...p, agreedValueCurrency: e.target.value }))}
+                  onBlur={(e) => updateField('agreedValueCurrency', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </Field>
             </div>
           </div>
           <button
@@ -820,15 +775,8 @@ export default function AgreedValueTab({
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    IV Values
+                  <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+                    IV values
                   </label>
                   <div
                     style={{
@@ -913,28 +861,20 @@ export default function AgreedValueTab({
                   </div>
                 </div>
                 <div style={{ maxWidth: '120px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Currency
-                  </label>
-                  <input
-                    type="text"
-                    value={quotation.ivCurrency || 'USD'}
-                    onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
-                    onBlur={(e) => updateField('ivCurrency', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem'
-                    }}
-                  />
+                  <Field label="Currency">
+                    <input
+                      type="text"
+                      value={quotation.ivCurrency || 'USD'}
+                      onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
+                      onBlur={(e) => updateField('ivCurrency', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </Field>
                 </div>
               </div>
             ) : (
@@ -942,62 +882,46 @@ export default function AgreedValueTab({
                 style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}
               >
                 <div style={{ flex: 1, maxWidth: '250px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    IV Value
-                  </label>
-                  <MoneyInput
-                    value={quotation.ivValue}
-                    onChange={(val) => setQ((p) => ({ ...p, ivValue: val }))}
-                    onBlur={async (val) => {
-                      const nv = val ?? null
-                      updateField('ivValue', nv)
-                      // Sync to single vessel record
-                      if (qVessels.length === 1) {
-                        await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: nv })
-                        setQVessels((prev) =>
-                          prev.map((v, i) => (i === 0 ? { ...v, ivValue: nv } : v))
-                        )
-                      }
-                    }}
-                    placeholder="0.00"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem'
-                    }}
-                  />
+                  <Field label="IV value">
+                    <MoneyInput
+                      value={quotation.ivValue}
+                      onChange={(val) => setQ((p) => ({ ...p, ivValue: val }))}
+                      onBlur={async (val) => {
+                        const nv = val ?? null
+                        updateField('ivValue', nv)
+                        // Sync to single vessel record
+                        if (qVessels.length === 1) {
+                          await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: nv })
+                          setQVessels((prev) =>
+                            prev.map((v, i) => (i === 0 ? { ...v, ivValue: nv } : v))
+                          )
+                        }
+                      }}
+                      placeholder="0.00"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </Field>
                 </div>
                 <div style={{ maxWidth: '120px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Currency
-                  </label>
-                  <input
-                    type="text"
-                    value={quotation.ivCurrency || 'USD'}
-                    onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
-                    onBlur={(e) => updateField('ivCurrency', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem'
-                    }}
-                  />
+                  <Field label="Currency">
+                    <input
+                      type="text"
+                      value={quotation.ivCurrency || 'USD'}
+                      onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
+                      onBlur={(e) => updateField('ivCurrency', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </Field>
                 </div>
               </div>
             ))}
@@ -1007,14 +931,7 @@ export default function AgreedValueTab({
       {/* Template texts to add */}
       {unusedTexts.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '6px'
-            }}
-          >
+          <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
             Add from templates
           </label>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1034,15 +951,8 @@ export default function AgreedValueTab({
 
       {/* Selected items */}
       <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '6px'
-          }}
-        >
-          Value Text Items ({visibleItems.length})
+        <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
+          Value text items ({visibleItems.length})
         </label>
         {visibleItems.length === 0 ? (
           <div
@@ -1183,30 +1093,22 @@ export default function AgreedValueTab({
       {/* Add custom text */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
-          <label
-            style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Add custom text
-          </label>
-          <textarea
-            value={newText}
-            onChange={(e) => setNewText(e.target.value)}
-            placeholder="Enter custom agreed value text..."
-            rows={2}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              resize: 'vertical',
-              fontFamily: 'inherit'
-            }}
-          />
+          <Field label="Add custom text">
+            <textarea
+              value={newText}
+              onChange={(e) => setNewText(e.target.value)}
+              placeholder="Enter custom agreed value text..."
+              rows={2}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+            />
+          </Field>
         </div>
         <button
           onClick={addCustomText}

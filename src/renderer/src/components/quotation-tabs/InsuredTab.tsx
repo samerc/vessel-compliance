@@ -9,7 +9,6 @@ import {
   QuotationVessel,
   Vessel
 } from '../../../../shared/types'
-import { useTheme } from '../../contexts/ThemeContext'
 import { confirmDialog } from '../DialogHost'
 import { CaseToggleBtn } from '../CaseToggle'
 
@@ -27,8 +26,6 @@ export default function InsuredTab({
   updateField: (f: string, v: unknown) => void
 }): React.JSX.Element {
   void _vessels
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const [assureds, setAssureds] = useState<QuotationAssured[]>([])
   const [roles, setRoles] = useState<AssuredRole[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
@@ -349,7 +346,7 @@ export default function InsuredTab({
               ? 'Search customer or type a name...'
               : 'Search broker or type a name...'
           }
-          style={{ width: '100%', border: '1px solid var(--input-border)', paddingRight: '44px' }}
+          style={{ width: '100%', paddingRight: '44px' }}
         />
         <CaseToggleBtn
           value={coInputValue}
@@ -365,7 +362,7 @@ export default function InsuredTab({
               top: '100%',
               left: 0,
               right: 0,
-              background: isLight ? '#ffffff' : '#1a1d28',
+              background: 'var(--bg-primary)',
               border: '1px solid var(--glass-border-color)',
               borderRadius: '6px',
               zIndex: 100,
@@ -426,17 +423,7 @@ export default function InsuredTab({
               marginBottom: '8px'
             }}
           >
-            <span
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-            >
-              Groups
-            </span>
+            <span className="field-label">Groups</span>
           </div>
           {groups.map((g, i) => (
             <div
@@ -610,7 +597,7 @@ export default function InsuredTab({
               }
             }}
             placeholder="Search entity or type a new assured name..."
-            style={{ width: '100%', border: '1px solid var(--input-border)', paddingRight: '44px' }}
+            style={{ width: '100%', paddingRight: '44px' }}
           />
           <CaseToggleBtn value={newName} onChange={setNewName} />
           {showEntityDropdown && entityFiltered.length > 0 && (
@@ -620,7 +607,7 @@ export default function InsuredTab({
                 top: '100%',
                 left: 0,
                 right: 0,
-                background: isLight ? '#ffffff' : '#1a1d28',
+                background: 'var(--bg-primary)',
                 border: '1px solid var(--glass-border-color)',
                 borderRadius: '6px',
                 zIndex: 100,
@@ -668,7 +655,7 @@ export default function InsuredTab({
                 if (e.key === 'Enter') handleCreateRole()
               }}
               placeholder="New role name"
-              style={{ width: '140px', border: '1px solid var(--input-border)' }}
+              style={{ width: '140px' }}
               autoFocus
             />
             <button
@@ -705,14 +692,7 @@ export default function InsuredTab({
                 setNewRole('')
               } else setNewRole(e.target.value)
             }}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              minWidth: '140px',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)'
-            }}
+            style={{ minWidth: '140px' }}
           >
             <option value="">Role</option>
             {roles.map((r) => (
@@ -724,17 +704,7 @@ export default function InsuredTab({
           </select>
         )}
         {qVessels.length > 0 && (
-          <select
-            value={newVesselLabel}
-            onChange={(e) => setNewVesselLabel(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)'
-            }}
-          >
+          <select value={newVesselLabel} onChange={(e) => setNewVesselLabel(e.target.value)}>
             <option value="">All vessels</option>
             {qVessels.map((v) => (
               <option key={v.id} value={v.vesselLabel}>
@@ -744,17 +714,7 @@ export default function InsuredTab({
           </select>
         )}
         {groups.length > 0 && (
-          <select
-            value={newGroupId}
-            onChange={(e) => setNewGroupId(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)'
-            }}
-          >
+          <select value={newGroupId} onChange={(e) => setNewGroupId(e.target.value)}>
             <option value="">No group</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>

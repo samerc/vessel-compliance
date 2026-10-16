@@ -20,6 +20,7 @@ import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsCons
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
+import { Field } from '../ui'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
 
@@ -1774,61 +1775,20 @@ export default function PremiumTab({
         !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) &&
         (() => {
           return (
-            <div style={{ marginBottom: '16px' }}>
-              <table
-                style={{
-                  borderCollapse: 'collapse',
-                  width: '100%',
-                  maxWidth: '700px',
-                  fontSize: '0.82rem'
-                }}
-              >
+            <div className="table-wrap" style={{ marginBottom: '16px', maxWidth: '700px' }}>
+              <table className="data-table">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-                    <th
-                      style={{
-                        textAlign: 'left',
-                        padding: '6px 10px',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 500
-                      }}
-                    >
-                      Vessel
-                    </th>
-                    <th
-                      style={{
-                        textAlign: 'right',
-                        padding: '6px 10px',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 500
-                      }}
-                    >
+                  <tr>
+                    <th>Vessel</th>
+                    <th className="num">
                       {premiumLabel} ({currency})
                     </th>
                     {showVesselPrevious && (
-                      <th
-                        style={{
-                          textAlign: 'right',
-                          padding: '6px 10px',
-                          color: 'var(--danger)',
-                          fontWeight: 500
-                        }}
-                      >
+                      <th className="num" style={{ color: 'var(--danger)' }}>
                         Previous
                       </th>
                     )}
-                    {hasDiscount && (
-                      <th
-                        style={{
-                          textAlign: 'right',
-                          padding: '6px 10px',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 500
-                        }}
-                      >
-                        Payable ({currency})
-                      </th>
-                    )}
+                    {hasDiscount && <th className="num">Payable ({currency})</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1847,17 +1807,11 @@ export default function PremiumTab({
                       } as Partial<QuotationVessel>)
                     }
                     return (
-                      <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                        <td
-                          style={{
-                            padding: '6px 10px',
-                            fontWeight: 600,
-                            textTransform: 'uppercase'
-                          }}
-                        >
+                      <tr key={v.id}>
+                        <td style={{ fontWeight: 600, textTransform: 'uppercase' }}>
                           {v.name || v.vesselLabel}
                         </td>
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                        <td className="num">
                           <MoneyInput
                             value={v.premiumAmount}
                             onChange={(val) =>
@@ -1883,7 +1837,7 @@ export default function PremiumTab({
                           )}
                         </td>
                         {showVesselPrevious && (
-                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          <td className="num">
                             <MoneyInput
                               value={v.previousPremium}
                               onChange={(val) =>
@@ -1911,7 +1865,7 @@ export default function PremiumTab({
                           </td>
                         )}
                         {hasDiscount && (
-                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          <td className="num">
                             <div
                               style={{
                                 display: 'flex',
@@ -2024,9 +1978,9 @@ export default function PremiumTab({
                       </tr>
                     )
                   })}
-                  <tr style={{ fontWeight: 700 }}>
-                    <td style={{ padding: '8px 10px' }}>Total</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                  <tr style={{ fontWeight: 600, background: 'var(--table-header-bg)' }}>
+                    <td>Total</td>
+                    <td className="num">
                       {technicalPremium > 0
                         ? technicalPremium.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
@@ -2035,9 +1989,7 @@ export default function PremiumTab({
                         : '-'}
                     </td>
                     {showVesselPrevious && (
-                      <td
-                        style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--danger)' }}
-                      >
+                      <td className="num" style={{ color: 'var(--danger)' }}>
                         {(() => {
                           const tp = qVessels.reduce((s, v) => s + (v.previousPremium || 0), 0)
                           return tp > 0
@@ -2050,7 +2002,7 @@ export default function PremiumTab({
                       </td>
                     )}
                     {hasDiscount && (
-                      <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                      <td className="num">
                         {technicalPremium > 0
                           ? payablePremium.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -2368,15 +2320,7 @@ export default function PremiumTab({
                       updateField('ncbText', tpl.text)
                     }
                   }}
-                  style={{
-                    padding: '7px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.84rem',
-                    width: '100%'
-                  }}
+                  style={{ width: '100%' }}
                 >
                   <option value="">
                     {ncbTemplates.length > 0
@@ -2549,15 +2493,7 @@ export default function PremiumTab({
                       updateField('upccText', tpl.text)
                     }
                   }}
-                  style={{
-                    padding: '7px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.84rem',
-                    width: '100%'
-                  }}
+                  style={{ width: '100%' }}
                 >
                   <option value="">
                     {upccTemplates.length > 0
@@ -2675,15 +2611,7 @@ export default function PremiumTab({
                     placeholder="Discount name (e.g. Loyalty Discount)"
                     onChange={(e) => patch({ label: e.target.value })}
                     onBlur={(e) => save({ label: e.target.value })}
-                    style={{
-                      flex: '1 1 200px',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: 'transparent',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ flex: '1 1 200px' }}
                   />
                   <label
                     style={{
@@ -2734,15 +2662,7 @@ export default function PremiumTab({
                         value={d.amount}
                         onChange={(val) => patch({ amount: val ?? null })}
                         onBlur={(val) => save({ amount: val ?? null })}
-                        style={{
-                          width: '110px',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'transparent',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem'
-                        }}
+                        style={{ width: '110px' }}
                         showZero
                       />
                     </div>
@@ -2760,15 +2680,7 @@ export default function PremiumTab({
                         onBlur={(e) =>
                           save({ percent: e.target.value ? parseFloat(e.target.value) : null })
                         }
-                        style={{
-                          width: '70px',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'transparent',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem'
-                        }}
+                        style={{ width: '70px' }}
                       />
                       <span style={{ fontSize: '0.78rem' }}>%</span>
                     </div>
@@ -2848,15 +2760,7 @@ export default function PremiumTab({
                       patch({ targetSection: v })
                       save({ targetSection: v })
                     }}
-                    style={{
-                      flex: '0 1 260px',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--bg-input, var(--table-header-bg))',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.82rem'
-                    }}
+                    style={{ flex: '0 1 260px' }}
                   >
                     <option value="">Own section</option>
                     {getDefaultSectionOrder(quotation.quotationTypeCode)
@@ -3100,67 +3004,47 @@ export default function PremiumTab({
           )}
         </div>
         {quotation.nonRefundableType && (
-          <div style={{ marginTop: '10px' }}>
-            <label
-              style={{
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                display: 'block',
-                marginBottom: '4px'
-              }}
-            >
-              Non-refundable sentence (appears in export after 1st instalment)
-            </label>
-            <textarea
-              value={
-                quotation.nonRefundableType === 'first_instalment'
-                  ? stripHtml(
-                      quotation.sectionTextsOverride?.nonRefundableFirstText ??
-                        getEffectiveText('nonRefundableFirstText')
-                    )
-                  : stripHtml(
-                      quotation.sectionTextsOverride?.nonRefundablePercentText ??
-                        getEffectiveText('nonRefundablePercentText')
-                    ).replace(/\{percent\}/g, String(quotation.nonRefundablePercent || '___'))
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr', marginTop: '10px' }}>
+            <Field
+              label="Non-refundable sentence (appears in export after 1st instalment)"
+              hint={
+                quotation.nonRefundableType === 'percentage'
+                  ? 'Use {percent} as placeholder for the percentage value'
+                  : undefined
               }
-              onChange={(e) => {
-                const key =
+            >
+              <textarea
+                value={
                   quotation.nonRefundableType === 'first_instalment'
-                    ? 'nonRefundableFirstText'
-                    : 'nonRefundablePercentText'
-                const val = e.target.value
-                setQ((p) => ({
-                  ...p,
-                  sectionTextsOverride: { ...(p.sectionTextsOverride || {}), [key]: val }
-                }))
-              }}
-              onBlur={() => {
-                setQ((p) => {
-                  updateField('sectionTextsOverride', p.sectionTextsOverride)
-                  return p
-                })
-              }}
-              style={{
-                width: '100%',
-                maxWidth: '600px',
-                minHeight: '40px',
-                resize: 'vertical',
-                fontSize: '0.82rem',
-                padding: '6px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--bg-input, var(--table-header-bg))',
-                color: 'var(--text-primary)',
-                boxSizing: 'border-box'
-              }}
-            />
-            {quotation.nonRefundableType === 'percentage' && (
-              <div
-                style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}
-              >
-                Use {'{percent}'} as placeholder for the percentage value
-              </div>
-            )}
+                    ? stripHtml(
+                        quotation.sectionTextsOverride?.nonRefundableFirstText ??
+                          getEffectiveText('nonRefundableFirstText')
+                      )
+                    : stripHtml(
+                        quotation.sectionTextsOverride?.nonRefundablePercentText ??
+                          getEffectiveText('nonRefundablePercentText')
+                      ).replace(/\{percent\}/g, String(quotation.nonRefundablePercent || '___'))
+                }
+                onChange={(e) => {
+                  const key =
+                    quotation.nonRefundableType === 'first_instalment'
+                      ? 'nonRefundableFirstText'
+                      : 'nonRefundablePercentText'
+                  const val = e.target.value
+                  setQ((p) => ({
+                    ...p,
+                    sectionTextsOverride: { ...(p.sectionTextsOverride || {}), [key]: val }
+                  }))
+                }}
+                onBlur={() => {
+                  setQ((p) => {
+                    updateField('sectionTextsOverride', p.sectionTextsOverride)
+                    return p
+                  })
+                }}
+                style={{ maxWidth: '600px', minHeight: '40px', resize: 'vertical' }}
+              />
+            </Field>
           </div>
         )}
       </div>
@@ -3342,29 +3226,21 @@ export default function PremiumTab({
       )}
 
       {/* Additional premium instructions */}
-      <div style={{ marginBottom: '20px' }}>
-        <label
-          style={{
-            fontSize: '0.8rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Additional premium instructions
-        </label>
-        <RichTextEditor
-          value={quotation.premiumAdditionalText || ''}
-          onChange={(val) => {
-            setQ((p) => ({ ...p, premiumAdditionalText: val }))
-            updateField('premiumAdditionalText', val)
-          }}
-          minHeight={60}
-          maxWidth="600px"
-          showFontSize
-          showAlignment
-          showLineSpacing
-        />
+      <div className="form-grid" style={{ gridTemplateColumns: '1fr', marginBottom: '20px' }}>
+        <Field label="Additional premium instructions">
+          <RichTextEditor
+            value={quotation.premiumAdditionalText || ''}
+            onChange={(val) => {
+              setQ((p) => ({ ...p, premiumAdditionalText: val }))
+              updateField('premiumAdditionalText', val)
+            }}
+            minHeight={60}
+            maxWidth="600px"
+            showFontSize
+            showAlignment
+            showLineSpacing
+          />
+        </Field>
       </div>
     </div>
   )

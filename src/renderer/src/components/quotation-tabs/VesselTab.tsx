@@ -24,6 +24,7 @@ import {
 import { ok } from '../../utils/ipc'
 import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
+import { Field } from '../ui'
 
 const EMPTY_NEW_VESSEL = {
   name: '',
@@ -104,13 +105,11 @@ function ClassSocietyInput({
   value,
   onChange,
   societies,
-  isLight,
   placeholder
 }: {
   value: string
   onChange: (v: string) => void
   societies: ClassificationSociety[]
-  isLight?: boolean
   placeholder?: string
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
@@ -154,7 +153,7 @@ function ClassSocietyInput({
             marginTop: '2px',
             maxHeight: '200px',
             overflowY: 'auto',
-            background: isLight ? '#ffffff' : '#1a1d28',
+            background: 'var(--bg-primary)',
             border: '1px solid var(--input-border)',
             borderRadius: '8px',
             zIndex: 100,
@@ -179,9 +178,7 @@ function ClassSocietyInput({
                 gap: '8px'
               }}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.background = isLight
-                  ? 'rgba(0,150,200,0.06)'
-                  : 'rgba(var(--accent-primary-rgb), 0.06)')
+                (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')
               }
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
@@ -204,7 +201,6 @@ export default function VesselTab({
   vessels,
   showSuccess,
   showError,
-  isLight,
   onVesselsChanged,
   setQ
 }: {
@@ -734,14 +730,7 @@ export default function VesselTab({
                   value={fleetSearch}
                   onChange={(e) => setFleetSearch(e.target.value)}
                   placeholder="Search fleets..."
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--input-border)'
-                  }}
+                  style={{ width: '100%' }}
                 />
               </div>
               <div
@@ -788,9 +777,7 @@ export default function VesselTab({
                       }}
                       onMouseEnter={(e) => {
                         if (!addingFleet)
-                          e.currentTarget.style.background = isLight
-                            ? 'rgba(0,150,200,0.06)'
-                            : 'rgba(var(--accent-primary-rgb), 0.06)'
+                          e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)'
                       }}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
@@ -837,14 +824,7 @@ export default function VesselTab({
                   onFocus={() => setVesselDropdownOpen(true)}
                   onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 200)}
                   placeholder="Search vessel by name or IMO..."
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--input-border)'
-                  }}
+                  style={{ width: '100%' }}
                 />
                 {vesselDropdownOpen &&
                   (() => {
@@ -866,7 +846,7 @@ export default function VesselTab({
                           marginTop: '4px',
                           maxHeight: '220px',
                           overflowY: 'auto',
-                          background: isLight ? '#ffffff' : '#1a1d28',
+                          background: 'var(--bg-primary)',
                           border: '1px solid var(--glass-border-color)',
                           borderRadius: '8px',
                           zIndex: 20,
@@ -889,9 +869,8 @@ export default function VesselTab({
                               transition: 'background 0.15s'
                             }}
                             onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = isLight
-                                ? 'rgba(0,150,200,0.06)'
-                                : 'rgba(var(--accent-primary-rgb), 0.06)')
+                              (e.currentTarget.style.background =
+                                'rgba(var(--accent-primary-rgb), 0.06)')
                             }
                             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                           >
@@ -933,29 +912,18 @@ export default function VesselTab({
             </div>
           ) : (
             <div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '10px',
-                  maxWidth: '600px',
-                  marginBottom: '12px'
-                }}
-              >
+              <div className="form-grid cols-2" style={{ maxWidth: '600px', marginBottom: '12px' }}>
                 {(
                   [
-                    ['name', 'Name *', 'text', true],
-                    ['imoNumber', 'IMO Number', 'text', false],
-                    ['builtYear', 'Built Year', 'number', false],
-                    ['rebuiltYear', 'Rebuilt Year', 'number', false],
-                    ['grossTonnage', 'Gross Tonnage', 'number', false],
-                    ['callSign', 'Call Sign', 'text', false]
+                    ['name', 'Name', 'text', true],
+                    ['imoNumber', 'IMO number', 'text', false],
+                    ['builtYear', 'Built year', 'number', false],
+                    ['rebuiltYear', 'Rebuilt year', 'number', false],
+                    ['grossTonnage', 'Gross tonnage', 'number', false],
+                    ['callSign', 'Call sign', 'text', false]
                   ] as [keyof typeof EMPTY_NEW_VESSEL, string, string, boolean][]
                 ).map(([field, label, type, upper]) => (
-                  <div key={field}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      {label}
-                    </label>
+                  <Field key={field} label={label} required={field === 'name'}>
                     <input
                       type={type}
                       value={newData[field]}
@@ -965,175 +933,167 @@ export default function VesselTab({
                           [field]: upper ? e.target.value.toUpperCase() : e.target.value
                         }))
                       }
-                      style={{ width: '100%', ...(upper ? { textTransform: 'uppercase' } : {}) }}
+                      style={upper ? { textTransform: 'uppercase' } : undefined}
                     />
-                  </div>
+                  </Field>
                 ))}
                 {/* Flag combobox */}
-                <div style={{ position: 'relative' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Flag
-                  </label>
-                  <input
-                    type="text"
-                    value={newData.flag}
-                    onChange={(e) => {
-                      setNewData((p) => ({ ...p, flag: e.target.value }))
-                      setFlagDropdownOpen(true)
-                    }}
-                    onFocus={() => setFlagDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setFlagDropdownOpen(false), 150)}
-                    placeholder="Search flag states..."
-                    style={{ width: '100%' }}
-                  />
-                  {flagDropdownOpen &&
-                    (() => {
-                      const q = newData.flag.toLowerCase()
-                      const filtered = flagStatesLocal
-                        .filter(
-                          (f) =>
-                            f.name?.toLowerCase().includes(q) ||
-                            f.iso3Code?.toLowerCase().includes(q)
-                        )
-                        .slice(0, 10)
-                      return filtered.length > 0 ? (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            marginTop: '2px',
-                            maxHeight: '200px',
-                            overflowY: 'auto',
-                            background: isLight ? '#ffffff' : '#1a1d28',
-                            border: '1px solid var(--input-border)',
-                            borderRadius: '8px',
-                            zIndex: 100,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                          }}
-                        >
-                          {filtered.map((f) => (
-                            <div
-                              key={f.id}
-                              onMouseDown={() => {
-                                setNewData((p) => ({ ...p, flag: f.name }))
-                                setFlagDropdownOpen(false)
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderBottom: '1px solid var(--table-border)'
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = isLight
-                                  ? 'rgba(0,150,200,0.06)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.06)')
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = 'transparent')
-                              }
-                            >
-                              {f.name}
-                              {f.iso3Code ? (
-                                <span
-                                  style={{
-                                    color: 'var(--text-secondary)',
-                                    marginLeft: '6px',
-                                    fontSize: '0.8rem'
-                                  }}
-                                >
-                                  ({f.iso3Code})
-                                </span>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null
-                    })()}
-                </div>
+                <Field label="Flag">
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={newData.flag}
+                      onChange={(e) => {
+                        setNewData((p) => ({ ...p, flag: e.target.value }))
+                        setFlagDropdownOpen(true)
+                      }}
+                      onFocus={() => setFlagDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setFlagDropdownOpen(false), 150)}
+                      placeholder="Search flag states..."
+                      style={{ width: '100%' }}
+                    />
+                    {flagDropdownOpen &&
+                      (() => {
+                        const q = newData.flag.toLowerCase()
+                        const filtered = flagStatesLocal
+                          .filter(
+                            (f) =>
+                              f.name?.toLowerCase().includes(q) ||
+                              f.iso3Code?.toLowerCase().includes(q)
+                          )
+                          .slice(0, 10)
+                        return filtered.length > 0 ? (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              marginTop: '2px',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--input-border)',
+                              borderRadius: '8px',
+                              zIndex: 100,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                            }}
+                          >
+                            {filtered.map((f) => (
+                              <div
+                                key={f.id}
+                                onMouseDown={() => {
+                                  setNewData((p) => ({ ...p, flag: f.name }))
+                                  setFlagDropdownOpen(false)
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  borderBottom: '1px solid var(--table-border)'
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.background =
+                                    'rgba(var(--accent-primary-rgb), 0.06)')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.background = 'transparent')
+                                }
+                              >
+                                {f.name}
+                                {f.iso3Code ? (
+                                  <span
+                                    style={{
+                                      color: 'var(--text-secondary)',
+                                      marginLeft: '6px',
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    ({f.iso3Code})
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null
+                      })()}
+                  </div>
+                </Field>
                 {/* Vessel Type combobox */}
-                <div style={{ position: 'relative' }}>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Vessel Type
-                  </label>
-                  <input
-                    type="text"
-                    value={newData.vesselType}
-                    onChange={(e) => {
-                      setNewData((p) => ({ ...p, vesselType: e.target.value }))
-                      setTypeDropdownOpen(true)
-                    }}
-                    onFocus={() => setTypeDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
-                    placeholder="Search vessel types..."
-                    style={{ width: '100%' }}
-                  />
-                  {typeDropdownOpen &&
-                    (() => {
-                      const q = newData.vesselType.toLowerCase()
-                      const filtered = vesselTypesLocal
-                        .filter((t) => t.name?.toLowerCase().includes(q))
-                        .slice(0, 10)
-                      return filtered.length > 0 ? (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            marginTop: '2px',
-                            maxHeight: '200px',
-                            overflowY: 'auto',
-                            background: isLight ? '#ffffff' : '#1a1d28',
-                            border: '1px solid var(--input-border)',
-                            borderRadius: '8px',
-                            zIndex: 100,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                          }}
-                        >
-                          {filtered.map((t) => (
-                            <div
-                              key={t.id}
-                              onMouseDown={() => {
-                                setNewData((p) => ({ ...p, vesselType: t.name }))
-                                setTypeDropdownOpen(false)
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderBottom: '1px solid var(--table-border)'
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = isLight
-                                  ? 'rgba(0,150,200,0.06)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.06)')
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = 'transparent')
-                              }
-                            >
-                              {t.name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null
-                    })()}
-                </div>
+                <Field label="Vessel type">
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={newData.vesselType}
+                      onChange={(e) => {
+                        setNewData((p) => ({ ...p, vesselType: e.target.value }))
+                        setTypeDropdownOpen(true)
+                      }}
+                      onFocus={() => setTypeDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
+                      placeholder="Search vessel types..."
+                      style={{ width: '100%' }}
+                    />
+                    {typeDropdownOpen &&
+                      (() => {
+                        const q = newData.vesselType.toLowerCase()
+                        const filtered = vesselTypesLocal
+                          .filter((t) => t.name?.toLowerCase().includes(q))
+                          .slice(0, 10)
+                        return filtered.length > 0 ? (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              marginTop: '2px',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--input-border)',
+                              borderRadius: '8px',
+                              zIndex: 100,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                            }}
+                          >
+                            {filtered.map((t) => (
+                              <div
+                                key={t.id}
+                                onMouseDown={() => {
+                                  setNewData((p) => ({ ...p, vesselType: t.name }))
+                                  setTypeDropdownOpen(false)
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  borderBottom: '1px solid var(--table-border)'
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.background =
+                                    'rgba(var(--accent-primary-rgb), 0.06)')
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.background = 'transparent')
+                                }
+                              >
+                                {t.name}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null
+                      })()}
+                  </div>
+                </Field>
                 {/* Classification: by name or abbreviation */}
-                <div>
-                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Classification
-                  </label>
+                <Field label="Classification">
                   <ClassSocietyInput
                     value={newData.classification}
                     onChange={(v) => setNewData((p) => ({ ...p, classification: v }))}
                     societies={classSocietiesLocal}
-                    isLight={isLight}
                   />
-                </div>
+                </Field>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -1239,30 +1199,26 @@ export default function VesselTab({
             </div>
             {isEditing ? (
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-grid cols-2">
                   {(
                     [
-                      ['name', 'Name *', true],
-                      ['imoNumber', 'IMO Number', true],
-                      ['builtYear', 'Built Year', false],
-                      ['rebuiltYear', 'Rebuilt Year', false],
-                      ['grossTonnage', 'Gross Tonnage', false],
-                      ['callSign', 'Call Sign', true],
+                      ['name', 'Name', true],
+                      ['imoNumber', 'IMO number', true],
+                      ['builtYear', 'Built year', false],
+                      ['rebuiltYear', 'Rebuilt year', false],
+                      ['grossTonnage', 'Gross tonnage', false],
+                      ['callSign', 'Call sign', true],
                       ['flag', 'Flag', false],
-                      ['vesselType', 'Vessel Type', false],
+                      ['vesselType', 'Vessel type', false],
                       ['classification', 'Classification', false]
                     ] as [keyof typeof EMPTY_NEW_VESSEL, string, boolean][]
                   ).map(([field, label, upper]) => (
-                    <div key={field}>
-                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {label}
-                      </label>
+                    <Field key={field} label={label} required={field === 'name'}>
                       {field === 'classification' ? (
                         <ClassSocietyInput
                           value={editData.classification}
                           onChange={(v) => setEditData((p) => ({ ...p, classification: v }))}
                           societies={classSocietiesLocal}
-                          isLight={isLight}
                         />
                       ) : (
                         <input
@@ -1274,13 +1230,10 @@ export default function VesselTab({
                               [field]: upper ? e.target.value.toUpperCase() : e.target.value
                             }))
                           }
-                          style={{
-                            width: '100%',
-                            ...(upper ? { textTransform: 'uppercase' } : {})
-                          }}
+                          style={upper ? { textTransform: 'uppercase' } : undefined}
                         />
                       )}
-                    </div>
+                    </Field>
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

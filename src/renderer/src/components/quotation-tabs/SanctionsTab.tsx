@@ -1,5 +1,6 @@
 import { Quotation, PISanctionsVersion } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
+import { Field } from '../ui'
 
 export default function SanctionsTab({
   quotation,
@@ -47,37 +48,21 @@ export default function SanctionsTab({
       </p>
 
       {sanctionsVersions.length > 0 ? (
-        <div style={{ marginBottom: '16px' }}>
-          <label
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              display: 'block',
-              marginBottom: '4px'
-            }}
-          >
-            Sanctions Version
-          </label>
-          <select
-            value={quotation.sanctionsClauseVersion || ''}
-            onChange={(e) => handleVersionChange(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: '1px solid var(--glass-border-color)',
-              background: 'var(--bg-input, var(--table-header-bg))',
-              color: 'var(--text-primary)',
-              fontSize: '0.85rem',
-              minWidth: '250px'
-            }}
-          >
-            <option value="">Select a version...</option>
-            {sanctionsVersions.map((v) => (
-              <option key={v.id} value={v.key}>
-                {v.name}
-              </option>
-            ))}
-          </select>
+        <div className="form-grid" style={{ marginBottom: '16px' }}>
+          <Field label="Sanctions version">
+            <select
+              value={quotation.sanctionsClauseVersion || ''}
+              onChange={(e) => handleVersionChange(e.target.value)}
+              style={{ width: 'auto', minWidth: '250px' }}
+            >
+              <option value="">Select a version...</option>
+              {sanctionsVersions.map((v) => (
+                <option key={v.id} value={v.key}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
       ) : (
         <div
@@ -98,8 +83,8 @@ export default function SanctionsTab({
       {(selectedVersion || quotation.sanctionsClauseVersion) && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Clause Text{' '}
+            <label className="field-label">
+              Clause text{' '}
               {isOverridden && (
                 <span style={{ color: 'var(--accent-primary)', fontSize: '0.72rem' }}>
                   (customized)

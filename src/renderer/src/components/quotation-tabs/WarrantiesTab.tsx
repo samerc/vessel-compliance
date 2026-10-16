@@ -28,6 +28,7 @@ import { AlternativeScopeChips } from './shared'
 import { ALT_COLORS } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { Modal, Field } from '../ui'
 
 export default function WarrantiesTab({
   quotation,
@@ -532,12 +533,7 @@ export default function WarrantiesTab({
                   style={{
                     width: '100%',
                     padding: '5px 8px 5px 26px',
-                    fontSize: '0.78rem',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
-                    boxSizing: 'border-box'
+                    fontSize: '0.78rem'
                   }}
                 />
               </div>
@@ -591,7 +587,7 @@ export default function WarrantiesTab({
                               padding: '0px 4px',
                               borderRadius: '3px',
                               background: 'rgba(0, 200, 100, 0.12)',
-                              color: isLight ? '#007a3d' : '#00c864',
+                              color: 'var(--success)',
                               fontWeight: 600,
                               whiteSpace: 'nowrap'
                             }}
@@ -615,7 +611,7 @@ export default function WarrantiesTab({
                           <span
                             style={{
                               fontSize: '0.68rem',
-                              color: isLight ? '#007a3d' : '#00c864',
+                              color: 'var(--success)',
                               whiteSpace: 'nowrap',
                               display: 'flex',
                               alignItems: 'center',
@@ -786,7 +782,7 @@ export default function WarrantiesTab({
                       <Check
                         size={14}
                         style={{
-                          color: isLight ? '#007a3d' : '#00c864',
+                          color: 'var(--success)',
                           marginTop: '2px',
                           flexShrink: 0
                         }}
@@ -1297,10 +1293,7 @@ export default function WarrantiesTab({
                                     resize: 'vertical',
                                     fontSize: '0.78rem',
                                     padding: '3px 6px',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--input-border)',
-                                    background: 'var(--bg-input, var(--table-header-bg))',
-                                    color: 'var(--text-primary)'
+                                    borderRadius: '4px'
                                   }}
                                 />
                                 <button
@@ -1462,9 +1455,6 @@ export default function WarrantiesTab({
                     fontSize: '0.78rem',
                     padding: '5px 8px',
                     borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-input, var(--table-header-bg))',
-                    color: 'var(--text-primary)',
                     overflow: 'auto'
                   }}
                   onKeyDown={(e) => {
@@ -1622,109 +1612,18 @@ export default function WarrantiesTab({
 
       {/* Import modal */}
       {showImportModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
+        <Modal
+          title="Import Warranties"
+          icon={<Upload size={18} />}
+          width={560}
+          closeOnOverlay={false}
+          onClose={() => {
+            setShowImportModal(false)
+            setImportText('')
+            setImportedItems([])
           }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '560px',
-              maxHeight: '80vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Import Warranties</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-              Paste warranties with bullet points, dashes, or numbered lists. Each line becomes a
-              separate warranty.
-            </p>
-            <textarea
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder="- Warranty one&#10;- Warranty two&#10;• Warranty three&#10;1. Warranty four"
-              style={{
-                width: '100%',
-                minHeight: '160px',
-                resize: 'vertical',
-                fontSize: '0.85rem',
-                marginBottom: '10px',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--bg-input, var(--table-header-bg))',
-                color: 'var(--text-primary)'
-              }}
-            />
-            <button
-              onClick={parseImportText}
-              className="btn-secondary"
-              style={{ marginBottom: '12px', fontSize: '0.8rem' }}
-            >
-              Parse
-            </button>
-            {importedItems.length > 0 && (
-              <div style={{ marginBottom: '12px' }}>
-                <label
-                  style={{
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    display: 'block',
-                    marginBottom: '6px'
-                  }}
-                >
-                  Preview ({importedItems.length} items):
-                </label>
-                {importedItems.map((item, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      gap: '6px',
-                      alignItems: 'flex-start',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--table-border)',
-                      marginBottom: '3px',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    <span style={{ color: 'var(--text-secondary)', minWidth: '20px' }}>
-                      {i + 1}.
-                    </span>
-                    <span style={{ flex: 1 }}>{item}</span>
-                    <button
-                      title="Remove"
-                      aria-label="Remove"
-                      onClick={() => setImportedItems((prev) => prev.filter((_, j) => j !== i))}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--danger)',
-                        padding: '0'
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          footer={
+            <>
               <button
                 onClick={() => {
                   setShowImportModal(false)
@@ -1732,22 +1631,76 @@ export default function WarrantiesTab({
                   setImportedItems([])
                 }}
                 className="btn-secondary"
-                style={{ fontSize: '0.8rem' }}
               >
                 Cancel
               </button>
               {importedItems.length > 0 && (
-                <button
-                  onClick={confirmImport}
-                  className="btn-primary"
-                  style={{ fontSize: '0.8rem' }}
-                >
+                <button onClick={confirmImport} className="btn-primary">
                   Import {importedItems.length} Warranties
                 </button>
               )}
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field
+              label="Warranties"
+              span="all"
+              hint="Paste warranties with bullet points, dashes, or numbered lists. Each line becomes a separate warranty."
+            >
+              <textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder="- Warranty one&#10;- Warranty two&#10;• Warranty three&#10;1. Warranty four"
+                style={{ minHeight: '160px', resize: 'vertical' }}
+              />
+            </Field>
           </div>
-        </div>
+          <button
+            onClick={parseImportText}
+            className="btn-secondary"
+            style={{ margin: '10px 0 12px' }}
+          >
+            Parse
+          </button>
+          {importedItems.length > 0 && (
+            <div>
+              <div className="form-section-title">Preview ({importedItems.length} items)</div>
+              {importedItems.map((item, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    gap: '6px',
+                    alignItems: 'flex-start',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--table-border)',
+                    marginBottom: '3px',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  <span style={{ color: 'var(--text-secondary)', minWidth: '20px' }}>{i + 1}.</span>
+                  <span style={{ flex: 1 }}>{item}</span>
+                  <button
+                    title="Remove"
+                    aria-label="Remove"
+                    onClick={() => setImportedItems((prev) => prev.filter((_, j) => j !== i))}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--danger)',
+                      padding: '0'
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )
