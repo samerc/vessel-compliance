@@ -198,6 +198,17 @@ import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
 import schemaSql from './schema.sql?raw'
 
+/** Rows grouped by a key column, keeping their order (one query instead of one per parent) */
+function groupRows(rows: RowDataPacket[], key: string): Map<string, RowDataPacket[]> {
+  const map = new Map<string, RowDataPacket[]>()
+  for (const r of rows) {
+    const k = String(r[key])
+    if (!map.has(k)) map.set(k, [])
+    map.get(k)!.push(r)
+  }
+  return map
+}
+
 // Parse a JSON column without letting ONE corrupt row break a whole list/load.
 function safeJson<T>(raw: unknown, fallback: T): T {
   if (raw == null || raw === '') return fallback
@@ -10475,14 +10486,15 @@ export class MySQLAdapter {
     if (!this.pool) return []
     const [rows] = await this.pool.query('SELECT id, name FROM pi_clause_sets ORDER BY name ASC')
     const sets = rows as PIClauseSet[]
+    const [allItems] = await this.pool.query(
+      'SELECT set_id, clause_id, description_override FROM pi_clause_set_items'
+    )
+    const bySet = groupRows(allItems as RowDataPacket[], 'set_id')
     for (const set of sets) {
-      const [items] = await this.pool.query(
-        'SELECT clause_id, description_override FROM pi_clause_set_items WHERE set_id = ?',
-        [set.id]
-      )
-      set.clauseIds = (items as RowDataPacket[]).map((i) => i.clause_id)
+      const items = bySet.get(set.id) || []
+      set.clauseIds = items.map((i) => i.clause_id)
       const overrides: Record<string, string> = {}
-      for (const item of items as RowDataPacket[]) {
+      for (const item of items) {
         if (item.description_override) overrides[item.clause_id] = item.description_override
       }
       if (Object.keys(overrides).length > 0) set.descriptionOverrides = overrides
@@ -10647,15 +10659,15 @@ export class MySQLAdapter {
       "SELECT id, name, default_selected as defaultSelected, alternative_scope as alternativeScope, COALESCE(type_scope, 'all') as typeScope FROM pi_warranty_sets ORDER BY name ASC"
     )
     const sets = rows as Row<PIWarrantySet>[]
+    const [allItems] = await this.pool.query(
+      'SELECT set_id, warranty_id FROM pi_warranty_set_items ORDER BY set_id, order_index ASC'
+    )
+    const bySet = groupRows(allItems as RowDataPacket[], 'set_id')
     for (const set of sets) {
       set.defaultSelected = !!set.defaultSelected
       set.alternativeScope = set.alternativeScope || null
       set.typeScope = set.typeScope || 'all'
-      const [items] = await this.pool.query(
-        'SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ? ORDER BY order_index ASC',
-        [set.id]
-      )
-      set.warrantyIds = (items as RowDataPacket[]).map((i) => i.warranty_id)
+      set.warrantyIds = (bySet.get(set.id) || []).map((i) => i.warranty_id)
     }
     return sets
   }
@@ -12192,10 +12204,11 @@ export class MySQLAdapter {
     if (params.search) {
       conditions.push(
         `(q.reference_number LIKE ? OR q.co_name LIKE ? OR q.title LIKE ? OR q.created_by LIKE ?
-                  OR q.created_by IN (SELECT id FROM users WHERE username LIKE ? OR full_name LIKE ?) OR qv_agg.vessel_name LIKE ?)`
+                  OR q.created_by IN (SELECT id FROM users WHERE username LIKE ? OR full_name LIKE ?) OR qv_agg.vessel_name LIKE ?
+                  OR q.customer_entity_id IN (SELECT id FROM entities WHERE name LIKE ?))`
       )
       const s = `%${params.search}%`
-      values.push(s, s, s, s, s, s, s)
+      values.push(s, s, s, s, s, s, s, s)
     }
     if (params.status && params.status !== 'all') {
       conditions.push('q.status = ?')
@@ -12280,29 +12293,18 @@ export class MySQLAdapter {
             WHERE q.id IN (${latestIdList}) AND q.deleted_at IS NULL ${whereClause}
         `
 
-    // Count total
-    const [countRows] = await this.pool.query(`SELECT COUNT(*) as total ${baseQuery}`, values)
-    const total = (countRows as RowDataPacket[])[0].total
-
-    // Stats (always from full filtered set)
-    const [statsRows] = await this.pool.query(
-      `SELECT q.status, COUNT(*) as cnt ${baseQuery} GROUP BY q.status`,
-      values
-    )
-    const statsByStatus: Record<string, number> = {}
-    for (const r of statsRows as RowDataPacket[]) statsByStatus[r.status] = r.cnt
-
-    const [typeStatsRows] = await this.pool.query(
-      `SELECT qt.code, qt.name, COUNT(*) as cnt ${baseQuery} GROUP BY qt.code, qt.name`,
-      values
-    )
-    const statsByType: { code: string; name: string; count: number }[] = (
-      typeStatsRows as RowDataPacket[]
-    ).map((r) => ({ code: r.code, name: r.name, count: r.cnt }))
-
-    // Paginated results
-    const [rows] = await this.pool.query(
-      `
+    // Count, stats and the page are independent: one parallel round instead of four
+    const [[countRows], [statsRows], [typeStatsRows], [rows]] = await Promise.all([
+      this.pool.query(`SELECT COUNT(*) as total ${baseQuery}`, values),
+      // Stats (always from full filtered set)
+      this.pool.query(`SELECT q.status, COUNT(*) as cnt ${baseQuery} GROUP BY q.status`, values),
+      this.pool.query(
+        `SELECT qt.code, qt.name, COUNT(*) as cnt ${baseQuery} GROUP BY qt.code, qt.name`,
+        values
+      ),
+      // Paginated results
+      this.pool.query(
+        `
             SELECT q.id, q.reference_number as referenceNumber,
                 q.quotation_type_id as quotationTypeId, qt.name as quotationTypeName, qt.code as quotationTypeCode,
                 q.quotation_date as quotationDate,
@@ -12319,8 +12321,15 @@ export class MySQLAdapter {
             ORDER BY ${orderCol} ${sortDir}
             LIMIT ? OFFSET ?
         `,
-      [...values, pageSize, pg * pageSize]
-    )
+        [...values, pageSize, pg * pageSize]
+      )
+    ])
+    const total = (countRows as RowDataPacket[])[0].total
+    const statsByStatus: Record<string, number> = {}
+    for (const r of statsRows as RowDataPacket[]) statsByStatus[r.status] = r.cnt
+    const statsByType: { code: string; name: string; count: number }[] = (
+      typeStatsRows as RowDataPacket[]
+    ).map((r) => ({ code: r.code, name: r.name, count: r.cnt }))
 
     return {
       rows: (rows as Row<QuotationListRow>[]).map((r) => ({
@@ -15829,14 +15838,12 @@ export class MySQLAdapter {
       "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC"
     )
     const subjs = rows as Row<PISubjectivity>[]
-    // Load doc type links
-    for (const s of subjs) {
-      const [links] = await this.pool.query(
-        'SELECT doc_type_id as docTypeId FROM pi_subjectivity_doc_types WHERE subjectivity_id = ?',
-        [s.id]
-      )
-      s.docTypeIds = (links as RowDataPacket[]).map((l) => l.docTypeId)
-    }
+    // Doc type links, all in one query
+    const [links] = await this.pool.query(
+      'SELECT subjectivity_id, doc_type_id as docTypeId FROM pi_subjectivity_doc_types'
+    )
+    const bySubj = groupRows(links as RowDataPacket[], 'subjectivity_id')
+    for (const s of subjs) s.docTypeIds = (bySubj.get(s.id) || []).map((l) => l.docTypeId)
     return subjs
   }
 
@@ -21859,15 +21866,15 @@ export class MySQLAdapter {
       'SELECT * FROM survey_warranty_template_sets ORDER BY order_index'
     )
     const sets: SurveyWarrantyTemplateSet[] = []
+    const [allItems] = await this.pool.query(
+      'SELECT set_id, template_id FROM survey_warranty_template_set_items'
+    )
+    const bySet = groupRows(allItems as RowDataPacket[], 'set_id')
     for (const r of rows as RowDataPacket[]) {
-      const [items] = await this.pool.query(
-        'SELECT template_id FROM survey_warranty_template_set_items WHERE set_id = ?',
-        [r.id]
-      )
       sets.push({
         id: r.id,
         name: r.name,
-        templateIds: (items as RowDataPacket[]).map((i) => i.template_id),
+        templateIds: (bySet.get(r.id) || []).map((i) => i.template_id),
         order: r.order_index
       })
     }
@@ -23688,13 +23695,11 @@ export class MySQLAdapter {
           'SELECT id, section, name, order_index as `order` FROM cargo_clause_sets ORDER BY section, order_index ASC, name ASC'
         )
     const sets = rows as Row<CargoClauseSet>[]
-    for (const set of sets) {
-      const [items] = await this.pool.query(
-        'SELECT cargo_clause_id FROM cargo_clause_set_items WHERE set_id = ? ORDER BY order_index ASC',
-        [set.id]
-      )
-      set.clauseIds = (items as RowDataPacket[]).map((i) => i.cargo_clause_id)
-    }
+    const [allItems] = await this.pool.query(
+      'SELECT set_id, cargo_clause_id FROM cargo_clause_set_items ORDER BY set_id, order_index ASC'
+    )
+    const bySet = groupRows(allItems as RowDataPacket[], 'set_id')
+    for (const set of sets) set.clauseIds = (bySet.get(set.id) || []).map((i) => i.cargo_clause_id)
     return sets
   }
 
