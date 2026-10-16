@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutGrid, Sun } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { NavTarget } from '../features'
 import type {
@@ -13,7 +12,7 @@ import type {
   VesselDocument
 } from '../../../shared/types'
 
-// Home: what needs the user today. The customizable widget dashboard is the second view.
+// Home: what needs the user today
 
 type QuotationRow = Quotation & { vesselCount?: number }
 type VesselSection = 'documents' | 'policies' | 'surveys'
@@ -23,8 +22,6 @@ interface Props {
   onOpenVessel: (vesselId: string, section: VesselSection) => void
   onOpenQuotation: (quotationId: string) => void
   onOpenRecent: (item: RecentItem) => void
-  /** The widget dashboard, shown when the user picks the Dashboard view; gets the view switch */
-  dashboard: (viewSwitch: React.ReactNode) => React.ReactNode
 }
 
 interface ExpiredDoc {
@@ -289,27 +286,9 @@ export default function HomePage({
   onNavigate,
   onOpenVessel,
   onOpenQuotation,
-  onOpenRecent,
-  dashboard
+  onOpenRecent
 }: Props): React.JSX.Element {
   const { user, hasPermission } = useAuth()
-  const viewKey = `home_view_u${user?.id ?? ''}`
-  const [view, setView] = useState<'today' | 'dashboard'>(() => {
-    try {
-      return localStorage.getItem(viewKey) === 'dashboard' ? 'dashboard' : 'today'
-    } catch {
-      return 'today'
-    }
-  })
-  const pickView = (v: 'today' | 'dashboard'): void => {
-    setView(v)
-    try {
-      localStorage.setItem(viewKey, v)
-    } catch {
-      // per-viewer convenience only
-    }
-  }
-
   const canRenewals = hasPermission('policies:view')
   const canQuotations = hasPermission('quotations:view')
   const canCompliance = hasPermission('compliance:view')
@@ -325,7 +304,6 @@ export default function HomePage({
   const [recent, setRecent] = useState<RecentItem[]>([])
 
   useEffect(() => {
-    if (view !== 'today') return
     let cancelled = false
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -379,7 +357,7 @@ export default function HomePage({
     return () => {
       cancelled = true
     }
-  }, [view, canRenewals, canQuotations, canCompliance, canSurveys])
+  }, [canRenewals, canQuotations, canCompliance, canSurveys])
 
   const today = useMemo(() => {
     const d = new Date()
@@ -518,54 +496,6 @@ export default function HomePage({
   const needCount = cards.filter((c) => c.count > 0).length
   const firstName = (user?.fullName || user?.username || '').trim().split(/\s+/)[0]
 
-  const viewSwitch = (
-    <div
-      role="group"
-      aria-label="Home view"
-      style={{
-        display: 'inline-flex',
-        padding: '3px',
-        gap: '2px',
-        borderRadius: '10px',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--glass-border-color)'
-      }}
-    >
-      {(
-        [
-          ['today', 'Today', <Sun key="i" size={14} />],
-          ['dashboard', 'Dashboard', <LayoutGrid key="i" size={14} />]
-        ] as const
-      ).map(([id, label, icon]) => (
-        <button
-          key={id}
-          onClick={() => pickView(id)}
-          aria-pressed={view === id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '5px 12px',
-            borderRadius: '7px',
-            border: 'none',
-            font: 'inherit',
-            fontSize: '0.82rem',
-            fontWeight: view === id ? 600 : 500,
-            background: view === id ? 'var(--bg-card)' : 'transparent',
-            color: view === id ? 'var(--text-primary)' : 'var(--text-secondary)',
-            boxShadow: view === id ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-            cursor: 'pointer'
-          }}
-        >
-          {icon}
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-
-  if (view === 'dashboard') return <>{dashboard(viewSwitch)}</>
-
   return (
     <div className="page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div
@@ -591,16 +521,13 @@ export default function HomePage({
             {firstName ? `, ${firstName}` : ''}
           </h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          {!loading && cards.length > 0 && (
-            <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-              {needCount === 0
-                ? 'Nothing needs you right now'
-                : `${needCount} thing${needCount === 1 ? '' : 's'} need${needCount === 1 ? 's' : ''} your attention`}
-            </span>
-          )}
-          {viewSwitch}
-        </div>
+        {!loading && cards.length > 0 && (
+          <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+            {needCount === 0
+              ? 'Nothing needs you right now'
+              : `${needCount} thing${needCount === 1 ? '' : 's'} need${needCount === 1 ? 's' : ''} your attention`}
+          </span>
+        )}
       </div>
 
       {cards.length > 0 && (

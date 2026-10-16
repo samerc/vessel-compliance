@@ -88,8 +88,8 @@ export const FEATURES: Feature[] = [
     kind: 'page',
     target: { tab: 'dashboard' },
     description:
-      'What needs you today: renewals, draft quotations, expired documents, sanctions to review, your quotations, alerts and recent items. Switch to Dashboard for the customizable widgets.',
-    keywords: 'home dashboard today overview widgets kpi alerts'
+      'What needs you today: renewals, draft quotations, expired documents, sanctions to review, your quotations, alerts and recent items.',
+    keywords: 'home dashboard today overview kpi alerts'
   },
   {
     id: 'vessels',

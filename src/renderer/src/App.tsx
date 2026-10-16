@@ -39,7 +39,6 @@ import {
   X
 } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
-import Dashboard from './components/Dashboard'
 import HomePage from './components/HomePage'
 import VesselManager from './components/VesselManager'
 import { SetupScreen } from './components/SetupScreen'
@@ -1511,31 +1510,6 @@ function App(): React.JSX.Element {
                   setActiveTab('quotations')
                 }}
                 onOpenRecent={openRecentItem}
-                dashboard={(viewSwitch) => (
-                  <Dashboard
-                    headerExtra={viewSwitch}
-                    onViewAlerts={() => setActiveTab('compliance')}
-                    onViewSurveyFollowUp={() => setActiveTab('survey-followup')}
-                    onNavigateToVessel={(vesselId, section) => {
-                      setNavigateToVesselId(vesselId)
-                      setNavigateToVesselSection(section)
-                      setNavigateBackTab('dashboard')
-                      setActiveTab('vessels')
-                    }}
-                    onNavigate={(tab) => {
-                      if (tab === 'search') {
-                        setSearchOpen(true)
-                        return
-                      }
-                      if (tab === 'new-vessel' || tab === 'new-quotation' || tab === 'new-entity') {
-                        startCreate(tab.slice(4) as 'vessel' | 'quotation' | 'entity')
-                        return
-                      }
-                      setPageRequest(null)
-                      setActiveTab(tab as AppTab)
-                    }}
-                  />
-                )}
               />
             )}
             {activeTab === 'vessels' && (

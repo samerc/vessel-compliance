@@ -544,69 +544,6 @@ export interface Api {
   closeSurvey: (surveyId: string, userId: string) => Promise<void>
   updateConditionSurveyEndorsement: (surveyId: string, issued: boolean) => Promise<void>
 
-  // Dashboard
-  dashboardGetActivity: () => Promise<{
-    recentVessels: Array<{
-      id: string
-      name: string
-      imoNumber: string
-      fleetName?: string
-      createdAt: string
-      isActive: boolean
-    }>
-    recentEntities: Array<{ id: string; name: string; type: string; createdAt: string }>
-    recentAuditEntries: Array<{
-      vesselId: string
-      vesselName: string
-      fieldName: string
-      newValue?: string
-      changedAt: string
-    }>
-    weekRenewals: Array<{
-      vesselName: string
-      imoNumber: string
-      policyTypeName: string
-      policyNumber?: string
-      endDate: string
-    }>
-  }>
-  dashboardGetDataQualityAlerts: () => Promise<{
-    vesselsNoCustomer: number
-    entitiesNoEmail: number
-    entitiesNoPhone: number
-    policiesNoEndDate: number
-  }>
-  dashboardGetLayout: () => Promise<{
-    widgets: Array<{ id: string; enabled: boolean; order: number }>
-  } | null>
-  dashboardSaveLayout: (layout: {
-    widgets: Array<{ id: string; enabled: boolean; order: number }>
-  }) => Promise<void>
-  dashboardSetOnboarded: () => Promise<void>
-  dashboardGetCalendarEvents: (
-    year: number,
-    month: number
-  ) => Promise<{
-    policies: Array<{
-      vesselName: string
-      vesselId: string
-      policyTypeName: string
-      endDate: string
-    }>
-    documents: Array<{
-      vesselName: string
-      vesselId: string
-      documentName: string
-      expiryDate: string
-    }>
-    surveys: Array<{ vesselName: string; vesselId: string; surveyDate: string; surveyType: string }>
-    warranties: Array<{
-      vesselName: string
-      vesselId: string
-      description: string
-      deadlineDate: string
-    }>
-  }>
   complianceGetDataValidation: () => Promise<{
     rules: Array<{
       id: string

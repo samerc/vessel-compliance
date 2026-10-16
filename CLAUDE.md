@@ -246,7 +246,7 @@ Entity document types are configurable via Admin Panel → Entity Document Types
 - **Legacy columns**: `passport_file_path`, `certificate_of_incorporation_path`, `articles_of_association_path`, `kyc_file_path` kept on entities table but no longer used for reads
 - **IPC**: `entityDocTypes:*` for admin CRUD, `entityDocs:*` for per-entity document management
 - **UI**: EntityDirectory slide-in panel + AssuredManager slide-in panel show dynamic document list with upload/replace/delete
-- **Compliance**: Dashboard, Reports (v1+v2), CustomerComplianceReport, VesselDetail copy-missing, SubjectivitiesTab all use dynamic entity_document_types
+- **Compliance**: Reports (v1+v2), CustomerComplianceReport, VesselDetail copy-missing, SubjectivitiesTab all use dynamic entity_document_types
 - **Remap**: `getEntityFilePaths` / `remapEntityFilePaths` read from entity_documents table
 - **Merge**: `mergeEntities` copies entity_documents from source to target (skip duplicates)
 
@@ -273,7 +273,7 @@ For `annualRenewal = true` document types, the effective expiry is inherited fro
 - **`resolveEffectivePolicyExpiry(policies)`**: filters `status === 'active'`, matches policy name containing "p&i" or "protection" first, then "hull" or "h&m". Looks for a characteristic whose name contains "end date" and returns its `valueDate`.
 - **Short-cycle rule**: if `(expiryDate − receivedDate) < 60 days`, the document is treated as **Compliant** even when it would otherwise be flagged "Expiring Soon". Rationale: a document placed today against a P&I policy expiring in 30 days was intentionally uploaded knowing its short remaining life.
 - **Helper**: `annualShortCycle(expiry, received)` — returns `true` if span < 60 days
-- **Applied in**: `VesselDocumentsView.tsx` (`getDocStatus`), `ReportService.ts` (`getDocStatus` / `getExcelDocStatus`), `ReportServiceV2.ts` (`getStatus`), `Dashboard.tsx` (`allAlerts` memo)
+- **Applied in**: `VesselDocumentsView.tsx` (`getDocStatus`), `ReportService.ts` (`getDocStatus` / `getExcelDocStatus`), `ReportServiceV2.ts` (`getStatus`). Home's expired-documents count uses the policy end date only
 - **CRITICAL — loading order**: `dynamicPolicies` must be loaded inside `VesselDetail.loadData()` (not just on Policies/Surveys tab switch), otherwise `effectivePolicyExpiry` is always `undefined` when the Documents tab opens. The fix: add `getVesselDynamicPolicies(vessel.id)` to the supplementary try/catch blocks in `loadData()`.
 - **Editable date**: Annual doc expiry row in `VesselDocumentsView` shows a P&I reference badge (cyan, read-only) above an always-editable date input. The stored doc date is the fallback when no P&I policy end date exists; editing it does NOT override the P&I date for compliance (P&I still takes priority in `effectiveExpiry` calculation).
 
@@ -298,29 +298,16 @@ Centralized compliance monitoring with four tabs:
 
 ### Document Reminders (REMOVED)
 
-The standalone Document Reminders page (ReminderCenter) and its per-vessel snooze system were removed — document expiry is covered by the Compliance Center, Dashboard alerts, and the vessel Documents tab. The `vessel_reminder_snoozes` table is dropped on migration. The old Admin "Vessel Reminders" section was repurposed to **Annual Doc Grace** (still section id `reminders`), which configures only `annual_grace_days`.
+The standalone Document Reminders page (ReminderCenter) and its per-vessel snooze system were removed — document expiry is covered by the Compliance Center, Home alerts, and the vessel Documents tab. The `vessel_reminder_snoozes` table is dropped on migration. The old Admin "Vessel Reminders" section was repurposed to **Annual Doc Grace** (still section id `reminders`), which configures only `annual_grace_days`.
 
 ### Home (redesign 2026-10)
 
-The first page (tab id still `dashboard`, menu label "Home"; `src/renderer/src/components/HomePage.tsx`). Two views, remembered per user in localStorage (`home_view_u{id}`):
+The first page (tab id still `dashboard`, menu label "Home"; `src/renderer/src/components/HomePage.tsx`). It replaced the customizable widget Dashboard (removed 2026-10-16 with its `dashboard:*` IPC; the `users.dashboard_onboarded` column is left unused):
 
-- **Today** (default): greeting + date; "needs your attention" cards (Renewals in 30 days via `getRenewalPipeline`, Draft quotations, Expired documents with the Dashboard's expiry rule, Sanctions to review), each shown only with its permission and linking to its page; My quotations (`createdBy` = user, not converted); Renewals this month (`getPolicyRenewalsByMonth`); Alerts (up to 3 expired documents, 2 policies ending within 14 days, 2 overdue defects, filled to 6) opening the vessel tab; Recent (shares `openRecentItem` with the sidebar)
-- **Dashboard**: the customizable widget dashboard below, rendered by `HomePage` through its `dashboard(viewSwitch)` prop; the switch shows in the Dashboard header (`headerExtra`)
-
-### Dashboard
-
-Aggregate health overview (`src/renderer/src/components/Dashboard.tsx`), the "Dashboard" view of Home:
-
-- **Layout** (top to bottom):
-  1. KPI row (5 cards): Active Vessels | Entities | Doc Compliance % | Critical Issues | Sanctions Pending
-  2. 2-col main row (60/40 split): Upcoming Expirations card (merged docs + policies, max 12, sorted by urgency) + Operational Status card (6 status rows)
-  3. 3-col activity row (equal width): Recently Added Vessels | Recently Added Entities | Recent Changes (audit)
-- **`dashboardGetActivity` IPC**: returns `{ recentVessels, recentEntities, recentAuditEntries }`. Vessels include `created_at`; entities include `created_at`; audit entries include `changedAt`.
-- **`loadData` wrapped in `useCallback([], [])`**: prevents infinite re-render loop; called once on mount and on refresh button click
-- **`allAlerts` memo**: filters to active vessels only (via `activeVesselIds`) to avoid inactive vessel alerts inflating Missing/Expired counts
-- **`fullyCompliantCount`**: filters `allAlerts` by `activeVesselIds` to avoid negative compliance numbers
-- **Upcoming Expirations**: merges document alerts (type expired/expiring, active vessels only) + policy expiry (within 90 days). Sorted: expired first → missing → expiring soonest. Rows are clickable — navigates to vessel's Documents or Policies tab via `onNavigateToVessel` prop
-- **Operational Status — Entity Docs Missing**: `entityDocMissingCount` memo counts entities with missing required documents (CoI/AoA/KYC for companies, passport for persons); shown as a status row with amber/green color
+- Greeting + date and "needs your attention" cards: Renewals in 30 days (`getRenewalPipeline`), Draft quotations, Expired documents (active vessels, filed documents, annual documents follow the vessel's policy end date), Sanctions to review. Each card shows only with its permission and opens its page
+- My quotations (`createdBy` = user, not converted), Renewals this month (`getPolicyRenewalsByMonth`)
+- Alerts: up to 3 expired documents, 2 policies ending within 14 days, 2 overdue defects, filled to 6; each opens the vessel on the matching tab ("Back to Home")
+- Recent: shares `openRecentItem` (App.tsx) with the sidebar Recent list
 
 ### Calculators
 
@@ -491,7 +478,7 @@ Per-customer document compliance overview (`src/renderer/src/components/Customer
 - **On-screen view**: Select customer (or all), click "Generate Report" to load grouped vessels with per-vessel compliance stats (Compliant / Missing / Expiring Soon / Expired / %)
 - **Compliance %**: `compliant / totalRequired * 100` — only fully-compliant docs count. Expired and expiring-soon docs do NOT inflate the percentage.
 - **Scope**: active vessels only; includes both global `document_types` and per-vessel `vessel_custom_doc_types`
-- **Expiry window**: "Expiring Soon" = within 60 days (intentionally wider than the 30-day Dashboard threshold)
+- **Expiry window**: "Expiring Soon" = within 60 days (intentionally wider than the usual 30-day threshold)
 - **Export PDF**: per-customer via `exportCustomerCompliancePDF()` (exported function, also called from EntityDirectory); full-fleet via "Export PDF" button in the component. Uses `ReportSettingsService` for company name, colors, footer
 - **Export Excel**: flat rows with customer header rows interspersed
 - **N+1 prevention**: custom doc types for all vessels in scope are batch-fetched with `Promise.all` before the vessel loop — never one IPC call per vessel
@@ -953,23 +940,13 @@ Customizable reports with 9 data sources:
 
 ### Feature Registry & Navigation
 
-- **Registry**: `src/renderer/src/features.ts` (`FEATURES`) lists every page, sub-tab and notable action with title, description, area, keywords, permission and a `NavTarget` (`{ tab, sub?, action? }`). It feeds the command palette, the **Features** page (`FeaturesPage.tsx`, sidebar under Dashboard) and What's New "Try it" links. **Add an entry when you add a page, a sub-tab or a notable action.**
+- **Registry**: `src/renderer/src/features.ts` (`FEATURES`) lists every page, sub-tab and notable action with title, description, area, keywords, permission and a `NavTarget` (`{ tab, sub?, action? }`). It feeds the command palette, the **Features** page (`FeaturesPage.tsx`, bottom of the sidebar) and What's New "Try it" links. **Add an entry when you add a page, a sub-tab or a notable action.**
 - **`navigateTo(target)`** in App.tsx is the one way to go anywhere: sets the tab, a requested sub-tab (`pageRequest`), or runs an `AppAction` (new vessel/quotation/entity, what's new, release history, profile, check updates, theme, density)
 - **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
 - **What's New "Try it"**: `featureId` on a `WHATS_NEW` item, or `[try:feature-id]` at the end of a release-note line
 - **Sidebar menu** (redesign 2026-10, App.tsx): Home, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Vessel Filter, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
 - **Settings hub** (AdminPanel = the Settings page): one place for every setting. The left list is grouped (`SETTINGS_GROUPS`: Quotations & policies, Vessels & documents, Compliance, Users & access, Files, System) with a search box (section names + `SECTION_KEYWORDS`). Quotation Settings, Policy Settings & Banks and User Management open INSIDE it (`HUB_PAGES`, outside the read-only fieldset, each with its own permission); a dot marks sections shared with regular users. The sidebar shows Settings when the user has admin:settings, fileManager:view, quotations:settings or admin:users. `navigateTo({ tab: 'users' })` redirects to `{ tab: 'admin', sub: 'users' }`; the Quotations and Policies pages keep their own Settings toggle too. Banks are managed only in Policy Settings
-- **First-run tip**: one-time Dashboard banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
-
-### Customizable Dashboard
-
-Widget-based dashboard with per-user layout:
-
-- **12 Widgets**: Key Metrics, Expirations, Operational Status, Recent Vessels/Entities/Changes, Data Quality, Week Renewals, Renewal Calendar, Quotation Pipeline, Quick Actions, Fleet Overview
-- **Edit Mode**: Toggle widgets on/off, reorder, category filter
-- **Calendar Widget**: Monthly grid with colored dots for policy/document/survey/warranty events
-- **Onboarding**: First-time overlay explaining customization
-- **Layout**: CSS Grid (full/half/third column spans), saved per user with debounce
+- **First-run tip**: one-time Home banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
 
 ### Recent Items
 

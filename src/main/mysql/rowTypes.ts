@@ -63,41 +63,6 @@ export interface DefectAttachmentRow {
   uploadedBy: string
 }
 
-/** Dashboard activity lists (dashboard:getActivity) */
-export interface DashboardActivity {
-  recentVessels: {
-    id: string
-    name: string
-    imoNumber: string
-    fleetName?: string
-    createdAt: string
-    isActive: boolean
-  }[]
-  recentEntities: { id: string; name: string; type: string; createdAt: string }[]
-  recentAuditEntries: {
-    vesselId: string
-    vesselName: string
-    fieldName: string
-    newValue?: string
-    changedAt: string
-  }[]
-  weekRenewals: {
-    vesselName: string
-    imoNumber: string
-    policyTypeName: string
-    policyNumber?: string
-    endDate: string
-  }[]
-}
-
-/** Dated events of one month for the dashboard calendar (dashboard:getCalendarEvents) */
-export interface CalendarEvents {
-  policies: { vesselName: string; vesselId: string; policyTypeName: string; endDate: string }[]
-  documents: { vesselName: string; vesselId: string; documentName: string; expiryDate: string }[]
-  surveys: { vesselName: string; vesselId: string; surveyDate: string; surveyType: string }[]
-  warranties: { vesselName: string; vesselId: string; description: string; deadlineDate: string }[]
-}
-
 /** Stored weekly compliance schedule: the defaults keep lastRunAt/nextRunAt as null. */
 export type StoredComplianceSchedule = Omit<
   ComplianceScheduleSettings,

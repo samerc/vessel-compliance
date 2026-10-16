@@ -2349,19 +2349,6 @@ app.whenReady().then(() => {
     }
   )
 
-  // Dashboard
-  safeHandle('dashboard:getActivity', (event) => {
-    requireSession(event)
-    return db.getDashboardActivity()
-  })
-  safeHandle('dashboard:getDataQualityAlerts', (event) => {
-    requireSession(event)
-    return db.getDataQualityAlerts()
-  })
-  safeHandle('dashboard:getCalendarEvents', (event, year: number, month: number) => {
-    requireSession(event)
-    return db.getCalendarEvents(year, month)
-  })
   safeHandle('compliance:getDataValidation', (event) => {
     requireSession(event)
     return db.getDataValidationResults()
@@ -2397,34 +2384,6 @@ app.whenReady().then(() => {
   safeHandle('validationRules:run', (event) => {
     requireSession(event)
     return db.runCustomValidationRules()
-  })
-
-  safeHandle('dashboard:getLayout', async (event) => {
-    const user = requireSession(event)
-    const val = await db.getSetting(`dashboard_layout_${user.id}`)
-    if (!val) return null
-    try {
-      return JSON.parse(val)
-    } catch {
-      return null
-    }
-  })
-
-  safeHandle('dashboard:saveLayout', async (event, layout: unknown) => {
-    const user = requireSession(event)
-    await db.setSetting(`dashboard_layout_${user.id}`, JSON.stringify(layout))
-  })
-
-  safeHandle('dashboard:setOnboarded', async (event) => {
-    const user = requireSession(event)
-    await db.updateUserDashboardOnboarded(user.id, true)
-    const webContents = event.sender
-    const windowId = BrowserWindow.fromWebContents(webContents)?.id
-    if (windowId) {
-      const sessionId = windowSessions.get(windowId)
-      const session = auth.getSessionData(sessionId)
-      if (session) session.user.dashboardOnboarded = true
-    }
   })
 
   // Survey Warranties
