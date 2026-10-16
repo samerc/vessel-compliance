@@ -27,6 +27,7 @@ import type {
 import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
+import MissingFilePath from './MissingFilePath'
 
 interface Props {
   vessel: Vessel
@@ -817,25 +818,7 @@ export default function VesselDocumentsView({
             ) : null
           ) : hasFile && !fileExists ? (
             <>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  color: 'var(--danger)',
-                  fontFamily: 'monospace',
-                  maxWidth: '300px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer'
-                }}
-                title={doc!.filePath}
-                onClick={() => {
-                  navigator.clipboard.writeText(doc!.filePath)
-                  showSuccess('Path copied')
-                }}
-              >
-                {doc!.filePath}
-              </span>
+              <MissingFilePath filePath={doc!.filePath} style={{ maxWidth: '320px' }} />
               {hasPermission('documents:upload') && (
                 <button
                   onClick={() => handleClickUpload(id)}

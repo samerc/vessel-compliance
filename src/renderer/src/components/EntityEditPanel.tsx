@@ -33,6 +33,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import { CaseToggleBtn } from './CaseToggle'
+import MissingFilePath from './MissingFilePath'
 import { confirmDialog } from './DialogHost'
 import { SanctionsBadge } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
@@ -657,30 +658,7 @@ export default function EntityEditPanel({
                     (file missing)
                   </span>
                 )}
-                {fileMissing && (
-                  // Where the stored path points (as in the vessel documents): click to copy
-                  <span
-                    title={`${doc!.filePath} (click to copy)`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigator.clipboard.writeText(doc!.filePath!)
-                      showSuccess('Path copied')
-                    }}
-                    style={{
-                      display: 'block',
-                      marginTop: '2px',
-                      fontSize: '0.68rem',
-                      fontFamily: 'monospace',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      cursor: 'copy',
-                      opacity: 0.85
-                    }}
-                  >
-                    {doc!.filePath}
-                  </span>
-                )}
+                {fileMissing && <MissingFilePath filePath={doc!.filePath!} />}
               </span>
               {hasFile ? (
                 <div style={{ display: 'flex', gap: '4px' }}>
