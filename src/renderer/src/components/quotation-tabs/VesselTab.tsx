@@ -22,6 +22,7 @@ import {
   AssuredRole
 } from '../../../../shared/types'
 import { ok } from '../../utils/ipc'
+import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
 
 const EMPTY_NEW_VESSEL = {
@@ -288,109 +289,16 @@ export default function VesselTab({
 
   const handleAddExisting = async (): Promise<void> => {
     if (!selectedVesselId) return
+    const v = vessels.find((vv) => vv.id === selectedVesselId)
+    if (!v) return
     try {
-      const vLabel = nextLabel(qVessels)
-      const v = vessels.find((vv) => vv.id === selectedVesselId)
-      const flagStates: FlagState[] = await window.api.getFlagStates().catch(() => [])
-      const flagName = v?.flagStateId
-        ? flagStates.find((f) => f.id === v.flagStateId)?.name || ''
-        : ''
-      const classifName =
-        (await resolveClassification(selectedVesselId)) || v?.classificationSociety
-      await window.api.addQuotationVessel({
-        quotationId: quotation.id,
-        vesselId: selectedVesselId,
-        vesselLabel: vLabel,
-        order: qVessels.length,
-        name: v?.name,
-        imoNumber: v?.imoNumber,
-        builtYear: v?.builtYear,
-        rebuiltYear: v?.rebuiltYear,
-        grossTonnage: v?.grossTonnage,
-        flag: flagName,
-        vesselType: v?.vesselType,
-        classification: classifName,
-        callSign: v?.callSign
-      })
-
-      // Auto-load vessel assureds into the quotation, sorted by role order from settings
-      // Skip for cargo quotations — cargo doesn't use vessel-level assureds
-      let assuredsAdded = 0
-      if (quotation.quotationTypeCode !== 'C') {
-        const [vassureds, allEntities, existingQAssureds, assuredRoles] = await Promise.all([
-          window.api.getVesselAssureds(selectedVesselId),
-          window.api.getEntities(),
-          window.api.getQuotationAssureds(quotation.id),
-          window.api.getAssuredRoles()
-        ])
-        const roleOrder = new Map(
-          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r, idx): [string, number] => [
-            r.name?.toLowerCase(),
-            r.order ?? idx
-          ])
-        )
-        // Skip entities already added for THIS vessel label (allow same entity on different vessels)
-        const existingForThisVessel = new Set(
-          existingQAssureds
-            .filter((a) => a.vesselLabel === vLabel)
-            .map((a) => a.entityId)
-            .filter(Boolean)
-        )
-        const toAdd = vassureds
-          .filter((va) => !existingForThisVessel.has(va.entityId))
-          .sort(
-            (a, b) =>
-              (roleOrder.get(a.role?.toLowerCase()) ?? 999) -
-              (roleOrder.get(b.role?.toLowerCase()) ?? 999)
-          )
-        let addIdx = 0
-        for (let i = 0; i < toAdd.length; i++) {
-          const va = toAdd[i]
-          const entity = allEntities.find((e) => e.id === va.entityId)
-          if (!entity) continue
-          // c/o role → set as broker, not as an assured
-          if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-            if (!quotation.coName) {
-              ok(await window.api.updateQuotation(quotation.id, { coName: entity.name }))
-            }
-            continue
-          }
-          await window.api.addQuotationAssured({
-            quotationId: quotation.id,
-            entityId: va.entityId,
-            name: entity.name,
-            role: va.role || undefined,
-            vesselLabel: vLabel,
-            order: existingQAssureds.length + addIdx
-          })
-          addIdx++
-        }
-        assuredsAdded = addIdx
-      }
-
-      // Auto-copy customer from existing vessel policy of the same type
-      if (!quotation.customerEntityId && selectedVesselId) {
-        try {
-          const dynPolicies = await window.api.getVesselDynamicPolicies(selectedVesselId)
-          const matching = (Array.isArray(dynPolicies) ? dynPolicies : []).find(
-            (p) =>
-              p.status === 'active' &&
-              p.policyTypeId === quotation.quotationTypeId &&
-              p.customerEntityId
-          )
-          if (matching) {
-            ok(
-              await window.api.updateQuotation(quotation.id, {
-                customerEntityId: matching.customerEntityId,
-                customerType: matching.customerType,
-                coName: matching.customerName
-              })
-            )
-          }
-        } catch {
-          /* non-critical */
-        }
-      }
+      const assuredsAdded = await addRegistryVessel(
+        quotation,
+        v,
+        nextLabel(qVessels),
+        qVessels.length,
+        classSocietiesLocal
+      )
 
       setSelectedVesselId('')
       setVesselSearch('')

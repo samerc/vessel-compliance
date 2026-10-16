@@ -52,6 +52,7 @@ import {
   PolicyTypeCondition,
   Entity,
   ClassificationSociety,
+  QuotationType,
   VesselType,
   VesselNote,
   DocumentTemplate
@@ -66,6 +67,9 @@ import { ReportService } from '../services/ReportService'
 import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
+import VesselSidePanel from './VesselSidePanel'
+import { TypeChip } from './ui'
+import { addRegistryVessel } from '../utils/addRegistryVessel'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
@@ -427,6 +431,28 @@ export default function VesselDetail({
   const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
   // auditLog removed — merged into Activity (timeline) tab
   const [showExportMenu, setShowExportMenu] = useState(false)
+  // "New quotation" for this vessel: the type menu and its types (loaded when first opened)
+  const [showNewQuoteMenu, setShowNewQuoteMenu] = useState(false)
+  // Notes & activity panel beside the tabs; hidden/shown choice remembered on this computer
+  const [showSidePanel, setShowSidePanel] = useState(() => {
+    try {
+      return localStorage.getItem('vessel_side_panel') !== '0'
+    } catch {
+      return true
+    }
+  })
+  const toggleSidePanel = (): void => {
+    setShowSidePanel((v) => {
+      try {
+        localStorage.setItem('vessel_side_panel', v ? '0' : '1')
+      } catch {
+        // per-viewer convenience only
+      }
+      return !v
+    })
+  }
+  const [quoteTypes, setQuoteTypes] = useState<QuotationType[]>([])
+  const [creatingQuote, setCreatingQuote] = useState(false)
   const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
   const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
   const [showNotesModal, setShowNotesModal] = useState(false)
@@ -898,6 +924,40 @@ export default function VesselDetail({
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
+  }
+
+  const openNewQuoteMenu = async (): Promise<void> => {
+    setShowNewQuoteMenu((v) => !v)
+    if (quoteTypes.length === 0) {
+      const qt = await window.api.getQuotationTypes().catch(() => [])
+      setQuoteTypes(Array.isArray(qt) ? qt : [])
+    }
+  }
+
+  // Creates a draft quotation of the chosen type with this vessel (and its assureds) already in
+  const handleNewQuotation = async (quotationTypeId: string): Promise<void> => {
+    setShowNewQuoteMenu(false)
+    setCreatingQuote(true)
+    try {
+      const created = ok(
+        await window.api.addQuotation({
+          quotationDate: new Date().toISOString().split('T')[0],
+          quotationTypeId,
+          status: 'draft'
+        })
+      )
+      const full = ok(await window.api.getQuotation(created.id))
+      if (!full) throw new Error('The new quotation could not be loaded')
+      const assureds = await addRegistryVessel(full, vessel, 'V1', 0, classSocieties)
+      showSuccess(
+        `Quotation created for ${vessel.name}${assureds > 0 ? `, ${assureds} assured(s) loaded` : ''}`
+      )
+      onNavigateToQuotation?.(created.id)
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to create quotation')
+    } finally {
+      setCreatingQuote(false)
+    }
   }
 
   const handleOpenVesselNotes = async (): Promise<void> => {
@@ -2329,6 +2389,80 @@ export default function VesselDetail({
                   <Trash size={16} /> Delete
                 </button>
               )}
+              {hasPermission('quotations:create') && onNavigateToQuotation && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={openNewQuoteMenu}
+                    disabled={creatingQuote}
+                    className="btn-primary"
+                    aria-expanded={showNewQuoteMenu}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 14px',
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    {creatingQuote ? <Loader2 size={15} className="spinner" /> : <Plus size={15} />}
+                    New quotation
+                  </button>
+                  {showNewQuoteMenu && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                        onClick={() => setShowNewQuoteMenu(false)}
+                      />
+                      <div
+                        role="menu"
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          marginTop: '4px',
+                          zIndex: 100,
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--glass-border-color)',
+                          borderRadius: '10px',
+                          padding: '6px',
+                          minWidth: '180px',
+                          boxShadow: 'var(--shadow-lg)'
+                        }}
+                      >
+                        {quoteTypes.length === 0 && (
+                          <div style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
+                            Loading…
+                          </div>
+                        )}
+                        {quoteTypes.map((qt) => (
+                          <button
+                            key={qt.id}
+                            role="menuitem"
+                            onClick={() => handleNewQuotation(qt.id)}
+                            className="hover-effect"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: 'none',
+                              borderRadius: '6px',
+                              background: 'transparent',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <TypeChip code={qt.code} name={qt.name} />
+                            {qt.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2349,490 +2483,547 @@ export default function VesselDetail({
         )}
       </header>
 
-      {/* Section navigation tabs */}
-      <div
-        role="tablist"
-        aria-label="Vessel sections"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '4px',
-          borderBottom: '1px solid var(--glass-border-color)',
-          marginBottom: '16px',
-          alignItems: 'center'
-        }}
-      >
-        {(
-          [
-            'documents',
-            'assureds',
-            'surveys',
-            'quotations',
-            'policies',
-            'payments',
-            'timeline'
-          ] as const
-        ).map((view) => (
-          <button
-            key={view}
-            role="tab"
-            aria-selected={detailView === view}
-            onClick={() => {
-              setDetailView(view)
-              if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
-            }}
+      {/* Tabs and their content, with the notes & activity panel beside them */}
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Section navigation tabs */}
+          <div
+            role="tablist"
+            aria-label="Vessel sections"
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '7px',
-              padding: '10px 14px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: 0,
-              borderBottom:
-                detailView === view ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              marginBottom: '-1px',
-              color: detailView === view ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontWeight: detailView === view ? 600 : 500,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              transition: 'var(--transition)'
+              flexWrap: 'wrap',
+              gap: '4px',
+              borderBottom: '1px solid var(--glass-border-color)',
+              marginBottom: '16px',
+              alignItems: 'center'
             }}
           >
-            {view === 'documents' && <FileText size={16} />}
-            {view === 'assureds' && <Users size={16} />}
-            {view === 'surveys' && <ClipboardList size={16} />}
-            {view === 'policies' && <Shield size={16} />}
-            {view === 'quotations' && <Hash size={16} />}
-            {view === 'payments' && <Receipt size={16} />}
-            {view === 'timeline' && <Clock size={16} />}
-            {view === 'assureds'
-              ? 'Assured'
-              : view === 'timeline'
-                ? 'Activity'
-                : view.charAt(0).toUpperCase() + view.slice(1)}
-          </button>
-        ))}
-        {detailView === 'documents' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              onClick={async () => {
-                // Load associated entity IDs for combined remap
-                try {
-                  const assureds = await window.api.getVesselAssureds(vessel.id)
-                  const eIds = (Array.isArray(assureds) ? assureds : [])
-                    .map((a) => a.entityId)
-                    .filter(Boolean)
-                  setRemapEntityIds([...new Set(eIds)])
-                } catch {
-                  setRemapEntityIds([])
-                }
-                setShowRemapModal(true)
-              }}
-              title="Remap file paths for this vessel and its entities"
-              style={{
-                marginBottom: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--glass-border-color)',
-                borderRadius: '8px',
-                color: 'var(--text-secondary)',
-                fontSize: '0.8rem',
-                cursor: 'pointer'
-              }}
-            >
-              <FolderSearch size={15} />
-              Remap Files
-            </button>
-            <button
-              onClick={() => {
-                const next = !useCardDocs
-                setUseCardDocs(next)
-                localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
-              }}
-              title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
-              style={{
-                marginBottom: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--glass-border-color)',
-                borderRadius: '8px',
-                color: 'var(--text-secondary)',
-                fontSize: '0.8rem',
-                cursor: 'pointer'
-              }}
-            >
-              {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
-              {useCardDocs ? 'Table View' : 'Card View'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {detailView === 'documents' && useCardDocs && (
-        <VesselDocumentsView
-          vessel={vessel}
-          dynamicPolicies={dynamicPolicies}
-          onReload={loadData}
-        />
-      )}
-
-      {detailView === 'documents' && !useCardDocs && (
-        <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
-            <caption className="sr-only">Document compliance</caption>
-            <thead>
-              <tr
+            {(
+              [
+                'documents',
+                'assureds',
+                'surveys',
+                'quotations',
+                'policies',
+                'payments',
+                'timeline'
+              ] as const
+            ).map((view) => (
+              <button
+                key={view}
+                role="tab"
+                aria-selected={detailView === view}
+                onClick={() => {
+                  setDetailView(view)
+                  if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
+                }}
                 style={{
-                  textAlign: 'left',
-                  background: 'var(--table-header-bg)',
-                  borderBottom: '1px solid var(--table-border)'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  padding: '10px 14px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  borderBottom:
+                    detailView === view
+                      ? '2px solid var(--accent-primary)'
+                      : '2px solid transparent',
+                  marginBottom: '-1px',
+                  color: detailView === view ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontWeight: detailView === view ? 600 : 500,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
                 }}
               >
-                <th scope="col" style={{ padding: '18px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Document Name
-                    <button
-                      onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
-                      style={{
-                        background: isLight
-                          ? 'rgba(0, 119, 163, 0.12)'
-                          : 'rgba(var(--accent-primary-rgb), 0.12)',
-                        border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                        borderRadius: '6px',
-                        padding: '3px 8px',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: 'var(--accent-primary)',
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}
-                      title="Add custom document type"
-                    >
-                      <Plus size={14} />
-                      Custom
-                    </button>
-                  </div>
-                </th>
-                <th scope="col" style={{ padding: '18px 16px' }}>
-                  Requirement
-                </th>
-                <th scope="col" style={{ padding: '18px 16px' }}>
-                  File Status
-                </th>
-                <th scope="col" style={{ padding: '18px 16px' }}>
-                  Date of Receipt
-                </th>
-                <th scope="col" style={{ padding: '18px 16px' }}>
-                  Expiry Date
-                </th>
-                <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {docTypes.map((type) => {
-                const docsForType = vesselDocs.filter((d) => d.documentTypeId === type.id)
-                const doc = docsForType[0]
-                const extraDocs = docsForType.slice(1)
-                const isRequired = doc ? doc.required : type.required || false
-
-                const renderDocRow = (
-                  rowDoc: VesselDocument | undefined,
-                  rowType: DocumentType,
-                  isExtra: boolean,
-                  key: string
-                ): React.JSX.Element => {
-                  const rowHasFile = !!rowDoc?.filePath
-                  const rowExists = fileStatus[rowType.id]
-                  // Determine left border color based on document status
-                  const getRowBorderColor = (): string => {
-                    if (isExtra) return 'transparent'
-                    if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
-                    if (rowDoc?.expiryDate) {
-                      const exp = new Date(rowDoc.expiryDate)
-                      const now = new Date()
-                      if (exp < now) return 'var(--danger)' // expired
-                      const soon = new Date()
-                      soon.setDate(soon.getDate() + 30)
-                      if (exp < soon) return '#e6a800' // expiring soon
+                {view === 'documents' && <FileText size={16} />}
+                {view === 'assureds' && <Users size={16} />}
+                {view === 'surveys' && <ClipboardList size={16} />}
+                {view === 'policies' && <Shield size={16} />}
+                {view === 'quotations' && <Hash size={16} />}
+                {view === 'payments' && <Receipt size={16} />}
+                {view === 'timeline' && <Clock size={16} />}
+                {view === 'assureds'
+                  ? 'Assured'
+                  : view === 'timeline'
+                    ? 'Activity'
+                    : view.charAt(0).toUpperCase() + view.slice(1)}
+              </button>
+            ))}
+            {detailView === 'documents' && (
+              <div
+                style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}
+              >
+                <button
+                  onClick={async () => {
+                    // Load associated entity IDs for combined remap
+                    try {
+                      const assureds = await window.api.getVesselAssureds(vessel.id)
+                      const eIds = (Array.isArray(assureds) ? assureds : [])
+                        .map((a) => a.entityId)
+                        .filter(Boolean)
+                      setRemapEntityIds([...new Set(eIds)])
+                    } catch {
+                      setRemapEntityIds([])
                     }
-                    return 'transparent' // compliant
-                  }
+                    setShowRemapModal(true)
+                  }}
+                  title="Remap file paths for this vessel and its entities"
+                  style={{
+                    marginBottom: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--glass-border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <FolderSearch size={15} />
+                  Remap Files
+                </button>
+                <button
+                  onClick={() => {
+                    const next = !useCardDocs
+                    setUseCardDocs(next)
+                    localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
+                  }}
+                  title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
+                  style={{
+                    marginBottom: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--glass-border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
+                  {useCardDocs ? 'Table View' : 'Card View'}
+                </button>
+              </div>
+            )}
+            <button
+              onClick={toggleSidePanel}
+              aria-pressed={showSidePanel}
+              title={showSidePanel ? 'Hide notes and activity' : 'Show notes and activity'}
+              style={{
+                marginLeft: detailView === 'documents' ? 0 : 'auto',
+                marginBottom: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--glass-border-color)',
+                borderRadius: '8px',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              <MessageSquare size={15} />
+              {showSidePanel ? 'Hide notes' : 'Notes & activity'}
+            </button>
+          </div>
 
-                  return (
-                    <tr
-                      key={key}
-                      style={{
-                        borderBottom: '1px solid var(--table-border)',
-                        borderLeft: `4px solid ${getRowBorderColor()}`,
-                        background:
-                          dragOverId === rowType.id
-                            ? 'rgba(var(--accent-primary-rgb), 0.2)'
-                            : isRequired && !rowHasFile && !isExtra
-                              ? 'rgba(255, 77, 77, 0.1)'
-                              : 'transparent',
-                        outline:
-                          dragOverId === rowType.id ? '2px dashed var(--accent-primary)' : 'none',
-                        outlineOffset: '-2px',
-                        transition: 'all 0.2s ease',
-                        cursor: dragOverId === rowType.id ? 'copy' : 'default'
-                      }}
-                      onDragOver={(e) => handleDragOver(e, rowType.id)}
-                      onDragEnter={(e) => handleDragEnter(e, rowType.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, rowType.id)}
-                    >
-                      <td style={{ padding: '16px' }}>
-                        <div
+          {detailView === 'documents' && useCardDocs && (
+            <VesselDocumentsView
+              vessel={vessel}
+              dynamicPolicies={dynamicPolicies}
+              onReload={loadData}
+            />
+          )}
+
+          {detailView === 'documents' && !useCardDocs && (
+            <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                <caption className="sr-only">Document compliance</caption>
+                <thead>
+                  <tr
+                    style={{
+                      textAlign: 'left',
+                      background: 'var(--table-header-bg)',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <th scope="col" style={{ padding: '18px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Document Name
+                        <button
+                          onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
                           style={{
-                            fontWeight: isExtra ? '400' : '600',
-                            paddingLeft: isExtra ? '20px' : '0',
-                            color: isExtra ? 'var(--text-secondary)' : 'inherit',
-                            display: 'flex',
+                            background: isLight
+                              ? 'rgba(0, 119, 163, 0.12)'
+                              : 'rgba(var(--accent-primary-rgb), 0.12)',
+                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            flexWrap: 'wrap'
+                            gap: '4px',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
                           }}
+                          title="Add custom document type"
                         >
-                          {isExtra ? `${rowType.name} (copy)` : rowType.name}
-                          {rowHasFile && (
-                            <DocExpiryBadge expiryDate={rowDoc?.expiryDate} isLight={isLight} />
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        {!isExtra && (
-                          <button
-                            onClick={() => handleToggleRequired(rowType.id)}
-                            style={{
-                              background: isRequired ? 'rgba(128, 128, 128, 0.1)' : 'transparent',
-                              border: '1px solid var(--table-border)',
-                              padding: '4px 8px',
-                              borderRadius: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer'
-                            }}
-                            title="Toggle Mandatory"
-                          >
-                            {isRequired ? 'Mandatory' : 'Optional'}
-                          </button>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        {rowHasFile ? (
-                          isExtra || rowExists ? (
+                          <Plus size={14} />
+                          Custom
+                        </button>
+                      </div>
+                    </th>
+                    <th scope="col" style={{ padding: '18px 16px' }}>
+                      Requirement
+                    </th>
+                    <th scope="col" style={{ padding: '18px 16px' }}>
+                      File Status
+                    </th>
+                    <th scope="col" style={{ padding: '18px 16px' }}>
+                      Date of Receipt
+                    </th>
+                    <th scope="col" style={{ padding: '18px 16px' }}>
+                      Expiry Date
+                    </th>
+                    <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {docTypes.map((type) => {
+                    const docsForType = vesselDocs.filter((d) => d.documentTypeId === type.id)
+                    const doc = docsForType[0]
+                    const extraDocs = docsForType.slice(1)
+                    const isRequired = doc ? doc.required : type.required || false
+
+                    const renderDocRow = (
+                      rowDoc: VesselDocument | undefined,
+                      rowType: DocumentType,
+                      isExtra: boolean,
+                      key: string
+                    ): React.JSX.Element => {
+                      const rowHasFile = !!rowDoc?.filePath
+                      const rowExists = fileStatus[rowType.id]
+                      // Determine left border color based on document status
+                      const getRowBorderColor = (): string => {
+                        if (isExtra) return 'transparent'
+                        if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
+                        if (rowDoc?.expiryDate) {
+                          const exp = new Date(rowDoc.expiryDate)
+                          const now = new Date()
+                          if (exp < now) return 'var(--danger)' // expired
+                          const soon = new Date()
+                          soon.setDate(soon.getDate() + 30)
+                          if (exp < soon) return '#e6a800' // expiring soon
+                        }
+                        return 'transparent' // compliant
+                      }
+
+                      return (
+                        <tr
+                          key={key}
+                          style={{
+                            borderBottom: '1px solid var(--table-border)',
+                            borderLeft: `4px solid ${getRowBorderColor()}`,
+                            background:
+                              dragOverId === rowType.id
+                                ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                                : isRequired && !rowHasFile && !isExtra
+                                  ? 'rgba(255, 77, 77, 0.1)'
+                                  : 'transparent',
+                            outline:
+                              dragOverId === rowType.id
+                                ? '2px dashed var(--accent-primary)'
+                                : 'none',
+                            outlineOffset: '-2px',
+                            transition: 'all 0.2s ease',
+                            cursor: dragOverId === rowType.id ? 'copy' : 'default'
+                          }}
+                          onDragOver={(e) => handleDragOver(e, rowType.id)}
+                          onDragEnter={(e) => handleDragEnter(e, rowType.id)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, rowType.id)}
+                        >
+                          <td style={{ padding: '16px' }}>
                             <div
                               style={{
-                                display: 'inline-flex',
+                                fontWeight: isExtra ? '400' : '600',
+                                paddingLeft: isExtra ? '20px' : '0',
+                                color: isExtra ? 'var(--text-secondary)' : 'inherit',
+                                display: 'flex',
                                 alignItems: 'center',
-                                gap: '6px',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '0.75rem',
-                                fontWeight: '600',
-                                background: isLight
-                                  ? 'rgba(0, 140, 70, 0.12)'
-                                  : 'rgba(0, 255, 136, 0.1)',
-                                border: isLight
-                                  ? '1px solid rgba(0, 140, 70, 0.35)'
-                                  : '1px solid rgba(0, 255, 136, 0.3)',
-                                color: isLight ? '#008c46' : '#00ff88',
-                                textTransform: 'uppercase'
+                                gap: '8px',
+                                flexWrap: 'wrap'
                               }}
                             >
-                              <CheckCircle size={14} />
-                              LINKED
+                              {isExtra ? `${rowType.name} (copy)` : rowType.name}
+                              {rowHasFile && (
+                                <DocExpiryBadge expiryDate={rowDoc?.expiryDate} isLight={isLight} />
+                              )}
                             </div>
-                          ) : (
-                            <div
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '0.75rem',
-                                fontWeight: '600',
-                                background: isLight
-                                  ? 'rgba(200, 0, 0, 0.12)'
-                                  : 'rgba(255, 77, 77, 0.1)',
-                                border: isLight
-                                  ? '1px solid rgba(200, 0, 0, 0.35)'
-                                  : '1px solid rgba(255, 77, 77, 0.3)',
-                                color: 'var(--danger)',
-                                textTransform: 'uppercase'
-                              }}
-                            >
-                              <AlertCircle size={14} />
-                              MISSING
-                            </div>
-                          )
-                        ) : hasPermission('documents:upload') ? (
-                          <button
-                            onClick={() => handleClickUpload(rowType.id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              background: isLight
-                                ? 'rgba(0, 119, 163, 0.05)'
-                                : 'rgba(var(--accent-primary-rgb), 0.05)',
-                              border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                              color: 'var(--accent-primary)',
-                              textTransform: 'uppercase',
-                              cursor: 'pointer'
-                            }}
-                            title="Click to browse or drag a file here"
-                          >
-                            <Upload size={14} />
-                            UPLOAD FILE
-                          </button>
-                        ) : null}
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        {rowHasFile ? (
-                          <input
-                            type="date"
-                            title="Click to change received date"
-                            value={
-                              editingReceived[rowType.id] !== undefined
-                                ? editingReceived[rowType.id]
-                                : rowDoc?.receivedDate?.split('T')[0] || ''
-                            }
-                            onFocus={() =>
-                              setEditingReceived((prev) => ({
-                                ...prev,
-                                [rowType.id]: rowDoc?.receivedDate?.split('T')[0] || ''
-                              }))
-                            }
-                            onChange={(e) =>
-                              setEditingReceived((prev) => ({
-                                ...prev,
-                                [rowType.id]: e.target.value
-                              }))
-                            }
-                            onBlur={async (e) => {
-                              const val = e.target.value
-                              setEditingReceived((prev) => {
-                                const n = { ...prev }
-                                delete n[rowType.id]
-                                return n
-                              })
-                              if (val) {
-                                await window.api.updateVesselDocumentReceivedDate(
-                                  vessel.id,
-                                  rowType.id,
-                                  val
-                                )
-                                loadData()
-                              }
-                            }}
-                            min="1900-01-01"
-                            max="2100-12-31"
-                            style={{
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.85rem',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              border: '1px solid var(--input-border)',
-                              colorScheme: isLight ? ('light' as const) : ('dark' as const)
-                            }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        {rowType.annualRenewal ? (
-                          rowHasFile ? (
-                            (() => {
-                              const piExpiry =
-                                resolveEffectivePolicyExpiry(dynamicPolicies) ||
-                                vessel.policyExpiryDate
-                              return piExpiry ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Calendar size={14} color="var(--text-secondary)" />
-                                  <span
-                                    style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
-                                  >
-                                    Expires with P&I ·{' '}
-                                    <span
-                                      style={{ color: 'var(--text-primary)', fontWeight: '500' }}
+                          </td>
+                          <td style={{ padding: '16px' }}>
+                            {!isExtra && (
+                              <button
+                                onClick={() => handleToggleRequired(rowType.id)}
+                                style={{
+                                  background: isRequired
+                                    ? 'rgba(128, 128, 128, 0.1)'
+                                    : 'transparent',
+                                  border: '1px solid var(--table-border)',
+                                  padding: '4px 8px',
+                                  borderRadius: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer'
+                                }}
+                                title="Toggle Mandatory"
+                              >
+                                {isRequired ? 'Mandatory' : 'Optional'}
+                              </button>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px' }}>
+                            {rowHasFile ? (
+                              isExtra || rowExists ? (
+                                <div
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    background: isLight
+                                      ? 'rgba(0, 140, 70, 0.12)'
+                                      : 'rgba(0, 255, 136, 0.1)',
+                                    border: isLight
+                                      ? '1px solid rgba(0, 140, 70, 0.35)'
+                                      : '1px solid rgba(0, 255, 136, 0.3)',
+                                    color: isLight ? '#008c46' : '#00ff88',
+                                    textTransform: 'uppercase'
+                                  }}
+                                >
+                                  <CheckCircle size={14} />
+                                  LINKED
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    background: isLight
+                                      ? 'rgba(200, 0, 0, 0.12)'
+                                      : 'rgba(255, 77, 77, 0.1)',
+                                    border: isLight
+                                      ? '1px solid rgba(200, 0, 0, 0.35)'
+                                      : '1px solid rgba(255, 77, 77, 0.3)',
+                                    color: 'var(--danger)',
+                                    textTransform: 'uppercase'
+                                  }}
+                                >
+                                  <AlertCircle size={14} />
+                                  MISSING
+                                </div>
+                              )
+                            ) : hasPermission('documents:upload') ? (
+                              <button
+                                onClick={() => handleClickUpload(rowType.id)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  background: isLight
+                                    ? 'rgba(0, 119, 163, 0.05)'
+                                    : 'rgba(var(--accent-primary-rgb), 0.05)',
+                                  border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                  color: 'var(--accent-primary)',
+                                  textTransform: 'uppercase',
+                                  cursor: 'pointer'
+                                }}
+                                title="Click to browse or drag a file here"
+                              >
+                                <Upload size={14} />
+                                UPLOAD FILE
+                              </button>
+                            ) : null}
+                          </td>
+                          <td style={{ padding: '16px' }}>
+                            {rowHasFile ? (
+                              <input
+                                type="date"
+                                title="Click to change received date"
+                                value={
+                                  editingReceived[rowType.id] !== undefined
+                                    ? editingReceived[rowType.id]
+                                    : rowDoc?.receivedDate?.split('T')[0] || ''
+                                }
+                                onFocus={() =>
+                                  setEditingReceived((prev) => ({
+                                    ...prev,
+                                    [rowType.id]: rowDoc?.receivedDate?.split('T')[0] || ''
+                                  }))
+                                }
+                                onChange={(e) =>
+                                  setEditingReceived((prev) => ({
+                                    ...prev,
+                                    [rowType.id]: e.target.value
+                                  }))
+                                }
+                                onBlur={async (e) => {
+                                  const val = e.target.value
+                                  setEditingReceived((prev) => {
+                                    const n = { ...prev }
+                                    delete n[rowType.id]
+                                    return n
+                                  })
+                                  if (val) {
+                                    await window.api.updateVesselDocumentReceivedDate(
+                                      vessel.id,
+                                      rowType.id,
+                                      val
+                                    )
+                                    loadData()
+                                  }
+                                }}
+                                min="1900-01-01"
+                                max="2100-12-31"
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.85rem',
+                                  background: 'var(--input-bg)',
+                                  color: 'var(--text-primary)',
+                                  border: '1px solid var(--input-border)',
+                                  colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                                }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px' }}>
+                            {rowType.annualRenewal ? (
+                              rowHasFile ? (
+                                (() => {
+                                  const piExpiry =
+                                    resolveEffectivePolicyExpiry(dynamicPolicies) ||
+                                    vessel.policyExpiryDate
+                                  return piExpiry ? (
+                                    <div
+                                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                                     >
-                                      {formatDate(piExpiry)}
+                                      <Calendar size={14} color="var(--text-secondary)" />
+                                      <span
+                                        style={{
+                                          fontSize: '0.85rem',
+                                          color: 'var(--text-secondary)'
+                                        }}
+                                      >
+                                        Expires with P&I ·{' '}
+                                        <span
+                                          style={{
+                                            color: 'var(--text-primary)',
+                                            fontWeight: '500'
+                                          }}
+                                        >
+                                          {formatDate(piExpiry)}
+                                        </span>
+                                      </span>
+                                    </div>
+                                  ) : rowDoc?.expiryDate ? (
+                                    <div
+                                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                      <Calendar size={14} color="var(--text-secondary)" />
+                                      <input
+                                        type="date"
+                                        value={
+                                          editingExpiry[rowType.id] !== undefined
+                                            ? editingExpiry[rowType.id]
+                                            : rowDoc.expiryDate || ''
+                                        }
+                                        onFocus={() =>
+                                          setEditingExpiry((prev) => ({
+                                            ...prev,
+                                            [rowType.id]: rowDoc.expiryDate || ''
+                                          }))
+                                        }
+                                        onChange={(e) =>
+                                          setEditingExpiry((prev) => ({
+                                            ...prev,
+                                            [rowType.id]: e.target.value
+                                          }))
+                                        }
+                                        onBlur={async (e) => {
+                                          const val = e.target.value
+                                          setEditingExpiry((prev) => {
+                                            const n = { ...prev }
+                                            delete n[rowType.id]
+                                            return n
+                                          })
+                                          await window.api.updateVesselDocumentExpiry(
+                                            vessel.id,
+                                            rowType.id,
+                                            val || null
+                                          )
+                                          loadData()
+                                        }}
+                                        min="1900-01-01"
+                                        max="2100-12-31"
+                                        style={{
+                                          padding: '4px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '0.85rem',
+                                          background: 'var(--input-bg)',
+                                          color: 'var(--text-primary)',
+                                          border: '1px solid var(--input-border)',
+                                          colorScheme: isLight
+                                            ? ('light' as const)
+                                            : ('dark' as const)
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: '0.75rem',
+                                        color: 'var(--text-secondary)',
+                                        fontStyle: 'italic'
+                                      }}
+                                    >
+                                      Annual — P&I date not set
                                     </span>
-                                  </span>
-                                </div>
-                              ) : rowDoc?.expiryDate ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Calendar size={14} color="var(--text-secondary)" />
-                                  <input
-                                    type="date"
-                                    value={
-                                      editingExpiry[rowType.id] !== undefined
-                                        ? editingExpiry[rowType.id]
-                                        : rowDoc.expiryDate || ''
-                                    }
-                                    onFocus={() =>
-                                      setEditingExpiry((prev) => ({
-                                        ...prev,
-                                        [rowType.id]: rowDoc.expiryDate || ''
-                                      }))
-                                    }
-                                    onChange={(e) =>
-                                      setEditingExpiry((prev) => ({
-                                        ...prev,
-                                        [rowType.id]: e.target.value
-                                      }))
-                                    }
-                                    onBlur={async (e) => {
-                                      const val = e.target.value
-                                      setEditingExpiry((prev) => {
-                                        const n = { ...prev }
-                                        delete n[rowType.id]
-                                        return n
-                                      })
-                                      await window.api.updateVesselDocumentExpiry(
-                                        vessel.id,
-                                        rowType.id,
-                                        val || null
-                                      )
-                                      loadData()
-                                    }}
-                                    min="1900-01-01"
-                                    max="2100-12-31"
-                                    style={{
-                                      padding: '4px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '0.85rem',
-                                      background: 'var(--input-bg)',
-                                      color: 'var(--text-primary)',
-                                      border: '1px solid var(--input-border)',
-                                      colorScheme: isLight ? ('light' as const) : ('dark' as const)
-                                    }}
-                                  />
-                                </div>
+                                  )
+                                })()
                               ) : (
                                 <span
                                   style={{
@@ -2841,54 +3032,380 @@ export default function VesselDetail({
                                     fontStyle: 'italic'
                                   }}
                                 >
-                                  Annual — P&I date not set
+                                  Annual (P&I)
                                 </span>
                               )
-                            })()
-                          ) : (
+                            ) : !rowHasFile ? (
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                -
+                              </span>
+                            ) : !rowDoc?.expiryDate || rowDoc.expiryDate === '0000-00-00' ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Calendar size={14} color="var(--text-secondary)" />
+                                <input
+                                  type="date"
+                                  placeholder="Set expiry"
+                                  value={
+                                    editingExpiry[rowType.id] !== undefined
+                                      ? editingExpiry[rowType.id]
+                                      : ''
+                                  }
+                                  onFocus={() =>
+                                    setEditingExpiry((prev) => ({ ...prev, [rowType.id]: '' }))
+                                  }
+                                  onChange={(e) =>
+                                    setEditingExpiry((prev) => ({
+                                      ...prev,
+                                      [rowType.id]: e.target.value
+                                    }))
+                                  }
+                                  onBlur={async (e) => {
+                                    const val = e.target.value
+                                    setEditingExpiry((prev) => {
+                                      const n = { ...prev }
+                                      delete n[rowType.id]
+                                      return n
+                                    })
+                                    if (val) {
+                                      await handleUpdateExpiry(rowType.id, val)
+                                    }
+                                  }}
+                                  min="1900-01-01"
+                                  max="2100-12-31"
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.85rem',
+                                    background: 'var(--input-bg)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid var(--input-border)',
+                                    colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                                  }}
+                                  aria-label={`Expiry date for ${rowType.name}`}
+                                />
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Calendar size={14} color="var(--text-secondary)" />
+                                <input
+                                  type="date"
+                                  value={
+                                    editingExpiry[rowType.id] !== undefined
+                                      ? editingExpiry[rowType.id]
+                                      : rowDoc?.expiryDate || ''
+                                  }
+                                  onFocus={() =>
+                                    setEditingExpiry((prev) => ({
+                                      ...prev,
+                                      [rowType.id]: rowDoc?.expiryDate || ''
+                                    }))
+                                  }
+                                  onChange={(e) =>
+                                    setEditingExpiry((prev) => ({
+                                      ...prev,
+                                      [rowType.id]: e.target.value
+                                    }))
+                                  }
+                                  onBlur={async (e) => {
+                                    const val = e.target.value
+                                    setEditingExpiry((prev) => {
+                                      const n = { ...prev }
+                                      delete n[rowType.id]
+                                      return n
+                                    })
+                                    await window.api.updateVesselDocumentExpiry(
+                                      vessel.id,
+                                      rowType.id,
+                                      val || null
+                                    )
+                                    loadData()
+                                  }}
+                                  min="1900-01-01"
+                                  max="2100-12-31"
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.85rem',
+                                    background: 'var(--input-bg)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid var(--input-border)',
+                                    colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                                  }}
+                                  aria-label={`Expiry date for ${rowType.name}`}
+                                />
+                                <button
+                                  title="Clear expiry date"
+                                  onClick={async () => {
+                                    await window.api.updateVesselDocumentExpiry(
+                                      vessel.id,
+                                      rowType.id,
+                                      null
+                                    )
+                                    loadData()
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '18px',
+                                    height: '18px',
+                                    padding: 0,
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px', textAlign: 'right' }}>
+                            <div
+                              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
+                            >
+                              {rowHasFile && (
+                                <>
+                                  <button
+                                    onClick={() => openFile(rowDoc!.filePath)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px' }}
+                                    title="View File"
+                                    aria-label="View file"
+                                  >
+                                    <Eye size={18} />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      window.api.shellShowItemInFolder(rowDoc!.filePath)
+                                    }
+                                    className="btn-secondary"
+                                    style={{ padding: '6px' }}
+                                    title="Open file location"
+                                    aria-label="Open file location"
+                                  >
+                                    <FolderOpen size={18} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDuplicateDoc(rowDoc!)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px' }}
+                                    title="Duplicate Document"
+                                    aria-label="Duplicate document"
+                                  >
+                                    <Copy size={18} />
+                                  </button>
+                                  {isExtra ? (
+                                    <button
+                                      onClick={() => handleDeleteDocById(rowDoc!)}
+                                      className="btn-secondary"
+                                      style={{ padding: '6px', color: 'var(--danger)' }}
+                                      title="Remove Document"
+                                      aria-label="Remove document"
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleDeleteDoc(rowDoc!)}
+                                      className="btn-secondary"
+                                      style={{ padding: '6px', color: 'var(--danger)' }}
+                                      title="Unlink File"
+                                      aria-label="Unlink file"
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    return [
+                      renderDocRow(doc, type, false, type.id),
+                      ...extraDocs.map((ed) => renderDocRow(ed, type, true, ed.id!))
+                    ]
+                  })}
+                  {customDocTypes.map((customType) => {
+                    const doc = vesselDocs.find((d) => d.documentTypeId === customType.id)
+                    const rowHasFile = !!doc?.filePath
+                    const rowExists = fileStatus[customType.id]
+
+                    return (
+                      <tr
+                        key={customType.id}
+                        style={{
+                          borderBottom: '1px solid var(--table-border)',
+                          background:
+                            dragOverId === customType.id
+                              ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                              : !rowHasFile
+                                ? 'rgba(255, 77, 77, 0.05)'
+                                : 'transparent',
+                          outline:
+                            dragOverId === customType.id
+                              ? '2px dashed var(--accent-primary)'
+                              : 'none',
+                          outlineOffset: '-2px',
+                          transition: 'all 0.2s ease',
+                          cursor: dragOverId === customType.id ? 'copy' : 'default'
+                        }}
+                        onDragOver={(e) => handleDragOver(e, customType.id)}
+                        onDragEnter={(e) => handleDragEnter(e, customType.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, customType.id)}
+                      >
+                        <td style={{ padding: '16px' }}>
+                          <div
+                            style={{
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            {customType.name}
                             <span
                               style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--text-secondary)',
-                                fontStyle: 'italic'
+                                fontSize: '0.65rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: isLight
+                                  ? 'rgba(59, 130, 246, 0.1)'
+                                  : 'rgba(59, 130, 246, 0.2)',
+                                color: isLight ? '#3b82f6' : '#93c5fd',
+                                fontWeight: '500'
                               }}
                             >
-                              Annual (P&I)
+                              Custom
                             </span>
-                          )
-                        ) : !rowHasFile ? (
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                            -
+                            {rowHasFile && (
+                              <DocExpiryBadge expiryDate={doc?.expiryDate} isLight={isLight} />
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            CUSTOM
                           </span>
-                        ) : !rowDoc?.expiryDate || rowDoc.expiryDate === '0000-00-00' ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={14} color="var(--text-secondary)" />
+                        </td>
+                        <td style={{ padding: '16px' }}>
+                          {rowHasFile ? (
+                            rowExists ? (
+                              <div
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  background: isLight
+                                    ? 'rgba(0, 140, 70, 0.12)'
+                                    : 'rgba(0, 255, 136, 0.1)',
+                                  border: isLight
+                                    ? '1px solid rgba(0, 140, 70, 0.35)'
+                                    : '1px solid rgba(0, 255, 136, 0.3)',
+                                  color: isLight ? '#008c46' : '#00ff88',
+                                  textTransform: 'uppercase'
+                                }}
+                              >
+                                <CheckCircle size={14} />
+                                LINKED
+                              </div>
+                            ) : (
+                              <div
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  background: isLight
+                                    ? 'rgba(200, 0, 0, 0.12)'
+                                    : 'rgba(255, 77, 77, 0.1)',
+                                  border: isLight
+                                    ? '1px solid rgba(200, 0, 0, 0.35)'
+                                    : '1px solid rgba(255, 77, 77, 0.3)',
+                                  color: 'var(--danger)',
+                                  textTransform: 'uppercase'
+                                }}
+                              >
+                                <AlertCircle size={14} />
+                                MISSING
+                              </div>
+                            )
+                          ) : hasPermission('documents:upload') ? (
+                            <button
+                              onClick={() => handleClickUpload(customType.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '500',
+                                background: isLight
+                                  ? 'rgba(0, 119, 163, 0.05)'
+                                  : 'rgba(var(--accent-primary-rgb), 0.05)',
+                                border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                color: 'var(--accent-primary)',
+                                textTransform: 'uppercase',
+                                cursor: 'pointer'
+                              }}
+                              title="Click to browse or drag a file here"
+                            >
+                              <Upload size={14} />
+                              UPLOAD FILE
+                            </button>
+                          ) : null}
+                        </td>
+                        <td style={{ padding: '16px' }}>
+                          {rowHasFile ? (
                             <input
                               type="date"
-                              placeholder="Set expiry"
+                              title="Click to change received date"
                               value={
-                                editingExpiry[rowType.id] !== undefined
-                                  ? editingExpiry[rowType.id]
-                                  : ''
+                                editingReceived[customType.id] !== undefined
+                                  ? editingReceived[customType.id]
+                                  : doc?.receivedDate?.split('T')[0] || ''
                               }
                               onFocus={() =>
-                                setEditingExpiry((prev) => ({ ...prev, [rowType.id]: '' }))
+                                setEditingReceived((prev) => ({
+                                  ...prev,
+                                  [customType.id]: doc?.receivedDate?.split('T')[0] || ''
+                                }))
                               }
                               onChange={(e) =>
-                                setEditingExpiry((prev) => ({
+                                setEditingReceived((prev) => ({
                                   ...prev,
-                                  [rowType.id]: e.target.value
+                                  [customType.id]: e.target.value
                                 }))
                               }
                               onBlur={async (e) => {
                                 const val = e.target.value
-                                setEditingExpiry((prev) => {
+                                setEditingReceived((prev) => {
                                   const n = { ...prev }
-                                  delete n[rowType.id]
+                                  delete n[customType.id]
                                   return n
                                 })
                                 if (val) {
-                                  await handleUpdateExpiry(rowType.id, val)
+                                  await window.api.updateVesselDocumentReceivedDate(
+                                    vessel.id,
+                                    customType.id,
+                                    val
+                                  )
+                                  loadData()
                                 }
                               }}
                               min="1900-01-01"
@@ -2902,132 +3419,123 @@ export default function VesselDetail({
                                 border: '1px solid var(--input-border)',
                                 colorScheme: isLight ? ('light' as const) : ('dark' as const)
                               }}
-                              aria-label={`Expiry date for ${rowType.name}`}
                             />
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={14} color="var(--text-secondary)" />
-                            <input
-                              type="date"
-                              value={
-                                editingExpiry[rowType.id] !== undefined
-                                  ? editingExpiry[rowType.id]
-                                  : rowDoc?.expiryDate || ''
-                              }
-                              onFocus={() =>
-                                setEditingExpiry((prev) => ({
-                                  ...prev,
-                                  [rowType.id]: rowDoc?.expiryDate || ''
-                                }))
-                              }
-                              onChange={(e) =>
-                                setEditingExpiry((prev) => ({
-                                  ...prev,
-                                  [rowType.id]: e.target.value
-                                }))
-                              }
-                              onBlur={async (e) => {
-                                const val = e.target.value
-                                setEditingExpiry((prev) => {
-                                  const n = { ...prev }
-                                  delete n[rowType.id]
-                                  return n
-                                })
-                                await window.api.updateVesselDocumentExpiry(
-                                  vessel.id,
-                                  rowType.id,
-                                  val || null
-                                )
-                                loadData()
-                              }}
-                              min="1900-01-01"
-                              max="2100-12-31"
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.85rem',
-                                background: 'var(--input-bg)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--input-border)',
-                                colorScheme: isLight ? ('light' as const) : ('dark' as const)
-                              }}
-                              aria-label={`Expiry date for ${rowType.name}`}
-                            />
-                            <button
-                              title="Clear expiry date"
-                              onClick={async () => {
-                                await window.api.updateVesselDocumentExpiry(
-                                  vessel.id,
-                                  rowType.id,
-                                  null
-                                )
-                                loadData()
-                              }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                padding: 0,
-                                borderRadius: '50%',
-                                border: 'none',
-                                background: 'transparent',
-                                color: 'var(--text-secondary)',
-                                cursor: 'pointer',
-                                flexShrink: 0
-                              }}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                          {rowHasFile && (
-                            <>
-                              <button
-                                onClick={() => openFile(rowDoc!.filePath)}
-                                className="btn-secondary"
-                                style={{ padding: '6px' }}
-                                title="View File"
-                                aria-label="View file"
-                              >
-                                <Eye size={18} />
-                              </button>
-                              <button
-                                onClick={() => window.api.shellShowItemInFolder(rowDoc!.filePath)}
-                                className="btn-secondary"
-                                style={{ padding: '6px' }}
-                                title="Open file location"
-                                aria-label="Open file location"
-                              >
-                                <FolderOpen size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDuplicateDoc(rowDoc!)}
-                                className="btn-secondary"
-                                style={{ padding: '6px' }}
-                                title="Duplicate Document"
-                                aria-label="Duplicate document"
-                              >
-                                <Copy size={18} />
-                              </button>
-                              {isExtra ? (
+                          ) : (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                              -
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '16px' }}>
+                          {!rowHasFile ? (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                              -
+                            </span>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={14} color="var(--text-secondary)" />
+                              <input
+                                type="date"
+                                value={
+                                  editingExpiry[customType.id] !== undefined
+                                    ? editingExpiry[customType.id]
+                                    : doc?.expiryDate || ''
+                                }
+                                onFocus={() =>
+                                  setEditingExpiry((prev) => ({
+                                    ...prev,
+                                    [customType.id]: doc?.expiryDate || ''
+                                  }))
+                                }
+                                onChange={(e) =>
+                                  setEditingExpiry((prev) => ({
+                                    ...prev,
+                                    [customType.id]: e.target.value
+                                  }))
+                                }
+                                onBlur={async (e) => {
+                                  const val = e.target.value
+                                  setEditingExpiry((prev) => {
+                                    const n = { ...prev }
+                                    delete n[customType.id]
+                                    return n
+                                  })
+                                  await window.api.updateVesselDocumentExpiry(
+                                    vessel.id,
+                                    customType.id,
+                                    val || null
+                                  )
+                                  loadData()
+                                }}
+                                min="1900-01-01"
+                                max="2100-12-31"
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.85rem',
+                                  background: 'var(--input-bg)',
+                                  color: 'var(--text-primary)',
+                                  border: '1px solid var(--input-border)',
+                                  colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                                }}
+                                aria-label={`Expiry date for ${customType.name}`}
+                              />
+                              {doc?.expiryDate && doc.expiryDate !== '0000-00-00' && (
                                 <button
-                                  onClick={() => handleDeleteDocById(rowDoc!)}
-                                  className="btn-secondary"
-                                  style={{ padding: '6px', color: 'var(--danger)' }}
-                                  title="Remove Document"
-                                  aria-label="Remove document"
+                                  title="Clear expiry date"
+                                  onClick={async () => {
+                                    await window.api.updateVesselDocumentExpiry(
+                                      vessel.id,
+                                      customType.id,
+                                      null
+                                    )
+                                    loadData()
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '18px',
+                                    height: '18px',
+                                    padding: 0,
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    flexShrink: 0
+                                  }}
                                 >
-                                  <Trash2 size={18} />
+                                  <X size={12} />
                                 </button>
-                              ) : (
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            {rowHasFile && (
+                              <>
                                 <button
-                                  onClick={() => handleDeleteDoc(rowDoc!)}
+                                  onClick={() => openFile(doc!.filePath)}
+                                  className="btn-secondary"
+                                  style={{ padding: '6px' }}
+                                  title="View File"
+                                  aria-label="View file"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                                <button
+                                  onClick={() => window.api.shellShowItemInFolder(doc!.filePath)}
+                                  className="btn-secondary"
+                                  style={{ padding: '6px' }}
+                                  title="Open file location"
+                                  aria-label="Open file location"
+                                >
+                                  <FolderOpen size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDoc(doc!)}
                                   className="btn-secondary"
                                   style={{ padding: '6px', color: 'var(--danger)' }}
                                   title="Unlink File"
@@ -3035,464 +3543,153 @@ export default function VesselDetail({
                                 >
                                   <Trash2 size={18} />
                                 </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                }
-
-                return [
-                  renderDocRow(doc, type, false, type.id),
-                  ...extraDocs.map((ed) => renderDocRow(ed, type, true, ed.id!))
-                ]
-              })}
-              {customDocTypes.map((customType) => {
-                const doc = vesselDocs.find((d) => d.documentTypeId === customType.id)
-                const rowHasFile = !!doc?.filePath
-                const rowExists = fileStatus[customType.id]
-
-                return (
-                  <tr
-                    key={customType.id}
-                    style={{
-                      borderBottom: '1px solid var(--table-border)',
-                      background:
-                        dragOverId === customType.id
-                          ? 'rgba(var(--accent-primary-rgb), 0.2)'
-                          : !rowHasFile
-                            ? 'rgba(255, 77, 77, 0.05)'
-                            : 'transparent',
-                      outline:
-                        dragOverId === customType.id ? '2px dashed var(--accent-primary)' : 'none',
-                      outlineOffset: '-2px',
-                      transition: 'all 0.2s ease',
-                      cursor: dragOverId === customType.id ? 'copy' : 'default'
-                    }}
-                    onDragOver={(e) => handleDragOver(e, customType.id)}
-                    onDragEnter={(e) => handleDragEnter(e, customType.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, customType.id)}
-                  >
-                    <td style={{ padding: '16px' }}>
-                      <div
-                        style={{
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        {customType.name}
-                        <span
-                          style={{
-                            fontSize: '0.65rem',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: isLight
-                              ? 'rgba(59, 130, 246, 0.1)'
-                              : 'rgba(59, 130, 246, 0.2)',
-                            color: isLight ? '#3b82f6' : '#93c5fd',
-                            fontWeight: '500'
-                          }}
-                        >
-                          Custom
-                        </span>
-                        {rowHasFile && (
-                          <DocExpiryBadge expiryDate={doc?.expiryDate} isLight={isLight} />
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        CUSTOM
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      {rowHasFile ? (
-                        rowExists ? (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              background: isLight
-                                ? 'rgba(0, 140, 70, 0.12)'
-                                : 'rgba(0, 255, 136, 0.1)',
-                              border: isLight
-                                ? '1px solid rgba(0, 140, 70, 0.35)'
-                                : '1px solid rgba(0, 255, 136, 0.3)',
-                              color: isLight ? '#008c46' : '#00ff88',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            <CheckCircle size={14} />
-                            LINKED
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              background: isLight
-                                ? 'rgba(200, 0, 0, 0.12)'
-                                : 'rgba(255, 77, 77, 0.1)',
-                              border: isLight
-                                ? '1px solid rgba(200, 0, 0, 0.35)'
-                                : '1px solid rgba(255, 77, 77, 0.3)',
-                              color: 'var(--danger)',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            <AlertCircle size={14} />
-                            MISSING
-                          </div>
-                        )
-                      ) : hasPermission('documents:upload') ? (
-                        <button
-                          onClick={() => handleClickUpload(customType.id)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            background: isLight
-                              ? 'rgba(0, 119, 163, 0.05)'
-                              : 'rgba(var(--accent-primary-rgb), 0.05)',
-                            border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                            color: 'var(--accent-primary)',
-                            textTransform: 'uppercase',
-                            cursor: 'pointer'
-                          }}
-                          title="Click to browse or drag a file here"
-                        >
-                          <Upload size={14} />
-                          UPLOAD FILE
-                        </button>
-                      ) : null}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      {rowHasFile ? (
-                        <input
-                          type="date"
-                          title="Click to change received date"
-                          value={
-                            editingReceived[customType.id] !== undefined
-                              ? editingReceived[customType.id]
-                              : doc?.receivedDate?.split('T')[0] || ''
-                          }
-                          onFocus={() =>
-                            setEditingReceived((prev) => ({
-                              ...prev,
-                              [customType.id]: doc?.receivedDate?.split('T')[0] || ''
-                            }))
-                          }
-                          onChange={(e) =>
-                            setEditingReceived((prev) => ({
-                              ...prev,
-                              [customType.id]: e.target.value
-                            }))
-                          }
-                          onBlur={async (e) => {
-                            const val = e.target.value
-                            setEditingReceived((prev) => {
-                              const n = { ...prev }
-                              delete n[customType.id]
-                              return n
-                            })
-                            if (val) {
-                              await window.api.updateVesselDocumentReceivedDate(
-                                vessel.id,
-                                customType.id,
-                                val
-                              )
-                              loadData()
-                            }
-                          }}
-                          min="1900-01-01"
-                          max="2100-12-31"
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.85rem',
-                            background: 'var(--input-bg)',
-                            color: 'var(--text-primary)',
-                            border: '1px solid var(--input-border)',
-                            colorScheme: isLight ? ('light' as const) : ('dark' as const)
-                          }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                          -
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      {!rowHasFile ? (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                          -
-                        </span>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} color="var(--text-secondary)" />
-                          <input
-                            type="date"
-                            value={
-                              editingExpiry[customType.id] !== undefined
-                                ? editingExpiry[customType.id]
-                                : doc?.expiryDate || ''
-                            }
-                            onFocus={() =>
-                              setEditingExpiry((prev) => ({
-                                ...prev,
-                                [customType.id]: doc?.expiryDate || ''
-                              }))
-                            }
-                            onChange={(e) =>
-                              setEditingExpiry((prev) => ({
-                                ...prev,
-                                [customType.id]: e.target.value
-                              }))
-                            }
-                            onBlur={async (e) => {
-                              const val = e.target.value
-                              setEditingExpiry((prev) => {
-                                const n = { ...prev }
-                                delete n[customType.id]
-                                return n
-                              })
-                              await window.api.updateVesselDocumentExpiry(
-                                vessel.id,
-                                customType.id,
-                                val || null
-                              )
-                              loadData()
-                            }}
-                            min="1900-01-01"
-                            max="2100-12-31"
-                            style={{
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.85rem',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              border: '1px solid var(--input-border)',
-                              colorScheme: isLight ? ('light' as const) : ('dark' as const)
-                            }}
-                            aria-label={`Expiry date for ${customType.name}`}
-                          />
-                          {doc?.expiryDate && doc.expiryDate !== '0000-00-00' && (
+                              </>
+                            )}
                             <button
-                              title="Clear expiry date"
-                              onClick={async () => {
-                                await window.api.updateVesselDocumentExpiry(
-                                  vessel.id,
-                                  customType.id,
-                                  null
-                                )
-                                loadData()
-                              }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                padding: 0,
-                                borderRadius: '50%',
-                                border: 'none',
-                                background: 'transparent',
-                                color: 'var(--text-secondary)',
-                                cursor: 'pointer',
-                                flexShrink: 0
-                              }}
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        {rowHasFile && (
-                          <>
-                            <button
-                              onClick={() => openFile(doc!.filePath)}
-                              className="btn-secondary"
-                              style={{ padding: '6px' }}
-                              title="View File"
-                              aria-label="View file"
-                            >
-                              <Eye size={18} />
-                            </button>
-                            <button
-                              onClick={() => window.api.shellShowItemInFolder(doc!.filePath)}
-                              className="btn-secondary"
-                              style={{ padding: '6px' }}
-                              title="Open file location"
-                              aria-label="Open file location"
-                            >
-                              <FolderOpen size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteDoc(doc!)}
+                              onClick={() => handleDeleteCustomDocType(customType)}
                               className="btn-secondary"
                               style={{ padding: '6px', color: 'var(--danger)' }}
-                              title="Unlink File"
-                              aria-label="Unlink file"
+                              title="Remove custom document type"
+                              aria-label="Remove custom document type"
                             >
-                              <Trash2 size={18} />
+                              <X size={18} />
                             </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => handleDeleteCustomDocType(customType)}
-                          className="btn-secondary"
-                          style={{ padding: '6px', color: 'var(--danger)' }}
-                          title="Remove custom document type"
-                          aria-label="Remove custom document type"
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {showAddCustomDoc && (
+                    <tr
+                      style={{
+                        borderBottom: '1px solid var(--table-border)',
+                        background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)'
+                      }}
+                    >
+                      <td colSpan={6} style={{ padding: '12px 16px' }}>
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            handleAddCustomDocType()
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
                         >
-                          <X size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {showAddCustomDoc && (
-                <tr
+                          <input
+                            type="text"
+                            value={newCustomDocName}
+                            onChange={(e) => setNewCustomDocName(e.target.value)}
+                            placeholder="Custom document type name..."
+                            style={{
+                              flex: 1,
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem'
+                            }}
+                            autoFocus
+                            aria-label="Custom document type name"
+                          />
+                          <button
+                            type="submit"
+                            className="btn-primary"
+                            style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                            disabled={!newCustomDocName.trim()}
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                            onClick={() => {
+                              setShowAddCustomDoc(false)
+                              setNewCustomDocName('')
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
+
+          {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
+
+          {detailView === 'policies' && (
+            <>
+              <DynamicPoliciesView
+                vesselId={vessel.id}
+                dynamicPolicies={dynamicPolicies}
+                isLight={isLight}
+                onReload={loadDynamicPolicies}
+                showSuccess={showSuccess}
+                showError={showError}
+              />
+
+              {/* Section divider between policies and warranties */}
+              <div
+                style={{
+                  margin: '32px 0 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+                <span
                   style={{
-                    borderBottom: '1px solid var(--table-border)',
-                    background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)'
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <td colSpan={6} style={{ padding: '12px 16px' }}>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        handleAddCustomDocType()
-                      }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-                    >
-                      <input
-                        type="text"
-                        value={newCustomDocName}
-                        onChange={(e) => setNewCustomDocName(e.target.value)}
-                        placeholder="Custom document type name..."
-                        style={{
-                          flex: 1,
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem'
-                        }}
-                        autoFocus
-                        aria-label="Custom document type name"
-                      />
-                      <button
-                        type="submit"
-                        className="btn-primary"
-                        style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-                        disabled={!newCustomDocName.trim()}
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                        onClick={() => {
-                          setShowAddCustomDoc(false)
-                          setNewCustomDocName('')
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  Survey Warranties
+                </span>
+                <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+              </div>
 
-      {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
+              <WarrantyManager
+                vesselId={vessel.id}
+                dynamicPolicies={dynamicPolicies}
+                isLight={isLight}
+              />
+            </>
+          )}
 
-      {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
+          {detailView === 'payments' && (
+            <ReceiptManager vesselId={vessel.id} vesselName={vessel.name} embedded />
+          )}
 
-      {detailView === 'policies' && (
-        <>
-          <DynamicPoliciesView
-            vesselId={vessel.id}
-            dynamicPolicies={dynamicPolicies}
-            isLight={isLight}
-            onReload={loadDynamicPolicies}
-            showSuccess={showSuccess}
-            showError={showError}
-          />
+          {detailView === 'timeline' && <VesselTimeline vesselId={vessel.id} isLight={isLight} />}
 
-          {/* Section divider between policies and warranties */}
-          <div
-            style={{
-              margin: '32px 0 24px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}
-          >
-            <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
-            <span
-              style={{
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                letterSpacing: '1px',
-                textTransform: 'uppercase',
-                color: 'var(--text-secondary)',
-                whiteSpace: 'nowrap'
+          {detailView === 'quotations' && (
+            <VesselQuotationsView
+              vessel={vessel}
+              onNavigateToQuotation={(qId) => {
+                if (onNavigateToQuotation) onNavigateToQuotation(qId)
               }}
-            >
-              Survey Warranties
-            </span>
-            <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
-          </div>
-
-          <WarrantyManager
+            />
+          )}
+        </div>
+        {showSidePanel && (
+          <VesselSidePanel
             vesselId={vessel.id}
-            dynamicPolicies={dynamicPolicies}
-            isLight={isLight}
+            noteCount={vesselNoteCount}
+            canAdd={hasPermission('vessels:edit')}
+            onNoteAdded={() => setVesselNoteCount((c) => c + 1)}
+            onOpenAllNotes={handleOpenVesselNotes}
+            onOpenActivity={() => setDetailView('timeline')}
           />
-        </>
-      )}
-
-      {detailView === 'payments' && (
-        <ReceiptManager vesselId={vessel.id} vesselName={vessel.name} embedded />
-      )}
-
-      {detailView === 'timeline' && <VesselTimeline vesselId={vessel.id} isLight={isLight} />}
-
-      {detailView === 'quotations' && (
-        <VesselQuotationsView
-          vessel={vessel}
-          onNavigateToQuotation={(qId) => {
-            if (onNavigateToQuotation) onNavigateToQuotation(qId)
-          }}
-        />
-      )}
+        )}
+      </div>
 
       {confirmation.show && (
         <ConfirmationModal
