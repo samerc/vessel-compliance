@@ -76,7 +76,7 @@ import ConfirmationModal from './ConfirmationModal'
 import RemapFilePathsModal from './RemapFilePathsModal'
 import VesselQuotationsView from './VesselQuotationsView'
 import ReceiptManager from './ReceiptManager'
-import { ok } from '../utils/ipc'
+import { ok, asArray } from '../utils/ipc'
 
 /** Vessel update where null clears the column (updateVessel accepts it at runtime) */
 type NullableVesselUpdate = { [K in keyof Vessel]?: Vessel[K] | null }
@@ -287,7 +287,7 @@ export default function VesselDetail({
     }
 
     await window.api.upsertVesselDocument(newDoc)
-    await loadData()
+    await loadDocuments()
   }
 
   const handleClickUpload = async (docTypeId: string): Promise<void> => {
@@ -321,7 +321,7 @@ export default function VesselDetail({
 
     await window.api.upsertVesselDocument(newDoc)
     showSuccess('Document linked successfully')
-    await loadData()
+    await loadDocuments()
   }
 
   const handleToggleRequired = async (docTypeId: string): Promise<void> => {
@@ -343,12 +343,12 @@ export default function VesselDetail({
       }
       await window.api.upsertVesselDocument(newDoc)
     }
-    loadData()
+    loadDocuments()
   }
 
   const handleUpdateExpiry = async (docTypeId: string, expiryDate: string): Promise<void> => {
     await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
-    loadData()
+    loadDocuments()
   }
 
   const handleDeleteDoc = async (doc: VesselDocument): Promise<void> => {
@@ -360,7 +360,7 @@ export default function VesselDetail({
       onConfirm: async () => {
         const updated = { ...doc, filePath: '' }
         await window.api.upsertVesselDocument(updated)
-        loadData()
+        loadDocuments()
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
@@ -370,7 +370,7 @@ export default function VesselDetail({
     try {
       await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
       showSuccess('Document duplicated')
-      loadData()
+      loadDocuments()
     } catch (error) {
       showError((error instanceof Error && error.message) || 'Failed to duplicate document')
     }
@@ -384,7 +384,7 @@ export default function VesselDetail({
       isDangerous: true,
       onConfirm: async () => {
         await window.api.deleteVesselDocumentById(doc.id!)
-        loadData()
+        loadDocuments()
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
@@ -535,10 +535,42 @@ export default function VesselDetail({
   const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
   const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
 
-  const loadData = useCallback(async (): Promise<void> => {
-    const types = await window.api.getDocumentTypes()
-    const docs = await window.api.getVesselDocuments(vessel.id)
-    const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+  // Reference lists (document / vessel / policy types, flags, class societies) load once per
+  // page; edits on the page add to them locally. Everything about this vessel reloads in one
+  // parallel round after each edit.
+  const referenceLoad = useRef<Promise<DocumentType[]> | null>(null)
+  const ensureReference = useCallback((): Promise<DocumentType[]> => {
+    if (!referenceLoad.current) {
+      referenceLoad.current = (async () => {
+        const settle = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null)
+        const [types, fs, cs, vt, pt] = await Promise.all([
+          settle(window.api.getDocumentTypes()),
+          settle(window.api.getFlagStates()),
+          settle(window.api.getClassificationSocieties()),
+          settle(window.api.getVesselTypes()),
+          settle(window.api.getPolicyTypes())
+        ])
+        setFlagStates(asArray(fs))
+        setClassSocieties(
+          [...asArray<ClassificationSociety>(cs)].sort((a, b) => a.name.localeCompare(b.name))
+        )
+        setVesselTypes(asArray(vt))
+        setAllPolicyTypes(asArray(pt))
+        return asArray<DocumentType>(types)
+      })()
+    }
+    return referenceLoad.current
+  }, [])
+
+  // Documents, custom types and the files-on-disk check: what the Documents tab changes
+  const loadDocuments = useCallback(async (): Promise<void> => {
+    const settle = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null)
+    const [types, docsRaw, customRaw] = await Promise.all([
+      ensureReference(),
+      settle(window.api.getVesselDocuments(vessel.id)),
+      settle(window.api.getVesselCustomDocTypes(vessel.id))
+    ])
+    const docs = asArray<VesselDocument>(docsRaw)
 
     // Custom sort: Required first, then by the 'order' defined in Admin.
     const sortedTypes = [...types].sort((a, b) => {
@@ -555,83 +587,49 @@ export default function VesselDetail({
 
     setDocTypes(sortedTypes)
     setVesselDocs(docs)
-    setCustomDocTypes(customTypes)
+    setCustomDocTypes(asArray(customRaw))
 
-    // Check if files exist on disk
-    const status: Record<string, boolean> = {}
-    const withFile = docs.filter((d: VesselDocument) => d.filePath)
+    // Files on disk: checked after the documents show (a slow share must not hold the page)
+    const withFile = docs.filter((d) => d.filePath)
+    if (withFile.length === 0) {
+      setFileStatus({})
+      return
+    }
     try {
-      const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
+      const exists = await window.api.fsExistsMany(withFile.map((d) => d.filePath!))
+      const status: Record<string, boolean> = {}
       if (Array.isArray(exists))
-        withFile.forEach((d: VesselDocument, i: number) => {
+        withFile.forEach((d, i) => {
           status[d.documentTypeId] = exists[i]
         })
+      setFileStatus(status)
     } catch {
       /* unknown = shown as present */
     }
-    setFileStatus(status)
+  }, [vessel.id, ensureReference])
 
-    // Load supplementary data separately so failures don't break core functionality
-    try {
-      const history = await window.api.getVesselNameHistory(vessel.id)
-      setNameHistory(Array.isArray(history) ? history : [])
-    } catch {
-      /* ignore */
-    }
-    try {
-      const fs = await window.api.getFlagStates()
-      setFlagStates(Array.isArray(fs) ? fs : [])
-    } catch {
-      /* ignore */
-    }
-    try {
-      const cs = await window.api.getClassificationSocieties()
-      setClassSocieties(
-        Array.isArray(cs) ? [...cs].sort((a, b) => a.name.localeCompare(b.name)) : []
+  const loadData = useCallback(async (): Promise<void> => {
+    const settle = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null)
+    const [, history, vcs, vp, dp, notes] = await Promise.all([
+      loadDocuments(),
+      settle(window.api.getVesselNameHistory(vessel.id)),
+      settle(window.api.getVesselClassifications(vessel.id)),
+      settle(window.api.getVesselPolicies(vessel.id)),
+      settle(window.api.getVesselDynamicPolicies(vessel.id)),
+      settle(window.api.getVesselNotes(vessel.id))
+    ])
+    setNameHistory(asArray(history))
+    setVesselClassificationIds(
+      new Set(
+        asArray<{ classificationSocietyId: string }>(vcs).map((vc) => vc.classificationSocietyId)
       )
-    } catch {
-      /* ignore */
-    }
-    try {
-      const vcs = await window.api.getVesselClassifications(vessel.id)
-      setVesselClassificationIds(
-        new Set(Array.isArray(vcs) ? vcs.map((vc) => vc.classificationSocietyId) : [])
-      )
-    } catch {
-      /* ignore */
-    }
-    try {
-      const vt = await window.api.getVesselTypes()
-      setVesselTypes(Array.isArray(vt) ? vt : [])
-    } catch {
-      /* ignore */
-    }
-    try {
-      const [pt, vp] = await Promise.all([
-        window.api.getPolicyTypes(),
-        window.api.getVesselPolicies(vessel.id)
-      ])
-      setAllPolicyTypes(Array.isArray(pt) ? pt : [])
-      setVesselPolicies(Array.isArray(vp) ? vp : [])
-      setAssignedPolicyTypeIds(
-        new Set(Array.isArray(vp) ? vp.map((p: VesselPolicy) => p.policyTypeId) : [])
-      )
-    } catch {
-      /* ignore */
-    }
-    try {
-      const dp = await window.api.getVesselDynamicPolicies(vessel.id)
-      setDynamicPolicies(Array.isArray(dp) ? dp : [])
-    } catch {
-      /* ignore */
-    }
-    try {
-      const notes = await window.api.getVesselNotes(vessel.id)
-      setVesselNoteCount(Array.isArray(notes) ? notes.length : 0)
-    } catch {
-      /* ignore */
-    }
-  }, [vessel.id, setVesselClassificationIds])
+    )
+    const vesselPols = asArray<VesselPolicy>(vp)
+    setVesselPolicies(vesselPols)
+    setAssignedPolicyTypeIds(new Set(vesselPols.map((p) => p.policyTypeId)))
+    setDynamicPolicies(asArray(dp))
+    setVesselNoteCount(asArray(notes).length)
+  }, [vessel.id, loadDocuments, setVesselClassificationIds])
 
   const loadDynamicPolicies = useCallback(async (): Promise<void> => {
     try {
@@ -761,7 +759,7 @@ export default function VesselDetail({
     setNewCustomDocName('')
     setShowAddCustomDoc(false)
     showSuccess('Custom document type added')
-    loadData()
+    loadDocuments()
   }
 
   const handleDeleteCustomDocType = async (customType: VesselCustomDocType): Promise<void> => {
@@ -778,7 +776,7 @@ export default function VesselDetail({
         }
         await window.api.deleteVesselCustomDocType(customType.id)
         showSuccess('Custom document type removed')
-        loadData()
+        loadDocuments()
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
@@ -2644,7 +2642,11 @@ export default function VesselDetail({
             <VesselDocumentsView
               vessel={vessel}
               dynamicPolicies={dynamicPolicies}
-              onReload={loadData}
+              docTypes={docTypes}
+              vesselDocs={vesselDocs}
+              customDocTypes={customDocTypes}
+              fileStatus={fileStatus}
+              onReload={loadDocuments}
             />
           )}
 
@@ -2892,7 +2894,7 @@ export default function VesselDetail({
                                       rowType.id,
                                       val
                                     )
-                                    loadData()
+                                    loadDocuments()
                                   }
                                 }}
                                 min="1900-01-01"
@@ -2978,7 +2980,7 @@ export default function VesselDetail({
                                             rowType.id,
                                             val || null
                                           )
-                                          loadData()
+                                          loadDocuments()
                                         }}
                                         min="1900-01-01"
                                         max="2100-12-31"
@@ -3101,7 +3103,7 @@ export default function VesselDetail({
                                       rowType.id,
                                       val || null
                                     )
-                                    loadData()
+                                    loadDocuments()
                                   }}
                                   min="1900-01-01"
                                   max="2100-12-31"
@@ -3124,7 +3126,7 @@ export default function VesselDetail({
                                       rowType.id,
                                       null
                                     )
-                                    loadData()
+                                    loadDocuments()
                                   }}
                                   style={{
                                     display: 'inline-flex',
@@ -3385,7 +3387,7 @@ export default function VesselDetail({
                                     customType.id,
                                     val
                                   )
-                                  loadData()
+                                  loadDocuments()
                                 }
                               }}
                               min="1900-01-01"
@@ -3445,7 +3447,7 @@ export default function VesselDetail({
                                     customType.id,
                                     val || null
                                   )
-                                  loadData()
+                                  loadDocuments()
                                 }}
                                 min="1900-01-01"
                                 max="2100-12-31"
@@ -3469,7 +3471,7 @@ export default function VesselDetail({
                                       customType.id,
                                       null
                                     )
-                                    loadData()
+                                    loadDocuments()
                                   }}
                                   style={{
                                     display: 'inline-flex',

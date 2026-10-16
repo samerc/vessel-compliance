@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import {
   CheckCircle,
   AlertCircle,
@@ -32,7 +32,14 @@ import MissingFilePath from './MissingFilePath'
 interface Props {
   vessel: Vessel
   dynamicPolicies?: VesselDynamicPolicy[]
-  onReload?: () => void
+  /** Loaded by the vessel page (sorted: required first) - this view does not fetch them again */
+  docTypes: DocumentType[]
+  vesselDocs: VesselDocument[]
+  customDocTypes: VesselCustomDocType[]
+  /** documentTypeId -> file exists on disk (missing key = not checked yet) */
+  fileStatus: Record<string, boolean>
+  /** Reloads the vessel page data after a change here */
+  onReload: () => void
 }
 
 const isExpired = (d: string | null | undefined): boolean => {
@@ -81,6 +88,10 @@ function getDocStatus(
 export default function VesselDocumentsView({
   vessel,
   dynamicPolicies,
+  docTypes,
+  vesselDocs,
+  customDocTypes,
+  fileStatus,
   onReload
 }: Props): React.JSX.Element {
   const { theme } = useTheme()
@@ -108,10 +119,6 @@ export default function VesselDocumentsView({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingDocTypeId = useRef<string | null>(null)
 
-  const [docTypes, setDocTypes] = useState<DocumentType[]>([])
-  const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
-  const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
-  const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
   const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
   const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -120,50 +127,7 @@ export default function VesselDocumentsView({
   const [newCustomName, setNewCustomName] = useState('')
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
 
-  // Bumping reloadKey re-runs the load effect below
-  const [reloadKey, setReloadKey] = useState(0)
-  const loadData = (): void => setReloadKey((k) => k + 1)
-
-  useEffect(() => {
-    let alive = true
-    const run = async (): Promise<void> => {
-      const [types, docs, customTypes] = await Promise.all([
-        window.api.getDocumentTypes(),
-        window.api.getVesselDocuments(vessel.id),
-        window.api.getVesselCustomDocTypes(vessel.id)
-      ])
-      const sorted = [...types].sort((a, b) => {
-        const dA = docs.find((d: VesselDocument) => d.documentTypeId === a.id)
-        const dB = docs.find((d: VesselDocument) => d.documentTypeId === b.id)
-        const rA = dA ? dA.required : a.required
-        const rB = dB ? dB.required : b.required
-        if (rA !== rB) return rA ? -1 : 1
-        return a.order - b.order
-      })
-      if (!alive) return
-      setDocTypes(sorted)
-      setVesselDocs(docs)
-      setCustomDocTypes(customTypes)
-      const status: Record<string, boolean> = {}
-      const withFile = docs.filter((d: VesselDocument) => d.filePath)
-      try {
-        const exists = await window.api.fsExistsMany(
-          withFile.map((d: VesselDocument) => d.filePath!)
-        )
-        if (Array.isArray(exists))
-          withFile.forEach((d: VesselDocument, i: number) => {
-            status[d.documentTypeId] = exists[i]
-          })
-      } catch {
-        /* unknown = shown as present */
-      }
-      if (alive) setFileStatus(status)
-    }
-    void run()
-    return () => {
-      alive = false
-    }
-  }, [vessel.id, reloadKey])
+  const loadData = onReload
 
   const uploadDoc = async (docTypeId: string, filePath: string): Promise<void> => {
     setUploadingId(docTypeId)
@@ -192,7 +156,6 @@ export default function VesselDocumentsView({
       })
       showSuccess('Document linked successfully')
       loadData()
-      onReload?.()
     } finally {
       setUploadingId(null)
     }
@@ -247,7 +210,6 @@ export default function VesselDocumentsView({
     if (!(await confirmDialog('Unlink this file? The record will remain.'))) return
     await window.api.upsertVesselDocument({ ...doc, filePath: '' })
     loadData()
-    onReload?.()
   }
 
   const handleDuplicate = async (doc: VesselDocument): Promise<void> => {
