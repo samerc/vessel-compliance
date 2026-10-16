@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import type { SicLetterPage, SicOcrLine } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
-import { Badge, SegmentedControl } from './ui'
+import { Badge, SegmentedControl, Field } from './ui'
 import { confirmDialog } from './DialogHost'
 import {
   parseLetterHeader,
@@ -704,6 +704,12 @@ export default function SicLetterImport({
   }
   const arStyle: CSSProperties = { ...inputStyle, direction: 'rtl', fontSize: '0.9rem' }
   const label: CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: 'var(--text-secondary)'
+  }
+  // Caption in the menu on the page (kept as it was)
+  const menuLabel: CSSProperties = {
     fontSize: '0.68rem',
     fontWeight: 700,
     color: 'var(--text-secondary)',
@@ -1024,7 +1030,7 @@ export default function SicLetterImport({
                           <RefreshCw size={14} /> Add to entry {rows.indexOf(selectedRow) + 1} and
                           read again
                         </button>
-                        <div style={{ ...label, padding: '8px 6px 4px' }}>
+                        <div style={{ ...menuLabel, padding: '8px 6px 4px' }}>
                           Put into entry {rows.indexOf(selectedRow) + 1} as
                         </div>
                         <div
@@ -1091,24 +1097,20 @@ export default function SicLetterImport({
                 gap: '8px 10px'
               }}
             >
-              <div>
-                <div style={label}>SIC reference</div>
+              <Field label="SIC reference">
                 <input
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   placeholder="e.g. 4737/26"
-                  style={inputStyle}
                 />
-              </div>
-              <div>
-                <div style={label}>Letter date</div>
+              </Field>
+              <Field label="Letter date">
                 <input
                   type="date"
                   value={letterDate}
                   onChange={(e) => setLetterDate(e.target.value)}
-                  style={inputStyle}
                 />
-              </div>
+              </Field>
               <div
                 style={{
                   gridColumn: '1 / -1',
@@ -1118,7 +1120,7 @@ export default function SicLetterImport({
                   flexWrap: 'wrap'
                 }}
               >
-                <span style={label}>Letter</span>
+                <span className="field-label">Letter</span>
                 <SegmentedControl
                   items={KIND_ITEMS}
                   value={kind}
@@ -1129,17 +1131,16 @@ export default function SicLetterImport({
                   }}
                 />
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    flexWrap: 'wrap',
-                    marginBottom: '4px'
+                    flexWrap: 'wrap'
                   }}
                 >
-                  <span style={label}>Remark for every entry</span>
+                  <span className="field-label">Remark for every entry</span>
                   {templates.length > 0 && (
                     <select
                       value={templates.find((t) => t.text === remark)?.label ?? ''}
@@ -1148,7 +1149,6 @@ export default function SicLetterImport({
                         if (t) setRemark(t.text)
                       }}
                       style={{
-                        ...inputStyle,
                         width: 'auto',
                         marginLeft: 'auto',
                         padding: '3px 6px',
@@ -1168,7 +1168,7 @@ export default function SicLetterImport({
                   value={remark}
                   onChange={(e) => setRemark(e.target.value)}
                   rows={2}
-                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                  style={{ resize: 'vertical' }}
                 />
               </div>
               {alreadyImported > 0 && (

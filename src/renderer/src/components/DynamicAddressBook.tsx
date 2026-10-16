@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { PolicyType, FlagState, DABQueryCriteria, DABResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { Badge, EmptyState, Spinner } from './ui'
 
 type PolicyFilter = 'all' | 'undefined' | string[]
 
@@ -654,163 +655,44 @@ export default function DynamicAddressBook(): React.JSX.Element {
 
           {/* Table / empty state */}
           {!hasSearched ? (
-            <div style={{ padding: '72px 40px', textAlign: 'center' }}>
-              <Users
-                size={48}
-                color="var(--text-secondary)"
-                style={{ marginBottom: '16px', opacity: 0.25 }}
-              />
-              <div
-                style={{
-                  fontSize: '1.05rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '8px'
-                }}
-              >
-                No query run yet
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                Select filters on the left, then click <strong>Run Query</strong> to find contacts.
-              </p>
-            </div>
+            <EmptyState
+              icon={<Users size={40} />}
+              title="No query run yet"
+              text={
+                <>
+                  Select filters on the left, then click <strong>Run Query</strong> to find
+                  contacts.
+                </>
+              }
+            />
           ) : loading ? (
-            <div
-              style={{ padding: '72px 40px', textAlign: 'center', color: 'var(--text-secondary)' }}
-            >
-              <Loader2
-                size={32}
-                className="spinner"
-                style={{ marginBottom: '12px', opacity: 0.5 }}
-              />
-              <p style={{ margin: 0 }}>Searching…</p>
+            <div style={{ padding: '72px 40px', display: 'flex', justifyContent: 'center' }}>
+              <Spinner size={32} label="Searching…" />
             </div>
           ) : filteredResults.length === 0 ? (
-            <div style={{ padding: '72px 40px', textAlign: 'center' }}>
-              <Search
-                size={48}
-                color="var(--text-secondary)"
-                style={{ marginBottom: '16px', opacity: 0.25 }}
-              />
-              <div
-                style={{
-                  fontSize: '1.05rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '8px'
-                }}
-              >
-                No contacts found
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                Try adjusting your filter criteria.
-              </p>
-            </div>
+            <EmptyState
+              icon={<Search size={40} />}
+              title="No contacts found"
+              text="Try adjusting your filter criteria."
+            />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+            <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+              <table className="data-table" style={{ minWidth: '600px' }}>
                 <thead>
                   <tr>
-                    <th
-                      style={{
-                        padding: '12px 16px',
-                        textAlign: 'left',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Name
-                    </th>
-                    <th
-                      style={{
-                        padding: '12px 12px',
-                        textAlign: 'left',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Type
-                    </th>
-                    {contactMode === 'customers' && (
-                      <th
-                        style={{
-                          padding: '12px 12px',
-                          textAlign: 'left',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary)',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        Role
-                      </th>
-                    )}
-                    {(exportType === 'email' || exportType === 'both') && (
-                      <th
-                        style={{
-                          padding: '12px 12px',
-                          textAlign: 'left',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary)',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        Email
-                      </th>
-                    )}
-                    {(exportType === 'phone' || exportType === 'both') && (
-                      <th
-                        style={{
-                          padding: '12px 12px',
-                          textAlign: 'left',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary)',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        Phone
-                      </th>
-                    )}
-                    <th
-                      style={{
-                        padding: '12px 16px',
-                        textAlign: 'left',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      Associated Vessels
-                    </th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    {contactMode === 'customers' && <th>Role</th>}
+                    {(exportType === 'email' || exportType === 'both') && <th>Email</th>}
+                    {(exportType === 'phone' || exportType === 'both') && <th>Phone</th>}
+                    <th>Associated Vessels</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredResults.map((r, idx) => (
-                    <tr
-                      key={r.entityId}
-                      style={{
-                        borderBottom: '1px solid var(--table-border)',
-                        background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
-                      }}
-                      className="hover-effect"
-                    >
+                  {filteredResults.map((r) => (
+                    <tr key={r.entityId}>
                       {/* Name */}
-                      <td style={{ padding: '11px 16px' }}>
+                      <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {r.entityType === 'company' ? (
                             <Building2
@@ -821,52 +703,27 @@ export default function DynamicAddressBook(): React.JSX.Element {
                           ) : (
                             <User
                               size={14}
-                              color="#c084fc"
+                              color="var(--violet)"
                               style={{ flexShrink: 0, opacity: 0.8 }}
                             />
                           )}
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              fontSize: '0.88rem',
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {r.entityName}
-                          </span>
+                          <span style={{ fontWeight: 600 }}>{r.entityName}</span>
                         </div>
                       </td>
 
                       {/* Type badge */}
-                      <td style={{ padding: '11px 12px' }}>
-                        <span
-                          style={{
-                            padding: '2px 9px',
-                            borderRadius: '10px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            background:
-                              r.entityType === 'company'
-                                ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                                : 'rgba(192, 132, 252, 0.12)',
-                            color: r.entityType === 'company' ? 'var(--accent-primary)' : '#c084fc',
-                            border: `1px solid ${r.entityType === 'company' ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'rgba(192, 132, 252, 0.25)'}`,
-                            textTransform: 'capitalize'
-                          }}
+                      <td>
+                        <Badge
+                          tone={r.entityType === 'company' ? 'accent' : 'violet'}
+                          style={{ textTransform: 'capitalize' }}
                         >
                           {r.entityType}
-                        </span>
+                        </Badge>
                       </td>
 
                       {/* Role (customers mode) */}
                       {contactMode === 'customers' && (
-                        <td
-                          style={{
-                            padding: '11px 12px',
-                            fontSize: '0.82rem',
-                            color: 'var(--text-secondary)'
-                          }}
-                        >
+                        <td className="muted">
                           {[r.isCustomer && 'Customer', r.isBroker && 'Broker']
                             .filter(Boolean)
                             .join(', ') || '—'}
@@ -875,7 +732,7 @@ export default function DynamicAddressBook(): React.JSX.Element {
 
                       {/* Email */}
                       {(exportType === 'email' || exportType === 'both') && (
-                        <td style={{ padding: '11px 12px' }}>
+                        <td>
                           {r.email ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <Mail
@@ -883,27 +740,17 @@ export default function DynamicAddressBook(): React.JSX.Element {
                                 color="var(--text-secondary)"
                                 style={{ opacity: 0.5, flexShrink: 0 }}
                               />
-                              <span
-                                style={{
-                                  fontSize: '0.85rem',
-                                  color: 'var(--text-primary)',
-                                  wordBreak: 'break-all'
-                                }}
-                              >
-                                {r.email}
-                              </span>
+                              <span style={{ wordBreak: 'break-all' }}>{r.email}</span>
                             </div>
                           ) : (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                              —
-                            </span>
+                            <span className="muted">—</span>
                           )}
                         </td>
                       )}
 
                       {/* Phone */}
                       {(exportType === 'phone' || exportType === 'both') && (
-                        <td style={{ padding: '11px 12px' }}>
+                        <td>
                           {r.phone ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <Phone
@@ -911,33 +758,16 @@ export default function DynamicAddressBook(): React.JSX.Element {
                                 color="var(--text-secondary)"
                                 style={{ opacity: 0.5, flexShrink: 0 }}
                               />
-                              <span
-                                style={{
-                                  fontSize: '0.85rem',
-                                  color: 'var(--text-primary)',
-                                  fontFamily: 'monospace'
-                                }}
-                              >
-                                {r.phone}
-                              </span>
+                              <span className="mono">{r.phone}</span>
                             </div>
                           ) : (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                              —
-                            </span>
+                            <span className="muted">—</span>
                           )}
                         </td>
                       )}
 
                       {/* Vessels */}
-                      <td
-                        style={{
-                          padding: '11px 16px',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.82rem',
-                          maxWidth: '260px'
-                        }}
-                      >
+                      <td className="muted" style={{ maxWidth: '260px' }}>
                         {r.vesselNames || '—'}
                       </td>
                     </tr>

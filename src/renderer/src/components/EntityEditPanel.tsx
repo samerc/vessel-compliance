@@ -35,7 +35,7 @@ import SanctionsModal from './SanctionsModal'
 import { CaseToggleBtn } from './CaseToggle'
 import MissingFilePath from './MissingFilePath'
 import { confirmDialog } from './DialogHost'
-import { SanctionsBadge } from './ui'
+import { SanctionsBadge, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 
 interface EntityEditPanelProps {
@@ -78,7 +78,7 @@ export default function EntityEditPanel({
   const isLight = theme === 'light' || theme === 'aurora'
   const { hasPermission } = useAuth()
   const canUploadDocs = hasPermission('documents:upload')
-  const accentBg = isLight ? 'rgba(0,150,200,0.1)' : 'rgba(var(--accent-primary-rgb), 0.08)'
+  const accentBg = 'var(--accent-tint)'
 
   // ── Data ─────────────────────────────────────────────────────────────────────
   const [entities, setEntities] = useState<Entity[]>([])
@@ -631,22 +631,16 @@ export default function EntityEditPanel({
               }}
             >
               {onFile ? (
-                <CheckCircle2 size={14} color={isLight ? '#008c46' : '#00ff88'} />
+                <CheckCircle2 size={14} color="var(--success)" />
               ) : (
-                <AlertTriangle size={14} color={isLight ? '#c00000' : '#ff4d4d'} />
+                <AlertTriangle size={14} color="var(--danger)" />
               )}
               <span
                 style={{
                   flex: 1,
                   minWidth: 0,
                   fontSize: '0.82rem',
-                  color: onFile
-                    ? isLight
-                      ? '#008c46'
-                      : 'rgba(0,255,136,0.85)'
-                    : isLight
-                      ? '#c00000'
-                      : 'rgba(255,77,77,0.85)',
+                  color: onFile ? 'var(--success)' : 'var(--danger)',
                   cursor: onFile ? 'pointer' : 'default'
                 }}
                 onClick={onFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}
@@ -746,11 +740,8 @@ export default function EntityEditPanel({
       {(editingCore || entity.email || entity.phone) && (
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
           {editingCore ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div>
-                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                  Name *
-                </label>
+            <div className="form-grid cols-2">
+              <Field label="Name" required span="all">
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -764,61 +755,43 @@ export default function EntityEditPanel({
                     onChange={(v) => setForm((f) => ({ ...f, name: v }))}
                   />
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                    Type
-                  </label>
-                  <select
-                    value={form.type}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
-                    }
-                    style={{ width: '100%', padding: '8px 10px' }}
-                  >
-                    <option value="company">Company</option>
-                    <option value="person">Person</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                    Identifier
-                  </label>
-                  <input
-                    type="text"
-                    value={form.identifier}
-                    onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))}
-                    style={{ width: '100%' }}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-              <div>
-                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                  Email(s)
-                </label>
+              </Field>
+              <Field label="Type">
+                <select
+                  value={form.type}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
+                  }
+                >
+                  <option value="company">Company</option>
+                  <option value="person">Person</option>
+                </select>
+              </Field>
+              <Field label="Identifier">
+                <input
+                  type="text"
+                  value={form.identifier}
+                  onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </Field>
+              <Field label="Email(s)" span="all">
                 <input
                   type="text"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  style={{ width: '100%' }}
                   placeholder="Separate multiple with commas"
                 />
-              </div>
-              <div>
-                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                  Phone
-                </label>
+              </Field>
+              <Field label="Phone" span="all">
                 <input
                   type="text"
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  style={{ width: '100%' }}
                   placeholder="Phone number"
                 />
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              </Field>
+              <div style={{ display: 'flex', gap: '8px', gridColumn: '1 / -1' }}>
                 <button
                   onClick={handleSaveCore}
                   disabled={!form.name.trim() || savingCore}
@@ -945,37 +918,24 @@ export default function EntityEditPanel({
               border: '1px solid var(--table-border)'
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <input
-                placeholder="Label (e.g. Registered Office) *"
-                value={addrForm.label}
-                onChange={(e) => setAddrForm((p) => ({ ...p, label: e.target.value }))}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.8rem'
-                }}
-              />
-              <textarea
-                placeholder="Paste or type full address *"
-                value={addrForm.addressLine1}
-                onChange={(e) => setAddrForm((p) => ({ ...p, addressLine1: e.target.value }))}
-                rows={3}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.8rem',
-                  resize: 'vertical',
-                  fontFamily: 'inherit'
-                }}
-              />
-              <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+            <div className="form-grid" style={{ gap: '10px' }}>
+              <Field label="Label" required span="all">
+                <input
+                  placeholder="e.g. Registered Office"
+                  value={addrForm.label}
+                  onChange={(e) => setAddrForm((p) => ({ ...p, label: e.target.value }))}
+                />
+              </Field>
+              <Field label="Address" required span="all">
+                <textarea
+                  placeholder="Paste or type full address"
+                  value={addrForm.addressLine1}
+                  onChange={(e) => setAddrForm((p) => ({ ...p, addressLine1: e.target.value }))}
+                  rows={3}
+                  style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </Field>
+              <div style={{ display: 'flex', gap: '6px', gridColumn: '1 / -1' }}>
                 <button
                   onClick={handleSaveAddress}
                   disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()}
@@ -1129,14 +1089,7 @@ export default function EntityEditPanel({
                   style={{
                     fontSize: '0.72rem',
                     fontWeight: 600,
-                    color:
-                      uboScore.have === uboScore.total
-                        ? isLight
-                          ? '#008c46'
-                          : '#00c264'
-                        : isLight
-                          ? '#c00000'
-                          : '#ff4d4d'
+                    color: uboScore.have === uboScore.total ? 'var(--success)' : 'var(--danger)'
                   }}
                 >
                   <Hash size={9} style={{ opacity: 0.5 }} />
@@ -1212,7 +1165,7 @@ export default function EntityEditPanel({
                       padding: '6px',
                       maxHeight: '150px',
                       overflowY: 'auto',
-                      background: isLight ? '#ffffff' : '#1e222a',
+                      background: 'var(--bg-primary)',
                       border: '1px solid var(--accent-primary)',
                       borderRadius: '8px',
                       boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
@@ -1404,11 +1357,7 @@ export default function EntityEditPanel({
                           width: '70px',
                           padding: '4px 6px',
                           textAlign: 'right',
-                          fontSize: '0.82rem',
-                          borderRadius: '4px',
-                          border: '1px solid var(--input-border)',
-                          background: 'transparent',
-                          color: 'var(--text-primary)'
+                          fontSize: '0.82rem'
                         }}
                       />
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>%</span>
@@ -1418,7 +1367,7 @@ export default function EntityEditPanel({
                             fontSize: '0.6rem',
                             padding: '1px 4px',
                             borderRadius: '3px',
-                            background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                            background: 'var(--accent-tint)',
                             color: 'var(--accent-primary)'
                           }}
                         >

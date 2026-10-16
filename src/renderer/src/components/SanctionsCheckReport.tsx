@@ -11,12 +11,12 @@ import {
   CheckCircle,
   AlertTriangle
 } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { formatDate } from '../utils/dateUtils'
 import { Entity, SanctionsMatch, SanctionsReportListResult } from '../../../shared/types'
+import { Field } from './ui'
 
 const SOURCES: { code: string; label: string }[] = [
   { code: 'OFAC', label: 'OFAC (US Treasury)' },
@@ -30,8 +30,6 @@ const SOURCES: { code: string; label: string }[] = [
 type Decision = 'CLEARED' | 'SANCTIONED' | null
 
 export default function SanctionsCheckReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
   const { user } = useAuth()
 
@@ -161,8 +159,8 @@ export default function SanctionsCheckReport(): React.JSX.Element {
 
   // ── styles ──
   const card: React.CSSProperties = {
-    background: isLight ? '#ffffff' : 'rgba(255,255,255,0.03)',
-    border: '1px solid var(--table-border)',
+    background: 'var(--bg-card)',
+    border: 'var(--glass-border)',
     borderRadius: '12px',
     padding: '20px',
     marginBottom: '16px'
@@ -172,99 +170,85 @@ export default function SanctionsCheckReport(): React.JSX.Element {
     <div style={{ maxWidth: '820px' }}>
       {/* Subject picker */}
       <div style={card}>
-        <label
-          style={{
-            display: 'block',
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            marginBottom: '6px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em'
-          }}
-        >
-          Name or Entity to Screen
-        </label>
-        <div ref={pickerRef} style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              value={subjectName}
-              onChange={(e) => {
-                setSubjectName(e.target.value)
-                setSelectedEntity(null)
-                resetResults()
-              }}
-              onFocus={() => setPickerOpen(true)}
-              placeholder="Type a name, or pick an existing entity…"
-              style={{ flex: 1 }}
-            />
-            <button
-              onClick={runCheck}
-              className="btn-primary"
-              disabled={running || !subjectName.trim()}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
-            >
-              {running ? <Loader2 size={16} className="spin" /> : <Search size={16} />} Run Check
-            </button>
-          </div>
-          {pickerOpen && entityMatches.length > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                marginTop: '4px',
-                zIndex: 50,
-                maxHeight: '260px',
-                overflowY: 'auto',
-                borderRadius: '8px',
-                border: '1px solid var(--glass-border-color)',
-                background: isLight ? '#ffffff' : '#1a1d28',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
-              }}
-            >
-              {entityMatches.map((e) => (
-                <div
-                  key={e.id}
-                  onClick={() => {
-                    setSelectedEntity(e)
-                    setSubjectName(e.name)
-                    setPickerOpen(false)
-                    resetResults()
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    borderBottom: '1px solid var(--table-border)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '8px'
-                  }}
-                  onMouseEnter={(ev) =>
-                    (ev.currentTarget.style.background = isLight
-                      ? 'rgba(0,0,0,0.04)'
-                      : 'rgba(255,255,255,0.05)')
-                  }
-                  onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
-                >
-                  <span>{e.name}</span>
-                  <span
-                    style={{
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.72rem',
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {e.type}
-                  </span>
-                </div>
-              ))}
+        <Field label="Name or entity to screen" htmlFor="sanctions-report-subject">
+          <div ref={pickerRef} style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                id="sanctions-report-subject"
+                type="text"
+                value={subjectName}
+                onChange={(e) => {
+                  setSubjectName(e.target.value)
+                  setSelectedEntity(null)
+                  resetResults()
+                }}
+                onFocus={() => setPickerOpen(true)}
+                placeholder="Type a name, or pick an existing entity…"
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={runCheck}
+                className="btn-primary"
+                disabled={running || !subjectName.trim()}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {running ? <Loader2 size={16} className="spin" /> : <Search size={16} />} Run Check
+              </button>
             </div>
-          )}
-        </div>
+            {pickerOpen && entityMatches.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  zIndex: 50,
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  borderRadius: '8px',
+                  border: '1px solid var(--glass-border-color)',
+                  background: 'var(--bg-primary)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+                }}
+              >
+                {entityMatches.map((e) => (
+                  <div
+                    key={e.id}
+                    onClick={() => {
+                      setSelectedEntity(e)
+                      setSubjectName(e.name)
+                      setPickerOpen(false)
+                      resetResults()
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      borderBottom: '1px solid var(--table-border)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.background = 'var(--row-hover)')}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
+                  >
+                    <span>{e.name}</span>
+                    <span
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.72rem',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {e.type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Field>
         <div
           style={{
             display: 'flex',
@@ -341,51 +325,45 @@ export default function SanctionsCheckReport(): React.JSX.Element {
               {checkedAt && formatDate(checkedAt)}
             </span>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--table-border)' }}>
-                <th style={{ padding: '8px 10px', fontWeight: 600 }}>Sanctions List</th>
-                <th style={{ padding: '8px 10px', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '8px 10px', fontWeight: 600, textAlign: 'center' }}>
-                  Matches
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => {
-                const label = SOURCES.find((s) => s.code === r.source)?.label || r.source
-                const clear = r.status === 'CLEAR'
-                return (
-                  <tr key={r.source} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                    <td style={{ padding: '8px 10px' }}>{label}</td>
-                    <td style={{ padding: '8px 10px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontWeight: 600,
-                          color: clear ? '#16a34a' : '#d97706'
-                        }}
-                      >
-                        {clear ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}
-                        {clear ? 'Clear' : 'Potential Match'}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 10px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      {r.matchCount || '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Sanctions List</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'center' }}>Matches</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r) => {
+                  const label = SOURCES.find((s) => s.code === r.source)?.label || r.source
+                  const clear = r.status === 'CLEAR'
+                  return (
+                    <tr key={r.source}>
+                      <td style={{ fontWeight: 500 }}>{label}</td>
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontWeight: 600,
+                            color: clear ? 'var(--success)' : 'var(--warning)'
+                          }}
+                        >
+                          {clear ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}
+                          {clear ? 'Clear' : 'Potential Match'}
+                        </span>
+                      </td>
+                      <td className="muted" style={{ textAlign: 'center' }}>
+                        {r.matchCount || '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Decision */}
           <div
@@ -403,7 +381,7 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                     alignItems: 'center',
                     gap: '8px',
                     fontSize: '0.84rem',
-                    color: '#d97706',
+                    color: 'var(--warning)',
                     marginBottom: '10px'
                   }}
                 >
@@ -415,11 +393,8 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                     onClick={() => setDecision('CLEARED')}
                     className="btn-secondary"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      borderColor: decision === 'CLEARED' ? '#16a34a' : undefined,
-                      color: decision === 'CLEARED' ? '#16a34a' : undefined,
+                      borderColor: decision === 'CLEARED' ? 'var(--success)' : undefined,
+                      color: decision === 'CLEARED' ? 'var(--success)' : undefined,
                       background: decision === 'CLEARED' ? 'rgba(22,163,74,0.1)' : undefined
                     }}
                   >
@@ -429,9 +404,6 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                     onClick={() => setDecision('SANCTIONED')}
                     className="btn-secondary"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
                       borderColor: decision === 'SANCTIONED' ? 'var(--danger)' : undefined,
                       color: decision === 'SANCTIONED' ? 'var(--danger)' : undefined,
                       background: decision === 'SANCTIONED' ? 'rgba(255,77,77,0.1)' : undefined
@@ -448,7 +420,7 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                   alignItems: 'center',
                   gap: '8px',
                   fontSize: '0.86rem',
-                  color: '#16a34a'
+                  color: 'var(--success)'
                 }}
               >
                 <CheckCircle size={16} /> No matches above {threshold}% — subject is clear on all
@@ -462,7 +434,6 @@ export default function SanctionsCheckReport(): React.JSX.Element {
               onClick={handleExport}
               className="btn-primary"
               disabled={exporting || !decision}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               {exporting ? <Loader2 size={16} className="spin" /> : <FileText size={16} />} Export
               PDF

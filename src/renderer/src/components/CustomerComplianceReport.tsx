@@ -14,7 +14,7 @@ import {
   Search,
   Archive
 } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
+import { Badge, EmptyState, Field, Modal } from './ui'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
@@ -26,8 +26,6 @@ import { buildVesselRow, type CustomerGroup } from '../services/CustomerComplian
 type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
 export default function CustomerComplianceReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all')
@@ -684,7 +682,6 @@ export default function CustomerComplianceReport(): React.JSX.Element {
     }
   }
 
-  const border = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
   const totalVessels = groups.reduce((s, g) => s + g.vessels.length, 0)
   const totalMissing = groups.reduce((s, g) => g.vessels.reduce((sv, v) => sv + v.missing, s), 0)
   const avgPct =
@@ -698,30 +695,11 @@ export default function CustomerComplianceReport(): React.JSX.Element {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Controls */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '0.78rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '6px',
-              fontWeight: '500'
-            }}
-          >
-            Customer
-          </label>
+        <Field label="Customer">
           <select
             value={selectedCustomerId}
             onChange={(e) => setSelectedCustomerId(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '0.9rem',
-              background: 'var(--input-bg)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)',
-              minWidth: '220px'
-            }}
+            style={{ minWidth: '220px' }}
           >
             <option value="all">All Customers</option>
             {customers.map((c) => (
@@ -730,70 +708,26 @@ export default function CustomerComplianceReport(): React.JSX.Element {
               </option>
             ))}
           </select>
-        </div>
-        <button
-          onClick={loadReport}
-          disabled={loading}
-          className="btn-primary"
-          style={{ padding: '8px 20px', fontSize: '0.9rem' }}
-        >
+        </Field>
+        <button onClick={loadReport} disabled={loading} className="btn-primary">
           {loading ? 'Loading...' : 'Generate Report'}
         </button>
         {groups.length > 0 && (
           <>
-            <button
-              onClick={exportToPDF}
-              disabled={exporting}
-              className="btn-secondary"
-              style={{
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
+            <button onClick={exportToPDF} disabled={exporting} className="btn-secondary">
               <FileText size={16} /> {exporting ? 'Exporting...' : 'Export PDF'}
             </button>
-            <button
-              onClick={exportToExcel}
-              className="btn-secondary"
-              style={{
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
+            <button onClick={exportToExcel} className="btn-secondary">
               <Download size={16} /> Export Excel
             </button>
             <button
               onClick={copyMissingDocuments}
               disabled={copyingMissing}
               className="btn-secondary"
-              style={{
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
             >
               <Copy size={16} /> {copyingMissing ? 'Copying...' : 'Copy Missing'}
             </button>
-            <button
-              onClick={handleOpenZipModal}
-              disabled={exportingZip}
-              className="btn-secondary"
-              style={{
-                padding: '8px 16px',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
+            <button onClick={handleOpenZipModal} disabled={exportingZip} className="btn-secondary">
               <Archive size={16} />{' '}
               {exportingZip
                 ? `Exporting ${zipProgress ? `${zipProgress.current}/${zipProgress.total}` : '...'}`
@@ -821,13 +755,9 @@ export default function CustomerComplianceReport(): React.JSX.Element {
               icon: <CheckCircle size={18} />,
               color:
                 avgPct === 100
-                  ? isLight
-                    ? '#008c46'
-                    : '#00c264'
+                  ? 'var(--success)'
                   : avgPct >= 70
-                    ? isLight
-                      ? '#b45309'
-                      : '#f59e0b'
+                    ? 'var(--warning)'
                     : 'var(--danger)'
             }
           ].map((s) => (
@@ -837,7 +767,7 @@ export default function CustomerComplianceReport(): React.JSX.Element {
                 padding: '14px 20px',
                 background: 'var(--bg-card)',
                 borderRadius: '10px',
-                border,
+                border: 'var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px'
@@ -854,16 +784,7 @@ export default function CustomerComplianceReport(): React.JSX.Element {
                 >
                   {s.value}
                 </div>
-                <div
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.4px'
-                  }}
-                >
-                  {s.label}
-                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{s.label}</div>
               </div>
             </div>
           ))}
@@ -872,15 +793,12 @@ export default function CustomerComplianceReport(): React.JSX.Element {
 
       {/* Customer groups */}
       {groups.map((group) => (
-        <div
-          key={group.customerId || '__unassigned__'}
-          style={{ background: 'var(--bg-card)', borderRadius: '12px', border, overflow: 'hidden' }}
-        >
+        <div key={group.customerId || '__unassigned__'} className="table-wrap">
           {/* Customer header */}
           <div
             style={{
               padding: '12px 18px',
-              background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+              background: 'var(--table-header-bg)',
               borderBottom: '1px solid var(--table-border)',
               display: 'flex',
               alignItems: 'center',
@@ -892,19 +810,9 @@ export default function CustomerComplianceReport(): React.JSX.Element {
               {group.customerName}
             </span>
             {group.customerType && (
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  background: 'rgba(99,102,241,0.12)',
-                  color: isLight ? '#4f46e5' : '#818cf8',
-                  fontWeight: '600',
-                  textTransform: 'uppercase'
-                }}
-              >
+              <Badge tone="violet" style={{ textTransform: 'uppercase' }}>
                 {group.customerType}
-              </span>
+              </Badge>
             )}
             <span
               style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}
@@ -919,15 +827,7 @@ export default function CustomerComplianceReport(): React.JSX.Element {
                     handlePortfolioPDF(group.customerId!, group.customerName, group.customerType)
                   }}
                   disabled={exportingPortfolio === group.customerId}
-                  className="btn-secondary"
-                  style={{
-                    padding: '3px 10px',
-                    fontSize: '0.72rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    borderRadius: '6px'
-                  }}
+                  className="btn-secondary btn-sm"
                 >
                   <Briefcase size={13} />
                   {exportingPortfolio === group.customerId ? 'Exporting...' : 'Portfolio PDF'}
@@ -937,22 +837,16 @@ export default function CustomerComplianceReport(): React.JSX.Element {
           </div>
 
           {/* Vessel table */}
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ background: 'var(--table-header-bg)' }}>
+              <tr>
                 {['Vessel', 'IMO', 'Assured', 'Docs', 'Missing', 'Expiring', '%'].map((h) => (
                   <th
                     key={h}
                     style={{
-                      padding: '8px 12px',
-                      fontSize: '0.73rem',
-                      fontWeight: '600',
-                      color: 'var(--text-secondary)',
                       textAlign: ['Docs', 'Missing', 'Expiring', '%'].includes(h)
                         ? 'center'
-                        : 'left',
-                      whiteSpace: 'nowrap',
-                      borderBottom: '1px solid var(--table-border)'
+                        : 'left'
                     }}
                   >
                     {h}
@@ -964,60 +858,23 @@ export default function CustomerComplianceReport(): React.JSX.Element {
               {group.vessels.map((v) => {
                 const pctColor =
                   v.pct === 100
-                    ? isLight
-                      ? '#008c46'
-                      : '#00c264'
+                    ? 'var(--success)'
                     : v.missing > 0
                       ? 'var(--danger)'
-                      : isLight
-                        ? '#b45309'
-                        : '#f59e0b'
+                      : 'var(--warning)'
                 return (
-                  <tr key={v.vesselId} style={{ borderTop: '1px solid var(--table-border)' }}>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        fontWeight: '600',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      {v.vesselName}
+                  <tr key={v.vesselId}>
+                    <td style={{ fontWeight: '600' }}>{v.vesselName}</td>
+                    <td className="muted">
+                      <span className="mono">{v.imoNumber}</span>
                     </td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.82rem',
-                        fontFamily: 'monospace'
-                      }}
-                    >
-                      {v.imoNumber}
-                    </td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.82rem'
-                      }}
-                    >
-                      {v.assured}
-                    </td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        textAlign: 'center',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.82rem'
-                      }}
-                    >
+                    <td className="muted">{v.assured}</td>
+                    <td style={{ textAlign: 'center' }}>
                       {v.compliant}/{v.totalRequired}
                     </td>
                     <td
                       style={{
-                        padding: '10px 12px',
                         textAlign: 'center',
-                        fontSize: '0.82rem',
                         fontWeight: v.missing > 0 ? '700' : '400',
                         color: v.missing > 0 ? 'var(--danger)' : 'var(--text-secondary)'
                       }}
@@ -1026,29 +883,14 @@ export default function CustomerComplianceReport(): React.JSX.Element {
                     </td>
                     <td
                       style={{
-                        padding: '10px 12px',
                         textAlign: 'center',
-                        fontSize: '0.82rem',
                         fontWeight: v.expiringSoon > 0 ? '600' : '400',
-                        color:
-                          v.expiringSoon > 0
-                            ? isLight
-                              ? '#b45309'
-                              : '#f59e0b'
-                            : 'var(--text-secondary)'
+                        color: v.expiringSoon > 0 ? 'var(--warning)' : 'var(--text-secondary)'
                       }}
                     >
                       {v.expiringSoon > 0 ? v.expiringSoon : '—'}
                     </td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        textAlign: 'center',
-                        fontWeight: '700',
-                        color: pctColor,
-                        fontSize: '0.85rem'
-                      }}
-                    >
+                    <td style={{ textAlign: 'center', fontWeight: '700', color: pctColor }}>
                       {v.pct}%
                     </td>
                   </tr>
@@ -1060,202 +902,147 @@ export default function CustomerComplianceReport(): React.JSX.Element {
       ))}
 
       {groups.length === 0 && !loading && (
-        <div
-          style={{
-            padding: '64px',
-            textAlign: 'center',
-            background: 'var(--bg-card)',
-            borderRadius: '12px',
-            border
-          }}
-        >
-          <Users
-            size={48}
-            color="var(--text-secondary)"
-            style={{ marginBottom: '16px', opacity: 0.3 }}
+        <div className="table-wrap">
+          <EmptyState
+            icon={<Users size={40} />}
+            title="No report generated yet"
+            text="Select a customer and click Generate Report."
           />
-          <div
-            style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: 'var(--text-primary)',
-              marginBottom: '8px'
-            }}
-          >
-            No report generated yet
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            Select a customer and click Generate Report.
-          </p>
         </div>
       )}
       {/* ZIP Export Modal */}
       {showZipModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,0.5)'
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '500px',
-              maxHeight: '70vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem' }}>Export Compliance PDFs</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 14px' }}>
-              Select vessels to include. Each gets its own PDF, all bundled in a ZIP file.
-            </p>
-            <div style={{ position: 'relative', marginBottom: '10px' }}>
-              <Search
-                size={14}
-                style={{
-                  position: 'absolute',
-                  left: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-secondary)'
-                }}
-              />
-              <input
-                value={zipSearch}
-                onChange={(e) => setZipSearch(e.target.value)}
-                placeholder="Filter vessels..."
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 32px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg)',
-                  color: 'var(--input-text)',
-                  fontSize: '0.85rem',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-              <button
-                onClick={() =>
-                  setZipSelectedIds(new Set(zipFilteredVessels.map((v) => v.vesselId)))
-                }
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--accent-primary)',
-                  fontSize: '0.78rem',
-                  padding: 0
-                }}
-              >
-                Select All
-              </button>
-              <button
-                onClick={() => setZipSelectedIds(new Set())}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--accent-primary)',
-                  fontSize: '0.78rem',
-                  padding: 0
-                }}
-              >
-                Select None
-              </button>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                {zipSelectedIds.size} selected
-              </span>
-            </div>
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                border: '1px solid var(--table-border)',
-                borderRadius: '8px',
-                marginBottom: '16px'
-              }}
-            >
-              {zipFilteredVessels.map((v) => (
-                <label
-                  key={v.vesselId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--table-border)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={zipSelectedIds.has(v.vesselId)}
-                    onChange={() => {
-                      setZipSelectedIds((prev) => {
-                        const n = new Set(prev)
-                        n.has(v.vesselId) ? n.delete(v.vesselId) : n.add(v.vesselId)
-                        return n
-                      })
-                    }}
-                  />
-                  <span style={{ fontWeight: 600 }}>{v.vesselName}</span>
-                  {v.imoNumber && (
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                      IMO: {v.imoNumber}
-                    </span>
-                  )}
-                  <span style={{ flex: 1 }} />
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color:
-                        v.pct === 100
-                          ? 'var(--success)'
-                          : v.missing > 0
-                            ? 'var(--danger)'
-                            : 'var(--text-secondary)'
-                    }}
-                  >
-                    {v.pct}%
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowZipModal(false)}
-                className="btn-secondary"
-                style={{ padding: '8px 16px' }}
-              >
+        <Modal
+          title="Export Compliance PDFs"
+          icon={<Archive size={18} />}
+          onClose={() => setShowZipModal(false)}
+          width={500}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setShowZipModal(false)} className="btn-secondary">
                 Cancel
               </button>
               <button
                 onClick={handleExportZip}
                 disabled={zipSelectedIds.size === 0}
                 className="btn-primary"
-                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Archive size={15} /> Export {zipSelectedIds.size} PDF
                 {zipSelectedIds.size !== 1 ? 's' : ''} as ZIP
               </button>
-            </div>
+            </>
+          }
+        >
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 14px' }}>
+            Select vessels to include. Each gets its own PDF, all bundled in a ZIP file.
+          </p>
+          <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <Search
+              size={14}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-secondary)'
+              }}
+            />
+            <input
+              value={zipSearch}
+              onChange={(e) => setZipSearch(e.target.value)}
+              placeholder="Filter vessels..."
+              style={{ width: '100%', paddingLeft: '32px' }}
+            />
           </div>
-        </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <button
+              onClick={() => setZipSelectedIds(new Set(zipFilteredVessels.map((v) => v.vesselId)))}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--accent-primary)',
+                fontSize: '0.78rem',
+                padding: 0
+              }}
+            >
+              Select All
+            </button>
+            <button
+              onClick={() => setZipSelectedIds(new Set())}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--accent-primary)',
+                fontSize: '0.78rem',
+                padding: 0
+              }}
+            >
+              Select None
+            </button>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {zipSelectedIds.size} selected
+            </span>
+          </div>
+          <div
+            style={{
+              maxHeight: '45vh',
+              overflowY: 'auto',
+              border: '1px solid var(--table-border)',
+              borderRadius: '8px'
+            }}
+          >
+            {zipFilteredVessels.map((v) => (
+              <label
+                key={v.vesselId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--table-border)',
+                  fontSize: '0.85rem'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={zipSelectedIds.has(v.vesselId)}
+                  onChange={() => {
+                    setZipSelectedIds((prev) => {
+                      const n = new Set(prev)
+                      n.has(v.vesselId) ? n.delete(v.vesselId) : n.add(v.vesselId)
+                      return n
+                    })
+                  }}
+                />
+                <span style={{ fontWeight: 600 }}>{v.vesselName}</span>
+                {v.imoNumber && (
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                    IMO: {v.imoNumber}
+                  </span>
+                )}
+                <span style={{ flex: 1 }} />
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color:
+                      v.pct === 100
+                        ? 'var(--success)'
+                        : v.missing > 0
+                          ? 'var(--danger)'
+                          : 'var(--text-secondary)'
+                  }}
+                >
+                  {v.pct}%
+                </span>
+              </label>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
   )

@@ -58,7 +58,7 @@ import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from '../services/CustomerComplianceExport'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { SanctionsBadge, EmptyState } from './ui'
+import { SanctionsBadge, EmptyState, Modal, Field } from './ui'
 
 /** A vessel linked to an entity, directly (roles) or through an assured it is UBO of */
 type AssociatedVessel = Vessel & { roles: string[]; viaAssureds: string[] }
@@ -820,7 +820,7 @@ export default function EntityDirectory({
     )
   }
 
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
+  const accentBg = 'var(--accent-tint)'
   const companyColor = 'var(--accent-primary)'
   const personColor = isLight ? '#9c27b0' : '#ba68c8'
 
@@ -1089,7 +1089,7 @@ export default function EntityDirectory({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)',
+            background: 'var(--accent-tint)',
             border: '1px solid var(--accent-primary)',
             position: 'sticky',
             top: 0,
@@ -1152,10 +1152,7 @@ export default function EntityDirectory({
       {/* Main: table + slide-in panel */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
         {/* Table */}
-        <div
-          className="glass-card"
-          style={{ flex: 1, minWidth: 0, overflow: 'hidden', padding: 0 }}
-        >
+        <div className="table-wrap" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
           <div
             style={{
               overflowX: 'auto',
@@ -1164,7 +1161,7 @@ export default function EntityDirectory({
               position: 'relative'
             }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="data-table">
               <colgroup>
                 {selectMode && <col style={{ width: '40px' }} />}
                 <col style={{ width: 'auto' }} />
@@ -1174,22 +1171,9 @@ export default function EntityDirectory({
                 <col style={{ width: '80px' }} />
               </colgroup>
               <thead>
-                <tr
-                  style={{
-                    textAlign: 'left',
-                    background: 'var(--table-header-bg)',
-                    borderBottom: '1px solid var(--table-border)'
-                  }}
-                >
+                <tr>
                   {selectMode && (
-                    <th
-                      style={{
-                        padding: '10px 8px 10px 16px',
-                        width: '40px',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '2px solid var(--table-border)'
-                      }}
-                    >
+                    <th style={{ width: '40px' }}>
                       <div
                         onClick={toggleSelectAllEntities}
                         style={{
@@ -1219,32 +1203,9 @@ export default function EntityDirectory({
                   ]
                     .filter((col) => entVisSet.has(col.id))
                     .map((col) => (
-                      <th
-                        key={col.id}
-                        style={{
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          fontSize: '0.69rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.6px',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          background: 'var(--table-header-bg)',
-                          borderBottom: '2px solid var(--table-border)'
-                        }}
-                      >
-                        {col.label}
-                      </th>
+                      <th key={col.id}>{col.label}</th>
                     ))}
-                  <th
-                    style={{
-                      padding: '10px 8px',
-                      width: '36px',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '2px solid var(--table-border)'
-                    }}
-                  >
+                  <th style={{ width: '36px', padding: '10px 8px' }}>
                     <ColumnSelector
                       pageKey="entities"
                       allColumns={ENTITY_COLUMNS}
@@ -1259,11 +1220,8 @@ export default function EntityDirectory({
                   <tr>
                     <td
                       colSpan={selectMode ? 6 : 5}
-                      style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
+                      className="muted"
+                      style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <Loader2
                         size={22}
@@ -1277,11 +1235,7 @@ export default function EntityDirectory({
                   <tr>
                     <td
                       colSpan={selectMode ? 6 : 5}
-                      style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
+                      style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <EmptyState
                         compact
@@ -1322,46 +1276,20 @@ export default function EntityDirectory({
                     const vcount = getVesselCount(entity.id)
                     const docColor =
                       score.have === score.total
-                        ? isLight
-                          ? '#008c46'
-                          : '#00c264'
+                        ? 'var(--success)'
                         : score.have === 0
-                          ? isLight
-                            ? '#c00000'
-                            : '#ff4d4d'
-                          : isLight
-                            ? '#b45309'
-                            : '#f59e0b'
+                          ? 'var(--danger)'
+                          : 'var(--warning)'
 
                     return (
                       <tr
                         key={entity.id}
                         onClick={() => setSelectedEntity(isSelected ? null : entity)}
-                        className="hover-effect"
-                        style={{
-                          cursor: 'pointer',
-                          borderBottom: '1px solid var(--table-border)',
-                          background: isBulkChecked
-                            ? isLight
-                              ? 'rgba(0,150,200,0.06)'
-                              : 'rgba(var(--accent-primary-rgb), 0.04)'
-                            : isSelected
-                              ? isLight
-                                ? 'rgba(26,115,232,0.07)'
-                                : 'rgba(var(--accent-primary-rgb), 0.07)'
-                              : 'transparent',
-                          borderLeft: isSelected
-                            ? '3px solid var(--accent-primary)'
-                            : '3px solid transparent',
-                          transition: 'background 0.12s, border-color 0.12s'
-                        }}
+                        className={isSelected || isBulkChecked ? 'clickable selected' : 'clickable'}
                       >
                         {/* Checkbox */}
                         {selectMode && (
-                          <td
-                            style={{ padding: '11px 8px 11px 16px', width: '40px' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <td style={{ width: '40px' }} onClick={(e) => e.stopPropagation()}>
                             <div
                               onClick={() => toggleSelectEntity(entity.id)}
                               style={{
@@ -1383,7 +1311,7 @@ export default function EntityDirectory({
                         )}
                         {/* Name */}
                         {entVisSet.has('name') && (
-                          <td style={{ padding: '11px 16px', overflow: 'hidden' }}>
+                          <td style={{ overflow: 'hidden' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div
                                 style={{
@@ -1439,7 +1367,7 @@ export default function EntityDirectory({
                         )}
                         {/* Type */}
                         {entVisSet.has('type') && (
-                          <td style={{ padding: '11px 16px' }}>
+                          <td>
                             <span
                               style={{
                                 fontSize: '0.72rem',
@@ -1463,13 +1391,11 @@ export default function EntityDirectory({
                         )}
                         {/* Sanctions */}
                         {entVisSet.has('sanctions') && (
-                          <td style={{ padding: '11px 16px' }}>
-                            {renderOfacBadge({ entity }, () => handleOfacRecheck(entity))}
-                          </td>
+                          <td>{renderOfacBadge({ entity }, () => handleOfacRecheck(entity))}</td>
                         )}
                         {/* Documents */}
                         {entVisSet.has('documents') && (
-                          <td style={{ padding: '11px 16px' }}>
+                          <td>
                             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>
                               {score.have}/{score.total}
                             </span>
@@ -1477,7 +1403,7 @@ export default function EntityDirectory({
                         )}
                         {/* Vessels */}
                         {entVisSet.has('vessels') && (
-                          <td style={{ padding: '11px 16px' }}>
+                          <td>
                             {vcount > 0 ? (
                               <span
                                 style={{
@@ -1980,209 +1906,114 @@ export default function EntityDirectory({
 
       {/* Create Entity Modal */}
       {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '32px',
-              width: '480px',
-              maxWidth: '90vw',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '24px'
-              }}
-            >
-              <h3 style={{ fontSize: '1.3rem' }}>Create Entity</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowCreateModal(false)}
-                className="btn-secondary"
-                style={{ padding: '6px' }}
-              >
-                <X size={18} />
+        <Modal
+          title="Create Entity"
+          icon={<Plus size={18} />}
+          onClose={() => setShowCreateModal(false)}
+          width={480}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setShowCreateModal(false)} className="btn-secondary">
+                Cancel
               </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label
+              <button
+                onClick={handleCreateEntity}
+                className="btn-primary"
+                disabled={!createForm.name.trim() || isCreating}
+              >
+                {isCreating ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />} Create
+                Entity
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Name" required span="all">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                  style={{ width: '100%', paddingRight: '44px' }}
+                  placeholder="Entity name"
+                  autoFocus
+                />
+                <CaseToggleBtn
+                  value={createForm.name}
+                  onChange={(v) => setCreateForm((f) => ({ ...f, name: v }))}
+                />
+              </div>
+              {similarEntities.length > 0 && (
+                <div
                   style={{
+                    marginTop: '2px',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+                    border: isLight
+                      ? '1px solid rgba(200,120,0,0.2)'
+                      : '1px solid rgba(255,193,7,0.15)',
                     fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
+                    color: 'var(--warning)'
                   }}
                 >
-                  Name *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                    style={{ width: '100%', paddingRight: '44px' }}
-                    placeholder="Entity name"
-                    autoFocus
-                  />
-                  <CaseToggleBtn
-                    value={createForm.name}
-                    onChange={(v) => setCreateForm((f) => ({ ...f, name: v }))}
-                  />
-                </div>
-                {similarEntities.length > 0 && (
                   <div
                     style={{
-                      marginTop: '8px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
-                      border: isLight
-                        ? '1px solid rgba(200,120,0,0.2)'
-                        : '1px solid rgba(255,193,7,0.15)',
-                      fontSize: '0.8rem',
-                      color: isLight ? '#8a6d00' : '#ffc107'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '6px',
+                      fontWeight: 600
                     }}
                   >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '6px',
-                        fontWeight: 600
-                      }}
-                    >
-                      <AlertTriangle size={14} /> Similar entities found:
-                    </div>
-                    {similarEntities.map((s, i) => (
-                      <div key={i} style={{ paddingLeft: '20px', lineHeight: 1.6 }}>
-                        &bull; &ldquo;{s.name}&rdquo; ({Math.round(s.score * 100)}% match)
-                      </div>
-                    ))}
+                    <AlertTriangle size={14} /> Similar entities found:
                   </div>
-                )}
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Type
-                </label>
-                <select
-                  value={createForm.type}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
-                  }
-                  style={{ width: '100%', padding: '10px 12px' }}
-                >
-                  <option value="company">Company</option>
-                  <option value="person">Person</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Identifier
-                </label>
-                <input
-                  type="text"
-                  value={createForm.identifier}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, identifier: e.target.value }))}
-                  style={{ width: '100%' }}
-                  placeholder="Optional note to distinguish same-named entities"
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Email(s)
-                </label>
-                <input
-                  type="text"
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-                  style={{ width: '100%' }}
-                  placeholder="Separate multiple emails with commas"
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Phone
-                </label>
-                <input
-                  type="text"
-                  value={createForm.phone}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
-                  style={{ width: '100%' }}
-                  placeholder="Phone number"
-                />
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  justifyContent: 'flex-end',
-                  marginTop: '8px'
-                }}
+                  {similarEntities.map((s, i) => (
+                    <div key={i} style={{ paddingLeft: '20px', lineHeight: 1.6 }}>
+                      &bull; &ldquo;{s.name}&rdquo; ({Math.round(s.score * 100)}% match)
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <Field label="Type" span="all">
+              <select
+                value={createForm.type}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
+                }
               >
-                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateEntity}
-                  className="btn-primary"
-                  disabled={!createForm.name.trim() || isCreating}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  {isCreating ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />}{' '}
-                  Create Entity
-                </button>
-              </div>
-            </div>
+                <option value="company">Company</option>
+                <option value="person">Person</option>
+              </select>
+            </Field>
+            <Field label="Identifier" span="all">
+              <input
+                type="text"
+                value={createForm.identifier}
+                onChange={(e) => setCreateForm((f) => ({ ...f, identifier: e.target.value }))}
+                placeholder="Optional note to distinguish same-named entities"
+              />
+            </Field>
+            <Field label="Email(s)" span="all">
+              <input
+                type="text"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="Separate multiple emails with commas"
+              />
+            </Field>
+            <Field label="Phone" span="all">
+              <input
+                type="text"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Phone number"
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Sanctions Modal */}
@@ -2210,80 +2041,45 @@ export default function EntityDirectory({
 
       {/* Merge Modal */}
       {showMergeModal && mergeSource && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
+        <Modal
+          title="Merge Entities"
+          icon={<Merge size={18} />}
+          onClose={() => setShowMergeModal(false)}
+          width={560}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setShowMergeModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleMerge}
+                className="btn-danger"
+                disabled={!mergeTarget || isMerging}
+              >
+                {isMerging ? <Loader2 size={14} className="spinner" /> : <Merge size={14} />}
+                {isMerging ? 'Merging...' : 'Merge Entities'}
+              </button>
+            </>
+          }
         >
           <div
             style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '32px',
-              width: '560px',
-              maxWidth: '90vw',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              border: '1px solid var(--glass-border-color)'
+              marginBottom: '20px',
+              padding: '14px',
+              borderRadius: '10px',
+              background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+              border: isLight ? '1px solid rgba(200,120,0,0.2)' : '1px solid rgba(255,193,7,0.15)',
+              fontSize: '0.82rem',
+              color: 'var(--warning)'
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '24px'
-              }}
-            >
-              <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Merge size={20} /> Merge Entities
-              </h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowMergeModal(false)}
-                className="btn-secondary"
-                style={{ padding: '6px' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div
-              style={{
-                marginBottom: '20px',
-                padding: '14px',
-                borderRadius: '10px',
-                background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
-                border: isLight
-                  ? '1px solid rgba(200,120,0,0.2)'
-                  : '1px solid rgba(255,193,7,0.15)',
-                fontSize: '0.82rem',
-                color: isLight ? '#8a6d00' : '#ffc107'
-              }}
-            >
-              <AlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-              This will merge the source entity INTO the target. All vessel links, UBOs, and
-              customer assignments will be transferred. The source entity will be deleted.
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontWeight: 600
-                }}
-              >
-                Source (will be deleted)
-              </label>
+            <AlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+            This will merge the source entity INTO the target. All vessel links, UBOs, and customer
+            assignments will be transferred. The source entity will be deleted.
+          </div>
+          <div className="form-grid">
+            <Field label="Source (will be deleted)" span="all">
               <div
                 style={{
                   padding: '12px',
@@ -2310,19 +2106,8 @@ export default function EntityDirectory({
                   </div>
                 </div>
               </div>
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontWeight: 600
-                }}
-              >
-                Target (will be kept)
-              </label>
+            </Field>
+            <Field label="Target (will be kept)" span="all">
               {mergeTarget ? (
                 <div
                   style={{
@@ -2388,7 +2173,7 @@ export default function EntityDirectory({
                         overflowY: 'auto',
                         border: '1px solid var(--glass-border-color)',
                         borderRadius: '8px',
-                        background: isLight ? '#fff' : '#1e222a'
+                        background: 'var(--bg-primary)'
                       }}
                     >
                       {mergeSearchResults.map((e) => (
@@ -2424,20 +2209,9 @@ export default function EntityDirectory({
                   )}
                 </div>
               )}
-            </div>
+            </Field>
             {mergeTarget && (
-              <div style={{ marginBottom: '24px' }}>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    display: 'block',
-                    marginBottom: '6px',
-                    fontWeight: 600
-                  }}
-                >
-                  Keep which name?
-                </label>
+              <Field label="Keep which name?" span="all">
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     onClick={() => setMergeKeepName('target')}
@@ -2454,30 +2228,10 @@ export default function EntityDirectory({
                     {mergeSource.name}
                   </button>
                 </div>
-              </div>
+              </Field>
             )}
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowMergeModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-              <button
-                onClick={handleMerge}
-                className="btn-primary"
-                disabled={!mergeTarget || isMerging}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'var(--danger)',
-                  borderColor: 'var(--danger)'
-                }}
-              >
-                {isMerging ? <Loader2 size={14} className="spinner" /> : <Merge size={14} />}
-                {isMerging ? 'Merging...' : 'Merge Entities'}
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Bulk Delete Confirmation */}
@@ -2503,303 +2257,177 @@ export default function EntityDirectory({
 
       {/* Duplicate Finder Modal */}
       {showDuplicatesModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px'
-          }}
+        <Modal
+          title="Duplicate Finder"
+          icon={<ScanSearch size={18} />}
+          onClose={() => setShowDuplicatesModal(false)}
+          width={780}
+          closeOnOverlay={false}
+          footer={
+            <button onClick={() => setShowDuplicatesModal(false)} className="btn-secondary">
+              Close
+            </button>
+          }
         >
+          <p style={{ margin: '0 0 14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            Entities with similar names based on Jaro-Winkler similarity
+          </p>
+
+          {/* Threshold control */}
           <div
             style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '100%',
-              maxWidth: '780px',
-              maxHeight: '80vh',
               display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.4)'
+              alignItems: 'center',
+              gap: '14px',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              background: 'var(--table-header-bg)',
+              marginBottom: '18px'
             }}
           >
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  background:
-                    'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}
-              >
-                <ScanSearch size={20} color="white" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>
-                  Duplicate Finder
-                </h2>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  Entities with similar names based on Jaro-Winkler similarity
-                </p>
-              </div>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowDuplicatesModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Threshold control */}
-            <div
+            <label
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                background: 'var(--table-header-bg)',
-                marginBottom: '18px'
+                fontSize: '0.83rem',
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
               }}
             >
-              <label
-                style={{
-                  fontSize: '0.83rem',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Similarity threshold:
-              </label>
-              <input
-                type="range"
-                min={70}
-                max={99}
-                value={dupThreshold}
-                onChange={(e) => setDupThreshold(Number(e.target.value))}
-                style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
-              />
-              <span
-                style={{
-                  fontSize: '0.9rem',
-                  fontWeight: '700',
-                  color: 'var(--accent-primary)',
-                  minWidth: '38px',
-                  textAlign: 'right'
-                }}
-              >
-                {dupThreshold}%
-              </span>
-              <span
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                — {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found
-              </span>
-            </div>
-
-            {/* Results */}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {duplicatePairs.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '48px 20px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <CheckCircle2
-                    size={40}
-                    style={{ marginBottom: '12px', color: 'var(--success, #00c853)', opacity: 0.7 }}
-                  />
-                  <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '4px' }}>
-                    No duplicates found
-                  </div>
-                  <div style={{ fontSize: '0.82rem' }}>
-                    No entities share {dupThreshold}%+ name similarity.
-                  </div>
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--table-header-bg)' }}>
-                      <th
-                        style={{
-                          padding: '9px 14px',
-                          textAlign: 'left',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.75rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        Entity A
-                      </th>
-                      <th
-                        style={{
-                          padding: '9px 14px',
-                          textAlign: 'left',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.75rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          borderBottom: '1px solid var(--table-border)'
-                        }}
-                      >
-                        Entity B
-                      </th>
-                      <th
-                        style={{
-                          padding: '9px 14px',
-                          textAlign: 'center',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.75rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          borderBottom: '1px solid var(--table-border)',
-                          width: '80px'
-                        }}
-                      >
-                        Score
-                      </th>
-                      <th
-                        style={{
-                          padding: '9px 14px',
-                          borderBottom: '1px solid var(--table-border)',
-                          width: '80px'
-                        }}
-                      ></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {duplicatePairs.map((pair, idx) => (
-                      <tr
-                        key={idx}
-                        style={{
-                          borderBottom: '1px solid var(--table-border)',
-                          background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <td style={{ padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {pair.a.type === 'company' ? (
-                              <Building2 size={14} color={companyColor} />
-                            ) : (
-                              <User size={14} color={personColor} />
-                            )}
-                            <div>
-                              <div style={{ fontWeight: '600' }}>{pair.a.name}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                {pair.a.type}
-                                {pair.a.identifier ? ` · ${pair.a.identifier}` : ''}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {pair.b.type === 'company' ? (
-                              <Building2 size={14} color={companyColor} />
-                            ) : (
-                              <User size={14} color={personColor} />
-                            )}
-                            <div>
-                              <div style={{ fontWeight: '600' }}>{pair.b.name}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                {pair.b.type}
-                                {pair.b.identifier ? ` · ${pair.b.identifier}` : ''}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <span
-                            style={{
-                              padding: '3px 10px',
-                              borderRadius: '20px',
-                              fontSize: '0.78rem',
-                              fontWeight: '700',
-                              background:
-                                pair.score >= 0.97
-                                  ? 'rgba(255,77,77,0.12)'
-                                  : pair.score >= 0.92
-                                    ? 'rgba(255,193,7,0.12)'
-                                    : 'rgba(0,200,100,0.1)',
-                              color:
-                                pair.score >= 0.97
-                                  ? 'var(--danger)'
-                                  : pair.score >= 0.92
-                                    ? isLight
-                                      ? '#a06000'
-                                      : '#ffc107'
-                                    : isLight
-                                      ? '#007a3d'
-                                      : '#00c853'
-                            }}
-                          >
-                            {Math.round(pair.score * 100)}%
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <button
-                            className="btn-secondary"
-                            style={{
-                              padding: '5px 10px',
-                              fontSize: '0.75rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            onClick={() => {
-                              setShowDuplicatesModal(false)
-                              openMergeModal(pair.a)
-                            }}
-                            title="Open merge dialog for this pair"
-                          >
-                            <Merge size={13} /> Merge
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
-              <button onClick={() => setShowDuplicatesModal(false)} className="btn-secondary">
-                Close
-              </button>
-            </div>
+              Similarity threshold:
+            </label>
+            <input
+              type="range"
+              min={70}
+              max={99}
+              value={dupThreshold}
+              onChange={(e) => setDupThreshold(Number(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
+            />
+            <span
+              style={{
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                color: 'var(--accent-primary)',
+                minWidth: '38px',
+                textAlign: 'right'
+              }}
+            >
+              {dupThreshold}%
+            </span>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              — {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found
+            </span>
           </div>
-        </div>
+
+          {/* Results */}
+          {duplicatePairs.length === 0 ? (
+            <EmptyState
+              compact
+              icon={<CheckCircle2 size={34} />}
+              title="No duplicates found"
+              text={`No entities share ${dupThreshold}%+ name similarity.`}
+            />
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Entity A</th>
+                    <th>Entity B</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Score</th>
+                    <th style={{ width: '80px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {duplicatePairs.map((pair, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {pair.a.type === 'company' ? (
+                            <Building2 size={14} color={companyColor} />
+                          ) : (
+                            <User size={14} color={personColor} />
+                          )}
+                          <div>
+                            <div style={{ fontWeight: '600' }}>{pair.a.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                              {pair.a.type}
+                              {pair.a.identifier ? ` · ${pair.a.identifier}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {pair.b.type === 'company' ? (
+                            <Building2 size={14} color={companyColor} />
+                          ) : (
+                            <User size={14} color={personColor} />
+                          )}
+                          <div>
+                            <div style={{ fontWeight: '600' }}>{pair.b.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                              {pair.b.type}
+                              {pair.b.identifier ? ` · ${pair.b.identifier}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span
+                          style={{
+                            padding: '3px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.78rem',
+                            fontWeight: '700',
+                            background:
+                              pair.score >= 0.97
+                                ? 'rgba(255,77,77,0.12)'
+                                : pair.score >= 0.92
+                                  ? 'rgba(255,193,7,0.12)'
+                                  : 'rgba(0,200,100,0.1)',
+                            color:
+                              pair.score >= 0.97
+                                ? 'var(--danger)'
+                                : pair.score >= 0.92
+                                  ? 'var(--warning)'
+                                  : 'var(--success)'
+                          }}
+                        >
+                          {Math.round(pair.score * 100)}%
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="btn-secondary"
+                          style={{
+                            padding: '5px 10px',
+                            fontSize: '0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          onClick={() => {
+                            setShowDuplicatesModal(false)
+                            openMergeModal(pair.a)
+                          }}
+                          title="Open merge dialog for this pair"
+                        >
+                          <Merge size={13} /> Merge
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )

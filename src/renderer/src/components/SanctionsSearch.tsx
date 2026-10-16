@@ -26,7 +26,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
 import SicLetterImport from './SicLetterImport'
-import { PageHeader } from './ui'
+import { PageHeader, Modal, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 import { hasArabic } from '../utils/arabicNames'
@@ -227,10 +227,10 @@ export default function SanctionsSearch({
 
   const getScoreColor = (
     score?: number
-  ): '#ff6b6b' | 'var(--text-secondary)' | '#ffc107' | 'var(--success)' => {
+  ): 'var(--danger)' | 'var(--text-secondary)' | 'var(--warning)' | 'var(--success)' => {
     if (!score) return 'var(--text-secondary)'
-    if (score >= 0.9) return '#ff6b6b'
-    if (score >= 0.7) return '#ffc107'
+    if (score >= 0.9) return 'var(--danger)'
+    if (score >= 0.7) return 'var(--warning)'
     return 'var(--success)'
   }
 
@@ -390,26 +390,6 @@ export default function SanctionsSearch({
       (e.aliases || []).some((a) => a.toLowerCase().includes(q))
     )
   })
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 12px',
-    fontSize: '0.88rem',
-    borderRadius: '8px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)'
-  }
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    marginBottom: '4px',
-    display: 'block'
-  }
 
   const handleUpdateLists = async (): Promise<void> => {
     const SANCTION_SOURCES = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
@@ -878,7 +858,7 @@ export default function SanctionsSearch({
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  color: '#4dabf7',
+                                  color: 'var(--info)',
                                   fontWeight: 'bold'
                                 }}
                               >
@@ -1035,62 +1015,25 @@ export default function SanctionsSearch({
             </span>
             {canEditSic && (
               <>
-                <button
-                  className="btn-secondary"
-                  onClick={openTemplateManager}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.82rem',
-                    padding: '7px 14px'
-                  }}
-                >
+                <button className="btn-secondary btn-sm" onClick={openTemplateManager}>
                   <Settings size={14} /> Templates
                 </button>
                 {hasPermission('admin:settings') && (
-                  <button
-                    className="btn-secondary"
-                    onClick={handleImportSic}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.82rem',
-                      padding: '7px 14px'
-                    }}
-                  >
+                  <button className="btn-secondary btn-sm" onClick={handleImportSic}>
                     <Upload size={14} /> Import Excel
                   </button>
                 )}
                 <button
-                  className="btn-secondary"
+                  className="btn-secondary btn-sm"
                   title="Read scanned SIC letters (PDF or image) and add the names they list"
                   onClick={async () => {
                     const picked = await window.api.sicLetterPick()
                     if (Array.isArray(picked) && picked.length) setLetterFiles(picked)
                   }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.82rem',
-                    padding: '7px 14px'
-                  }}
                 >
                   <ScanText size={14} /> Import Letters
                 </button>
-                <button
-                  className="btn-primary"
-                  onClick={openAddSic}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.82rem',
-                    padding: '7px 14px'
-                  }}
-                >
+                <button className="btn-primary btn-sm" onClick={openAddSic}>
                   <Plus size={14} /> Add Entry
                 </button>
               </>
@@ -1113,121 +1056,24 @@ export default function SanctionsSearch({
               </p>
             </div>
           ) : (
-            <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="table-wrap">
+              <table className="data-table">
                 <thead>
                   <tr>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Name
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Father
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Mother
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Nationality
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      DOB
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      SIC Ref
-                    </th>
-                    <th
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'right',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.5px',
-                        width: '80px'
-                      }}
-                    >
-                      Actions
-                    </th>
+                    <th>Name</th>
+                    <th>Father</th>
+                    <th>Mother</th>
+                    <th>Nationality</th>
+                    <th>DOB</th>
+                    <th>Date</th>
+                    <th>SIC Ref</th>
+                    <th style={{ textAlign: 'right', width: '80px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSic.map((entry) => (
-                    <tr key={entry.id} style={{ borderTop: '1px solid var(--glass-border-color)' }}>
-                      <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
+                    <tr key={entry.id}>
+                      <td style={{ fontWeight: 600 }}>
                         {entry.name}
                         {entry.aliases
                           ?.filter((a) => hasArabic(a))
@@ -1258,61 +1104,17 @@ export default function SanctionsSearch({
                           </div>
                         )}
                       </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {entry.father_name || '—'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {entry.mother_name || '—'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {entry.nationality || '—'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {entry.date_of_birth || '—'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
+                      <td className="muted">{entry.father_name || '—'}</td>
+                      <td className="muted">{entry.mother_name || '—'}</td>
+                      <td className="muted">{entry.nationality || '—'}</td>
+                      <td className="muted">{entry.date_of_birth || '—'}</td>
+                      <td className="muted">
                         {formatDate(entry.listed_date) || entry.listed_date || '—'}
                       </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.78rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        {entry.source_id || '—'}
+                      <td className="muted">
+                        <span className="mono">{entry.source_id || '—'}</span>
                       </td>
-                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         {canEditSic && (
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                             <button
@@ -1397,204 +1199,145 @@ export default function SanctionsSearch({
 
       {/* ============ SIC MODAL ============ */}
       {showSicModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '560px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              border: '1px solid var(--glass-border-color)'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>
-                {editingSic ? 'Edit SIC Entry' : 'Add SIC Entry'}
-              </h2>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowSicModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
+        <Modal
+          title={editingSic ? 'Edit SIC Entry' : 'Add SIC Entry'}
+          icon={editingSic ? <Pencil size={18} /> : <Plus size={18} />}
+          onClose={() => setShowSicModal(false)}
+          width={560}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setShowSicModal(false)}>
+                Cancel
               </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Full Name *</label>
+              <button
+                className="btn-primary"
+                onClick={handleSaveSic}
+                disabled={!sicForm.name.trim()}
+              >
+                {editingSic ? 'Save Changes' : 'Add Entry'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid cols-2">
+            <Field label="Full name" required span="all">
+              <input
+                value={sicForm.name}
+                onChange={(e) => setSicForm((p) => ({ ...p, name: e.target.value }))}
+              />
+            </Field>
+            <Field label="Father's name">
+              <input
+                value={sicForm.father_name || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, father_name: e.target.value }))}
+              />
+            </Field>
+            <Field label="Mother's name">
+              <input
+                value={sicForm.mother_name || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, mother_name: e.target.value }))}
+              />
+            </Field>
+            <Field label="Nationality">
+              <input
+                value={sicForm.nationality || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, nationality: e.target.value }))}
+              />
+            </Field>
+            <Field label="Date of birth">
+              <input
+                value={sicForm.date_of_birth || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, date_of_birth: e.target.value }))}
+                placeholder="e.g. 1985 or 1985-03-15"
+              />
+            </Field>
+            <Field label="Date added">
+              <input
+                type="date"
+                value={sicForm.listed_date || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, listed_date: e.target.value }))}
+              />
+            </Field>
+            <Field label="SIC reference">
+              <input
+                value={sicForm.source_id || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, source_id: e.target.value }))}
+                placeholder="e.g. SIC Ref 1149/26/9446"
+              />
+            </Field>
+            <Field label="Type" span="all">
+              <select
+                value={sicForm.entity_type}
+                onChange={(e) => setSicForm((p) => ({ ...p, entity_type: e.target.value }))}
+              >
+                <option value="individual">Individual</option>
+                <option value="entity">Entity / Organization</option>
+                <option value="vessel">Vessel</option>
+              </select>
+            </Field>
+            <Field label="Aliases" span="all">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <input
-                  value={sicForm.name}
-                  onChange={(e) => setSicForm((p) => ({ ...p, name: e.target.value }))}
-                  style={inputStyle}
+                  value={aliasInput}
+                  onChange={(e) => setAliasInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addAlias()
+                    }
+                  }}
+                  placeholder="Add alias and press Enter"
+                  style={{ flex: 1 }}
                 />
+                <button className="btn-secondary btn-sm" onClick={addAlias}>
+                  Add
+                </button>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={labelStyle}>Father&apos;s Name</label>
-                  <input
-                    value={sicForm.father_name || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, father_name: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Mother&apos;s Name</label>
-                  <input
-                    value={sicForm.mother_name || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, mother_name: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={labelStyle}>Nationality</label>
-                  <input
-                    value={sicForm.nationality || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, nationality: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Date of Birth</label>
-                  <input
-                    value={sicForm.date_of_birth || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, date_of_birth: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="e.g. 1985 or 1985-03-15"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={labelStyle}>Date Added</label>
-                  <input
-                    type="date"
-                    value={sicForm.listed_date || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, listed_date: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>SIC Reference</label>
-                  <input
-                    value={sicForm.source_id || ''}
-                    onChange={(e) => setSicForm((p) => ({ ...p, source_id: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="e.g. SIC Ref 1149/26/9446"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Type</label>
-                <select
-                  value={sicForm.entity_type}
-                  onChange={(e) => setSicForm((p) => ({ ...p, entity_type: e.target.value }))}
-                  style={inputStyle}
-                >
-                  <option value="individual">Individual</option>
-                  <option value="entity">Entity / Organization</option>
-                  <option value="vessel">Vessel</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Aliases</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    value={aliasInput}
-                    onChange={(e) => setAliasInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addAlias()
-                      }
-                    }}
-                    placeholder="Add alias and press Enter"
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <button
-                    className="btn-secondary"
-                    onClick={addAlias}
-                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  >
-                    Add
-                  </button>
-                </div>
-                {sicForm.aliases.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                    {sicForm.aliases.map((a, i) => (
-                      <span
-                        key={i}
-                        dir="auto"
+              {sicForm.aliases.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                  {sicForm.aliases.map((a, i) => (
+                    <span
+                      key={i}
+                      dir="auto"
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      {a}
+                      <button
+                        title="Remove"
+                        aria-label="Remove"
+                        onClick={() => removeAlias(i)}
                         style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.78rem',
-                          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--text-secondary)',
+                          padding: 0,
+                          lineHeight: 1
                         }}
                       >
-                        {a}
-                        <button
-                          title="Remove"
-                          aria-label="Remove"
-                          onClick={() => removeAlias(i)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--text-secondary)',
-                            padding: 0,
-                            lineHeight: 1
-                          }}
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <Field
+              span="all"
+              label={
+                <span
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <label style={labelStyle}>Remarks / Subject</label>
+                  Remarks / subject
                   <button
                     type="button"
                     onClick={() => {
@@ -1606,15 +1349,18 @@ export default function SanctionsSearch({
                       border: 'none',
                       cursor: 'pointer',
                       color: 'var(--accent-primary)',
-                      fontSize: '0.7rem',
+                      fontSize: '0.72rem',
                       fontWeight: 600,
                       padding: 0
                     }}
                   >
                     Manage Templates
                   </button>
-                </div>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                </span>
+              }
+            >
+              {remarkTemplates.length > 0 && (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {remarkTemplates.map((t, i) => (
                     <button
                       key={i}
@@ -1627,9 +1373,7 @@ export default function SanctionsSearch({
                         fontWeight: 600,
                         border: `1px solid ${sicForm.remarks === t.text ? 'var(--accent-primary)' : 'var(--input-border)'}`,
                         background:
-                          sicForm.remarks === t.text
-                            ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                            : 'transparent',
+                          sicForm.remarks === t.text ? 'var(--accent-tint)' : 'transparent',
                         color:
                           sicForm.remarks === t.text
                             ? 'var(--accent-primary)'
@@ -1642,239 +1386,158 @@ export default function SanctionsSearch({
                     </button>
                   ))}
                 </div>
-                <textarea
-                  value={sicForm.remarks || ''}
-                  onChange={(e) => setSicForm((p) => ({ ...p, remarks: e.target.value }))}
-                  style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                marginTop: '20px'
-              }}
-            >
-              <button
-                className="btn-secondary"
-                onClick={() => setShowSicModal(false)}
-                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleSaveSic}
-                disabled={!sicForm.name.trim()}
-                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
-              >
-                {editingSic ? 'Save Changes' : 'Add Entry'}
-              </button>
-            </div>
+              )}
+              <textarea
+                value={sicForm.remarks || ''}
+                onChange={(e) => setSicForm((p) => ({ ...p, remarks: e.target.value }))}
+                style={{ minHeight: '60px', resize: 'vertical' }}
+                rows={3}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ============ TEMPLATE MANAGER MODAL ============ */}
       {showTemplateManager && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999
-          }}
+        <Modal
+          title="Remark Templates"
+          icon={<Settings size={18} />}
+          onClose={() => setShowTemplateManager(false)}
+          width={620}
+          closeOnOverlay={false}
         >
+          {/* Existing templates */}
           <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '620px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              border: '1px solid var(--glass-border-color)'
-            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Remark Templates</h2>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowTemplateManager(false)}
+            {remarkTemplates.length === 0 && (
+              <div
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
+                  textAlign: 'center',
+                  padding: '24px',
                   color: 'var(--text-secondary)',
-                  padding: '4px'
+                  fontSize: '0.85rem'
                 }}
               >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Existing templates */}
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}
-            >
-              {remarkTemplates.length === 0 && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '24px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  No templates yet. Add one below.
-                </div>
-              )}
-              {remarkTemplates.map((t, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '10px',
-                    border:
-                      editingTemplateIdx === idx
-                        ? '1px solid var(--accent-primary)'
-                        : '1px solid var(--glass-border-color)',
-                    background:
-                      editingTemplateIdx === idx
-                        ? isLight
-                          ? 'rgba(var(--accent-primary-rgb), 0.04)'
-                          : 'rgba(var(--accent-primary-rgb), 0.06)'
-                        : 'transparent'
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t.label}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        onClick={() => startEditTemplate(t, idx)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--accent-primary)',
-                          padding: '4px'
-                        }}
-                        title="Edit"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => deleteTemplate(idx)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--danger)',
-                          padding: '4px'
-                        }}
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '4px',
-                      lineHeight: 1.4,
-                      whiteSpace: 'pre-wrap',
-                      maxHeight: '60px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {t.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Add / Edit form */}
-            <div style={{ borderTop: '1px solid var(--glass-border-color)', paddingTop: '16px' }}>
-              <h4
+                No templates yet. Add one below.
+              </div>
+            )}
+            {remarkTemplates.map((t, idx) => (
+              <div
+                key={idx}
                 style={{
-                  margin: '0 0 12px',
-                  fontSize: '0.82rem',
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border:
+                    editingTemplateIdx === idx
+                      ? '1px solid var(--accent-primary)'
+                      : '1px solid var(--glass-border-color)',
+                  background: editingTemplateIdx === idx ? 'var(--row-selected)' : 'transparent'
                 }}
               >
-                {editingTemplateIdx !== null ? 'Edit Template' : 'Add Template'}
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label style={labelStyle}>Label</label>
-                  <input
-                    value={templateForm.label}
-                    onChange={(e) => setTemplateForm((p) => ({ ...p, label: e.target.value }))}
-                    placeholder="Short name for the template"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Text</label>
-                  <textarea
-                    value={templateForm.text}
-                    onChange={(e) => setTemplateForm((p) => ({ ...p, text: e.target.value }))}
-                    placeholder="Full remark text..."
-                    style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
-                    rows={3}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    className="btn-primary"
-                    onClick={saveTemplate}
-                    disabled={!templateForm.label.trim() || !templateForm.text.trim()}
-                    style={{ padding: '7px 16px', fontSize: '0.82rem' }}
-                  >
-                    {editingTemplateIdx !== null ? 'Save Changes' : 'Add Template'}
-                  </button>
-                  {editingTemplateIdx !== null && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t.label}</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     <button
-                      className="btn-secondary"
-                      onClick={() => {
-                        setEditingTemplateIdx(null)
-                        setTemplateForm({ label: '', text: '' })
+                      onClick={() => startEditTemplate(t, idx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--accent-primary)',
+                        padding: '4px'
                       }}
-                      style={{ padding: '7px 16px', fontSize: '0.82rem' }}
+                      title="Edit"
                     >
-                      Cancel
+                      <Pencil size={14} />
                     </button>
-                  )}
+                    <button
+                      onClick={() => deleteTemplate(idx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--danger)',
+                        padding: '4px'
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)',
+                    marginTop: '4px',
+                    lineHeight: 1.4,
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: '60px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {t.text}
                 </div>
               </div>
+            ))}
+          </div>
+
+          {/* Add / Edit form */}
+          <div style={{ borderTop: '1px solid var(--table-border)', paddingTop: '16px' }}>
+            <h4 className="form-section-title">
+              {editingTemplateIdx !== null ? 'Edit template' : 'Add template'}
+            </h4>
+            <div className="form-grid cols-2">
+              <Field label="Label" span="all">
+                <input
+                  value={templateForm.label}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, label: e.target.value }))}
+                  placeholder="Short name for the template"
+                />
+              </Field>
+              <Field label="Text" span="all">
+                <textarea
+                  value={templateForm.text}
+                  onChange={(e) => setTemplateForm((p) => ({ ...p, text: e.target.value }))}
+                  placeholder="Full remark text..."
+                  style={{ minHeight: '80px', resize: 'vertical' }}
+                  rows={3}
+                />
+              </Field>
+            </div>
+            <div
+              className="form-actions"
+              style={{ justifyContent: 'flex-start', marginTop: '12px' }}
+            >
+              <button
+                className="btn-primary btn-sm"
+                onClick={saveTemplate}
+                disabled={!templateForm.label.trim() || !templateForm.text.trim()}
+              >
+                {editingTemplateIdx !== null ? 'Save Changes' : 'Add Template'}
+              </button>
+              {editingTemplateIdx !== null && (
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => {
+                    setEditingTemplateIdx(null)
+                    setTemplateForm({ label: '', text: '' })
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ============ CHECK REPORT TAB ============ */}

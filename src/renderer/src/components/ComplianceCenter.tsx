@@ -46,7 +46,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, Tabs, Badge } from './ui'
+import { PageHeader, Tabs, Badge, Field } from './ui'
 
 const STATIC_RULES = [
   {
@@ -814,13 +814,13 @@ export default function ComplianceCenter({
                 active={filter === 'expired'}
                 onClick={() => setFilter('expired')}
                 label="Expired"
-                color="#ff4d4d"
+                color="var(--danger)"
               />
               <FilterButton
                 active={filter === 'soon'}
                 onClick={() => setFilter('soon')}
                 label="Expiring Soon"
-                color="#ffcc00"
+                color="var(--warning)"
               />
             </div>
             <div
@@ -884,15 +884,7 @@ export default function ComplianceCenter({
                 value={docSearch}
                 onChange={(e) => setDocSearch(e.target.value)}
                 placeholder="Search vessels or documents..."
-                style={{
-                  padding: '7px 12px 7px 30px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg, transparent)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.82rem',
-                  width: '240px'
-                }}
+                style={{ paddingLeft: '30px', width: '240px' }}
               />
             </div>
           </div>
@@ -952,22 +944,16 @@ export default function ComplianceCenter({
                       </span>
                     </div>
                     {isExpanded && (
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <table className="data-table">
                         <tbody>
                           {group.alerts.map((alert) => {
                             const rowBorder =
                               alert.type === 'expired' || alert.type === 'missing'
                                 ? 'var(--danger)'
-                                : '#e6a800'
+                                : 'var(--warning)'
                             return (
-                              <tr
-                                key={alert.id}
-                                style={{
-                                  borderBottom: '1px solid var(--table-border)',
-                                  borderLeft: `4px solid ${rowBorder}`
-                                }}
-                              >
-                                <td style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+                              <tr key={alert.id} style={{ borderLeft: `4px solid ${rowBorder}` }}>
+                                <td>
                                   {alert.category === 'entity' && (
                                     <span
                                       style={{
@@ -975,7 +961,7 @@ export default function ComplianceCenter({
                                         padding: '1px 6px',
                                         borderRadius: '4px',
                                         background: 'rgba(139,92,246,0.1)',
-                                        color: isLight ? '#7a3db8' : '#b464ff',
+                                        color: 'var(--violet)',
                                         marginRight: '6px'
                                       }}
                                     >
@@ -984,7 +970,7 @@ export default function ComplianceCenter({
                                   )}
                                   {alert.document}
                                 </td>
-                                <td style={{ padding: '10px 16px', width: '120px' }}>
+                                <td style={{ width: '120px' }}>
                                   <div
                                     style={{
                                       display: 'flex',
@@ -997,22 +983,17 @@ export default function ComplianceCenter({
                                       <ShieldAlert size={14} color="var(--danger)" />
                                     )}
                                     {alert.type === 'expired' && (
-                                      <AlertCircle size={14} color="#ff4d4d" />
+                                      <AlertCircle size={14} color="var(--danger)" />
                                     )}
-                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                    {alert.type === 'soon' && (
+                                      <Clock size={14} color="var(--warning)" />
+                                    )}
                                     <span style={{ textTransform: 'capitalize' }}>
                                       {alert.type === 'soon' ? 'Expiring' : alert.type}
                                     </span>
                                   </div>
                                 </td>
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '0.8rem',
-                                    textAlign: 'right'
-                                  }}
-                                >
+                                <td className="muted" style={{ textAlign: 'right' }}>
                                   {alert.date !== '-' && alert.date}
                                 </td>
                               </tr>
@@ -1097,33 +1078,22 @@ export default function ComplianceCenter({
                       </span>
                     </div>
                     {isExpanded && (
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <table className="data-table">
                         <tbody>
                           {group.alerts.map((alert) => {
                             const rowBorder =
                               alert.type === 'expired' || alert.type === 'missing'
                                 ? 'var(--danger)'
-                                : '#e6a800'
+                                : 'var(--warning)'
                             return (
                               <tr
                                 key={alert.id}
-                                style={{
-                                  borderBottom: '1px solid var(--table-border)',
-                                  borderLeft: `4px solid ${rowBorder}`,
-                                  cursor: 'pointer'
-                                }}
+                                className="clickable"
+                                style={{ borderLeft: `4px solid ${rowBorder}` }}
                                 onClick={() => onNavigateToVessel?.(alert.vesselId)}
                               >
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    fontWeight: 600,
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  {alert.vessel}
-                                </td>
-                                <td style={{ padding: '10px 16px', width: '120px' }}>
+                                <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
+                                <td style={{ width: '120px' }}>
                                   <div
                                     style={{
                                       display: 'flex',
@@ -1136,22 +1106,17 @@ export default function ComplianceCenter({
                                       <ShieldAlert size={14} color="var(--danger)" />
                                     )}
                                     {alert.type === 'expired' && (
-                                      <AlertCircle size={14} color="#ff4d4d" />
+                                      <AlertCircle size={14} color="var(--danger)" />
                                     )}
-                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                    {alert.type === 'soon' && (
+                                      <Clock size={14} color="var(--warning)" />
+                                    )}
                                     <span style={{ textTransform: 'capitalize' }}>
                                       {alert.type === 'soon' ? 'Expiring' : alert.type}
                                     </span>
                                   </div>
                                 </td>
-                                <td
-                                  style={{
-                                    padding: '10px 16px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '0.8rem',
-                                    textAlign: 'right'
-                                  }}
-                                >
+                                <td className="muted" style={{ textAlign: 'right' }}>
                                   {alert.date !== '-' && alert.date}
                                 </td>
                               </tr>
@@ -1179,50 +1144,16 @@ export default function ComplianceCenter({
             </div>
           ) : (
             /* Flat list view */
-            <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="table-wrap">
+              <table className="data-table">
                 <caption className="sr-only">Document compliance alerts</caption>
                 <thead>
-                  <tr
-                    style={{
-                      textAlign: 'left',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)'
-                    }}
-                  >
-                    <th
-                      scope="col"
-                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                    >
-                      Vessel
-                    </th>
-                    <th
-                      scope="col"
-                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                    >
-                      Document
-                    </th>
-                    <th
-                      scope="col"
-                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                    >
-                      Type
-                    </th>
-                    <th
-                      scope="col"
-                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      scope="col"
-                      style={{
-                        padding: '14px 16px',
-                        fontWeight: 600,
-                        fontSize: '0.82rem',
-                        textAlign: 'right'
-                      }}
-                    >
+                  <tr>
+                    <th scope="col">Vessel</th>
+                    <th scope="col">Document</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Date</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>
                       Severity
                     </th>
                   </tr>
@@ -1232,19 +1163,11 @@ export default function ComplianceCenter({
                     const rowBorder =
                       alert.type === 'expired' || alert.type === 'missing'
                         ? 'var(--danger)'
-                        : '#e6a800'
+                        : 'var(--warning)'
                     return (
-                      <tr
-                        key={alert.id}
-                        style={{
-                          borderBottom: '1px solid var(--table-border)',
-                          borderLeft: `4px solid ${rowBorder}`
-                        }}
-                      >
-                        <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>
-                          {alert.vessel}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                      <tr key={alert.id} style={{ borderLeft: `4px solid ${rowBorder}` }}>
+                        <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
+                        <td>
                           {alert.category === 'entity' && (
                             <span
                               style={{
@@ -1252,7 +1175,7 @@ export default function ComplianceCenter({
                                 padding: '1px 6px',
                                 borderRadius: '4px',
                                 background: 'rgba(139,92,246,0.1)',
-                                color: isLight ? '#7a3db8' : '#b464ff',
+                                color: 'var(--violet)',
                                 marginRight: '6px'
                               }}
                             >
@@ -1261,7 +1184,7 @@ export default function ComplianceCenter({
                           )}
                           {alert.document}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           <div
                             style={{
                               display: 'flex',
@@ -1273,23 +1196,17 @@ export default function ComplianceCenter({
                             {alert.type === 'missing' && (
                               <ShieldAlert size={14} color="var(--danger)" />
                             )}
-                            {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
-                            {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                            {alert.type === 'expired' && (
+                              <AlertCircle size={14} color="var(--danger)" />
+                            )}
+                            {alert.type === 'soon' && <Clock size={14} color="var(--warning)" />}
                             <span style={{ textTransform: 'capitalize' }}>
                               {alert.type === 'soon' ? 'Expiring' : alert.type}
                             </span>
                           </div>
                         </td>
-                        <td
-                          style={{
-                            padding: '12px 16px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '0.82rem'
-                          }}
-                        >
-                          {alert.date !== '-' ? alert.date : ''}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <td className="muted">{alert.date !== '-' ? alert.date : ''}</td>
+                        <td style={{ textAlign: 'right' }}>
                           <span
                             style={{
                               padding: '3px 8px',
@@ -1308,7 +1225,7 @@ export default function ComplianceCenter({
                                   ? 'var(--danger)'
                                   : alert.severity === 'high'
                                     ? '#ff784d'
-                                    : '#e6a800'
+                                    : 'var(--warning)'
                             }}
                           >
                             {alert.severity}
@@ -1370,72 +1287,22 @@ export default function ComplianceCenter({
                   count={policyExpiringSoon.length}
                 />
               </div>
-              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="data-table">
                   <caption className="sr-only">Policy alerts</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
-                      <th
-                        scope="col"
-                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                      >
-                        Vessel
-                      </th>
-                      <th
-                        scope="col"
-                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                      >
-                        Policy Type
-                      </th>
-                      <th
-                        scope="col"
-                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                      >
-                        Policy Number
-                      </th>
-                      <th
-                        scope="col"
-                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
-                      >
-                        End Date
-                      </th>
-                      <th
-                        scope="col"
-                        style={{
-                          padding: '14px 16px',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          textAlign: 'right'
-                        }}
-                      >
+                    <tr>
+                      <th scope="col">Vessel</th>
+                      <th scope="col">Policy Type</th>
+                      <th scope="col">Policy Number</th>
+                      <th scope="col">End Date</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         {policyFilter === 'expired' ? 'Days Overdue' : 'Days Left'}
                       </th>
-                      <th
-                        scope="col"
-                        style={{
-                          padding: '14px 16px',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          textAlign: 'center'
-                        }}
-                      >
+                      <th scope="col" style={{ textAlign: 'center' }}>
                         Status
                       </th>
-                      <th
-                        scope="col"
-                        style={{
-                          padding: '14px 16px',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          textAlign: 'center'
-                        }}
-                      >
+                      <th scope="col" style={{ textAlign: 'center' }}>
                         Actions
                       </th>
                     </tr>
@@ -1453,37 +1320,16 @@ export default function ComplianceCenter({
                         <tr
                           key={alert.id || idx}
                           style={{
-                            borderBottom: '1px solid var(--table-border)',
-                            borderLeft: `4px solid ${isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'}`
+                            borderLeft: `4px solid ${isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : 'var(--warning)'}`
                           }}
                         >
-                          <td
-                            style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}
-                          >
-                            {alert.vesselName}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                            {alert.policyTypeName}
-                          </td>
-                          <td
-                            style={{
-                              padding: '12px 16px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.85rem'
-                            }}
-                          >
-                            {alert.policyNumber || '-'}
-                          </td>
-                          <td
-                            style={{
-                              padding: '12px 16px',
-                              color: isExpired ? 'var(--danger)' : '#e6a800',
-                              fontSize: '0.85rem'
-                            }}
-                          >
+                          <td style={{ fontWeight: 600 }}>{alert.vesselName}</td>
+                          <td>{alert.policyTypeName}</td>
+                          <td className="muted">{alert.policyNumber || '-'}</td>
+                          <td style={{ color: isExpired ? 'var(--danger)' : 'var(--warning)' }}>
                             {formatDate(alert.endDate) || alert.endDate || '-'}
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <span
                               style={{
                                 padding: '3px 8px',
@@ -1499,7 +1345,7 @@ export default function ComplianceCenter({
                                   ? 'var(--danger)'
                                   : absDays <= 30
                                     ? '#ffa500'
-                                    : '#e6a800'
+                                    : 'var(--warning)'
                               }}
                             >
                               {isExpired
@@ -1509,19 +1355,11 @@ export default function ComplianceCenter({
                                   : `${absDays}d left`}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center' }}>
                             <select
                               value={alert.status || 'active'}
                               onChange={(e) => handleChangePolicyStatus(alert.id, e.target.value)}
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '0.78rem',
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--input-bg, transparent)',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer'
-                              }}
+                              style={{ padding: '4px 8px', fontSize: '0.78rem', cursor: 'pointer' }}
                             >
                               <option value="active">Active</option>
                               <option value="expired">Expired</option>
@@ -1529,17 +1367,10 @@ export default function ComplianceCenter({
                               <option value="inactive">Inactive</option>
                             </select>
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center' }}>
                             <button
                               onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')}
-                              className="btn-secondary"
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '0.78rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
+                              className="btn-secondary btn-sm"
                             >
                               <Eye size={13} /> View
                             </button>
@@ -1661,7 +1492,7 @@ export default function ComplianceCenter({
                 marginBottom: '16px',
                 padding: '16px 20px',
                 borderRadius: '10px',
-                background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                background: 'var(--bg-card)',
                 border: '1px solid var(--glass-border-color)'
               }}
             >
@@ -1685,7 +1516,7 @@ export default function ComplianceCenter({
                         justifyContent: 'space-between',
                         padding: '8px 12px',
                         borderRadius: '8px',
-                        background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                        background: 'var(--bg-primary)',
                         border: '1px solid var(--glass-border-color)',
                         opacity: enabled ? 1 : 0.5
                       }}
@@ -1787,62 +1618,19 @@ export default function ComplianceCenter({
                     padding: '14px',
                     borderRadius: '8px',
                     marginBottom: '12px',
-                    background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
+                    background: 'var(--bg-primary)',
                     border: '1px solid var(--accent-primary)'
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '10px',
-                      marginBottom: '10px'
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Name
-                      </label>
+                  <div className="form-grid cols-2" style={{ marginBottom: '14px' }}>
+                    <Field label="Name">
                       <input
                         value={ruleForm.name}
                         onChange={(e) => setRuleForm((f) => ({ ...f, name: e.target.value }))}
                         placeholder="Rule name"
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box'
-                        }}
                       />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Entity Type
-                      </label>
+                    </Field>
+                    <Field label="Entity type">
                       <select
                         value={ruleForm.entityType}
                         onChange={(e) =>
@@ -1852,16 +1640,6 @@ export default function ComplianceCenter({
                             fieldName: RULE_FIELDS[e.target.value]?.[0]?.key || ''
                           }))
                         }
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box'
-                        }}
                       >
                         {ENTITY_TYPES.map((t) => (
                           <option key={t.key} value={t.key}>
@@ -1869,43 +1647,13 @@ export default function ComplianceCenter({
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
                   </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr 1fr',
-                      gap: '10px',
-                      marginBottom: '10px'
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Field
-                      </label>
+                  <div className="form-grid cols-3" style={{ marginBottom: '14px' }}>
+                    <Field label="Field">
                       <select
                         value={ruleForm.fieldName}
                         onChange={(e) => setRuleForm((f) => ({ ...f, fieldName: e.target.value }))}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box'
-                        }}
                       >
                         <option value="">Select field...</option>
                         {(RULE_FIELDS[ruleForm.entityType] || []).map((f) => (
@@ -1914,34 +1662,11 @@ export default function ComplianceCenter({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Operator
-                      </label>
+                    </Field>
+                    <Field label="Operator">
                       <select
                         value={ruleForm.operator}
                         onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box'
-                        }}
                       >
                         {OPERATORS.map((o) => (
                           <option key={o.key} value={o.key}>
@@ -1949,21 +1674,8 @@ export default function ComplianceCenter({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Value
-                      </label>
+                    </Field>
+                    <Field label="Value">
                       <input
                         value={ruleForm.value}
                         onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))}
@@ -1974,36 +1686,15 @@ export default function ComplianceCenter({
                         }
                         disabled={!OPERATORS.find((o) => o.key === ruleForm.operator)?.needsValue}
                         style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-input)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box',
                           opacity: OPERATORS.find((o) => o.key === ruleForm.operator)?.needsValue
                             ? 1
                             : 0.4
                         }}
                       />
-                    </div>
+                    </Field>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          marginBottom: '4px',
-                          display: 'block'
-                        }}
-                      >
-                        Severity
-                      </label>
+                    <Field label="Severity">
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {SEVERITIES.map((s) => (
                           <button
@@ -2030,7 +1721,7 @@ export default function ComplianceCenter({
                           </button>
                         ))}
                       </div>
-                    </div>
+                    </Field>
                     <div
                       style={{
                         marginLeft: 'auto',
@@ -2045,16 +1736,11 @@ export default function ComplianceCenter({
                           setEditingRuleId(null)
                           setRuleForm(EMPTY_RULE_FORM)
                         }}
-                        className="btn-secondary"
-                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                        className="btn-secondary btn-sm"
                       >
                         Cancel
                       </button>
-                      <button
-                        onClick={handleSaveRule}
-                        className="btn-primary"
-                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                      >
+                      <button onClick={handleSaveRule} className="btn-primary btn-sm">
                         {editingRuleId ? 'Update' : 'Save'}
                       </button>
                     </div>
@@ -2091,7 +1777,7 @@ export default function ComplianceCenter({
                         justifyContent: 'space-between',
                         padding: '8px 12px',
                         borderRadius: '8px',
-                        background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                        background: 'var(--bg-primary)',
                         border: '1px solid var(--glass-border-color)',
                         opacity: rule.isEnabled ? 1 : 0.5
                       }}
@@ -2219,25 +1905,15 @@ export default function ComplianceCenter({
               </div>
             </div>
           ) : (
-            <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="table-wrap">
+              <table className="data-table">
                 <caption className="sr-only">Data quality validation rules</caption>
                 <thead>
-                  <tr
-                    style={{
-                      textAlign: 'left',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)'
-                    }}
-                  >
-                    <th scope="col" style={{ padding: '16px', width: '32px' }}></th>
-                    <th scope="col" style={{ padding: '16px' }}>
-                      Rule
-                    </th>
-                    <th scope="col" style={{ padding: '16px' }}>
-                      Category
-                    </th>
-                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                  <tr>
+                    <th scope="col" style={{ width: '32px' }}></th>
+                    <th scope="col">Rule</th>
+                    <th scope="col">Category</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>
                       Violations
                     </th>
                   </tr>
@@ -2254,13 +1930,12 @@ export default function ComplianceCenter({
                           <tr
                             key={rule.id}
                             onClick={() => hasIssues && toggleRule(rule.id)}
+                            className={hasIssues ? 'clickable' : undefined}
                             style={{
-                              borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
-                              cursor: hasIssues ? 'pointer' : 'default',
                               borderLeft: `4px solid ${hasIssues ? 'var(--danger)' : 'var(--success)'}`
                             }}
                           >
-                            <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            <td style={{ textAlign: 'center' }}>
                               {hasIssues ? (
                                 <ChevronDownIcon
                                   size={16}
@@ -2274,7 +1949,7 @@ export default function ComplianceCenter({
                                 <CheckCircle size={16} color="var(--success)" />
                               )}
                             </td>
-                            <td style={{ padding: '14px 16px' }}>
+                            <td>
                               <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>
                                 {rule.name}
                               </div>
@@ -2288,7 +1963,7 @@ export default function ComplianceCenter({
                                 {rule.description}
                               </div>
                             </td>
-                            <td style={{ padding: '14px 16px' }}>
+                            <td>
                               <span
                                 style={{
                                   padding: '2px 8px',
@@ -2303,7 +1978,7 @@ export default function ComplianceCenter({
                                 {rule.category}
                               </span>
                             </td>
-                            <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            <td style={{ textAlign: 'right' }}>
                               <span
                                 style={{
                                   padding: '4px 12px',
@@ -2326,8 +2001,7 @@ export default function ComplianceCenter({
                                 colSpan={4}
                                 style={{
                                   padding: '0 16px 16px 48px',
-                                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)',
-                                  borderBottom: '1px solid var(--table-border)'
+                                  background: 'var(--table-header-bg)'
                                 }}
                               >
                                 <div
@@ -2339,7 +2013,7 @@ export default function ComplianceCenter({
                                     overflowY: 'auto'
                                   }}
                                 >
-                                  {rule.items.map((item, idx) => (
+                                  {rule.items.map((item) => (
                                     <div
                                       key={item.id}
                                       onClick={(e) => {
@@ -2353,12 +2027,6 @@ export default function ComplianceCenter({
                                         gap: '8px',
                                         padding: '6px 10px',
                                         borderRadius: '6px',
-                                        background:
-                                          idx % 2 === 0
-                                            ? 'transparent'
-                                            : isLight
-                                              ? 'rgba(0,0,0,0.02)'
-                                              : 'rgba(255,255,255,0.02)',
                                         cursor:
                                           item.type === 'vessel' && onNavigateToVessel
                                             ? 'pointer'
@@ -2383,9 +2051,7 @@ export default function ComplianceCenter({
                                           fontWeight: '600',
                                           padding: '1px 6px',
                                           borderRadius: '4px',
-                                          background: isLight
-                                            ? 'rgba(0,0,0,0.05)'
-                                            : 'rgba(255,255,255,0.08)',
+                                          background: 'var(--bg-card-hover)',
                                           color: 'var(--text-secondary)',
                                           textTransform: 'uppercase'
                                         }}
@@ -2412,13 +2078,12 @@ export default function ComplianceCenter({
                         <tr
                           key={rule.ruleId}
                           onClick={() => hasIssues && toggleRule(rule.ruleId)}
+                          className={hasIssues ? 'clickable' : undefined}
                           style={{
-                            borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
-                            cursor: hasIssues ? 'pointer' : 'default',
                             borderLeft: `4px solid ${hasIssues ? sevDef.color : 'var(--success)'}`
                           }}
                         >
-                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center' }}>
                             {hasIssues ? (
                               <ChevronDownIcon
                                 size={16}
@@ -2432,7 +2097,7 @@ export default function ComplianceCenter({
                               <CheckCircle size={16} color="var(--success)" />
                             )}
                           </td>
-                          <td style={{ padding: '14px 16px' }}>
+                          <td>
                             <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>
                               {rule.ruleName}
                             </div>
@@ -2446,7 +2111,7 @@ export default function ComplianceCenter({
                               Custom rule
                             </div>
                           </td>
-                          <td style={{ padding: '14px 16px' }}>
+                          <td>
                             <span
                               style={{
                                 padding: '2px 8px',
@@ -2461,7 +2126,7 @@ export default function ComplianceCenter({
                               {rule.severity}
                             </span>
                           </td>
-                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <span
                               style={{
                                 padding: '4px 12px',
@@ -2484,8 +2149,7 @@ export default function ComplianceCenter({
                               colSpan={4}
                               style={{
                                 padding: '0 16px 16px 48px',
-                                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)',
-                                borderBottom: '1px solid var(--table-border)'
+                                background: 'var(--table-header-bg)'
                               }}
                             >
                               <div
@@ -2497,7 +2161,7 @@ export default function ComplianceCenter({
                                   overflowY: 'auto'
                                 }}
                               >
-                                {rule.items.map((item, idx) => (
+                                {rule.items.map((item) => (
                                   <div
                                     key={item.id}
                                     style={{
@@ -2506,12 +2170,6 @@ export default function ComplianceCenter({
                                       gap: '8px',
                                       padding: '6px 10px',
                                       borderRadius: '6px',
-                                      background:
-                                        idx % 2 === 0
-                                          ? 'transparent'
-                                          : isLight
-                                            ? 'rgba(0,0,0,0.02)'
-                                            : 'rgba(255,255,255,0.02)',
                                       fontSize: '0.82rem'
                                     }}
                                   >
@@ -2566,7 +2224,7 @@ export default function ComplianceCenter({
               style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}
             >
               {/* Pending Reviews */}
-              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+              <div className="table-wrap">
                 <div
                   style={{
                     padding: '16px 20px',
@@ -2576,13 +2234,13 @@ export default function ComplianceCenter({
                     gap: '10px'
                   }}
                 >
-                  <ShieldAlert size={20} color="#ffc107" />
+                  <ShieldAlert size={20} color="var(--warning)" />
                   <h3 style={{ margin: 0 }}>Pending Review</h3>
                   {resultsTotal > 0 && (
                     <span
                       style={{
                         background: 'rgba(255, 193, 7, 0.2)',
-                        color: '#ffc107',
+                        color: 'var(--warning)',
                         padding: '2px 10px',
                         borderRadius: '10px',
                         fontSize: '0.8rem'
@@ -2609,7 +2267,7 @@ export default function ComplianceCenter({
                         style={{
                           background: 'rgba(0,255,136,0.1)',
                           border: '1px solid rgba(0,255,136,0.3)',
-                          color: '#00ff88',
+                          color: 'var(--success)',
                           cursor: 'pointer',
                           padding: '4px 10px',
                           borderRadius: '6px',
@@ -2642,18 +2300,12 @@ export default function ComplianceCenter({
                     </div>
                   )}
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="data-table">
                   <caption className="sr-only">Pending sanctions reviews</caption>
                   <thead>
-                    <tr
-                      style={{
-                        textAlign: 'left',
-                        background: 'var(--table-header-bg)',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
+                    <tr>
                       {canReview && (
-                        <th scope="col" style={{ padding: '12px 8px 12px 16px', width: '32px' }}>
+                        <th scope="col" style={{ width: '32px' }}>
                           <input
                             type="checkbox"
                             checked={
@@ -2668,19 +2320,11 @@ export default function ComplianceCenter({
                           />
                         </th>
                       )}
-                      <th scope="col" style={{ padding: '12px 16px' }}>
-                        Name
-                      </th>
-                      <th scope="col" style={{ padding: '12px 16px' }}>
-                        Type
-                      </th>
-                      <th scope="col" style={{ padding: '12px 16px' }}>
-                        Match Score
-                      </th>
-                      <th scope="col" style={{ padding: '12px 16px' }}>
-                        Date
-                      </th>
-                      <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <th scope="col">Name</th>
+                      <th scope="col">Type</th>
+                      <th scope="col">Match Score</th>
+                      <th scope="col">Date</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
                       </th>
                     </tr>
@@ -2688,17 +2332,9 @@ export default function ComplianceCenter({
                   <tbody>
                     {pendingResults.map((result) => (
                       <>
-                        <tr
-                          key={result.id}
-                          style={{
-                            borderBottom:
-                              expandedResult === result.id
-                                ? 'none'
-                                : '1px solid var(--table-border)'
-                          }}
-                        >
+                        <tr key={result.id}>
                           {canReview && (
-                            <td style={{ padding: '14px 8px 14px 16px', width: '32px' }}>
+                            <td style={{ width: '32px' }}>
                               <input
                                 type="checkbox"
                                 checked={selectedSanctions.has(result.id)}
@@ -2711,10 +2347,8 @@ export default function ComplianceCenter({
                               />
                             </td>
                           )}
-                          <td style={{ padding: '14px 16px', fontWeight: '600' }}>
-                            {result.entityName}
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
+                          <td style={{ fontWeight: '600' }}>{result.entityName}</td>
+                          <td>
                             <span
                               style={{
                                 padding: '2px 8px',
@@ -2724,14 +2358,17 @@ export default function ComplianceCenter({
                                   result.entityType === 'vessel'
                                     ? 'rgba(var(--accent-primary-rgb), 0.1)'
                                     : 'rgba(180, 140, 255, 0.1)',
-                                color: result.entityType === 'vessel' ? '#00d2ff' : '#b48cff',
+                                color:
+                                  result.entityType === 'vessel'
+                                    ? 'var(--accent-primary)'
+                                    : 'var(--violet)',
                                 textTransform: 'capitalize'
                               }}
                             >
                               {result.entityType}
                             </span>
                           </td>
-                          <td style={{ padding: '14px 16px' }}>
+                          <td>
                             <span
                               style={{
                                 fontWeight: '600',
@@ -2739,23 +2376,17 @@ export default function ComplianceCenter({
                                   Number(result.matchScore) >= 90
                                     ? 'var(--danger)'
                                     : Number(result.matchScore) >= 80
-                                      ? '#ffc107'
+                                      ? 'var(--warning)'
                                       : 'var(--text-secondary)'
                               }}
                             >
                               {Number(result.matchScore || 0).toFixed(0)}%
                             </span>
                           </td>
-                          <td
-                            style={{
-                              padding: '14px 16px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.85rem'
-                            }}
-                          >
+                          <td className="muted">
                             {result.createdAt ? formatDate(result.createdAt) : '-'}
                           </td>
-                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <div
                               style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
                             >
@@ -2785,7 +2416,7 @@ export default function ComplianceCenter({
                                   style={{
                                     background: 'rgba(0, 255, 136, 0.1)',
                                     border: '1px solid rgba(0, 255, 136, 0.3)',
-                                    color: '#00ff88',
+                                    color: 'var(--success)',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2829,7 +2460,7 @@ export default function ComplianceCenter({
                               colSpan={canReview ? 6 : 5}
                               style={{
                                 padding: '0 16px 16px 16px',
-                                background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)'
+                                background: 'var(--table-header-bg)'
                               }}
                             >
                               <div
@@ -2854,9 +2485,7 @@ export default function ComplianceCenter({
                                         style={{
                                           marginBottom: '8px',
                                           padding: '8px',
-                                          background: isLight
-                                            ? 'rgba(0, 0, 0, 0.05)'
-                                            : 'rgba(0, 0, 0, 0.2)',
+                                          background: 'var(--table-header-bg)',
                                           borderRadius: '4px'
                                         }}
                                       >
@@ -3027,7 +2656,7 @@ export default function ComplianceCenter({
                                 ? 'var(--success)'
                                 : log.status === 'failed'
                                   ? 'var(--danger)'
-                                  : '#00d2ff',
+                                  : 'var(--accent-primary)',
                             textTransform: 'uppercase'
                           }}
                         >
@@ -3039,7 +2668,7 @@ export default function ComplianceCenter({
                         {log.totalChecked} |{' '}
                         <span
                           style={{
-                            color: log.matchesFound > 0 ? '#ffc107' : 'var(--text-secondary)'
+                            color: log.matchesFound > 0 ? 'var(--warning)' : 'var(--text-secondary)'
                           }}
                         >
                           Matches: {log.matchesFound}
