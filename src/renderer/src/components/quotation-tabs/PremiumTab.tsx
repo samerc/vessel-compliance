@@ -241,9 +241,7 @@ export default function PremiumTab({
     if (quotation.outstandingPremiumEnabled && !quotation.outstandingPremiumText) {
       Promise.all([window.api.piGetSectionTexts(), window.api.getSetting('policyExportSettings')])
         .then(([globalTexts, policyRaw]) => {
-          const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-            (t: { key: string; value?: string }) => t.key === 'outstandingPremiumDefaultText'
-          )?.value
+          const qDefault = globalTexts?.outstandingPremiumDefaultText
           const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
           const text =
             qDefault || pDefault || 'All outstanding premium to be settled prior inception'
@@ -3082,10 +3080,7 @@ export default function PremiumTab({
                     window.api.piGetSectionTexts(),
                     window.api.getSetting('policyExportSettings')
                   ])
-                  const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-                    (t: { key: string; value?: string }) =>
-                      t.key === 'outstandingPremiumDefaultText'
-                  )?.value
+                  const qDefault = globalTexts?.outstandingPremiumDefaultText
                   const pDefault = policyRaw
                     ? JSON.parse(policyRaw).outstandingPremiumDefaultText
                     : null
@@ -3193,9 +3188,7 @@ export default function PremiumTab({
                       window.api.piGetSectionTexts(),
                       window.api.getSetting('policyExportSettings')
                     ])
-                    const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-                      (t: { key: string; value?: string }) => t.key === 'fullPremiumLossDefaultText'
-                    )?.value
+                    const qDefault = globalTexts?.fullPremiumLossDefaultText
                     const pDefault = policyRaw
                       ? JSON.parse(policyRaw).fullPremiumLossDefaultText
                       : null

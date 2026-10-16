@@ -268,7 +268,8 @@ export default function VesselManager({
     setIsAdding(true)
     try {
       // Scan OFAC
-      const scanResult = await OfacService.checkSanctions(newVessel.name)
+      const scan = await OfacService.checkNewRecord(newVessel.name)
+      if (scan.warning) showError(scan.warning)
 
       const result = await window.api.addVessel({
         name: newVessel.name,
@@ -276,9 +277,7 @@ export default function VesselManager({
         fleetId: newVessel.fleetId,
         customerId: newVessel.customerId || undefined,
         customerType: newVessel.customerType || undefined,
-        ofacCheckedAt: scanResult.timestamp,
-        ofacMatchFound: scanResult.matchFound,
-        ofacStatus: scanResult.status,
+        ...scan.fields,
         isActive: true
       })
 
@@ -295,11 +294,11 @@ export default function VesselManager({
       setSelectedVessel(vessel)
 
       // Show modal if potential matches found
-      if (scanResult.matchFound && scanResult.matches.length > 0) {
+      if (scan.result?.matchFound && scan.result.matches.length > 0) {
         setSanctionsModal({
           show: true,
           searchedName: newVessel.name,
-          matches: scanResult.matches,
+          matches: scan.result.matches,
           vesselId: vessel.id
         })
       }

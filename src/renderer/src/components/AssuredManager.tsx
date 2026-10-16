@@ -139,7 +139,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
 
       if (!entityId) {
         // Check OFAC list
-        const scanResult = await OfacService.checkSanctions(newName)
+        const scan = await OfacService.checkNewRecord(newName)
+        if (scan.warning) showError(scan.warning)
 
         const entity = await window.api.addEntity({
           name: newName,
@@ -147,9 +148,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
           identifier: newIdentifier,
           email: newEmail,
           phone: newPhone,
-          ofacCheckedAt: scanResult.timestamp,
-          ofacMatchFound: scanResult.matchFound,
-          ofacStatus: scanResult.status
+          ...scan.fields
         })
         entityId = entity.id
       }

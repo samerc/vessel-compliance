@@ -381,8 +381,11 @@ export default function EntityDirectory({
           }
           setCheckingId(null)
         }
-      } catch {
+      } catch (err) {
         setCheckingId(null)
+        showError(
+          `Entity created, but not checked for sanctions: ${(err instanceof Error && err.message) || 'the check failed'}`
+        )
       }
     } catch (error) {
       showError((error instanceof Error && error.message) || 'Failed to create entity')

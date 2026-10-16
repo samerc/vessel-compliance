@@ -1,3 +1,4 @@
+import { saveFile } from '../utils/saveFile'
 import {
   Document,
   Packer,
@@ -176,17 +177,34 @@ export const BC_DEFAULTS = {
 
 type BcSettingsMap = Record<keyof typeof BC_DEFAULTS, string>
 
+// Exports freeze their content on the first export: a read that failed must stop the export,
+// never fall back to an empty value that would then be frozen into the document
+const EXPORT_LOAD_FAILED =
+  'Some policy data could not be loaded (network or database), so nothing was exported. Try again.'
+
+/** A setting for an export: null when unset, throws when the read failed */
+async function exportSetting(key: string): Promise<string | null> {
+  const val: unknown = await window.api.getSetting(key)
+  if (val != null && typeof val !== 'string') throw new Error(EXPORT_LOAD_FAILED)
+  return (val as string | null) || null
+}
+
+/** Promise.all for export loads: throws when any read came back as an IPC error value */
+async function allLoaded<T extends readonly unknown[]>(
+  reads: readonly [...T]
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  const results = await Promise.all(reads)
+  if (results.some((r) => isIpcError(r))) throw new Error(EXPORT_LOAD_FAILED)
+  return results as { -readonly [K in keyof T]: Awaited<T[K]> }
+}
+
 async function loadBcSettings(): Promise<BcSettingsMap> {
   const result = { ...BC_DEFAULTS } as unknown as BcSettingsMap
   const keys = Object.keys(BC_DEFAULTS) as (keyof typeof BC_DEFAULTS)[]
   await Promise.all(
     keys.map(async (key) => {
-      try {
-        const val = await window.api.getSetting(key)
-        if (val) result[key] = val
-      } catch {
-        /* use default */
-      }
+      const val = await exportSetting(key)
+      if (val) result[key] = val
     })
   )
   return result
@@ -852,7 +870,7 @@ export async function exportBlueCardDocx(
   policyId?: string
 ): Promise<void> {
   const { blob, fileName } = await buildBlueCardBlob(data, cardType, policyId)
-  polDownloadBlob(blob, fileName)
+  await polDownloadBlob(blob, fileName)
 }
 
 async function buildBlueCardBlobFresh(
@@ -1175,65 +1193,55 @@ async function loadFrozenSettings(
   quotation: Quotation,
   sectionTextsRaw?: PISectionTexts | null
 ): Promise<FrozenExportSettings> {
-  let exportSettings: PolicyExportSettings = {}
-  try {
-    const raw = await window.api.getSetting('policyExportSettings')
-    if (raw) exportSettings = JSON.parse(raw)
-  } catch {
-    /* keep {} */
-  }
-  const bcSettings = await loadBcSettings()
-  const fontRaw = await window.api.getSetting('policy_font_size')
-  let sectionOrderDefault: string[] | null = null
-  try {
-    const rawSec = await window.api.getSetting(
-      `policy_section_order_defaults_${quotation.quotationTypeCode}`
-    )
-    if (rawSec) sectionOrderDefault = JSON.parse(rawSec)
-  } catch {
-    /* null */
-  }
-  const qrBase =
-    quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
-  const logoPath = await window.api.piGetQuotationLogoPath()
-  let declarationSettings: DeclarationSettings | null = null
-  try {
-    const rawDec = await window.api.getSetting('declaration_settings')
-    if (rawDec) declarationSettings = JSON.parse(rawDec)
-  } catch {
-    /* null */
-  }
-  const endorsementClosingText =
-    (await window.api.getSetting('endorsement_closing_text').catch(() => null)) || null
-  const policyClosingText =
-    (await window.api
-      .getSetting(`policy_text_${quotation.quotationTypeCode}_closingText`)
-      .catch(() => null)) || null
-  let st: PISectionTexts | null | undefined = sectionTextsRaw
-  if (!st) {
+  // Invalid JSON in a setting keeps its default; a failed read throws (see exportSetting)
+  const parseOr = <T>(raw: string | null, fallback: T): T => {
+    if (!raw) return fallback
     try {
-      st = await window.api.piGetSectionTexts()
+      return JSON.parse(raw) as T
     } catch {
-      st = null
+      return fallback
     }
   }
+  const exportSettings = parseOr<PolicyExportSettings>(
+    await exportSetting('policyExportSettings'),
+    {}
+  )
+  const bcSettings = await loadBcSettings()
+  const fontRaw = await exportSetting('policy_font_size')
+  const sectionOrderDefault = parseOr<string[] | null>(
+    await exportSetting(`policy_section_order_defaults_${quotation.quotationTypeCode}`),
+    null
+  )
+  const qrBase =
+    quotation.quotationTypeCode === 'P' ? await exportSetting('qr_verification_url') : null
+  const logoPath = await window.api.piGetQuotationLogoPath()
+  if (isIpcError(logoPath)) throw new Error(EXPORT_LOAD_FAILED)
+  const declarationSettings = parseOr<DeclarationSettings | null>(
+    await exportSetting('declaration_settings'),
+    null
+  )
+  const endorsementClosingText = await exportSetting('endorsement_closing_text')
+  const policyClosingText = await exportSetting(
+    `policy_text_${quotation.quotationTypeCode}_closingText`
+  )
+  let st: PISectionTexts | null | undefined = sectionTextsRaw
+  if (!st) st = await window.api.piGetSectionTexts()
+  if (isIpcError(st)) throw new Error(EXPORT_LOAD_FAILED)
   let brokerEntity: FrozenExportSettings['brokerEntity'] = null
   let brokerAddress: FrozenExportSettings['brokerAddress'] = null
   if (quotation.customerEntityId && quotation.customerType === 'broker') {
-    try {
-      const ents = await window.api.getEntities()
-      const be = (Array.isArray(ents) ? ents : []).find((e) => e.id === quotation.customerEntityId)
-      if (be) brokerEntity = { id: be.id, name: be.name, email: be.email, phone: be.phone }
-      const addrs = await window.api.getEntityAddresses(quotation.customerEntityId)
-      if (Array.isArray(addrs) && addrs.length > 0)
-        brokerAddress = {
-          addressLine1: addrs[0].addressLine1,
-          city: addrs[0].city,
-          country: addrs[0].country
-        }
-    } catch {
-      /* no broker */
-    }
+    const [ents, addrs] = await allLoaded([
+      window.api.getEntities(),
+      window.api.getEntityAddresses(quotation.customerEntityId)
+    ])
+    const be = (Array.isArray(ents) ? ents : []).find((e) => e.id === quotation.customerEntityId)
+    if (be) brokerEntity = { id: be.id, name: be.name, email: be.email, phone: be.phone }
+    if (Array.isArray(addrs) && addrs.length > 0)
+      brokerAddress = {
+        addressLine1: addrs[0].addressLine1,
+        city: addrs[0].city,
+        country: addrs[0].country
+      }
   }
   return {
     exportSettings,
@@ -1253,8 +1261,10 @@ async function loadFrozenSettings(
 }
 
 async function loadPolicyExportData(policyId: string): Promise<PolicyExportData> {
-  // A missing policy still fails on the property access below (unchanged behaviour)
-  const policy: PolicyDocRecord = (await window.api.policyGetById(policyId))!
+  const policyOrNull = await window.api.policyGetById(policyId)
+  if (isIpcError(policyOrNull)) throw new Error(EXPORT_LOAD_FAILED)
+  if (!policyOrNull) throw new Error('This policy no longer exists')
+  const policy: PolicyDocRecord = policyOrNull
 
   // If policy has a frozen export snapshot, use it instead of live data
   if (policy.exportSnapshot) {
@@ -1328,7 +1338,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     fleetsRaw,
     tradingIntrosRaw,
     assuredRolesRaw
-  ] = await Promise.all([
+  ] = await allLoaded([
     window.api.policyGetInstalments(policyId),
     window.api.policyGetAddresses(policyId),
     window.api.policyGetBlueCards(policyId),
@@ -2359,17 +2369,14 @@ function polMakePageProperties(): ISectionPropertiesOptions {
 let _polCaptureMode = false
 let _polCapturedBlob: Blob | null = null
 
-function polDownloadBlob(blob: Blob, filename: string): void {
+// Resolves once the file is saved; rejects on cancel or a failed write, so nothing after it
+// (exported marks, success toasts) runs for a file that was never written
+async function polDownloadBlob(blob: Blob, filename: string): Promise<void> {
   if (_polCaptureMode) {
     _polCapturedBlob = blob
     return
   }
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  await saveFile(blob, filename)
 }
 
 async function polLoadLogoAsBuffer(
@@ -4118,7 +4125,7 @@ export async function exportPolicyDocx(
   if (storable) {
     const stored = await polStoredFile(policyId, 'policy')
     if (stored) {
-      polDownloadBlob(stored.blob, stored.fileName)
+      await polDownloadBlob(stored.blob, stored.fileName)
       return
     }
   }
@@ -5166,7 +5173,7 @@ export async function exportPolicyDocx(
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`
   if (storable) await polStoreFile(policyId, 'policy', { blob, fileName: polFileName })
-  polDownloadBlob(blob, polFileName)
+  await polDownloadBlob(blob, polFileName)
 
   // Mark policy as exported
   try {
@@ -5222,7 +5229,7 @@ async function generatePolicyDocxBuffer(
 export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   const storedPdf = await polStoredFile(policyId, 'policy-pdf')
   if (storedPdf) {
-    polDownloadBlob(storedPdf.blob, storedPdf.fileName)
+    await polDownloadBlob(storedPdf.blob, storedPdf.fileName)
     return
   }
   // Check if T&C template exists for this policy type
@@ -5251,7 +5258,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
       fileName: res.fileName
     }
     await polStoreFile(policyId, 'policy-pdf', htmlPdf)
-    polDownloadBlob(htmlPdf.blob, htmlPdf.fileName)
+    await polDownloadBlob(htmlPdf.blob, htmlPdf.fileName)
     try {
       ok(
         await window.api.policyUpdate(policyId, {
@@ -5309,7 +5316,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   // Download the merged PDF
   const pdfBlob = new Blob([new Uint8Array(result.data)], { type: 'application/pdf' })
   await polStoreFile(policyId, 'policy-pdf', { blob: pdfBlob, fileName: result.fileName })
-  polDownloadBlob(pdfBlob, result.fileName)
+  await polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
   try {
@@ -5531,7 +5538,7 @@ async function polLoadSignature(
 
 export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   const { blob, fileName } = await buildDebitAdviceBlob(policyId)
-  polDownloadBlob(blob, fileName)
+  await polDownloadBlob(blob, fileName)
 }
 
 async function buildDebitAdviceBlobFresh(
@@ -6001,7 +6008,7 @@ async function buildDebitAdviceBlobFresh(
 
 export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const { blob, fileName } = await buildCreditAdviceBlob(policyId)
-  polDownloadBlob(blob, fileName)
+  await polDownloadBlob(blob, fileName)
 }
 
 async function buildCreditAdviceBlobFresh(
@@ -6451,7 +6458,7 @@ export async function exportPolicyBundleZip(
 
   const zipBlob = await zip.generateAsync({ type: 'blob' })
   const base = pol.fileName.replace(/\.docx$/i, '')
-  polDownloadBlob(zipBlob, `${base} (All Documents).zip`)
+  await polDownloadBlob(zipBlob, `${base} (All Documents).zip`)
 }
 
 // ==================== War Declaration Export ====================
@@ -6647,7 +6654,7 @@ export async function exportDeclarationDocx(
   const declKey = 'decl'
   const storedDecl = await polStoredFile(policyId, declKey)
   if (storedDecl) {
-    polDownloadBlob(storedDecl.blob, storedDecl.fileName)
+    await polDownloadBlob(storedDecl.blob, storedDecl.fileName)
     return
   }
   const data = await loadFrozenExportData(policyId)
@@ -6833,7 +6840,7 @@ export async function exportDeclarationDocx(
   const vName = data.vesselInfo?.name || ''
   const declFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Declaration).docx` }
   await polStoreFile(policyId, declKey, declFile)
-  polDownloadBlob(declFile.blob, declFile.fileName)
+  await polDownloadBlob(declFile.blob, declFile.fileName)
 }
 
 // ============================================================================
@@ -6869,7 +6876,7 @@ export async function exportEndorsementDocx(
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end:${endorsementId}`)
   if (storedEnd) {
-    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    await polDownloadBlob(storedEnd.blob, storedEnd.fileName)
     return
   }
   await loadPolicyFontSize()
@@ -7141,7 +7148,7 @@ export async function exportEndorsementDocx(
     fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx`
   }
   await polStoreFile(policyId, `end:${endorsementId}`, endFile)
-  polDownloadBlob(endFile.blob, endFile.fileName)
+  await polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
 export async function exportEndorsementDADocx(
@@ -7151,7 +7158,7 @@ export async function exportEndorsementDADocx(
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end-da:${endorsementId}`)
   if (storedEnd) {
-    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    await polDownloadBlob(storedEnd.blob, storedEnd.fileName)
     return
   }
   await loadPolicyFontSize()
@@ -7512,7 +7519,7 @@ export async function exportEndorsementDADocx(
     fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx`
   }
   await polStoreFile(policyId, `end-da:${endorsementId}`, endFile)
-  polDownloadBlob(endFile.blob, endFile.fileName)
+  await polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
 export async function exportEndorsementCADocx(
@@ -7522,7 +7529,7 @@ export async function exportEndorsementCADocx(
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end-ca:${endorsementId}`)
   if (storedEnd) {
-    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    await polDownloadBlob(storedEnd.blob, storedEnd.fileName)
     return
   }
   await loadPolicyFontSize()
@@ -7746,5 +7753,5 @@ export async function exportEndorsementCADocx(
     fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx`
   }
   await polStoreFile(policyId, `end-ca:${endorsementId}`, endFile)
-  polDownloadBlob(endFile.blob, endFile.fileName)
+  await polDownloadBlob(endFile.blob, endFile.fileName)
 }

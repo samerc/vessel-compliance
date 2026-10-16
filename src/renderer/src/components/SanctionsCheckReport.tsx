@@ -91,6 +91,8 @@ export default function SanctionsCheckReport(): React.JSX.Element {
         threshold / 100,
         SOURCES.map((s) => s.code)
       )
+      // Lists not loaded: nothing was screened, so no list may read as clear
+      if (resp?.status === 'ERROR') throw new Error(resp.error || 'The sanctions check failed')
       const matches: SanctionsMatch[] = (resp?.matches || []).filter(
         (m: SanctionsMatch) => Math.round((m.score || 0) * 100) >= threshold
       )
@@ -102,8 +104,10 @@ export default function SanctionsCheckReport(): React.JSX.Element {
       setCheckedAt(new Date())
       // Auto-clear when every list is clean; otherwise require an explicit decision
       setDecision(perList.some((r) => r.status === 'POTENTIAL_MATCH') ? null : 'CLEARED')
-    } catch {
-      showError('Sanctions check failed')
+    } catch (err) {
+      setResults(null)
+      setDecision(null)
+      showError((err instanceof Error && err.message) || 'Sanctions check failed')
     } finally {
       setRunning(false)
     }

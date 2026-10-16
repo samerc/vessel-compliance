@@ -123,6 +123,20 @@ async function fetchSignaturePageData(): Promise<SignaturePageData> {
 
 const policySectionOrderKey = (tc: string): string => `policy_section_order_defaults_${tc}`
 
+/**
+ * Merges a few keys into the shared policyExportSettings blob. When the current blob cannot be
+ * read it throws instead of writing: saving only the new keys would wipe every other setting.
+ */
+async function savePolicyExportSettings(patch: Record<string, unknown>): Promise<void> {
+  const raw: unknown = await window.api.getSetting('policyExportSettings')
+  if (raw != null && typeof raw !== 'string')
+    throw new Error(
+      'The current export settings could not be read, so nothing was saved. Try again.'
+    )
+  const existing = raw ? JSON.parse(raw) : {}
+  ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, ...patch })))
+}
+
 type PolicySettingsCategory = 'general' | 'pi' | 'fdd' | 'hull' | 'war'
 
 type PolicySettingsTab =
@@ -777,20 +791,8 @@ function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }):
   }, [])
 
   const handleSave = async (): Promise<void> => {
-    try {
-      const raw = await window.api.getSetting('policyExportSettings')
-      const existing = raw ? JSON.parse(raw) : {}
-      ok(
-        await window.api.setSetting(
-          'policyExportSettings',
-          JSON.stringify({ ...existing, footerText })
-        )
-      )
-      showSuccess('Footer text saved')
-    } catch {
-      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ footerText })))
-      showSuccess('Footer text saved')
-    }
+    await savePolicyExportSettings({ footerText })
+    showSuccess('Footer text saved')
   }
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
@@ -856,20 +858,8 @@ function HeaderTitlesTab({
   }, [])
 
   const handleSave = async (): Promise<void> => {
-    try {
-      const raw = await window.api.getSetting('policyExportSettings')
-      const existing = raw ? JSON.parse(raw) : {}
-      ok(
-        await window.api.setSetting(
-          'policyExportSettings',
-          JSON.stringify({ ...existing, headerTitles })
-        )
-      )
-      showSuccess('Header titles saved')
-    } catch {
-      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ headerTitles })))
-      showSuccess('Header titles saved')
-    }
+    await savePolicyExportSettings({ headerTitles })
+    showSuccess('Header titles saved')
   }
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
@@ -1312,46 +1302,18 @@ function PremiumIntroTab({
   }, [])
 
   const handleSave = async (): Promise<void> => {
-    try {
-      const raw = await window.api.getSetting('policyExportSettings')
-      const existing = raw ? JSON.parse(raw) : {}
-      ok(
-        await window.api.setSetting(
-          'policyExportSettings',
-          JSON.stringify({
-            ...existing,
-            premiumIntroText,
-            premiumIntroSingleText,
-            debitAdviceIntroText: daIntroText,
-            debitAdviceIntroSingleText: daIntroSingleText,
-            creditAdviceCommissionText: caCommText,
-            creditAdviceCommissionSingleText: caCommSingleText,
-            outstandingPremiumDefaultText: outstandingText,
-            fullPremiumLossDefaultText: fullPremiumLossText,
-            premiumPaymentTime
-          })
-        )
-      )
-      showSuccess('Premium intro text saved')
-    } catch {
-      ok(
-        await window.api.setSetting(
-          'policyExportSettings',
-          JSON.stringify({
-            premiumIntroText,
-            premiumIntroSingleText,
-            debitAdviceIntroText: daIntroText,
-            debitAdviceIntroSingleText: daIntroSingleText,
-            creditAdviceCommissionText: caCommText,
-            creditAdviceCommissionSingleText: caCommSingleText,
-            outstandingPremiumDefaultText: outstandingText,
-            fullPremiumLossDefaultText: fullPremiumLossText,
-            premiumPaymentTime
-          })
-        )
-      )
-      showSuccess('Premium intro text saved')
-    }
+    await savePolicyExportSettings({
+      premiumIntroText,
+      premiumIntroSingleText,
+      debitAdviceIntroText: daIntroText,
+      debitAdviceIntroSingleText: daIntroSingleText,
+      creditAdviceCommissionText: caCommText,
+      creditAdviceCommissionSingleText: caCommSingleText,
+      outstandingPremiumDefaultText: outstandingText,
+      fullPremiumLossDefaultText: fullPremiumLossText,
+      premiumPaymentTime
+    })
+    showSuccess('Premium intro text saved')
   }
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
@@ -1598,37 +1560,44 @@ function BlueCardTextsTab({
 }): React.JSX.Element {
   const [values, setValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  // A text that failed to load shows its default: saving then would replace the real text
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     ;(async () => {
       const result: Record<string, string> = {}
+      let failed = false
       const keys = Object.keys(BC_DEFAULTS) as (keyof typeof BC_DEFAULTS)[]
       await Promise.all(
         keys.map(async (key) => {
           try {
-            const val = await window.api.getSetting(key)
-            result[key] = val || BC_DEFAULTS[key]
+            const val: unknown = await window.api.getSetting(key)
+            if (val != null && typeof val !== 'string') failed = true
+            result[key] = typeof val === 'string' && val ? val : BC_DEFAULTS[key]
           } catch {
+            failed = true
             result[key] = BC_DEFAULTS[key]
           }
         })
       )
       setValues(result)
+      setLoadFailed(failed)
       setLoading(false)
     })()
   }, [])
 
   const handleSave = async (): Promise<void> => {
+    if (loadFailed)
+      throw new Error(
+        'Some blue card texts could not be loaded, so saving is blocked. Reopen this tab and try again.'
+      )
     const keys = Object.keys(values)
-    await Promise.all(
-      keys.map(async (key) => {
-        try {
-          ok(await window.api.setSetting(key, values[key]))
-        } catch {
-          /* ignore */
-        }
-      })
+    const results = await Promise.allSettled(
+      keys.map(async (key) => ok(await window.api.setSetting(key, values[key])))
     )
+    const failed = results.filter((r) => r.status === 'rejected').length
+    if (failed > 0)
+      throw new Error(`${failed} of ${keys.length} blue card texts could not be saved`)
     showSuccess('Blue card texts saved')
   }
 
@@ -1842,9 +1811,7 @@ function TcTemplatesTab({
 
   const saveFooter = async (): Promise<void> => {
     try {
-      const raw = await window.api.getSetting('policyExportSettings')
-      const p = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...p, ...footer }))
+      await savePolicyExportSettings({ ...footer })
       showSuccess('T&C footer saved')
     } catch (err) {
       showError((err instanceof Error ? err.message : '') || 'Failed to save footer')

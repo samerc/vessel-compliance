@@ -1,3 +1,4 @@
+import { saveFile } from '../utils/saveFile'
 import {
   Document,
   Packer,
@@ -114,15 +115,6 @@ async function loadLogoAsBuffer(
   } catch {
     return null
   }
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -376,5 +368,5 @@ export async function buildReceiptBlob(
 
 export async function exportReceiptDocx(receipt: Receipt): Promise<void> {
   const { blob, fileName } = await buildReceiptBlob(receipt)
-  downloadBlob(blob, fileName)
+  await saveFile(blob, fileName)
 }

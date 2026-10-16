@@ -1,3 +1,4 @@
+import { saveFile } from '../utils/saveFile'
 import {
   Document,
   Packer,
@@ -572,18 +573,9 @@ export async function buildStatementDocx(
   return { blob, fileName: `${parts.join(' - ') || 'Statement'}.docx` }
 }
 
-function download(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = fileName
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export async function exportStatementDocx(input: StatementExportInput): Promise<void> {
   const { blob, fileName } = await buildStatementDocx(input)
-  download(blob, fileName)
+  await saveFile(blob, fileName)
 }
 
 /** PDF through the Word / LibreOffice converter (same as the policy PDF export). */
@@ -592,7 +584,7 @@ export async function exportStatementPdf(input: StatementExportInput): Promise<v
   const docxData = Array.from(new Uint8Array(await blob.arrayBuffer()))
   const res = await window.api.convertDocxBufferToPdf({ docxData, fileName })
   if (isIpcError(res)) throw new Error(res.message || 'PDF conversion failed')
-  download(
+  await saveFile(
     new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
     fileName.replace(/\.docx$/i, '.pdf')
   )

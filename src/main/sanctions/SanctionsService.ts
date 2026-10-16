@@ -370,6 +370,29 @@ export class SanctionsService {
     return results
   }
 
+  /**
+   * Downloaded lists that hold no entries on this PC (all of them when the database could not be
+   * opened). A search over a missing list finds nothing, which must never read as "clear".
+   * SIC is kept by hand and may legitimately be empty, so it is not required.
+   */
+  missingLists(sources?: string[]): string[] {
+    const required = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
+    const wanted = sources?.length
+      ? required.filter((s) => sources.some((x) => x.toUpperCase() === s))
+      : required
+    if (!this.initialized) return wanted.length ? wanted : required
+    return wanted.filter((s) => this.db.getEntityCount(s) === 0)
+  }
+
+  /** Why a screening cannot be trusted right now, or null when every needed list is loaded */
+  screeningProblem(sources?: string[]): string | null {
+    if (!this.initialized)
+      return 'The sanctions lists could not be opened on this PC, so nothing was checked. Restart the app; if it persists, use Update Lists in Sanctions Search.'
+    const missing = this.missingLists(sources)
+    if (missing.length === 0) return null
+    return `The ${missing.join(', ')} sanctions list${missing.length > 1 ? 's are' : ' is'} not loaded on this PC, so nothing was checked. Use Update Lists in Sanctions Search, then check again.`
+  }
+
   getStatus(): { sources: (DataUpdate & { entityCount: number })[]; totalEntities: number } {
     const updates = this.db.getDataUpdates()
     const allSources = ['OFAC', 'EU', 'UK', 'UN', 'ISF', 'SIC']

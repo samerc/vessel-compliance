@@ -115,6 +115,9 @@ export interface VesselAssured {
   entityId: string
   role: string
   addressId?: string | null
+  /** From the linked entity (read only) */
+  entityName?: string
+  entityType?: 'company' | 'person'
 }
 
 export interface EntityAddress {

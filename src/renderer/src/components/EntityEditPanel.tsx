@@ -484,16 +484,15 @@ export default function EntityEditPanel({
     try {
       let uboEntityId = selectedUBOId
       if (!uboEntityId) {
-        const scan = await OfacService.checkSanctions(newUBOName)
+        const scan = await OfacService.checkNewRecord(newUBOName)
+        if (scan.warning) showError(scan.warning)
         const created = await window.api.addEntity({
           name: newUBOName,
           type: newUBOType,
           identifier: newUBOIdentifier,
           email: newUBOEmail,
           phone: newUBOPhone,
-          ofacCheckedAt: scan.timestamp,
-          ofacMatchFound: scan.matchFound,
-          ofacStatus: scan.status
+          ...scan.fields
         })
         uboEntityId = created.id
       }

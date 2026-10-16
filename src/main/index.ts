@@ -3104,6 +3104,19 @@ app.whenReady().then(() => {
         const effectiveThreshold = threshold ?? (compSettings.threshold || 85) / 100
         const autoMarkCleanOnCheck = compSettings.autoMarkCleanOnCheck ?? true
 
+        // An empty or unopened list finds nothing: report an error, never CLEARED
+        const problem = sanctionsService.screeningProblem(sources)
+        if (problem) {
+          return {
+            status: 'ERROR',
+            matchFound: false,
+            timestamp: formatDateForMySQL(new Date()),
+            matches: [],
+            error: problem,
+            autoMarkCleanOnCheck
+          }
+        }
+
         const data = sanctionsService.search(name, {
           threshold: effectiveThreshold,
           sources: sources?.map((s) => s.toUpperCase()),
@@ -3145,6 +3158,7 @@ app.whenReady().then(() => {
           matchFound: false,
           timestamp: formatDateForMySQL(new Date()),
           matches: [],
+          error: (error instanceof Error && error.message) || 'The sanctions check failed',
           autoMarkCleanOnCheck: true
         }
       }
@@ -6442,6 +6456,45 @@ app.whenReady().then(() => {
     if (result.canceled || !result.filePath) return { success: false }
     writeFileSync(result.filePath, Buffer.from(data))
     return { success: true, filePath: result.filePath }
+  })
+
+  // Export save: the renderer learns whether the file was really written (cancel / file open in Word)
+  let lastExportDir = ''
+  const SAVE_FILTERS: Record<string, string> = {
+    docx: 'Word Documents',
+    pdf: 'PDF Documents',
+    xlsx: 'Excel Workbooks',
+    zip: 'ZIP Archives'
+  }
+  safeHandle('file:save', async (event, data: Uint8Array, defaultName: string) => {
+    requireSession(event)
+    const ext = extname(defaultName).slice(1).toLowerCase()
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: 'Save',
+      defaultPath: join(lastExportDir || app.getPath('downloads'), basename(defaultName)),
+      filters: ext ? [{ name: SAVE_FILTERS[ext] || ext.toUpperCase(), extensions: [ext] }] : []
+    }
+    const result = win
+      ? await dialog.showSaveDialog(win, options)
+      : await dialog.showSaveDialog(options)
+    if (result.canceled || !result.filePath) return { saved: false, cancelled: true }
+    try {
+      writeFileSync(result.filePath, Buffer.from(data))
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')
+        throw new Error(
+          `${basename(result.filePath)} could not be saved: it is open in another program (e.g. Word) or the folder is read-only. Close it and export again.`,
+          { cause: err }
+        )
+      throw new Error(
+        `${basename(result.filePath)} could not be saved: ${(err as Error).message || code}`,
+        { cause: err }
+      )
+    }
+    lastExportDir = dirname(result.filePath)
+    return { saved: true, filePath: result.filePath }
   })
 
   // Database Backup & Restore

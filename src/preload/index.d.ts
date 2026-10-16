@@ -407,6 +407,8 @@ export interface Api {
     matchFound: boolean
     timestamp: string
     matches: SanctionsMatch[]
+    /** Why the screening could not run (status ERROR) */
+    error?: string
     autoMarkCleanOnCheck?: boolean
   }>
 
@@ -2156,6 +2158,11 @@ export interface Api {
   reportBuilderDelete: (id: string) => Promise<void>
   reportBuilderRun: (dataSource: string, config: ReportConfig) => Promise<ReportResultRow[]>
 
+  /** Save dialog + write. Cancel resolves { saved: false, cancelled: true }; a failed write rejects */
+  fileSave: (
+    data: Uint8Array,
+    defaultName: string
+  ) => Promise<{ saved: true; filePath: string } | { saved: false; cancelled: true }>
   // Document Templates
   fileSaveDocx: (
     data: number[],

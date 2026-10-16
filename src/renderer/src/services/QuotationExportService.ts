@@ -1,3 +1,4 @@
+import { saveFile } from '../utils/saveFile'
 import {
   Document,
   Packer,
@@ -5479,12 +5480,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   })
 
   const blob = await Packer.toBlob(document)
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
-  a.download = getFileName(data, 'docx')
-  a.click()
-  URL.revokeObjectURL(url)
+  await saveFile(blob, getFileName(data, 'docx'))
 }
 
 // ==================== Border Helpers ====================

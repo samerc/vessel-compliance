@@ -1445,6 +1445,8 @@ const api: Api = {
     ipcRenderer.invoke('reports:run', dataSource, config),
 
   // Document Templates
+  fileSave: (data: Uint8Array, defaultName: string) =>
+    ipcRenderer.invoke('file:save', data, defaultName),
   fileSaveDocx: (data: number[], defaultName: string) =>
     ipcRenderer.invoke('file:saveDocx', data, defaultName),
   docTemplateGetAll: (category?: string) => ipcRenderer.invoke('docTemplate:getAll', category),

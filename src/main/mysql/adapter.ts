@@ -7584,11 +7584,12 @@ export class MySQLAdapter {
   // --- Vessel Assureds ---
   async getVesselAssureds(vesselId?: string): Promise<VesselAssured[]> {
     if (!this.pool) return []
+    // Name and type of the entity come along: compliance checks need to know persons from companies
     let sql =
-      'SELECT id, vessel_id as vesselId, entity_id as entityId, role, address_id as addressId FROM vessel_assureds'
+      'SELECT va.id, va.vessel_id as vesselId, va.entity_id as entityId, va.role, va.address_id as addressId, e.name as entityName, e.type as entityType FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id'
     const params: SqlValue[] = []
     if (vesselId) {
-      sql += ' WHERE vessel_id = ?'
+      sql += ' WHERE va.vessel_id = ?'
       params.push(vesselId)
     }
     const [rows] = await this.pool.query(sql, params)
