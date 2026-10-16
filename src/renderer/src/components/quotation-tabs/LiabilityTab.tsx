@@ -13,6 +13,7 @@ import { ALT_COLORS } from './sharedUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { asArray, ok } from '../../utils/ipc'
 import { isPiLike } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 
 export default function LiabilityTab({
   quotation,
@@ -59,7 +60,7 @@ export default function LiabilityTab({
     const run = async (): Promise<void> => {
       const [sl, tmpl, qv] = await Promise.all([
         window.api.getQuotationSubLimits(quotationId),
-        window.api.piGetSubLimitTemplates(),
+        masterData('piGetSubLimitTemplates'),
         window.api.getQuotationVessels(quotationId)
       ])
       if (!alive) return

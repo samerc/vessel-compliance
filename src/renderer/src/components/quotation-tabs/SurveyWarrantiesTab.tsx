@@ -13,6 +13,7 @@ import { AlternativeScopeChips } from './shared'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok, isIpcError, type IpcErrorValue } from '../../utils/ipc'
 import { Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 const DEADLINE_PRESETS = [
   'prior inception',
@@ -54,8 +55,8 @@ export default function SurveyWarrantiesTab({
       try {
         const [w, t, s] = await Promise.all([
           window.api.quotationSurveyWarrantyGetAll(quotation.id),
-          window.api.surveyWarrantyTemplateGetAll(),
-          window.api.surveyWarrantyTemplateSetGetAll()
+          masterData('surveyWarrantyTemplateGetAll'),
+          masterData('surveyWarrantyTemplateSetGetAll')
         ])
         if (!alive) return
         if (Array.isArray(w)) setItems(w)

@@ -16,6 +16,7 @@ import { AlternativeScopeChips, PickerDropdown, MoneyInput } from './shared'
 import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 
 export default function DeductiblesTab({
   quotation,
@@ -64,15 +65,13 @@ export default function DeductiblesTab({
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
   const defaultsApplied = useRef(false)
 
-  const [reloadKey, setReloadKey] = useState(0)
-
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       const [qd, md, td, mtd, qv] = await Promise.all([
         window.api.getQuotationDeductibles(quotation.id),
-        window.api.piGetDeductibles(),
+        masterData('piGetDeductibles'),
         window.api.getQuotationTextDeductibles(quotation.id),
-        window.api.piGetTextDeductibles(),
+        masterData('piGetTextDeductibles'),
         window.api.getQuotationVessels(quotation.id)
       ])
       const safeQd = Array.isArray(qd) ? qd : []
@@ -117,8 +116,16 @@ export default function DeductiblesTab({
       }
     }
     loadData()
-  }, [quotation.id, quotation.quotationTypeCode, reloadKey])
-  const reload = (): void => setReloadKey((k) => k + 1)
+  }, [quotation.id, quotation.quotationTypeCode])
+  // After an edit: re-read only this quotation's deductibles (the settings lists do not change)
+  const reload = async (): Promise<void> => {
+    const [qd, td] = await Promise.all([
+      window.api.getQuotationDeductibles(quotation.id),
+      window.api.getQuotationTextDeductibles(quotation.id)
+    ])
+    setDeductibles(Array.isArray(qd) ? qd : [])
+    setTextDeds(Array.isArray(td) ? td : [])
+  }
 
   const handleAddFromMaster = async (masterId: string): Promise<void> => {
     const master = masterDeductibles.find((m) => m.id === masterId)
@@ -134,7 +141,7 @@ export default function DeductiblesTab({
       order: deductibles.length
     })
     showSuccess('Deductible added')
-    reload()
+    await reload()
   }
 
   const addCustomDeductible = async (): Promise<void> => {
@@ -148,7 +155,7 @@ export default function DeductiblesTab({
     })
     setNewCustomDesc('')
     showSuccess('Custom deductible added')
-    reload()
+    await reload()
   }
 
   const handleUpdate = async (
@@ -259,7 +266,7 @@ export default function DeductiblesTab({
     setNewTextTitle('')
     setNewTextDed('')
     showSuccess('Text deductible added')
-    reload()
+    await reload()
   }
 
   const addTextFromMaster = async (masterId: string): Promise<void> => {
@@ -273,7 +280,7 @@ export default function DeductiblesTab({
       order: textDeds.length
     })
     showSuccess('Text deductible added')
-    reload()
+    await reload()
   }
 
   const moveTextDed = async (index: number, direction: 'up' | 'down'): Promise<void> => {
@@ -462,7 +469,7 @@ export default function DeductiblesTab({
               aria-label="Delete"
               onClick={async () => {
                 await window.api.deleteQuotationDeductible(d.id)
-                reload()
+                await reload()
               }}
               style={{
                 background: 'transparent',
@@ -880,7 +887,7 @@ export default function DeductiblesTab({
                       text: editTextContent
                     })
                     setEditingTextId(null)
-                    reload()
+                    await reload()
                   }}
                   style={{
                     background: 'transparent',
@@ -949,7 +956,7 @@ export default function DeductiblesTab({
                   aria-label="Delete"
                   onClick={async () => {
                     await window.api.deleteQuotationTextDeductible(td.id)
-                    reload()
+                    await reload()
                   }}
                   style={{
                     background: 'transparent',

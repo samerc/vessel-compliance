@@ -15,6 +15,7 @@ import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 
 type QuotationAdditionalClauseRow = Awaited<
   ReturnType<typeof window.api.getQuotationAdditionalClauses>
@@ -58,16 +59,54 @@ export default function ConditionsTab({
   const additionalDefaultsApplied = useRef(false)
   const clauseDefaultsApplied = useRef(false)
 
+  type ClauseRow = Awaited<ReturnType<typeof window.api.getQuotationClauses>>[number]
+  const applyClauseRows = (rows: ClauseRow[]): void => {
+    setSelectedIds(new Set(rows.map((r) => r.piClauseId)))
+    setClauseRows(
+      rows.map((r) => ({
+        id: r.id,
+        piClauseId: r.piClauseId,
+        alternativeId: r.alternativeId || null
+      }))
+    )
+    setClauseVesselScopes(
+      rows.reduce((m: Record<string, string[] | null>, r) => {
+        if (r.vesselScope) m[r.piClauseId] = r.vesselScope
+        return m
+      }, {})
+    )
+    setClauseAltIds(
+      rows.reduce((m: Record<string, string | null>, r) => {
+        m[r.piClauseId] = r.alternativeId || null
+        return m
+      }, {})
+    )
+  }
+
+  // After an edit: re-read only this quotation's rows (the settings lists do not change)
+  const reloadClauses = async (): Promise<void> => {
+    const [selected, overrides] = await Promise.all([
+      window.api.getQuotationClauses(quotation.id),
+      window.api.getQuotationClauseOverrides(quotation.id)
+    ])
+    applyClauseRows(Array.isArray(selected) ? selected : [])
+    setDescOverrides(overrides && !(overrides as IpcResultLike).error ? overrides : {})
+  }
+  const reloadAdditional = async (): Promise<void> => {
+    const addClauses = await window.api.getQuotationAdditionalClauses(quotation.id)
+    setAdditionalClauses(Array.isArray(addClauses) ? addClauses : [])
+  }
+
   const loadData = useCallback(async (): Promise<void> => {
     const [clauses, sets, selected, overrides, addClauses, allAdd, addSets, qv] = await Promise.all(
       [
-        window.api.piGetClauses(),
-        window.api.piGetClauseSets(),
+        masterData('piGetClauses'),
+        masterData('piGetClauseSets'),
         window.api.getQuotationClauses(quotation.id),
         window.api.getQuotationClauseOverrides(quotation.id),
         window.api.getQuotationAdditionalClauses(quotation.id),
-        window.api.piGetAdditionalClauses(),
-        window.api.piGetAdditionalClauseSets(),
+        masterData('piGetAdditionalClauses'),
+        masterData('piGetAdditionalClauseSets'),
         window.api.getQuotationVessels(quotation.id)
       ]
     )
@@ -257,9 +296,9 @@ export default function ConditionsTab({
           if (!remainingCargoClauseSelected) {
             const [allWarranties, currentWarrantyRows, allExclusions, currentExclusionRows] =
               await Promise.all([
-                window.api.piGetWarranties(),
+                masterData('piGetWarranties'),
                 window.api.getQuotationWarranties(quotation.id),
-                window.api.piGetExclusions(),
+                masterData('piGetExclusions'),
                 window.api.getQuotationExclusions(quotation.id)
               ])
             const currentWarrantyIds = (
@@ -333,7 +372,7 @@ export default function ConditionsTab({
       await window.api.setQuotationClauses(quotation.id, cs.clauseIds, mergedOverrides)
       showSuccess(`Applied "${cs.name}" clause set`)
     }
-    loadData()
+    await reloadClauses()
   }
 
   // Resolve override key: clauseId::altId for alt-specific, clauseId for shared
@@ -421,7 +460,7 @@ export default function ConditionsTab({
       order: additionalClauses.length
     })
     showSuccess('Additional clause added')
-    loadData()
+    await reloadAdditional()
   }
 
   const applyAdditionalSet = async (setId: string): Promise<void> => {
@@ -437,7 +476,7 @@ export default function ConditionsTab({
       })
     }
     showSuccess(`Applied "${set.name}"`)
-    loadData()
+    await reloadAdditional()
   }
 
   // FD&D: only the conditions tagged FD&D in settings (none by default), never P&I Section B
@@ -778,7 +817,7 @@ export default function ConditionsTab({
                     aria-label="Delete"
                     onClick={async () => {
                       await window.api.deleteQuotationAdditionalClause(ac.id)
-                      loadData()
+                      setAdditionalClauses((prev) => prev.filter((x) => x.id !== ac.id))
                     }}
                     style={{
                       background: 'transparent',

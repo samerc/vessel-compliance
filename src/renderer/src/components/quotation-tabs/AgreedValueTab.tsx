@@ -11,6 +11,7 @@ import {
 import VesselScopeChips from '../VesselScopeChips'
 import { MoneyInput } from './shared'
 import { Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 export default function AgreedValueTab({
   quotation,
@@ -35,7 +36,7 @@ export default function AgreedValueTab({
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       const [texts, existingItems, qv, alts, opts] = await Promise.all([
-        window.api.hullGetAgreedValueTexts(),
+        masterData('hullGetAgreedValueTexts'),
         window.api.hullGetQuotationAgreedValueItems(quotation.id),
         window.api.getQuotationVessels(quotation.id),
         window.api.hullGetQuotationAlternatives(quotation.id),

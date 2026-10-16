@@ -23,6 +23,7 @@ import { MoneyInput } from './shared'
 import { Field } from '../ui'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
+import { cachedSetting, masterData } from './masterDataCache'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
 const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
@@ -236,10 +237,10 @@ export default function PremiumTab({
     loadInstalments()
     loadDiscounts()
     loadVessels()
-    window.api.piGetInstalmentDefaults().then((d) => setInstalmentDefaults(d || {}))
+    masterData('piGetInstalmentDefaults').then((d) => setInstalmentDefaults(d || {}))
     // Populate outstanding premium text if enabled but empty (new quotation default)
     if (quotation.outstandingPremiumEnabled && !quotation.outstandingPremiumText) {
-      Promise.all([window.api.piGetSectionTexts(), window.api.getSetting('policyExportSettings')])
+      Promise.all([masterData('piGetSectionTexts'), cachedSetting('policyExportSettings')])
         .then(([globalTexts, policyRaw]) => {
           const qDefault = globalTexts?.outstandingPremiumDefaultText
           const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
@@ -250,8 +251,7 @@ export default function PremiumTab({
         })
         .catch(() => {})
     }
-    window.api
-      .premiumGetTextTemplates()
+    masterData('premiumGetTextTemplates')
       .then((res) => {
         const all = Array.isArray(res) ? res : []
         setNcbTemplates(all.filter((t) => t.type === 'ncb'))
@@ -262,7 +262,7 @@ export default function PremiumTab({
       window.api
         .hullGetQuotationAlternatives(quotation.id)
         .then((a) => setHullAlternatives(Array.isArray(a) ? a : []))
-      window.api.hullGetClauses().then((c) => setHullClauses(Array.isArray(c) ? c : []))
+      masterData('hullGetClauses').then((c) => setHullClauses(Array.isArray(c) ? c : []))
       window.api
         .hullGetAgreedValueOptions(quotation.id)
         .then((o) => setValueOptions(Array.isArray(o) ? o : []))
@@ -3076,8 +3076,8 @@ export default function PremiumTab({
                 try {
                   // Check quotation standard texts first, then policy settings, then hardcoded default
                   const [globalTexts, policyRaw] = await Promise.all([
-                    window.api.piGetSectionTexts(),
-                    window.api.getSetting('policyExportSettings')
+                    masterData('piGetSectionTexts'),
+                    cachedSetting('policyExportSettings')
                   ])
                   const qDefault = globalTexts?.outstandingPremiumDefaultText
                   const pDefault = policyRaw
@@ -3184,8 +3184,8 @@ export default function PremiumTab({
                 if (enabled && !quotation.fullPremiumLossText) {
                   try {
                     const [globalTexts, policyRaw] = await Promise.all([
-                      window.api.piGetSectionTexts(),
-                      window.api.getSetting('policyExportSettings')
+                      masterData('piGetSectionTexts'),
+                      cachedSetting('policyExportSettings')
                     ])
                     const qDefault = globalTexts?.fullPremiumLossDefaultText
                     const pDefault = policyRaw

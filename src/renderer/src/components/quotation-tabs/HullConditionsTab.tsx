@@ -26,6 +26,7 @@ import VesselScopeChips from '../VesselScopeChips'
 import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
+import { masterData } from './masterDataCache'
 
 function HullClauseDropdown({
   clauses,
@@ -717,9 +718,9 @@ export default function HullConditionsTab({
   const loadData = async (): Promise<void> => {
     const [clauses, conditions, additional, existCond, existAdd, qv, alts, customConds] =
       await Promise.all([
-        window.api.hullGetClauses(),
-        window.api.hullGetClauseConditions(),
-        window.api.hullGetAdditionalConditions(),
+        masterData('hullGetClauses'),
+        masterData('hullGetClauseConditions'),
+        masterData('hullGetAdditionalConditions'),
         window.api.hullGetQuotationHullConditions(quotation.id),
         window.api.hullGetQuotationHullAdditionalConditions(quotation.id),
         window.api.getQuotationVessels(quotation.id),

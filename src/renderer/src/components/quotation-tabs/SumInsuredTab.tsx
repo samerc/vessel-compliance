@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
 import { warSectionTexts } from '../../utils/warTexts'
 import { Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 /** Format a number with thousand separators for display in text inputs */
 function fmtNum(val: number | undefined | null): string {
@@ -77,7 +78,7 @@ export default function SumInsuredTab({
     ;(async () => {
       try {
         const [s, qv] = await Promise.all([
-          window.api.warGetSettings(),
+          masterData('warGetSettings'),
           window.api.getQuotationVessels(quotationId)
         ])
         if (s && !('error' in s && s.error)) setWarSettings(s)

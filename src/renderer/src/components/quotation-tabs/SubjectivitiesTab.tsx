@@ -26,6 +26,7 @@ import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 
 /** Where the subjectivity loaders put what they load */
 interface SubjectivitySink {
@@ -47,8 +48,8 @@ async function loadSubjectivities(
 ): Promise<void> {
   const [subjs, masters, dts, qv] = await Promise.all([
     window.api.getQuotationSubjectivities(quotationId),
-    window.api.getPISubjectivities(),
-    window.api.getDocumentTypes(),
+    masterData('getPISubjectivities'),
+    masterData('getDocumentTypes'),
     window.api.getQuotationVessels(quotationId)
   ])
   const safeSubjs = Array.isArray(subjs) ? subjs : []
@@ -133,7 +134,7 @@ async function autoPopulate(
       try {
         const qAssureds = await window.api.getQuotationAssureds(quotationId)
         const allEntities = await window.api.getEntities()
-        const edTypesRaw = await window.api.getEntityDocumentTypes()
+        const edTypesRaw = await masterData('getEntityDocumentTypes')
         const edDocsRaw = await window.api.getEntityDocuments()
         const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter(
           (t) => t.isActive && t.isRequired
@@ -231,7 +232,7 @@ async function autoSetSubjectivityScopes(
   let scopeEdDocs: EntityDocument[] = []
   try {
     const [edtRaw, eddRaw] = await Promise.all([
-      window.api.getEntityDocumentTypes(),
+      masterData('getEntityDocumentTypes'),
       window.api.getEntityDocuments()
     ])
     scopeEdTypes = (Array.isArray(edtRaw) ? edtRaw : []).filter((t) => t.isActive && t.isRequired)
@@ -359,6 +360,8 @@ export default function SubjectivitiesTab({
     setQVessels,
     setScopeAutoDetected
   }
+  // The settings lists come from the editor-session cache, so a reload re-reads only this
+  // quotation's rows
   const loadData = (): Promise<void> =>
     loadSubjectivities(quotation.id, quotation.quotationTypeCode, sink, autoPopulateRan)
 

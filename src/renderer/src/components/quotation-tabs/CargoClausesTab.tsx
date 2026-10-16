@@ -11,6 +11,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { ok } from '../../utils/ipc'
 import { Field } from '../ui'
+import { cachedIpc, masterData } from './masterDataCache'
 
 const SECTION_LABELS: Record<string, string> = {
   conditions: 'Conditions',
@@ -31,10 +32,10 @@ async function fetchCargoClauseData(
   section: 'conditions' | 'special' | 'law'
 ): Promise<CargoClauseData> {
   const [all, sel, cust, sts] = await Promise.all([
-    window.api.cargoGetClauses(section),
+    cachedIpc(`cargoGetClauses:${section}`, () => window.api.cargoGetClauses(section)),
     window.api.cargoGetQuotationClauses(quotationId, section),
     window.api.cargoGetQuotationCustomClauses(quotationId, section),
-    window.api.cargoGetClauseSets(section)
+    cachedIpc(`cargoGetClauseSets:${section}`, () => window.api.cargoGetClauseSets(section))
   ])
   return {
     all: Array.isArray(all) ? all : [],
@@ -285,7 +286,7 @@ export default function CargoClausesTab({
     const loadInstituteClauses = async (): Promise<void> => {
       if (section !== 'conditions') return
       try {
-        const result = await window.api.cargoGetInstituteClauses()
+        const result = await masterData('cargoGetInstituteClauses')
         setInstituteClauses(Array.isArray(result) ? result.filter((c) => c.active !== false) : [])
       } catch {
         setInstituteClauses([])

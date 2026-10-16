@@ -12,6 +12,7 @@ import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { asArray } from '../../utils/ipc'
 import { isPiLike } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 interface TradingIntro {
   id: string
   quotationId: string
@@ -52,9 +53,9 @@ export default function TradingTab({
     const run = async (): Promise<void> => {
       const [qc, masterCountries, tpls, custTexts, qv, intros] = await Promise.all([
         window.api.getQuotationExcludedCountries(quotation.id),
-        window.api.piGetTradingExcludedCountries(),
-        window.api.piGetTradingWarrantyTemplates(),
-        window.api.piGetTradingCustomTexts(),
+        masterData('piGetTradingExcludedCountries'),
+        masterData('piGetTradingWarrantyTemplates'),
+        masterData('piGetTradingCustomTexts'),
         window.api.getQuotationVessels(quotation.id),
         window.api.tradingGetIntros(quotation.id)
       ])

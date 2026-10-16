@@ -25,6 +25,7 @@ import { ok } from '../../utils/ipc'
 import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
 import { Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 const EMPTY_NEW_VESSEL = {
   name: '',
@@ -45,8 +46,8 @@ async function fetchLookupLists(): Promise<{
 }> {
   const [fs, cs, vt] = await Promise.all([
     window.api.getFlagStates().catch(() => []),
-    window.api.getClassificationSocieties().catch(() => []),
-    window.api.getVesselTypes().catch(() => [])
+    masterData('getClassificationSocieties').catch(() => []),
+    masterData('getVesselTypes').catch(() => [])
   ])
   return {
     flagStates: Array.isArray(fs) ? fs : [],

@@ -29,6 +29,7 @@ import { ALT_COLORS } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { Modal, Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 export default function WarrantiesTab({
   quotation,
@@ -82,16 +83,18 @@ export default function WarrantiesTab({
   const [showAdditionalText, setShowAdditionalText] = useState(false)
   const defaultsApplied = useRef(false)
 
-  // Bumped after a custom warranty change to reload everything
-  const [reloadKey, setReloadKey] = useState(0)
-  const loadData = (): void => setReloadKey((k) => k + 1)
+  // After a custom warranty change: re-read only this quotation's custom warranties
+  const reloadCustom = async (): Promise<void> => {
+    const custom = await window.api.getQuotationCustomWarranties(quotation.id)
+    setCustomWarranties(Array.isArray(custom) ? custom : [])
+  }
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       const [all, allTags, sets, selectedRows, custom, qv] = await Promise.all([
-        window.api.piGetWarranties(),
-        window.api.piGetWarrantyTags(),
-        window.api.piGetWarrantySets(),
+        masterData('piGetWarranties'),
+        masterData('piGetWarrantyTags'),
+        masterData('piGetWarrantySets'),
         window.api.getQuotationWarranties(quotation.id),
         window.api.getQuotationCustomWarranties(quotation.id),
         window.api.getQuotationVessels(quotation.id)
@@ -153,7 +156,7 @@ export default function WarrantiesTab({
       }
     }
     void loadData()
-  }, [quotation.id, quotation.quotationTypeCode, reloadKey])
+  }, [quotation.id, quotation.quotationTypeCode])
 
   const saveSelected = async (ids: string[]): Promise<void> => {
     setSelectedIds(ids)
@@ -257,18 +260,18 @@ export default function WarrantiesTab({
     }
     setNewCustomText('')
     showSuccess('Custom warranty added')
-    loadData()
+    await reloadCustom()
   }
 
   const saveCustomEdit = async (id: string): Promise<void> => {
     ok(await window.api.updateQuotationCustomWarranty(id, { text: editCustomText }))
     setEditingCustomId(null)
-    loadData()
+    await reloadCustom()
   }
 
   const deleteCustom = async (id: string): Promise<void> => {
     await window.api.deleteQuotationCustomWarranty(id)
-    loadData()
+    await reloadCustom()
   }
 
   const moveCustom = async (index: number, direction: 'up' | 'down'): Promise<void> => {
@@ -303,7 +306,7 @@ export default function WarrantiesTab({
     setShowImportModal(false)
     setImportText('')
     setImportedItems([])
-    loadData()
+    await reloadCustom()
   }
 
   // Filter warranties by quotation type scope
@@ -317,7 +320,7 @@ export default function WarrantiesTab({
     ;(async () => {
       try {
         const [clauses, selected] = await Promise.all([
-          window.api.piGetClauses(),
+          masterData('piGetClauses'),
           window.api.getQuotationClauses(quotation.id)
         ])
         const safeClauses = Array.isArray(clauses) ? clauses : []

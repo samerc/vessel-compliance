@@ -15,6 +15,7 @@ import { Modal } from '../ui'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { masterData } from './masterDataCache'
 
 // A quotation_exclusions row (the IPC type omits alternativeId, which the adapter returns)
 type ExclusionRow = Awaited<ReturnType<typeof window.api.getQuotationExclusions>>[number] & {
@@ -65,14 +66,14 @@ export default function ExclusionsTab({
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       const [all, qe, qv, ce, clauses, qClauses, vesselList, vTypes] = await Promise.all([
-        window.api.piGetExclusions(),
+        masterData('piGetExclusions'),
         window.api.getQuotationExclusions(quotation.id),
         window.api.getQuotationVessels(quotation.id),
         window.api.getQuotationCustomExclusions(quotation.id),
-        window.api.piGetClauses(),
+        masterData('piGetClauses'),
         window.api.getQuotationClauses(quotation.id),
         window.api.getVessels(),
-        window.api.getVesselTypes()
+        masterData('getVesselTypes')
       ])
       setVesselTypes(Array.isArray(vTypes) ? vTypes : [])
       // Only the exclusions offered for this quotation type (P&I or FD&D)
@@ -113,7 +114,7 @@ export default function ExclusionsTab({
         }
         if (vesselTypeNames.size > 0) {
           // Get vessel types to map names to IDs
-          const vesselTypes = await window.api.getVesselTypes()
+          const vesselTypes = await masterData('getVesselTypes')
           const vtIds = new Set(
             (Array.isArray(vesselTypes) ? vesselTypes : [])
               .filter((vt) => vesselTypeNames.has(vt.name.toLowerCase()))

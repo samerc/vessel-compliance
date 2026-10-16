@@ -1,6 +1,7 @@
 import { useState, useEffect, useEffectEvent } from 'react'
 import { Quotation, WarSettings } from '../../../../shared/types'
 import { Field } from '../ui'
+import { masterData } from './masterDataCache'
 
 export default function WarTradingTab({
   quotation,
@@ -31,7 +32,7 @@ export default function WarTradingTab({
   useEffect(() => {
     ;(async () => {
       try {
-        const settings = await window.api.warGetSettings()
+        const settings = await masterData('warGetSettings')
         if (settings && !('error' in settings && settings.error)) {
           setWarSettings(settings)
           applyDefaultText(settings)

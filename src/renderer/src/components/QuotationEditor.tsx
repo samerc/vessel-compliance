@@ -72,6 +72,7 @@ import InsuredValueTab from './quotation-tabs/InsuredValueTab'
 import VoyageTab from './quotation-tabs/VoyageTab'
 import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
+import { clearMasterDataCache, masterData } from './quotation-tabs/masterDataCache'
 import { Modal, Field } from './ui'
 import { ok } from '../utils/ipc'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
@@ -343,8 +344,8 @@ export default function QuotationEditor({
       window.api.getQuotation(quotation.id),
       window.api.getPolicyTypes(),
       window.api.getVessels(),
-      window.api.piGetSectionTexts(),
-      window.api.piGetSanctionsVersions(),
+      masterData('piGetSectionTexts'),
+      masterData('piGetSanctionsVersions'),
       window.api.getQuotationVessels(quotation.id)
     ])
     if (fullQ && hasIpcError(fullQ)) {
@@ -401,6 +402,9 @@ export default function QuotationEditor({
       setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
     setSanctionsVersions(Array.isArray(sv) ? sv : [])
   }
+
+  // Settings lists cached by the tabs live for this editor session only
+  useEffect(() => clearMasterDataCache, [])
 
   // Initial load, once on mount (loadMasterData sets state only after its first await)
   const loadMasterDataOnMount = useEffectEvent(loadMasterData)
@@ -501,6 +505,8 @@ export default function QuotationEditor({
 
   const handleReloadFromSettings = async (): Promise<void> => {
     try {
+      // Tabs re-read the settings lists on their next visit
+      clearMasterDataCache()
       // Clear export snapshot
       if (q.exportSnapshot) {
         await window.api.clearExportSnapshot(q.id)

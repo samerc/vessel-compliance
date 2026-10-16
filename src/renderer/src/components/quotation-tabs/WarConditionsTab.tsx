@@ -7,6 +7,7 @@ import {
   QuotationVessel
 } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
+import { masterData } from './masterDataCache'
 
 export default function WarConditionsTab({
   quotation,
@@ -25,9 +26,9 @@ export default function WarConditionsTab({
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       const [conds, existing, settings, qvs] = await Promise.all([
-        window.api.warGetConditions(),
+        masterData('warGetConditions'),
         window.api.warGetQuotationWarConditions(quotation.id),
-        window.api.warGetSettings(),
+        masterData('warGetSettings'),
         window.api.getQuotationVessels(quotation.id)
       ])
       const safeConds = Array.isArray(conds) ? conds : []
