@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
+import { Field } from './ui'
 import { formatDateShort } from '../utils/dateUtils'
 import RichTextEditor from './RichTextEditor'
 import ConfirmationModal from './ConfirmationModal'
@@ -144,8 +144,6 @@ export default function EndorsementManager({
 }: EndorsementManagerProps): React.JSX.Element {
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const canManage = hasPermission('policies:manage')
   const canSign = hasPermission('policies:sign')
 
@@ -645,22 +643,12 @@ export default function EndorsementManager({
     fontFamily: 'inherit'
   }
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.72rem',
-    color: 'var(--text-secondary)',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.3px',
-    marginBottom: '3px',
-    display: 'block'
-  }
-
   const statusBadge = (status: string, signed: boolean): React.JSX.Element => {
     const s = signed ? 'signed' : status
     const colors: Record<string, { bg: string; color: string }> = {
       draft: { bg: 'rgba(150,150,150,0.15)', color: 'var(--text-secondary)' },
       exported: { bg: 'rgba(var(--accent-primary-rgb), 0.15)', color: 'var(--accent-primary)' },
-      signed: { bg: 'rgba(76,175,80,0.15)', color: '#4caf50' }
+      signed: { bg: 'rgba(76,175,80,0.15)', color: 'var(--success)' }
     }
     const c = colors[s] || colors.draft
     return (
@@ -746,7 +734,7 @@ export default function EndorsementManager({
       {isEditing && (
         <div
           style={{
-            background: isLight ? '#f8f9fc' : '#161829',
+            background: 'var(--bg-card)',
             border: '1px solid var(--glass-border-color)',
             borderRadius: '10px',
             padding: '20px',
@@ -781,16 +769,8 @@ export default function EndorsementManager({
           </div>
 
           {/* Top fields */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '12px',
-              marginBottom: '16px'
-            }}
-          >
-            <div>
-              <label style={labelStyle}>Effective Date</label>
+          <div className="form-grid cols-3" style={{ marginBottom: '16px' }}>
+            <Field label="Effective date">
               <input
                 type="date"
                 value={editState.effectiveDate}
@@ -811,13 +791,9 @@ export default function EndorsementManager({
                     return updated
                   })
                 }}
-                style={inputStyle}
               />
-            </div>
-            <div>
-              <label style={labelStyle}>
-                {editState.isProRata ? 'Annual Premium (p.a.)' : 'Premium Amount'}
-              </label>
+            </Field>
+            <Field label={editState.isProRata ? 'Annual premium (p.a.)' : 'Premium amount'}>
               {editState.isProRata ? (
                 <StrMoneyInput
                   value={editState.annualPremium}
@@ -838,27 +814,23 @@ export default function EndorsementManager({
                     })
                   }}
                   placeholder="0.00"
-                  style={inputStyle}
                 />
               ) : (
                 <StrMoneyInput
                   value={editState.premiumAmount}
                   onChange={(s) => setEditState((prev) => ({ ...prev, premiumAmount: s }))}
                   placeholder="0.00"
-                  style={inputStyle}
                 />
               )}
-            </div>
-            <div>
-              <label style={labelStyle}>Currency</label>
+            </Field>
+            <Field label="Currency">
               <input
                 value={editState.premiumCurrency}
                 onChange={(e) =>
                   setEditState((prev) => ({ ...prev, premiumCurrency: e.target.value }))
                 }
-                style={inputStyle}
               />
-            </div>
+            </Field>
           </div>
 
           {editState.isProRata && editState.premiumAmount && (
@@ -877,16 +849,8 @@ export default function EndorsementManager({
             </div>
           )}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '12px',
-              marginBottom: '16px'
-            }}
-          >
-            <div>
-              <label style={labelStyle}>Commission %</label>
+          <div className="form-grid cols-3" style={{ marginBottom: '16px' }}>
+            <Field label="Commission %">
               <input
                 type="number"
                 value={editState.commissionPercent}
@@ -894,9 +858,8 @@ export default function EndorsementManager({
                 onChange={(e) =>
                   setEditState((prev) => ({ ...prev, commissionPercent: e.target.value }))
                 }
-                style={inputStyle}
               />
-            </div>
+            </Field>
             <div
               style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '4px' }}
             >
@@ -964,7 +927,9 @@ export default function EndorsementManager({
 
           {/* Section toggles */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Sections</label>
+            <div className="field-label" style={{ marginBottom: '6px' }}>
+              Sections
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
               {editState.sections.map((s) => (
                 <span
@@ -1013,7 +978,7 @@ export default function EndorsementManager({
                       alignItems: 'center',
                       gap: '8px',
                       padding: '8px 12px',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      background: 'var(--table-header-bg)',
                       cursor: 'pointer'
                     }}
                     onClick={() =>
@@ -1171,7 +1136,8 @@ export default function EndorsementManager({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <label
-                style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}
+                className="field-label"
+                style={{ cursor: 'pointer' }}
                 onClick={() => setShowInstalments(!showInstalments)}
               >
                 {showInstalments ? (
@@ -1503,7 +1469,7 @@ export default function EndorsementManager({
                       background: 'transparent',
                       border: 'none',
                       cursor: 'pointer',
-                      color: '#4caf50',
+                      color: 'var(--success)',
                       padding: '4px'
                     }}
                   >

@@ -28,7 +28,7 @@ import XLSX from 'xlsx-js-style'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
-import { PageHeader } from './ui'
+import { PageHeader, Modal } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 import type {
   PolicyRenewalRow,
@@ -872,21 +872,8 @@ export default function PolicyRenewals({
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDownIcon size={14} />
   }
 
-  // Solid header background for sticky to work (CSS vars are semi-transparent)
-  const stickyHeaderBg = isLight ? '#eef0f3' : '#181b24'
-
   const thBase: React.CSSProperties = {
-    padding: '10px 12px',
-    fontWeight: '600',
-    color: 'var(--text-secondary)',
-    fontSize: '0.8rem',
-    userSelect: 'none',
-    whiteSpace: 'nowrap',
-    position: 'sticky',
-    top: 0,
     zIndex: 2,
-    background: stickyHeaderBg,
-    borderBottom: '1px solid var(--table-border)',
     overflow: 'hidden'
   }
 
@@ -906,15 +893,13 @@ export default function PolicyRenewals({
   )
 
   const renderRenewalRow = (r: RenewalRow, idx: number): React.JSX.Element => (
-    <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
+    <tr key={r.id || idx}>
       {rnVisSet.has('vessel') && (
-        <td style={{ padding: '8px 12px', overflow: 'hidden' }}>
+        <td style={{ overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
             <span
               style={{
                 fontWeight: 600,
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
@@ -940,7 +925,10 @@ export default function PolicyRenewals({
             )}
           </div>
           {r.imoNumber && (
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
+            <div
+              className="mono"
+              style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '1px' }}
+            >
               IMO: {r.imoNumber}
             </div>
           )}
@@ -949,7 +937,6 @@ export default function PolicyRenewals({
       {rnVisSet.has('customer') && (
         <td
           style={{
-            padding: '8px 12px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
@@ -957,8 +944,6 @@ export default function PolicyRenewals({
         >
           <div
             style={{
-              fontSize: '0.85rem',
-              color: 'var(--text-primary)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -976,12 +961,9 @@ export default function PolicyRenewals({
       {rnVisSet.has('policyType') && (
         <td
           style={{
-            padding: '8px 12px',
-            color: 'var(--text-primary)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: '0.85rem'
+            whiteSpace: 'nowrap'
           }}
         >
           {r.policyTypeName}
@@ -989,10 +971,8 @@ export default function PolicyRenewals({
       )}
       {rnVisSet.has('policyNo') && (
         <td
+          className="muted mono"
           style={{
-            padding: '8px 12px',
-            color: 'var(--text-secondary)',
-            fontFamily: 'monospace',
             fontSize: '0.82rem',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1005,12 +985,9 @@ export default function PolicyRenewals({
       {rnVisSet.has('endDate') && (
         <td
           style={{
-            padding: '8px 12px',
-            color: 'var(--text-primary)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: '0.85rem'
+            whiteSpace: 'nowrap'
           }}
         >
           {formatDate(r.endDate) || r.endDate || '-'}
@@ -1018,22 +995,19 @@ export default function PolicyRenewals({
       )}
       {rnVisSet.has('premium') && (
         <td
+          className="num"
           style={{
-            padding: '8px 12px',
-            color: 'var(--text-primary)',
             fontWeight: '500',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontVariantNumeric: 'tabular-nums',
-            fontSize: '0.82rem'
+            whiteSpace: 'nowrap'
           }}
         >
           {formatPremium(r.premium, r.currency)}
         </td>
       )}
       {rnVisSet.has('days') && (
-        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+        <td style={{ textAlign: 'right' }}>
           {r.endDate ? (
             (() => {
               const d = daysUntil(r.endDate)
@@ -1041,7 +1015,7 @@ export default function PolicyRenewals({
                 d < 0
                   ? 'var(--danger)'
                   : d <= 30
-                    ? '#e68a00'
+                    ? 'var(--warning)'
                     : d <= 60
                       ? '#ffa726'
                       : 'var(--success)'
@@ -1076,7 +1050,7 @@ export default function PolicyRenewals({
         </td>
       )}
       {rnVisSet.has('status') && (
-        <td style={{ padding: '8px 12px' }}>
+        <td>
           <select
             value={r.renewalStatusId || ''}
             onChange={(e) => handleSetStatus(r.id, e.target.value || null)}
@@ -1088,11 +1062,7 @@ export default function PolicyRenewals({
                 ? `2px solid ${r.renewalStatusColor}`
                 : '1px solid var(--input-border)',
               background: r.renewalStatusColor ? `${r.renewalStatusColor}22` : 'var(--input-bg)',
-              color: r.renewalStatusId
-                ? isLight
-                  ? '#111111'
-                  : '#ffffff'
-                : 'var(--text-secondary)',
+              color: r.renewalStatusId ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontSize: '0.78rem',
               fontWeight: r.renewalStatusId ? '600' : '400',
               cursor: 'pointer',
@@ -1110,7 +1080,7 @@ export default function PolicyRenewals({
         </td>
       )}
       {rnVisSet.has('quotSent') && (
-        <td style={{ padding: '8px 12px' }}>
+        <td>
           <input
             type="date"
             value={
@@ -1133,27 +1103,23 @@ export default function PolicyRenewals({
             }}
             style={{
               padding: '5px 8px',
-              borderRadius: '6px',
               fontSize: '0.82rem',
               width: '100%',
               minWidth: '130px',
-              background: 'var(--input-bg)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--input-border)',
               colorScheme: isLight ? 'light' : 'dark'
             }}
           />
         </td>
       )}
       {rnVisSet.has('actions') && (
-        <td style={{ padding: '8px 14px', textAlign: 'center' }}>
+        <td style={{ textAlign: 'center' }}>
           <div
             style={{
               display: 'inline-flex',
               gap: 0,
               alignItems: 'center',
               borderRadius: '8px',
-              border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`
+              border: 'var(--glass-border)'
             }}
           >
             {/* Notes */}
@@ -1163,7 +1129,7 @@ export default function PolicyRenewals({
                 padding: '6px 9px',
                 background: 'transparent',
                 border: 'none',
-                borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                borderRight: '1px solid var(--glass-border-color)',
                 cursor: 'pointer',
                 color: (r.noteCount ?? 0) > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 position: 'relative',
@@ -1178,9 +1144,7 @@ export default function PolicyRenewals({
                   : 'Add notes'
               }
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = isLight
-                  ? 'rgba(0,0,0,0.05)'
-                  : 'rgba(255,255,255,0.06)'
+                e.currentTarget.style.background = 'var(--row-hover)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
@@ -1242,7 +1206,7 @@ export default function PolicyRenewals({
                   padding: '6px 9px',
                   background: 'transparent',
                   border: 'none',
-                  borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                  borderRight: '1px solid var(--glass-border-color)',
                   cursor: 'pointer',
                   color: 'var(--accent-primary)',
                   display: 'flex',
@@ -1253,9 +1217,7 @@ export default function PolicyRenewals({
                 }}
                 title="Create renewal quotation"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = isLight
-                    ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                    : 'rgba(var(--accent-primary-rgb), 0.08)'
+                  e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent'
@@ -1286,9 +1248,7 @@ export default function PolicyRenewals({
               }}
               title="View vessel"
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = isLight
-                  ? 'rgba(0,0,0,0.05)'
-                  : 'rgba(255,255,255,0.06)'
+                e.currentTarget.style.background = 'var(--row-hover)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
@@ -1371,7 +1331,7 @@ export default function PolicyRenewals({
             background: 'var(--bg-card)',
             borderRadius: '10px',
             padding: '4px',
-            border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
+            border: 'var(--glass-border)'
           }}
         >
           <button
@@ -1573,7 +1533,7 @@ export default function PolicyRenewals({
             borderRadius: '12px',
             padding: '20px',
             marginBottom: '24px',
-            border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
+            border: 'var(--glass-border)'
           }}
         >
           <h3
@@ -1838,7 +1798,7 @@ export default function PolicyRenewals({
             textAlign: 'center',
             background: 'var(--bg-card)',
             borderRadius: '12px',
-            border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
+            border: 'var(--glass-border)'
           }}
         >
           <Calendar
@@ -1861,23 +1821,13 @@ export default function PolicyRenewals({
           </p>
         </div>
       ) : (
-        <div
-          style={{
-            background: 'var(--bg-card)',
-            borderRadius: '12px',
-            border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
-            overflow: 'auto',
-            maxHeight: 'calc(100vh - 320px)'
-          }}
-        >
-          <table
-            style={{ width: `${totalWidth}px`, borderCollapse: 'collapse', tableLayout: 'fixed' }}
-          >
+        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          <table className="data-table" style={{ width: `${totalWidth}px`, tableLayout: 'fixed' }}>
             <caption className="sr-only">
               Policy renewals for {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
             </caption>
             <thead>
-              <tr style={{ textAlign: 'left' }}>
+              <tr>
                 {rnVisSet.has('vessel') && (
                   <th
                     scope="col"
@@ -2027,11 +1977,8 @@ export default function PolicyRenewals({
                 <tr>
                   <td
                     colSpan={10}
-                    style={{
-                      padding: '52px 20px',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)'
-                    }}
+                    className="muted"
+                    style={{ padding: '52px 20px', textAlign: 'center' }}
                   >
                     <Calendar
                       size={28}
@@ -2087,7 +2034,7 @@ export default function PolicyRenewals({
                               position: 'sticky' as const,
                               top: '49px',
                               zIndex: 1,
-                              background: isLight ? '#eef0f3' : '#181b24',
+                              background: 'var(--bg-sticky-header)',
                               letterSpacing: '0.02em'
                             }}
                           >
@@ -2118,7 +2065,7 @@ export default function PolicyRenewals({
                                       color: 'var(--accent-primary)',
                                       textTransform: 'uppercase' as const,
                                       letterSpacing: '0.5px',
-                                      background: isLight ? '#f4f6fa' : '#1a1d28'
+                                      background: 'var(--table-header-bg)'
                                     }}
                                   >
                                     {fleetName}{' '}
@@ -2160,7 +2107,7 @@ export default function PolicyRenewals({
                           position: 'sticky' as const,
                           top: '49px',
                           zIndex: 1,
-                          background: isLight ? '#eef0f3' : '#181b24'
+                          background: 'var(--bg-sticky-header)'
                         }}
                       >
                         {fleetName}{' '}
@@ -2231,7 +2178,7 @@ export default function PolicyRenewals({
                 position: 'fixed',
                 top: renewMenuPos.top,
                 right: renewMenuPos.right,
-                background: isLight ? '#ffffff' : '#1a1d28',
+                background: 'var(--bg-primary)',
                 border: '1px solid var(--glass-border-color)',
                 borderRadius: '8px',
                 padding: '4px',
@@ -2249,11 +2196,7 @@ export default function PolicyRenewals({
                   fontSize: '0.85rem',
                   color: 'var(--text-primary)'
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = isLight
-                    ? 'rgba(0,0,0,0.05)'
-                    : 'rgba(255,255,255,0.06)')
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 Renew Vessel Only
@@ -2267,11 +2210,7 @@ export default function PolicyRenewals({
                   fontSize: '0.85rem',
                   color: 'var(--text-primary)'
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = isLight
-                    ? 'rgba(0,0,0,0.05)'
-                    : 'rgba(255,255,255,0.06)')
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 Renew Fleet ({row.fleetName})
@@ -2282,90 +2221,33 @@ export default function PolicyRenewals({
 
       {/* Renewal Notes modal */}
       {notesModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
+        <Modal
+          title="Renewal Notes"
+          icon={<MessageSquare size={18} />}
+          onClose={() => setNotesModal(null)}
+          width={520}
+          closeOnOverlay={false}
         >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '520px',
-              maxWidth: '95vw',
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column',
-              border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '16px',
-                flexShrink: 0
-              }}
-            >
-              <div>
-                <h3
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '1.05rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <MessageSquare size={16} color="var(--accent-primary)" /> Renewal Notes
-                </h3>
-                <p
-                  style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
-                >
-                  {notesModal.vesselName} — {notesModal.policyType}
-                  {notesModal.policyNumber && (
-                    <span style={{ fontFamily: 'monospace', marginLeft: '6px', opacity: 0.7 }}>
-                      #{notesModal.policyNumber}
-                    </span>
-                  )}
-                </p>
-                <p
-                  style={{
-                    margin: '2px 0 0',
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    opacity: 0.7
-                  }}
-                >
-                  Notes are linked to this policy number and will not carry over on renewal.
-                </p>
-              </div>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setNotesModal(null)}
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
+            <div style={{ marginBottom: '16px', flexShrink: 0 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                {notesModal.vesselName} — {notesModal.policyType}
+                {notesModal.policyNumber && (
+                  <span style={{ fontFamily: 'monospace', marginLeft: '6px', opacity: 0.7 }}>
+                    #{notesModal.policyNumber}
+                  </span>
+                )}
+              </p>
+              <p
                 style={{
-                  background: 'transparent',
-                  border: 'none',
+                  margin: '2px 0 0',
+                  fontSize: '0.75rem',
                   color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  flexShrink: 0
+                  opacity: 0.7
                 }}
               >
-                <X size={18} />
-              </button>
+                Notes are linked to this policy number and will not carry over on renewal.
+              </p>
             </div>
 
             {/* New note input */}
@@ -2381,14 +2263,7 @@ export default function PolicyRenewals({
                   placeholder="Add a note about this renewal... (Ctrl+Enter to submit)"
                   style={{
                     width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
                     resize: 'none',
-                    fontFamily: 'inherit',
-                    fontSize: '0.9rem',
-                    background: 'var(--input-bg)',
-                    color: 'var(--input-text)',
-                    border: '1px solid var(--input-border)',
                     boxSizing: 'border-box'
                   }}
                 />
@@ -2443,7 +2318,7 @@ export default function PolicyRenewals({
                   <div
                     key={n.id}
                     style={{
-                      background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                      background: 'var(--table-header-bg)',
                       borderRadius: '10px',
                       padding: '12px 14px',
                       borderLeft: '3px solid var(--accent-primary)'
@@ -2527,7 +2402,7 @@ export default function PolicyRenewals({
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

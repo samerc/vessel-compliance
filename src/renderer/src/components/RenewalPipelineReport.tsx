@@ -12,7 +12,6 @@ import {
   Search,
   Filter
 } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import XLSX from 'xlsx-js-style'
 import { formatDateOrDash } from '../utils/dateUtils'
@@ -128,8 +127,6 @@ function KPI({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function RenewalPipelineReport(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   const now = new Date()
@@ -344,23 +341,12 @@ export default function RenewalPipelineReport(): React.JSX.Element {
   ]
 
   const headerStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    textAlign: 'left',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
     cursor: 'pointer',
     userSelect: 'none',
-    whiteSpace: 'nowrap',
-    borderBottom: '1px solid var(--table-border)'
+    whiteSpace: 'nowrap'
   }
 
   const cellStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    fontSize: '0.85rem',
-    borderBottom: '1px solid var(--table-border)',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
@@ -606,9 +592,9 @@ export default function RenewalPipelineReport(): React.JSX.Element {
       </div>
 
       {/* ── Pipeline Table ── */}
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
+      <div className="table-wrap">
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
               <tr>
                 <th style={headerStyle} onClick={() => toggleSort('vesselName')}>
@@ -652,12 +638,8 @@ export default function RenewalPipelineReport(): React.JSX.Element {
                 <tr>
                   <td
                     colSpan={7}
-                    style={{
-                      ...cellStyle,
-                      textAlign: 'center',
-                      padding: '40px',
-                      color: 'var(--text-secondary)'
-                    }}
+                    className="muted"
+                    style={{ ...cellStyle, textAlign: 'center', padding: '40px' }}
                   >
                     No renewals found for the selected period.
                   </td>
@@ -671,27 +653,19 @@ export default function RenewalPipelineReport(): React.JSX.Element {
                   const daysColor = isExpired
                     ? 'var(--danger)'
                     : isUrgent
-                      ? '#f59e0b'
+                      ? 'var(--warning)'
                       : isSoon
                         ? '#eab308'
                         : 'var(--text-primary)'
 
                   return (
-                    <tr
-                      key={`${r.id}-${idx}`}
-                      style={{
-                        background:
-                          idx % 2 === 0
-                            ? 'transparent'
-                            : isLight
-                              ? 'rgba(0,0,0,0.02)'
-                              : 'rgba(255,255,255,0.02)',
-                        transition: 'background 0.15s'
-                      }}
-                    >
+                    <tr key={`${r.id}-${idx}`}>
                       <td style={cellStyle}>
                         <div style={{ fontWeight: 600 }}>{r.vesselName}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        <div
+                          className="mono"
+                          style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}
+                        >
                           {r.imoNumber}
                         </div>
                       </td>
@@ -715,14 +689,7 @@ export default function RenewalPipelineReport(): React.JSX.Element {
                           {r.policyTypeName}
                         </span>
                       </td>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          textAlign: 'right',
-                          fontWeight: 600,
-                          fontVariantNumeric: 'tabular-nums'
-                        }}
-                      >
+                      <td className="num" style={{ ...cellStyle, fontWeight: 600 }}>
                         {formatPremium(r.premium, r.currency)}
                       </td>
                       <td style={cellStyle}>{formatDateOrDash(r.endDate)}</td>
@@ -748,13 +715,8 @@ export default function RenewalPipelineReport(): React.JSX.Element {
                         )}
                       </td>
                       <td
-                        style={{
-                          ...cellStyle,
-                          textAlign: 'right',
-                          fontWeight: 600,
-                          color: daysColor,
-                          fontVariantNumeric: 'tabular-nums'
-                        }}
+                        className="num"
+                        style={{ ...cellStyle, fontWeight: 600, color: daysColor }}
                       >
                         {isExpired ? `${Math.abs(days)}d overdue` : `${days}d`}
                       </td>

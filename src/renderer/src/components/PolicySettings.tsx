@@ -15,7 +15,6 @@ import {
   DollarSign,
   Shield,
   Upload,
-  X,
   FileCheck,
   Loader2,
   PenTool,
@@ -35,6 +34,7 @@ import { BC_DEFAULTS } from '../services/PolicyExportService'
 import { sanitizeHtml } from '../utils/sanitize'
 import { ok, isIpcError } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
+import { Modal, Field } from './ui'
 import type {
   TcTemplateMeta,
   EndorsementTriggerField,
@@ -325,29 +325,21 @@ export default function PolicySettings(): React.JSX.Element {
         {activeTab === 'premiumIntro' && <PremiumIntroTab showSuccess={showSuccess} />}
         {activeTab === 'blueCardTexts' && <BlueCardTextsTab showSuccess={showSuccess} />}
         {activeTab === 'tcTemplates' && (
-          <TcTemplatesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />
+          <TcTemplatesTab showSuccess={showSuccess} showError={showError} />
         )}
         {activeTab === 'signatures' && (
           <SignaturesTab showSuccess={showSuccess} showError={showError} isLight={isLight} />
         )}
         {activeTab === 'qrVerification' && <QrVerificationTab showSuccess={showSuccess} />}
         {activeTab === 'commissions' && (
-          <CommissionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />
+          <CommissionsTab showSuccess={showSuccess} showError={showError} />
         )}
         {activeTab === 'declaration' && <DeclarationSettingsTab showSuccess={showSuccess} />}
         {activeTab === 'endorsements' && (
-          <EndorsementSettingsTab
-            showSuccess={showSuccess}
-            showError={showError}
-            isLight={isLight}
-          />
+          <EndorsementSettingsTab showSuccess={showSuccess} showError={showError} />
         )}
         {activeTab === 'sectionOrder' && (
-          <PolicySectionOrderTab
-            showSuccess={showSuccess}
-            showError={showError}
-            isLight={isLight}
-          />
+          <PolicySectionOrderTab showSuccess={showSuccess} showError={showError} />
         )}
         {activeTab === 'piOpening' && (
           <RichTextSettingTab
@@ -749,16 +741,7 @@ function BaseCurrencyTab({
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
           maxLength={5}
-          style={{
-            width: '100px',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--input-bg)',
-            color: 'var(--text-primary)',
-            fontSize: '0.88rem',
-            textTransform: 'uppercase'
-          }}
+          style={{ width: '100px', textTransform: 'uppercase' }}
         />
         <button
           onClick={handleSave}
@@ -897,17 +880,15 @@ function HeaderTitlesTab({
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
         Title shown in the header of each policy type document, followed by the policy number.
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      <div className="form-grid" style={{ marginBottom: '16px' }}>
         {Object.entries(typeLabels).map(([code, label]) => (
-          <div key={code} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '50px' }}>{label}:</span>
+          <Field key={code} label={label} span="all">
             <input
               type="text"
               value={headerTitles[code] || ''}
               onChange={(e) => setHeaderTitles({ ...headerTitles, [code]: e.target.value })}
-              style={{ flex: 1 }}
             />
-          </div>
+          </Field>
         ))}
       </div>
       <button
@@ -1054,17 +1035,7 @@ function BanksTab({
           onChange={(e) => setNewBankDetails(e.target.value)}
           placeholder="Bank details (IBAN, SWIFT, address, etc.)"
           rows={3}
-          style={{
-            width: '100%',
-            padding: '9px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--input-bg)',
-            color: 'var(--text-primary)',
-            fontSize: '0.9rem',
-            resize: 'vertical',
-            boxSizing: 'border-box'
-          }}
+          style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box' }}
         />
       </form>
 
@@ -1091,17 +1062,7 @@ function BanksTab({
                     onChange={(e) => setEditBankName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && saveEdit(bank.id)}
                     autoFocus
-                    style={{
-                      width: '100%',
-                      marginBottom: '8px',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box'
-                    }}
+                    style={{ width: '100%', marginBottom: '8px', boxSizing: 'border-box' }}
                     aria-label="Edit bank name"
                   />
                   <textarea
@@ -1111,12 +1072,6 @@ function BanksTab({
                     style={{
                       width: '100%',
                       marginBottom: '8px',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--input-bg)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.9rem',
                       resize: 'vertical',
                       boxSizing: 'border-box'
                     }}
@@ -1276,20 +1231,17 @@ function CancelReplaceTab({
         Default cancel and replace text templates per policy type. Use {'{{policyNumber}}'} as a
         placeholder for the previous policy number.
       </p>
-      {Object.entries(typeLabels).map(([code, label]) => (
-        <div key={code} style={{ marginBottom: '20px' }}>
-          <label
-            style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', display: 'block' }}
-          >
-            {label}
-          </label>
-          <RichTextEditor
-            value={templates[code] || ''}
-            onChange={(val) => setTemplates((prev) => ({ ...prev, [code]: val }))}
-            minHeight={60}
-          />
-        </div>
-      ))}
+      <div className="form-grid" style={{ marginBottom: '20px' }}>
+        {Object.entries(typeLabels).map(([code, label]) => (
+          <Field key={code} label={label} span="all">
+            <RichTextEditor
+              value={templates[code] || ''}
+              onChange={(val) => setTemplates((prev) => ({ ...prev, [code]: val }))}
+              minHeight={60}
+            />
+          </Field>
+        ))}
+      </div>
       <button
         className="btn-primary"
         onClick={handleSave}
@@ -1406,192 +1358,178 @@ function PremiumIntroTab({
 
   return (
     <div>
-      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>
-        Multiple Instalments
-      </h4>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-        Used when 2+ instalments. Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'},{' '}
-        {'{time}'}, {'{timezone}'}
-      </p>
-      <textarea
-        value={premiumIntroText}
-        onChange={(e) => setPremiumIntroText(e.target.value)}
-        rows={3}
-        style={{ width: '100%', marginBottom: '20px', resize: 'vertical' }}
-      />
+      <div className="form-section">
+        <h4 className="form-section-title">Policy premium wording</h4>
+        <div className="form-grid">
+          <Field
+            label="Multiple instalments"
+            span="all"
+            hint={
+              <>
+                Used when 2+ instalments. Placeholders: {'{currency}'}, {'{amount}'},{' '}
+                {'{instalments}'}, {'{time}'}, {'{timezone}'}
+              </>
+            }
+          >
+            <textarea
+              value={premiumIntroText}
+              onChange={(e) => setPremiumIntroText(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+          <Field
+            label="Single instalment"
+            span="all"
+            hint={
+              <>
+                Used when 1 instalment. Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'},{' '}
+                {'{time}'}, {'{timezone}'}
+              </>
+            }
+          >
+            <textarea
+              value={premiumIntroSingleText}
+              onChange={(e) => setPremiumIntroSingleText(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+        </div>
+      </div>
 
-      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>
-        Single Instalment
-      </h4>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-        Used when 1 instalment. Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'},{' '}
-        {'{timezone}'}
-      </p>
-      <textarea
-        value={premiumIntroSingleText}
-        onChange={(e) => setPremiumIntroSingleText(e.target.value)}
-        rows={3}
-        style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
-      />
-
-      <div
-        style={{
-          borderTop: '1px solid var(--table-border)',
-          marginTop: '24px',
-          paddingTop: '20px'
-        }}
-      >
-        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Debit Advice</h4>
+      <div className="form-section">
+        <h4 className="form-section-title">Debit Advice</h4>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
           Premium intro text for the Debit Advice document.
         </p>
-
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Multiple Instalments — Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'},{' '}
-          {'{time}'}, {'{timezone}'}
-        </label>
-        <textarea
-          value={daIntroText}
-          onChange={(e) => setDaIntroText(e.target.value)}
-          rows={3}
-          style={{ width: '100%', marginBottom: '14px', resize: 'vertical' }}
-        />
-
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Single Instalment — Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'},{' '}
-          {'{timezone}'}
-        </label>
-        <textarea
-          value={daIntroSingleText}
-          onChange={(e) => setDaIntroSingleText(e.target.value)}
-          rows={3}
-          style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
-        />
+        <div className="form-grid">
+          <Field
+            label="Multiple instalments"
+            span="all"
+            hint={
+              <>
+                Placeholders: {'{currency}'}, {'{amount}'}, {'{instalments}'}, {'{time}'},{' '}
+                {'{timezone}'}
+              </>
+            }
+          >
+            <textarea
+              value={daIntroText}
+              onChange={(e) => setDaIntroText(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+          <Field
+            label="Single instalment"
+            span="all"
+            hint={
+              <>
+                Placeholders: {'{currency}'}, {'{amount}'}, {'{date}'}, {'{time}'}, {'{timezone}'}
+              </>
+            }
+          >
+            <textarea
+              value={daIntroSingleText}
+              onChange={(e) => setDaIntroSingleText(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+        </div>
       </div>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--table-border)',
-          marginTop: '24px',
-          paddingTop: '20px'
-        }}
-      >
-        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>Credit Advice</h4>
+      <div className="form-section">
+        <h4 className="form-section-title">Credit Advice</h4>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
           Commission wording for the Credit Advice document.
         </p>
-
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Multiple Instalments — Placeholder: {'{instalments}'}
-        </label>
-        <textarea
-          value={caCommText}
-          onChange={(e) => setCaCommText(e.target.value)}
-          rows={2}
-          style={{ width: '100%', marginBottom: '14px', resize: 'vertical' }}
-        />
-
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Single Instalment — Placeholder: {'{date}'}
-        </label>
-        <textarea
-          value={caCommSingleText}
-          onChange={(e) => setCaCommSingleText(e.target.value)}
-          rows={2}
-          style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
-        />
+        <div className="form-grid">
+          <Field label="Multiple instalments" span="all" hint={<>Placeholder: {'{instalments}'}</>}>
+            <textarea
+              value={caCommText}
+              onChange={(e) => setCaCommText(e.target.value)}
+              rows={2}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+          <Field label="Single instalment" span="all" hint={<>Placeholder: {'{date}'}</>}>
+            <textarea
+              value={caCommSingleText}
+              onChange={(e) => setCaCommSingleText(e.target.value)}
+              rows={2}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+        </div>
       </div>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--table-border)',
-          marginTop: '24px',
-          paddingTop: '20px'
-        }}
-      >
-        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>
-          Outstanding Premium Notice
-        </h4>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
-          Default text when the outstanding premium notice is enabled on a quotation.
-        </p>
-        <textarea
-          value={outstandingText}
-          onChange={(e) => setOutstandingText(e.target.value)}
-          rows={2}
-          style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
-        />
-
-        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px', marginTop: '16px' }}>
-          Full Premium in Case of Loss
-        </h4>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-          Default text for the full premium loss notice on pro-rata quotations.
-        </p>
-        <textarea
-          value={fullPremiumLossText}
-          onChange={(e) => setFullPremiumLossText(e.target.value)}
-          rows={2}
-          style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
-        />
+      <div className="form-section">
+        <h4 className="form-section-title">Premium notices</h4>
+        <div className="form-grid">
+          <Field
+            label="Outstanding premium notice"
+            span="all"
+            hint="Default text when the outstanding premium notice is enabled on a quotation."
+          >
+            <textarea
+              value={outstandingText}
+              onChange={(e) => setOutstandingText(e.target.value)}
+              rows={2}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+          <Field
+            label="Full premium in case of loss"
+            span="all"
+            hint="Default text for the full premium loss notice on pro-rata quotations."
+          >
+            <textarea
+              value={fullPremiumLossText}
+              onChange={(e) => setFullPremiumLossText(e.target.value)}
+              rows={2}
+              style={{ resize: 'vertical' }}
+            />
+          </Field>
+        </div>
       </div>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--table-border)',
-          marginTop: '24px',
-          paddingTop: '20px'
-        }}
-      >
-        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '4px' }}>
-          Premium Payment Time
-        </h4>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-          Fixed time-of-day used in the premium payment condition (policy, Debit Advice,
-          endorsement) — it replaces the {'{time}'} {'{timezone}'} placeholders and is NOT taken
-          from the policy&apos;s inception time. The PERIOD section still shows the policy&apos;s
-          actual time/timezone.
-        </p>
-        <input
-          value={premiumPaymentTime}
-          onChange={(e) => setPremiumPaymentTime(e.target.value)}
-          placeholder="Noon Lebanon LST"
-          style={{ width: '100%', maxWidth: '360px', marginBottom: '12px' }}
-        />
+      <div className="form-section">
+        <h4 className="form-section-title">Premium payment time</h4>
+        <div className="form-grid">
+          <Field
+            label="Time of day"
+            span="all"
+            hint={
+              <>
+                Fixed time-of-day used in the premium payment condition (policy, Debit Advice,
+                endorsement) — it replaces the {'{time}'} {'{timezone}'} placeholders and is NOT
+                taken from the policy&apos;s inception time. The PERIOD section still shows the
+                policy&apos;s actual time/timezone.
+              </>
+            }
+          >
+            <input
+              value={premiumPaymentTime}
+              onChange={(e) => setPremiumPaymentTime(e.target.value)}
+              placeholder="Noon Lebanon LST"
+              style={{ maxWidth: '360px' }}
+            />
+          </Field>
+        </div>
       </div>
 
       <button
         className="btn-primary"
         onClick={handleSave}
-        style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        style={{
+          marginTop: '20px',
+          padding: '6px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}
       >
         <Save size={14} /> Save
       </button>
@@ -1658,8 +1596,6 @@ function BlueCardTextsTab({
 }: {
   showSuccess: (msg: string) => void
 }): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const [values, setValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
@@ -1718,7 +1654,7 @@ function BlueCardTextsTab({
           padding: '16px',
           borderRadius: '10px',
           border: '1px solid var(--glass-border-color)',
-          background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
+          background: 'var(--table-header-bg)'
         }}
       >
         <h5
@@ -1741,7 +1677,7 @@ function BlueCardTextsTab({
                 marginBottom: '4px'
               }}
             >
-              <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>{f.label}</label>
+              <label className="field-label">{f.label}</label>
               <button
                 onClick={() => handleReset(f.key)}
                 style={{
@@ -1775,7 +1711,7 @@ function BlueCardTextsTab({
             borderRadius: '10px',
             border: '1px solid var(--glass-border-color)',
             borderLeft: `3px solid ${section.color}`,
-            background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
+            background: 'var(--table-header-bg)'
           }}
         >
           <h5
@@ -1798,7 +1734,7 @@ function BlueCardTextsTab({
                   marginBottom: '4px'
                 }}
               >
-                <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>{f.label}</label>
+                <label className="field-label">{f.label}</label>
                 <button
                   onClick={() => handleReset(f.key)}
                   style={{
@@ -1845,12 +1781,10 @@ const TC_TYPE_LABELS: Record<string, string> = {
 
 function TcTemplatesTab({
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-  isLight: boolean
 }): React.JSX.Element {
   const typeCodes = Object.keys(TC_TYPE_LABELS)
   const [typeCode, setTypeCode] = useState('P')
@@ -2097,7 +2031,7 @@ function TcTemplatesTab({
                 gap: '10px',
                 padding: '10px 14px',
                 borderRadius: '10px',
-                background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
+                background: 'var(--table-header-bg)',
                 border: t.isDefault
                   ? `1.5px solid ${typeColor(typeCode)}`
                   : '1px solid var(--glass-border-color)'
@@ -2238,68 +2172,42 @@ function TcTemplatesTab({
       </div>
 
       {/* T&C footer config */}
-      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
-        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '10px' }}>T&C Footer</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '520px' }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '4px'
-              }}
-            >
-              Title line (placeholders: {'{type}'}, {'{number}'})
-            </label>
+      <div
+        className="form-section"
+        style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}
+      >
+        <h4 className="form-section-title">T&C Footer</h4>
+        <div className="form-grid" style={{ maxWidth: '520px' }}>
+          <Field
+            label="Title line"
+            span="all"
+            hint={
+              <>
+                Placeholders: {'{type}'}, {'{number}'}
+              </>
+            }
+          >
             <input
               type="text"
               value={footer.tcTitleLine}
               onChange={(e) => setFooter({ ...footer, tcTitleLine: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '7px 10px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--input-bg, transparent)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem'
-              }}
             />
-          </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                marginBottom: '4px'
-              }}
-            >
-              Footer text (optional, shown below the title)
-            </label>
+          </Field>
+          <Field label="Footer text (optional, shown below the title)" span="all">
             <input
               type="text"
               value={footer.tcFooterText}
               onChange={(e) => setFooter({ ...footer, tcFooterText: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '7px 10px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--input-bg, transparent)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem'
-              }}
             />
-          </div>
+          </Field>
           <label
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               fontSize: '0.82rem',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              gridColumn: '1 / -1'
             }}
           >
             <input
@@ -2310,7 +2218,7 @@ function TcTemplatesTab({
             />{' '}
             Show page numbers on T&C pages
           </label>
-          <div>
+          <div style={{ gridColumn: '1 / -1' }}>
             <button
               type="button"
               onClick={saveFooter}
@@ -2331,131 +2239,62 @@ function TcTemplatesTab({
 
       {/* Rich-text editor modal */}
       {editing && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '20px',
-              width: '760px',
-              maxWidth: '94vw',
-              maxHeight: '88vh',
-              display: 'flex',
-              flexDirection: 'column',
-              border: '1px solid var(--glass-border-color)'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '12px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                {editing.id ? 'Edit' : 'New'} T&C — {TC_TYPE_LABELS[typeCode]}
-              </h3>
-              <button
-                title="Cancel"
-                aria-label="Cancel"
-                onClick={() => setEditing(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <input
-              type="text"
-              value={editing.name}
-              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              placeholder="Template name (e.g. Standard P&I T&C)"
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--input-bg, transparent)',
-                color: 'var(--text-primary)',
-                fontSize: '0.88rem',
-                marginBottom: '10px',
-                boxSizing: 'border-box'
-              }}
-            />
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: '260px' }}>
-              <RichTextEditor
-                value={editing.html}
-                onChange={(html) => setEditing((ed) => (ed ? { ...ed, html } : ed))}
-                minHeight={340}
-                showHeadings
-                showAlignment
-                showFontSize
-              />
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}
-            >
-              <button
-                onClick={() => setEditing(null)}
-                className="btn-secondary"
-                style={{ fontSize: '0.82rem' }}
-              >
+        <Modal
+          title={`${editing.id ? 'Edit' : 'New'} T&C — ${TC_TYPE_LABELS[typeCode]}`}
+          icon={<FileText size={18} />}
+          onClose={() => setEditing(null)}
+          width={760}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setEditing(null)} className="btn-secondary">
                 Cancel
               </button>
-              <button
-                onClick={saveHtml}
-                disabled={busy}
-                className="btn-primary"
-                style={{ fontSize: '0.82rem' }}
-              >
+              <button onClick={saveHtml} disabled={busy} className="btn-primary">
                 {busy ? 'Saving…' : 'Save Template'}
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid" style={{ marginBottom: '10px' }}>
+            <Field label="Template name" span="all">
+              <input
+                type="text"
+                value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                placeholder="Template name (e.g. Standard P&I T&C)"
+              />
+            </Field>
           </div>
-        </div>
+          <div style={{ minHeight: '260px' }}>
+            <RichTextEditor
+              value={editing.html}
+              onChange={(html) => setEditing((ed) => (ed ? { ...ed, html } : ed))}
+              minHeight={340}
+              showHeadings
+              showAlignment
+              showFontSize
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Preview modal (rich text) */}
       {previewHtml && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setPreviewHtml(null)}
+        <Modal
+          title="T&C preview"
+          icon={<Eye size={18} />}
+          onClose={() => setPreviewHtml(null)}
+          width={720}
         >
           <div
             style={{
               background: '#ffffff',
               color: '#000',
-              borderRadius: '10px',
-              padding: '32px 40px',
-              width: '720px',
-              maxWidth: '92vw',
-              maxHeight: '86vh',
-              overflowY: 'auto'
+              borderRadius: '8px',
+              border: '1px solid var(--glass-border-color)',
+              padding: '32px 40px'
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -2481,7 +2320,7 @@ function TcTemplatesTab({
               }}
             />
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -2660,7 +2499,7 @@ function SignaturesTab({
                 alignItems: 'center',
                 gap: '16px',
                 padding: '12px 16px',
-                background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
+                background: 'var(--table-header-bg)',
                 borderRadius: '10px',
                 border: '1px solid var(--glass-border-color)'
               }}
@@ -2671,7 +2510,7 @@ function SignaturesTab({
                   height: '8px',
                   borderRadius: '50%',
                   flexShrink: 0,
-                  background: sig ? '#22c55e' : 'var(--text-secondary)',
+                  background: sig ? 'var(--success)' : 'var(--text-secondary)',
                   opacity: sig ? 1 : 0.3
                 }}
                 title={sig ? 'Signature uploaded' : 'No signature'}
@@ -2694,7 +2533,7 @@ function SignaturesTab({
                         padding: '1px 8px',
                         borderRadius: '8px',
                         background: 'rgba(34,197,94,0.1)',
-                        color: '#22c55e',
+                        color: 'var(--success)',
                         fontWeight: 600
                       }}
                     >
@@ -2858,33 +2697,26 @@ function QrVerificationTab({
         wizard (Blue Cards step). Off by default; can be overridden per policy.
       </p>
 
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '6px' }}
+      <div className="form-grid" style={{ marginBottom: '16px' }}>
+        <Field
+          label="Verification URL base"
+          span="all"
+          hint={
+            <>
+              Example: If URL is <code>https://example.com/verify/</code> and policy is{' '}
+              <code>P/PI/001</code>, the full link will be{' '}
+              <code>https://example.com/verify/P/PI/001</code>
+            </>
+          }
         >
-          Verification URL Base
-        </label>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://your-domain.com/verify/"
-          style={{
-            width: '100%',
-            maxWidth: '500px',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--bg-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '0.88rem'
-          }}
-        />
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Example: If URL is <code>https://example.com/verify/</code> and policy is{' '}
-          <code>P/PI/001</code>, the full link will be{' '}
-          <code>https://example.com/verify/P/PI/001</code>
-        </p>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://your-domain.com/verify/"
+            style={{ maxWidth: '500px' }}
+          />
+        </Field>
       </div>
 
       <button
@@ -2902,12 +2734,10 @@ function QrVerificationTab({
 
 function CommissionsTab({
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  isLight: boolean
 }): React.JSX.Element {
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string; code: string }[]>([])
   const [defaults, setDefaults] = useState<Record<string, number>>({})
@@ -3063,18 +2893,7 @@ function CommissionsTab({
       </p>
 
       <div style={{ marginBottom: '28px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            display: 'block',
-            marginBottom: '10px'
-          }}
-        >
-          Default Rates
-        </label>
+        <h4 className="form-section-title">Default rates</h4>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
           {policyTypes.map((pt) => (
             <div
@@ -3098,16 +2917,7 @@ function CommissionsTab({
                   setDefaults((prev) => ({ ...prev, [pt.id]: parseFloat(e.target.value) || 0 }))
                 }
                 onBlur={(e) => handleDefaultChange(pt.id, e.target.value)}
-                style={{
-                  width: '70px',
-                  padding: '4px 6px',
-                  textAlign: 'right',
-                  fontSize: '0.85rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)'
-                }}
+                style={{ width: '70px', padding: '4px 6px', textAlign: 'right' }}
                 placeholder="0"
               />
               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>%</span>
@@ -3116,101 +2926,59 @@ function CommissionsTab({
         </div>
       </div>
 
-      <label
-        style={{
-          fontSize: '0.78rem',
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          textTransform: 'uppercase',
-          display: 'block',
-          marginBottom: '10px'
-        }}
-      >
-        Customer Overrides
-      </label>
+      <h4 className="form-section-title">Customer overrides</h4>
       {entityGroups.size > 0 && (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '0.82rem',
-            marginBottom: '16px'
-          }}
-        >
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-              <th
-                style={{
-                  textAlign: 'left',
-                  padding: '6px 10px',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 500
-                }}
-              >
-                Customer
-              </th>
-              {policyTypes.map((pt) => (
-                <th
-                  key={pt.id}
-                  style={{
-                    textAlign: 'center',
-                    padding: '6px 10px',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  {pt.code || pt.name}
-                </th>
-              ))}
-              <th style={{ width: '40px' }} />
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from(entityGroups.values()).map((eg) => (
-              <tr key={eg.entityId} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                <td style={{ padding: '6px 10px', fontWeight: 600 }}>{eg.entityName}</td>
+        <div className="table-wrap" style={{ marginBottom: '16px' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
                 {policyTypes.map((pt) => (
-                  <td key={pt.id} style={{ padding: '6px 10px', textAlign: 'center' }}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={eg.rates[pt.id] ?? ''}
-                      onChange={(e) => handleOverrideChange(eg.entityId, pt.id, e.target.value)}
-                      onBlur={(e) => handleOverrideChange(eg.entityId, pt.id, e.target.value)}
-                      style={{
-                        width: '60px',
-                        padding: '3px 6px',
-                        textAlign: 'right',
-                        fontSize: '0.82rem',
-                        borderRadius: '4px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)'
-                      }}
-                      placeholder={String(defaults[pt.id] || 0)}
-                    />
-                  </td>
+                  <th key={pt.id} style={{ textAlign: 'center' }}>
+                    {pt.code || pt.name}
+                  </th>
                 ))}
-                <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-                  <button
-                    title="Delete"
-                    aria-label="Delete"
-                    onClick={() => handleDeleteCustomer(eg.entityId)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--danger)',
-                      padding: '2px'
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </td>
+                <th style={{ width: '40px' }} />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Array.from(entityGroups.values()).map((eg) => (
+                <tr key={eg.entityId}>
+                  <td style={{ fontWeight: 600 }}>{eg.entityName}</td>
+                  {policyTypes.map((pt) => (
+                    <td key={pt.id} style={{ textAlign: 'center' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={eg.rates[pt.id] ?? ''}
+                        onChange={(e) => handleOverrideChange(eg.entityId, pt.id, e.target.value)}
+                        onBlur={(e) => handleOverrideChange(eg.entityId, pt.id, e.target.value)}
+                        style={{ width: '60px', padding: '3px 6px', textAlign: 'right' }}
+                        placeholder={String(defaults[pt.id] || 0)}
+                      />
+                    </td>
+                  ))}
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      title="Delete"
+                      aria-label="Delete"
+                      onClick={() => handleDeleteCustomer(eg.entityId)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--danger)',
+                        padding: '2px'
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -3235,7 +3003,7 @@ function CommissionsTab({
                 zIndex: 10,
                 maxHeight: '200px',
                 overflowY: 'auto',
-                background: isLight ? '#fff' : '#1a1d28',
+                background: 'var(--bg-primary)',
                 border: '1px solid var(--input-border)',
                 borderRadius: '6px',
                 marginTop: '2px'
@@ -3345,79 +3113,32 @@ function DeclarationSettingsTab({
         Configure per-year values for war declaration exports (UMR, Amlin Ref, Risk Code).
       </p>
 
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Year of Account
-        </label>
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          style={{ width: '120px', padding: '6px 10px', fontSize: '0.9rem' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          UMR
-        </label>
-        <input
-          value={umr}
-          onChange={(e) => setUmr(e.target.value)}
-          placeholder="e.g., B0572MA255259"
-          style={{ width: '100%', maxWidth: '400px', padding: '6px 10px', fontSize: '0.85rem' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Amlin Ref
-        </label>
-        <input
-          value={amlinRef}
-          onChange={(e) => setAmlinRef(e.target.value)}
-          placeholder="e.g., WHW1753225RQ"
-          style={{ width: '100%', maxWidth: '400px', padding: '6px 10px', fontSize: '0.85rem' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            fontSize: '0.78rem',
-            color: 'var(--text-secondary)',
-            display: 'block',
-            marginBottom: '4px'
-          }}
-        >
-          Risk Code
-        </label>
-        <input
-          value={riskCode}
-          onChange={(e) => setRiskCode(e.target.value)}
-          style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem' }}
-        />
+      <div className="form-grid" style={{ marginBottom: '16px', maxWidth: '520px' }}>
+        <Field label="Year of account" span="all">
+          <input
+            type="number"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            style={{ width: '120px' }}
+          />
+        </Field>
+        <Field label="UMR" span="all">
+          <input
+            value={umr}
+            onChange={(e) => setUmr(e.target.value)}
+            placeholder="e.g., B0572MA255259"
+          />
+        </Field>
+        <Field label="Amlin ref" span="all">
+          <input
+            value={amlinRef}
+            onChange={(e) => setAmlinRef(e.target.value)}
+            placeholder="e.g., WHW1753225RQ"
+          />
+        </Field>
+        <Field label="Risk code" span="all">
+          <input value={riskCode} onChange={(e) => setRiskCode(e.target.value)} />
+        </Field>
       </div>
 
       <button
@@ -3435,12 +3156,10 @@ function DeclarationSettingsTab({
 
 function EndorsementSettingsTab({
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  isLight: boolean
 }): React.JSX.Element {
   const [closingText, setClosingText] = useState('')
   const [triggerFields, setTriggerFields] = useState<EndorsementTriggerField[]>([])
@@ -3551,17 +3270,6 @@ function EndorsementSettingsTab({
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '6px 10px',
-    fontSize: '0.85rem',
-    borderRadius: '6px',
-    border: '1px solid var(--input-border)',
-    background: 'transparent',
-    color: 'var(--text-primary)',
-    fontFamily: 'inherit'
-  }
-
   return (
     <div>
       {/* Closing Text */}
@@ -3667,38 +3375,30 @@ function EndorsementSettingsTab({
         {addingTemplate && (
           <div
             style={{
-              background: isLight ? '#f8f9fc' : '#161829',
+              background: 'var(--bg-card)',
               border: '1px solid var(--glass-border-color)',
               borderRadius: '8px',
               padding: '14px',
               marginBottom: '12px'
             }}
           >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                marginBottom: '8px'
-              }}
-            >
-              <input
-                value={newTmplName}
-                onChange={(e) => setNewTmplName(e.target.value)}
-                placeholder="Template name"
-                style={inputStyle}
-              />
-              <select
-                value={newTmplSection}
-                onChange={(e) => setNewTmplSection(e.target.value)}
-                style={inputStyle}
-              >
-                {sectionOptions.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+            <div className="form-grid cols-2" style={{ marginBottom: '8px' }}>
+              <Field label="Template name">
+                <input
+                  value={newTmplName}
+                  onChange={(e) => setNewTmplName(e.target.value)}
+                  placeholder="Template name"
+                />
+              </Field>
+              <Field label="Section">
+                <select value={newTmplSection} onChange={(e) => setNewTmplSection(e.target.value)}>
+                  {sectionOptions.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
             <RichTextEditor value={newTmplContent} onChange={setNewTmplContent} minHeight={80} />
             <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
@@ -3727,30 +3427,22 @@ function EndorsementSettingsTab({
           >
             {editingTmpl === t.id ? (
               <div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '8px',
-                    marginBottom: '8px'
-                  }}
-                >
-                  <input
-                    value={editTmplName}
-                    onChange={(e) => setEditTmplName(e.target.value)}
-                    style={inputStyle}
-                  />
-                  <select
-                    value={editTmplSection}
-                    onChange={(e) => setEditTmplSection(e.target.value)}
-                    style={inputStyle}
-                  >
-                    {sectionOptions.map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="form-grid cols-2" style={{ marginBottom: '8px' }}>
+                  <Field label="Template name">
+                    <input value={editTmplName} onChange={(e) => setEditTmplName(e.target.value)} />
+                  </Field>
+                  <Field label="Section">
+                    <select
+                      value={editTmplSection}
+                      onChange={(e) => setEditTmplSection(e.target.value)}
+                    >
+                      {sectionOptions.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
                 <RichTextEditor
                   value={editTmplContent}
@@ -3848,12 +3540,10 @@ function EndorsementSettingsTab({
 // overridden per-policy in the conversion wizard.
 function PolicySectionOrderTab({
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  isLight: boolean
 }): React.JSX.Element {
   const TYPES: { code: string; label: string; color: string }[] = [
     { code: 'P', label: 'P&I', color: '#6464ff' },
@@ -3967,7 +3657,7 @@ function PolicySectionOrderTab({
                 display: 'flex',
                 gap: '12px',
                 alignItems: 'center',
-                background: isLight ? '#fafbfc' : 'transparent'
+                background: 'var(--table-header-bg)'
               }}
             >
               <span

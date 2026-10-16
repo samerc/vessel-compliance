@@ -75,6 +75,7 @@ import { ok, asArray } from '../utils/ipc'
 import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
+import { Modal, Field } from './ui'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
@@ -1272,7 +1273,7 @@ export default function PolicyDetail({
   }
 
   const cardStyle: React.CSSProperties = {
-    background: isLight ? '#ffffff' : 'var(--bg-card)',
+    background: 'var(--bg-card)',
     border: '1px solid var(--glass-border-color)',
     borderRadius: '12px',
     padding: '20px',
@@ -1297,10 +1298,8 @@ export default function PolicyDetail({
   }
 
   const labelStyle: React.CSSProperties = {
-    fontSize: '0.72rem',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
+    fontSize: '0.8rem',
+    fontWeight: 500,
     color: 'var(--text-secondary)',
     marginBottom: '4px'
   }
@@ -1309,21 +1308,6 @@ export default function PolicyDetail({
     fontSize: '0.88rem',
     color: 'var(--text-primary)',
     fontWeight: 500
-  }
-
-  const thStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    textAlign: 'left',
-    fontSize: '0.73rem',
-    color: 'var(--text-secondary)',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em'
-  }
-
-  const tdStyle: React.CSSProperties = {
-    padding: '10px 14px',
-    fontSize: '0.85rem'
   }
 
   const headerBtnStyle: React.CSSProperties = {
@@ -1557,7 +1541,7 @@ export default function PolicyDetail({
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   background: 'rgba(255, 176, 32, 0.15)',
-                  color: isLight ? '#b07a10' : '#ffb020'
+                  color: 'var(--warning)'
                 }}
               >
                 Editing
@@ -1619,7 +1603,7 @@ export default function PolicyDetail({
                 fontSize: '0.72rem',
                 fontWeight: 600,
                 background: 'rgba(0, 200, 100, 0.12)',
-                color: isLight ? '#007744' : '#00c864',
+                color: 'var(--success)',
                 border: '1px solid rgba(0, 200, 100, 0.25)'
               }}
               title={`Signed by ${policy.signedByName || 'unknown'} on ${policy.signedAt ? formatDateShort(policy.signedAt) : 'unknown date'}`}
@@ -1707,7 +1691,7 @@ export default function PolicyDetail({
                       top: actionsMenuPos.top,
                       right: actionsMenuPos.right,
                       zIndex: 9999,
-                      background: isLight ? '#ffffff' : '#1a1d28',
+                      background: 'var(--bg-primary)',
                       border: '1px solid var(--glass-border-color)',
                       borderRadius: '10px',
                       padding: '6px',
@@ -1754,7 +1738,7 @@ export default function PolicyDetail({
                             }
                           })
                         }}
-                        style={{ ...actionItemStyle, color: isLight ? '#008844' : '#00c864' }}
+                        style={{ ...actionItemStyle, color: 'var(--success)' }}
                         className="hover-effect"
                       >
                         <RefreshCw size={15} /> Renew
@@ -2014,7 +1998,7 @@ export default function PolicyDetail({
                   marginBottom: '20px',
                   padding: '12px 16px',
                   borderRadius: '8px',
-                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                  background: 'var(--table-header-bg)',
                   border: '1px solid var(--glass-border-color)'
                 }}
               >
@@ -2060,108 +2044,54 @@ export default function PolicyDetail({
               </div>
 
               {/* Editable period */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '14px',
-                  marginBottom: '16px'
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Inception Date</label>
+              <div className="form-grid cols-2" style={{ marginBottom: '16px' }}>
+                <Field label="Inception date">
                   <input
                     type="date"
                     value={editInception}
                     onChange={(e) => setEditInception(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Inception Time</label>
+                </Field>
+                <Field label="Inception time">
                   <input
                     type="time"
                     value={editInceptionTime}
                     onChange={(e) => setEditInceptionTime(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Expiry Date</label>
+                </Field>
+                <Field label="Expiry date">
                   <input
                     type="date"
                     value={editExpiry}
                     onChange={(e) => setEditExpiry(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Expiry Time</label>
+                </Field>
+                <Field label="Expiry time">
                   <input
                     type="time"
                     value={editExpiryTime}
                     onChange={(e) => setEditExpiryTime(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
+                </Field>
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Timezone</label>
-                <select
-                  value={editTimezone}
-                  onChange={(e) => setEditTimezone(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  {DEFAULT_TIMEZONE_OPTIONS.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                  {editTimezone && !DEFAULT_TIMEZONE_OPTIONS.includes(editTimezone) && (
-                    <option value={editTimezone}>{editTimezone}</option>
-                  )}
-                </select>
+              <div className="form-grid" style={{ marginBottom: '16px' }}>
+                <Field label="Timezone" span="all">
+                  <select value={editTimezone} onChange={(e) => setEditTimezone(e.target.value)}>
+                    {DEFAULT_TIMEZONE_OPTIONS.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz}
+                      </option>
+                    ))}
+                    {editTimezone && !DEFAULT_TIMEZONE_OPTIONS.includes(editTimezone) && (
+                      <option value={editTimezone}>{editTimezone}</option>
+                    )}
+                  </select>
+                </Field>
               </div>
 
               {/* Cancel & Replace */}
@@ -2202,17 +2132,7 @@ export default function PolicyDetail({
                     value={editCancelReplaceText}
                     onChange={(e) => setEditCancelReplaceText(e.target.value)}
                     rows={2}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.82rem',
-                      resize: 'vertical',
-                      marginTop: '8px'
-                    }}
+                    style={{ width: '100%', resize: 'vertical', marginTop: '8px' }}
                   />
                 )}
               </div>
@@ -2257,16 +2177,14 @@ export default function PolicyDetail({
                   padding: '12px',
                   borderRadius: '8px',
                   border: '1px solid transparent',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
                   alignItems: 'end'
                 }}
+                className="form-grid cols-2"
               >
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '4px' }}>
-                    Subjectivities to be complied with within (days)
-                  </label>
+                <Field
+                  label="Subjectivities to be complied with within (days)"
+                  hint='0 prints "prior inception"'
+                >
                   <input
                     type="number"
                     min={0}
@@ -2274,38 +2192,15 @@ export default function PolicyDetail({
                     onChange={(e) =>
                       setEditSubjectivityDays(Math.max(0, parseInt(e.target.value, 10) || 0))
                     }
-                    style={{ width: '100%' }}
                   />
-                  <div
-                    style={{
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '4px'
-                    }}
-                  >
-                    0 prints &quot;prior inception&quot;
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '4px' }}>
-                    UPCC section name
-                  </label>
+                </Field>
+                <Field label="UPCC section name" hint="Empty = the quotation's name">
                   <input
                     value={editUpccTitle}
                     onChange={(e) => setEditUpccTitle(e.target.value)}
                     placeholder={quotationData?.upccTitle || DEFAULT_UPCC_TITLE}
-                    style={{ width: '100%' }}
                   />
-                  <div
-                    style={{
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '4px'
-                    }}
-                  >
-                    Empty = the quotation&apos;s name
-                  </div>
-                </div>
+                </Field>
                 <div
                   style={{
                     gridColumn: '1 / -1',
@@ -2427,7 +2322,7 @@ export default function PolicyDetail({
                     style={{
                       padding: '14px',
                       borderRadius: '8px',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                      background: 'var(--table-header-bg)',
                       border: '1px solid var(--glass-border-color)',
                       position: 'relative'
                     }}
@@ -2448,16 +2343,8 @@ export default function PolicyDetail({
                     >
                       <X size={16} />
                     </button>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '10px',
-                        marginBottom: '10px'
-                      }}
-                    >
-                      <div>
-                        <label style={labelStyle}>Entity</label>
+                    <div className="form-grid cols-2" style={{ marginBottom: '10px' }}>
+                      <Field label="Entity">
                         <select
                           value={addr.entityId || ''}
                           onChange={(e) => {
@@ -2474,15 +2361,7 @@ export default function PolicyDetail({
                               )
                             )
                           }}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : '#23263a',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.85rem'
-                          }}
+                          style={{ width: '100%' }}
                         >
                           <option value="">Select entity...</option>
                           {assuredEntities.map((ent) => (
@@ -2491,9 +2370,8 @@ export default function PolicyDetail({
                             </option>
                           ))}
                         </select>
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Role</label>
+                      </Field>
+                      <Field label="Role">
                         <input
                           type="text"
                           value={addr.role}
@@ -2503,20 +2381,11 @@ export default function PolicyDetail({
                             )
                           }
                           placeholder="e.g. Assured, Owner..."
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : '#23263a',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.85rem'
-                          }}
+                          style={{ width: '100%' }}
                         />
-                      </div>
+                      </Field>
                     </div>
-                    <div>
-                      <label style={labelStyle}>Address</label>
+                    <Field label="Address">
                       <textarea
                         value={addr.addressText}
                         onChange={(e) =>
@@ -2528,18 +2397,9 @@ export default function PolicyDetail({
                         }
                         placeholder="Full address..."
                         rows={2}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: isLight ? '#fff' : '#23263a',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          resize: 'vertical'
-                        }}
+                        style={{ width: '100%', resize: 'vertical' }}
                       />
-                    </div>
+                    </Field>
                   </div>
                 ))}
               </div>
@@ -2554,16 +2414,8 @@ export default function PolicyDetail({
                 <span style={cardTitleStyle}>Financial Details</span>
               </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '14px',
-                  marginBottom: '20px'
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Premium Amount</label>
+              <div className="form-grid cols-3" style={{ marginBottom: '20px' }}>
+                <Field label="Premium amount">
                   <MoneyInput
                     value={editPremium}
                     onChange={(v) => {
@@ -2571,19 +2423,10 @@ export default function PolicyDetail({
                       setEditPremium(val)
                       setEditInstalments((prev) => recalcInstalments(val, editCommission, prev))
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Commission %</label>
+                </Field>
+                <Field label="Commission %">
                   <MoneyInput
                     value={editCommission}
                     onChange={(v) => {
@@ -2591,31 +2434,14 @@ export default function PolicyDetail({
                       setEditCommission(val)
                       setEditInstalments((prev) => recalcInstalments(editPremium, val, prev))
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   />
-                </div>
-                <div>
-                  <label style={labelStyle}>Bank</label>
+                </Field>
+                <Field label="Bank">
                   <select
                     value={editBankId}
                     onChange={(e) => setEditBankId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem'
-                    }}
+                    style={{ width: '100%' }}
                   >
                     <option value="">No bank selected</option>
                     {banks.map((b) => (
@@ -2624,7 +2450,7 @@ export default function PolicyDetail({
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
               </div>
 
               {/* Instalments */}
@@ -2637,7 +2463,7 @@ export default function PolicyDetail({
                     marginBottom: '10px'
                   }}
                 >
-                  <span style={{ ...labelStyle, marginBottom: 0 }}>Instalments</span>
+                  <span className="field-label">Instalments</span>
                   <button
                     className="btn-secondary"
                     style={{
@@ -2664,129 +2490,95 @@ export default function PolicyDetail({
                 </div>
 
                 {editInstalments.length > 0 && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                        <th style={thStyle}>#</th>
-                        <th style={thStyle}>Due Date</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
-                        <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
-                        <th style={{ ...thStyle, width: '40px' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editInstalments.map((inst, idx) => (
-                        <tr
-                          key={idx}
-                          style={{
-                            borderBottom: '1px solid var(--table-border)',
-                            background:
-                              idx % 2 === 0
-                                ? 'transparent'
-                                : isLight
-                                  ? 'rgba(0,0,0,0.02)'
-                                  : 'rgba(255,255,255,0.02)'
-                          }}
-                        >
-                          <td style={tdStyle}>{inst.instalmentNumber}</td>
-                          <td style={tdStyle}>
-                            <input
-                              type="date"
-                              value={inst.dueDate}
-                              onChange={(e) =>
-                                setEditInstalments((prev) =>
-                                  prev.map((r, i) =>
-                                    i === idx ? { ...r, dueDate: e.target.value } : r
-                                  )
-                                )
-                              }
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--input-border)',
-                                background: isLight ? '#fff' : '#23263a',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.82rem'
-                              }}
-                            />
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <MoneyInput
-                              value={inst.premiumAmount}
-                              onChange={(val) =>
-                                setEditInstalments((prev) =>
-                                  prev.map((r, i) =>
-                                    i === idx ? { ...r, premiumAmount: val || 0 } : r
-                                  )
-                                )
-                              }
-                              style={{
-                                width: '120px',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--input-border)',
-                                background: isLight ? '#fff' : '#23263a',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.82rem',
-                                textAlign: 'right'
-                              }}
-                            />
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <MoneyInput
-                              value={inst.commissionAmount}
-                              onChange={(val) =>
-                                setEditInstalments((prev) =>
-                                  prev.map((r, i) =>
-                                    i === idx ? { ...r, commissionAmount: val || 0 } : r
-                                  )
-                                )
-                              }
-                              style={{
-                                width: '120px',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--input-border)',
-                                background: isLight ? '#fff' : '#23263a',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.82rem',
-                                textAlign: 'right'
-                              }}
-                            />
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={inst.isNonRefundable}
-                              onChange={(e) =>
-                                setEditInstalments((prev) =>
-                                  prev.map((r, i) =>
-                                    i === idx ? { ...r, isNonRefundable: e.target.checked } : r
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td style={tdStyle}>
-                            <button
-                              onClick={() => removeInstalment(idx)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--danger)',
-                                padding: '2px'
-                              }}
-                              title="Remove instalment"
-                            >
-                              <X size={14} />
-                            </button>
-                          </td>
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Due Date</th>
+                          <th style={{ textAlign: 'right' }}>Premium</th>
+                          <th style={{ textAlign: 'right' }}>Commission</th>
+                          <th style={{ textAlign: 'center' }}>NR</th>
+                          <th style={{ width: '40px' }}></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {editInstalments.map((inst, idx) => (
+                          <tr key={idx}>
+                            <td>{inst.instalmentNumber}</td>
+                            <td>
+                              <input
+                                type="date"
+                                value={inst.dueDate}
+                                onChange={(e) =>
+                                  setEditInstalments((prev) =>
+                                    prev.map((r, i) =>
+                                      i === idx ? { ...r, dueDate: e.target.value } : r
+                                    )
+                                  )
+                                }
+                                style={{ padding: '4px 8px' }}
+                              />
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <MoneyInput
+                                value={inst.premiumAmount}
+                                onChange={(val) =>
+                                  setEditInstalments((prev) =>
+                                    prev.map((r, i) =>
+                                      i === idx ? { ...r, premiumAmount: val || 0 } : r
+                                    )
+                                  )
+                                }
+                                style={{ width: '120px', padding: '4px 8px', textAlign: 'right' }}
+                              />
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <MoneyInput
+                                value={inst.commissionAmount}
+                                onChange={(val) =>
+                                  setEditInstalments((prev) =>
+                                    prev.map((r, i) =>
+                                      i === idx ? { ...r, commissionAmount: val || 0 } : r
+                                    )
+                                  )
+                                }
+                                style={{ width: '120px', padding: '4px 8px', textAlign: 'right' }}
+                              />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={inst.isNonRefundable}
+                                onChange={(e) =>
+                                  setEditInstalments((prev) =>
+                                    prev.map((r, i) =>
+                                      i === idx ? { ...r, isNonRefundable: e.target.checked } : r
+                                    )
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              <button
+                                onClick={() => removeInstalment(idx)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--danger)',
+                                  padding: '2px'
+                                }}
+                                title="Remove instalment"
+                              >
+                                <X size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -2932,7 +2724,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3016,7 +2808,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3089,7 +2881,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3159,7 +2951,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3231,7 +3023,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3304,7 +3096,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3405,7 +3197,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'var(--table-header-bg)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >
@@ -3562,7 +3354,7 @@ export default function PolicyDetail({
               bottom: 0,
               padding: '14px 20px',
               marginTop: '16px',
-              background: isLight ? '#ffffff' : '#1a1d28',
+              background: 'var(--bg-primary)',
               border: '1px solid var(--glass-border-color)',
               borderRadius: '12px',
               display: 'flex',
@@ -3673,7 +3465,7 @@ export default function PolicyDetail({
                 )}
                 {policy.grossTonnage && (
                   <div>
-                    <div style={labelStyle}>Gross Tonnage</div>
+                    <div style={labelStyle}>Gross tonnage</div>
                     <div style={valueStyle}>{Number(policy.grossTonnage).toLocaleString()}</div>
                   </div>
                 )}
@@ -3720,7 +3512,7 @@ export default function PolicyDetail({
               {/* Source quotation */}
               {policy.quotationId && (
                 <div>
-                  <div style={labelStyle}>Source Quotation</div>
+                  <div style={labelStyle}>Source quotation</div>
                   <div style={valueStyle}>
                     {onNavigateToQuotation ? (
                       <span
@@ -3776,7 +3568,7 @@ export default function PolicyDetail({
                 </div>
                 {policy.perAnnumPremium != null && (
                   <div>
-                    <div style={labelStyle}>Per Annum Premium</div>
+                    <div style={labelStyle}>Per annum premium</div>
                     <div style={{ ...valueStyle, fontWeight: 600 }}>
                       {formatAmount(policy.perAnnumPremium, policy.premiumCurrency)}
                     </div>
@@ -3797,12 +3589,12 @@ export default function PolicyDetail({
                 )}
                 {netPremium != null && (
                   <div>
-                    <div style={labelStyle}>Net Premium</div>
+                    <div style={labelStyle}>Net premium</div>
                     <div
                       style={{
                         ...valueStyle,
                         fontWeight: 600,
-                        color: isLight ? '#047857' : '#34d399'
+                        color: 'var(--success)'
                       }}
                     >
                       {formatAmount(netPremium, policy.premiumCurrency)}
@@ -3817,13 +3609,13 @@ export default function PolicyDetail({
                 )}
                 {policy.proRata && (
                   <div>
-                    <div style={labelStyle}>Pro Rata</div>
+                    <div style={labelStyle}>Pro rata</div>
                     <div style={valueStyle}>Yes</div>
                   </div>
                 )}
                 {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
                   <div>
-                    <div style={labelStyle}>Exchange Rate</div>
+                    <div style={labelStyle}>Exchange rate</div>
                     <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
                   </div>
                 )}
@@ -3832,7 +3624,9 @@ export default function PolicyDetail({
               {/* Instalment table */}
               {instalments.length > 0 && (
                 <div style={{ marginTop: '8px' }}>
-                  <div style={{ ...labelStyle, marginBottom: '8px' }}>Instalments</div>
+                  <div className="field-label" style={{ marginBottom: '8px' }}>
+                    Instalments
+                  </div>
                   {(() => {
                     // Compact: currency once in the headings, one line per cell, and the
                     // commission / net columns only when there is a commission
@@ -3845,89 +3639,75 @@ export default function PolicyDetail({
                             maximumFractionDigits: 2
                           })
                     const hasComm = instalments.some((i) => (i.commissionAmount || 0) !== 0)
-                    const th: React.CSSProperties = {
-                      ...thStyle,
-                      padding: '8px 10px',
-                      whiteSpace: 'nowrap'
-                    }
+                    const th: React.CSSProperties = { padding: '8px 10px' }
                     const td: React.CSSProperties = {
-                      ...tdStyle,
                       padding: '8px 10px',
                       whiteSpace: 'nowrap',
                       fontVariantNumeric: 'tabular-nums'
                     }
                     return (
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                            <th style={{ ...th, width: '1%' }}>#</th>
-                            <th style={th}>Due Date</th>
-                            <th style={{ ...th, textAlign: 'right' }}>Premium ({cur})</th>
-                            {hasComm && <th style={{ ...th, textAlign: 'right' }}>Commission</th>}
-                            {hasComm && <th style={{ ...th, textAlign: 'right' }}>Net</th>}
-                            <th style={{ ...th, textAlign: 'center', width: '1%' }}>NR</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {instalments.map((inst, idx) => (
-                            <tr
-                              key={inst.instalmentNumber}
-                              style={{
-                                borderBottom: '1px solid var(--table-border)',
-                                background:
-                                  idx % 2 === 0
-                                    ? 'transparent'
-                                    : isLight
-                                      ? 'rgba(0,0,0,0.02)'
-                                      : 'rgba(255,255,255,0.02)'
-                              }}
-                            >
-                              <td style={td}>{inst.instalmentNumber}</td>
-                              <td style={td}>
-                                {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
-                              </td>
-                              <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
-                                {num(inst.premiumAmount)}
-                              </td>
-                              {hasComm && (
-                                <td style={{ ...td, textAlign: 'right' }}>
-                                  {num(inst.commissionAmount)}
-                                </td>
-                              )}
-                              {hasComm && (
-                                <td
-                                  style={{
-                                    ...td,
-                                    textAlign: 'right',
-                                    color: isLight ? '#047857' : '#34d399'
-                                  }}
-                                >
-                                  {num((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
-                                </td>
-                              )}
-                              <td style={{ ...td, textAlign: 'center' }}>
-                                {inst.isNonRefundable ? (
-                                  <span
-                                    style={{
-                                      padding: '2px 6px',
-                                      borderRadius: '4px',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 600,
-                                      background: 'rgba(255, 176, 32, 0.15)',
-                                      color: '#ffb020'
-                                    }}
-                                    title="Non-refundable"
-                                  >
-                                    NR
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--text-secondary)' }}>-</span>
-                                )}
-                              </td>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th style={{ ...th, width: '1%' }}>#</th>
+                              <th style={th}>Due Date</th>
+                              <th style={{ ...th, textAlign: 'right' }}>Premium ({cur})</th>
+                              {hasComm && <th style={{ ...th, textAlign: 'right' }}>Commission</th>}
+                              {hasComm && <th style={{ ...th, textAlign: 'right' }}>Net</th>}
+                              <th style={{ ...th, textAlign: 'center', width: '1%' }}>NR</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {instalments.map((inst) => (
+                              <tr key={inst.instalmentNumber}>
+                                <td style={td}>{inst.instalmentNumber}</td>
+                                <td style={td}>
+                                  {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
+                                </td>
+                                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+                                  {num(inst.premiumAmount)}
+                                </td>
+                                {hasComm && (
+                                  <td style={{ ...td, textAlign: 'right' }}>
+                                    {num(inst.commissionAmount)}
+                                  </td>
+                                )}
+                                {hasComm && (
+                                  <td
+                                    style={{
+                                      ...td,
+                                      textAlign: 'right',
+                                      color: 'var(--success)'
+                                    }}
+                                  >
+                                    {num((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
+                                  </td>
+                                )}
+                                <td style={{ ...td, textAlign: 'center' }}>
+                                  {inst.isNonRefundable ? (
+                                    <span
+                                      style={{
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        background: 'rgba(255, 176, 32, 0.15)',
+                                        color: '#ffb020'
+                                      }}
+                                      title="Non-refundable"
+                                    >
+                                      NR
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )
                   })()}
                 </div>
@@ -3975,7 +3755,7 @@ export default function PolicyDetail({
                     style={{
                       padding: '12px 16px',
                       borderRadius: '8px',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                      background: 'var(--table-header-bg)',
                       border: '1px solid var(--glass-border-color)'
                     }}
                   >
@@ -4281,7 +4061,7 @@ export default function PolicyDetail({
                               <div
                                 style={{
                                   fontSize: '0.75rem',
-                                  color: isLight ? '#b07a10' : '#ffb020',
+                                  color: 'var(--warning)',
                                   fontStyle: 'italic',
                                   marginTop: '4px'
                                 }}
@@ -4366,642 +4146,24 @@ export default function PolicyDetail({
 
           {/* Blue Card Issue/Reissue/Edit Modal */}
           {bcModalOpen && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-              }}
-              onClick={() => setBcModalOpen(false)}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  background: isLight ? '#ffffff' : '#1a1d28',
-                  borderRadius: '14px',
-                  padding: '24px',
-                  width: '560px',
-                  maxHeight: '85vh',
-                  overflowY: 'auto',
-                  border: '1px solid var(--glass-border-color)'
-                }}
-              >
-                {/* Modal header */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '20px'
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: '1.1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <CreditCard size={20} style={{ color: 'var(--accent-primary)' }} />
-                    {bcModalMode === 'edit'
-                      ? 'Edit Blue Card'
-                      : bcModalMode === 'reissue'
-                        ? 'Reissue Blue Card'
-                        : 'Issue New Blue Card'}
-                  </h3>
-                  <button
-                    title="Close"
-                    aria-label="Close"
-                    onClick={() => setBcModalOpen(false)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      padding: '4px'
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Card Type */}
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={labelStyle}>Card Type</label>
-                  {bcModalMode === 'edit' || bcPreselectedType ? (
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {bcForm.cardType} — {CARD_TYPE_LABELS[bcForm.cardType]}
-                    </div>
-                  ) : (
-                    <select
-                      value={bcForm.cardType}
-                      onChange={(e) => handleCardTypeChange(e.target.value as CardType)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      {CARD_TYPES.map((ct) => (
-                        <option key={ct} value={ct}>
-                          {ct} — {CARD_TYPE_LABELS[ct]}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <div
-                    style={{
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '4px',
-                      fontStyle: 'italic'
-                    }}
-                  >
-                    {CARD_TYPE_FULL_NAMES[bcForm.cardType]}
-                  </div>
-                </div>
-
-                {/* Period */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '12px',
-                    marginBottom: '14px'
-                  }}
-                >
-                  <div>
-                    <label style={labelStyle}>Inception Date</label>
-                    <input
-                      type="date"
-                      value={bcForm.inceptionDate}
-                      onChange={(e) => updateBcDate('inceptionDate', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Expiry Date</label>
-                    <input
-                      type="date"
-                      value={bcForm.expiryDate}
-                      onChange={(e) => updateBcDate('expiryDate', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Owner */}
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={labelStyle}>Owner</label>
-                  <select
-                    value={bcForm.ownerEntityId || '__custom__'}
-                    onChange={(e) => handleOwnerChange(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    {ownerOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.name}
-                      </option>
-                    ))}
-                    <option value="__custom__">Custom...</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Owner name"
-                    value={bcForm.ownerName}
-                    onChange={(e) => setBcForm((f) => ({ ...f, ownerName: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem',
-                      marginBottom: '8px'
-                    }}
-                  />
-                  <textarea
-                    placeholder="Owner address"
-                    value={bcForm.ownerAddress}
-                    onChange={(e) => setBcForm((f) => ({ ...f, ownerAddress: e.target.value }))}
-                    rows={2}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#23263a',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.85rem',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                {/* Port of Registry */}
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={labelStyle}>Port of Registry</label>
-                  {flagPorts.length > 1 ? (
-                    <select
-                      value={bcForm.portOfRegistry}
-                      onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      <option value="">Select port...</option>
-                      {flagPorts.map((p) => (
-                        <option key={p.id} value={p.name}>
-                          {p.name}
-                          {p.isDefault ? ' (default)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder={
-                        flagPorts.length === 1 ? flagPorts[0].name : 'Enter port of registry...'
-                      }
-                      value={bcForm.portOfRegistry}
-                      onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem'
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Addressed To (BBC/WRC only) */}
-                {needsAddressedTo(bcForm.cardType) && (
-                  <div
-                    style={{
-                      marginBottom: '14px',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                      border: '1px solid var(--glass-border-color)'
-                    }}
-                  >
-                    <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>
-                      Addressed To (Flag State Authority)
-                    </label>
-
-                    {/* Ratification warning */}
-                    {vesselFlagState &&
-                      ((bcForm.cardType === 'BBC' && !vesselFlagState.ratifiedBunker) ||
-                        (bcForm.cardType === 'WRC' && !vesselFlagState.ratifiedWreck)) && (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            background: 'rgba(255, 176, 32, 0.12)',
-                            color: isLight ? '#b07a10' : '#ffb020',
-                            fontSize: '0.78rem',
-                            fontWeight: 500,
-                            marginBottom: '10px'
-                          }}
-                        >
-                          <AlertTriangle size={14} />
-                          {vesselFlagState.name} has not ratified the{' '}
-                          {bcForm.cardType === 'BBC'
-                            ? 'Bunkers Convention'
-                            : 'Wreck Removal Convention'}
-                          . Select a ratified flag state below.
-                        </div>
-                      )}
-
-                    <select
-                      value={bcForm.addressedToFlagId}
-                      onChange={(e) => handleAddressedToFlagChange(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem',
-                        marginBottom: '8px'
-                      }}
-                    >
-                      <option value="">Select flag state...</option>
-                      {flagStates
-                        .filter((fs) =>
-                          bcForm.cardType === 'BBC' ? fs.ratifiedBunker : fs.ratifiedWreck
-                        )
-                        .map((fs) => (
-                          <option key={fs.id} value={fs.id}>
-                            {fs.name}
-                            {fs.authorityName ? ` — ${fs.authorityName}` : ''}
-                          </option>
-                        ))}
-                    </select>
-
-                    {/* Inline "add flag state" — when the ratified flag needed isn't listed */}
-                    {!bcAddingFlag ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBcAddingFlag(true)
-                          setNewFlagForm({
-                            name: '',
-                            iso3: '',
-                            ratBunker: bcForm.cardType === 'BBC',
-                            ratWreck: bcForm.cardType === 'WRC',
-                            authName: '',
-                            authAddr: ''
-                          })
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          marginBottom: '8px',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 0,
-                          color: 'var(--accent-primary)',
-                          fontSize: '0.78rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        <Plus size={13} /> Flag state not listed? Add it
-                      </button>
-                    ) : (
-                      <div
-                        style={{
-                          marginBottom: '10px',
-                          padding: '10px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: isLight ? '#fff' : '#20233a'
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '2fr 1fr',
-                            gap: '8px',
-                            marginBottom: '8px'
-                          }}
-                        >
-                          <input
-                            type="text"
-                            placeholder="Flag state name"
-                            value={newFlagForm.name}
-                            onChange={(e) =>
-                              setNewFlagForm((f) => ({ ...f, name: e.target.value }))
-                            }
-                            style={{
-                              padding: '7px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--input-border)',
-                              background: isLight ? '#fff' : '#23263a',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.82rem'
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="ISO3 (e.g. PAN)"
-                            maxLength={3}
-                            value={newFlagForm.iso3}
-                            onChange={(e) =>
-                              setNewFlagForm((f) => ({ ...f, iso3: e.target.value.toUpperCase() }))
-                            }
-                            style={{
-                              padding: '7px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--input-border)',
-                              background: isLight ? '#fff' : '#23263a',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.82rem',
-                              textTransform: 'uppercase'
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '16px',
-                            marginBottom: '8px',
-                            fontSize: '0.8rem'
-                          }}
-                        >
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={newFlagForm.ratBunker}
-                              onChange={(e) =>
-                                setNewFlagForm((f) => ({ ...f, ratBunker: e.target.checked }))
-                              }
-                            />
-                            Ratified Bunker
-                          </label>
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={newFlagForm.ratWreck}
-                              onChange={(e) =>
-                                setNewFlagForm((f) => ({ ...f, ratWreck: e.target.checked }))
-                              }
-                            />
-                            Ratified Wreck
-                          </label>
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Authority name"
-                          value={newFlagForm.authName}
-                          onChange={(e) =>
-                            setNewFlagForm((f) => ({ ...f, authName: e.target.value }))
-                          }
-                          style={{
-                            width: '100%',
-                            padding: '7px 10px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : '#23263a',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.82rem',
-                            marginBottom: '8px',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <textarea
-                          placeholder="Authority address"
-                          rows={2}
-                          value={newFlagForm.authAddr}
-                          onChange={(e) =>
-                            setNewFlagForm((f) => ({ ...f, authAddr: e.target.value }))
-                          }
-                          style={{
-                            width: '100%',
-                            padding: '7px 10px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--input-border)',
-                            background: isLight ? '#fff' : '#23263a',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.82rem',
-                            resize: 'vertical',
-                            marginBottom: '8px',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => setBcAddingFlag(false)}
-                            style={{ padding: '5px 12px', fontSize: '0.78rem' }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={handleAddFlagInline}
-                            style={{ padding: '5px 12px', fontSize: '0.78rem' }}
-                          >
-                            Add &amp; Select
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    <input
-                      type="text"
-                      placeholder="Authority name"
-                      value={bcForm.addressedToName}
-                      onChange={(e) =>
-                        setBcForm((f) => ({ ...f, addressedToName: e.target.value }))
-                      }
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem',
-                        marginBottom: '8px'
-                      }}
-                    />
-                    <textarea
-                      placeholder="Authority address"
-                      value={bcForm.addressedToAddress}
-                      onChange={(e) =>
-                        setBcForm((f) => ({ ...f, addressedToAddress: e.target.value }))
-                      }
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.85rem',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Cancel & Replace */}
-                <div
-                  style={{
-                    marginBottom: '18px',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: bcForm.cancelReplace
-                      ? isLight
-                        ? 'rgba(255, 176, 32, 0.06)'
-                        : 'rgba(255, 176, 32, 0.08)'
-                      : 'transparent',
-                    border: bcForm.cancelReplace
-                      ? '1px solid rgba(255, 176, 32, 0.2)'
-                      : '1px solid transparent'
-                  }}
-                >
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 500
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={bcForm.cancelReplace}
-                      onChange={(e) =>
-                        setBcForm((f) => ({ ...f, cancelReplace: e.target.checked }))
-                      }
-                    />
-                    Cancel & Replace existing card
-                  </label>
-                  {bcForm.cancelReplace && (
-                    <textarea
-                      placeholder="Cancel & replace text..."
-                      value={bcForm.cancelReplaceText}
-                      onChange={(e) =>
-                        setBcForm((f) => ({ ...f, cancelReplaceText: e.target.value }))
-                      }
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : '#23263a',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.82rem',
-                        resize: 'vertical',
-                        marginTop: '8px'
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Modal footer */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setBcModalOpen(false)}
-                    style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                  >
+            <Modal
+              title={
+                bcModalMode === 'edit'
+                  ? 'Edit Blue Card'
+                  : bcModalMode === 'reissue'
+                    ? 'Reissue Blue Card'
+                    : 'Issue New Blue Card'
+              }
+              icon={<CreditCard size={18} />}
+              onClose={() => setBcModalOpen(false)}
+              width={560}
+              closeOnOverlay={false}
+              footer={
+                <>
+                  <button className="btn-secondary" onClick={() => setBcModalOpen(false)}>
                     Cancel
                   </button>
-                  <button
-                    className="btn-primary"
-                    onClick={handleSaveBlueCard}
-                    disabled={bcSaving}
-                    style={{
-                      padding: '8px 20px',
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
+                  <button className="btn-primary" onClick={handleSaveBlueCard} disabled={bcSaving}>
                     {bcSaving ? (
                       <Loader2 size={14} className="spinner" />
                     ) : bcModalMode === 'edit' ? (
@@ -5012,9 +4174,402 @@ export default function PolicyDetail({
                       'Issue Card'
                     )}
                   </button>
+                </>
+              }
+            >
+              {/* Card Type */}
+              <div className="field" style={{ marginBottom: '14px' }}>
+                <label className="field-label">Card type</label>
+                {bcModalMode === 'edit' || bcPreselectedType ? (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    {bcForm.cardType} — {CARD_TYPE_LABELS[bcForm.cardType]}
+                  </div>
+                ) : (
+                  <select
+                    value={bcForm.cardType}
+                    onChange={(e) => handleCardTypeChange(e.target.value as CardType)}
+                    style={{ width: '100%' }}
+                  >
+                    {CARD_TYPES.map((ct) => (
+                      <option key={ct} value={ct}>
+                        {ct} — {CARD_TYPE_LABELS[ct]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    marginTop: '4px',
+                    fontStyle: 'italic'
+                  }}
+                >
+                  {CARD_TYPE_FULL_NAMES[bcForm.cardType]}
                 </div>
               </div>
-            </div>
+
+              {/* Period */}
+              <div className="form-grid cols-2" style={{ marginBottom: '14px' }}>
+                <Field label="Inception date">
+                  <input
+                    type="date"
+                    value={bcForm.inceptionDate}
+                    onChange={(e) => updateBcDate('inceptionDate', e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </Field>
+                <Field label="Expiry date">
+                  <input
+                    type="date"
+                    value={bcForm.expiryDate}
+                    onChange={(e) => updateBcDate('expiryDate', e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </Field>
+              </div>
+
+              {/* Owner */}
+              <div className="field" style={{ marginBottom: '14px' }}>
+                <label className="field-label">Owner</label>
+                <select
+                  value={bcForm.ownerEntityId || '__custom__'}
+                  onChange={(e) => handleOwnerChange(e.target.value)}
+                  style={{ width: '100%', marginBottom: '8px' }}
+                >
+                  {ownerOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                  <option value="__custom__">Custom...</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Owner name"
+                  value={bcForm.ownerName}
+                  onChange={(e) => setBcForm((f) => ({ ...f, ownerName: e.target.value }))}
+                  style={{ width: '100%', marginBottom: '8px' }}
+                />
+                <textarea
+                  placeholder="Owner address"
+                  value={bcForm.ownerAddress}
+                  onChange={(e) => setBcForm((f) => ({ ...f, ownerAddress: e.target.value }))}
+                  rows={2}
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Port of Registry */}
+              <div className="field" style={{ marginBottom: '14px' }}>
+                <label className="field-label">Port of registry</label>
+                {flagPorts.length > 1 ? (
+                  <select
+                    value={bcForm.portOfRegistry}
+                    onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Select port...</option>
+                    {flagPorts.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name}
+                        {p.isDefault ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder={
+                      flagPorts.length === 1 ? flagPorts[0].name : 'Enter port of registry...'
+                    }
+                    value={bcForm.portOfRegistry}
+                    onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
+                    style={{ width: '100%' }}
+                  />
+                )}
+              </div>
+
+              {/* Addressed To (BBC/WRC only) */}
+              {needsAddressedTo(bcForm.cardType) && (
+                <div
+                  style={{
+                    marginBottom: '14px',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'var(--table-header-bg)',
+                    border: '1px solid var(--glass-border-color)'
+                  }}
+                >
+                  <label className="field-label" style={{ marginBottom: '8px', display: 'block' }}>
+                    Addressed to (flag state authority)
+                  </label>
+
+                  {/* Ratification warning */}
+                  {vesselFlagState &&
+                    ((bcForm.cardType === 'BBC' && !vesselFlagState.ratifiedBunker) ||
+                      (bcForm.cardType === 'WRC' && !vesselFlagState.ratifiedWreck)) && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          background: 'rgba(255, 176, 32, 0.12)',
+                          color: 'var(--warning)',
+                          fontSize: '0.78rem',
+                          fontWeight: 500,
+                          marginBottom: '10px'
+                        }}
+                      >
+                        <AlertTriangle size={14} />
+                        {vesselFlagState.name} has not ratified the{' '}
+                        {bcForm.cardType === 'BBC'
+                          ? 'Bunkers Convention'
+                          : 'Wreck Removal Convention'}
+                        . Select a ratified flag state below.
+                      </div>
+                    )}
+
+                  <select
+                    value={bcForm.addressedToFlagId}
+                    onChange={(e) => handleAddressedToFlagChange(e.target.value)}
+                    style={{ width: '100%', marginBottom: '8px' }}
+                  >
+                    <option value="">Select flag state...</option>
+                    {flagStates
+                      .filter((fs) =>
+                        bcForm.cardType === 'BBC' ? fs.ratifiedBunker : fs.ratifiedWreck
+                      )
+                      .map((fs) => (
+                        <option key={fs.id} value={fs.id}>
+                          {fs.name}
+                          {fs.authorityName ? ` — ${fs.authorityName}` : ''}
+                        </option>
+                      ))}
+                  </select>
+
+                  {/* Inline "add flag state" — when the ratified flag needed isn't listed */}
+                  {!bcAddingFlag ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBcAddingFlag(true)
+                        setNewFlagForm({
+                          name: '',
+                          iso3: '',
+                          ratBunker: bcForm.cardType === 'BBC',
+                          ratWreck: bcForm.cardType === 'WRC',
+                          authName: '',
+                          authAddr: ''
+                        })
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginBottom: '8px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.78rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Plus size={13} /> Flag state not listed? Add it
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        marginBottom: '10px',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: 'var(--bg-primary)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '2fr 1fr',
+                          gap: '8px',
+                          marginBottom: '8px'
+                        }}
+                      >
+                        <input
+                          type="text"
+                          placeholder="Flag state name"
+                          value={newFlagForm.name}
+                          onChange={(e) => setNewFlagForm((f) => ({ ...f, name: e.target.value }))}
+                        />
+                        <input
+                          type="text"
+                          placeholder="ISO3 (e.g. PAN)"
+                          maxLength={3}
+                          value={newFlagForm.iso3}
+                          onChange={(e) =>
+                            setNewFlagForm((f) => ({ ...f, iso3: e.target.value.toUpperCase() }))
+                          }
+                          style={{ textTransform: 'uppercase' }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '16px',
+                          marginBottom: '8px',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newFlagForm.ratBunker}
+                            onChange={(e) =>
+                              setNewFlagForm((f) => ({ ...f, ratBunker: e.target.checked }))
+                            }
+                          />
+                          Ratified Bunker
+                        </label>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newFlagForm.ratWreck}
+                            onChange={(e) =>
+                              setNewFlagForm((f) => ({ ...f, ratWreck: e.target.checked }))
+                            }
+                          />
+                          Ratified Wreck
+                        </label>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Authority name"
+                        value={newFlagForm.authName}
+                        onChange={(e) =>
+                          setNewFlagForm((f) => ({ ...f, authName: e.target.value }))
+                        }
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <textarea
+                        placeholder="Authority address"
+                        rows={2}
+                        value={newFlagForm.authAddr}
+                        onChange={(e) =>
+                          setNewFlagForm((f) => ({ ...f, authAddr: e.target.value }))
+                        }
+                        style={{ width: '100%', resize: 'vertical', marginBottom: '8px' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setBcAddingFlag(false)}
+                          style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleAddFlagInline}
+                          style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                        >
+                          Add &amp; Select
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    placeholder="Authority name"
+                    value={bcForm.addressedToName}
+                    onChange={(e) => setBcForm((f) => ({ ...f, addressedToName: e.target.value }))}
+                    style={{ width: '100%', marginBottom: '8px' }}
+                  />
+                  <textarea
+                    placeholder="Authority address"
+                    value={bcForm.addressedToAddress}
+                    onChange={(e) =>
+                      setBcForm((f) => ({ ...f, addressedToAddress: e.target.value }))
+                    }
+                    rows={2}
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                </div>
+              )}
+
+              {/* Cancel & Replace */}
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: bcForm.cancelReplace
+                    ? isLight
+                      ? 'rgba(255, 176, 32, 0.06)'
+                      : 'rgba(255, 176, 32, 0.08)'
+                    : 'transparent',
+                  border: bcForm.cancelReplace
+                    ? '1px solid rgba(255, 176, 32, 0.2)'
+                    : '1px solid transparent'
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={bcForm.cancelReplace}
+                    onChange={(e) => setBcForm((f) => ({ ...f, cancelReplace: e.target.checked }))}
+                  />
+                  Cancel & Replace existing card
+                </label>
+                {bcForm.cancelReplace && (
+                  <textarea
+                    placeholder="Cancel & replace text..."
+                    value={bcForm.cancelReplaceText}
+                    onChange={(e) =>
+                      setBcForm((f) => ({ ...f, cancelReplaceText: e.target.value }))
+                    }
+                    rows={2}
+                    style={{ width: '100%', resize: 'vertical', marginTop: '8px' }}
+                  />
+                )}
+              </div>
+            </Modal>
           )}
 
           {/* Endorsements Card */}
@@ -5057,209 +4612,106 @@ export default function PolicyDetail({
       )}
 
       {/* War Declaration Modal */}
-      {showDeclarationModal && declarationFields && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
-            onClick={() => setShowDeclarationModal(false)}
-          />
-          <div
-            style={{
-              position: 'relative',
-              width: '700px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              borderRadius: '14px',
-              padding: '28px',
-              background: isLight ? '#ffffff' : '#1a1d28',
-              border: '1px solid var(--glass-border-color)'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: '1.1rem' }}>War Declaration</h2>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowDeclarationModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
+      {showDeclarationModal &&
+        declarationFields &&
+        (() => {
+          const f = declarationFields
+          const update = (key: keyof DeclarationFields, val: string): void =>
+            setDeclarationFields((prev) => (prev ? { ...prev, [key]: val } : prev))
+          const fieldRow = (
+            label: string,
+            key: keyof DeclarationFields,
+            rows?: number
+          ): React.JSX.Element => (
+            <Field label={label}>
+              {rows && rows > 1 ? (
+                <textarea
+                  value={f[key]}
+                  onChange={(e) => update(key, e.target.value)}
+                  rows={rows}
+                  style={{ resize: 'vertical' }}
+                />
+              ) : (
+                <input value={f[key]} onChange={(e) => update(key, e.target.value)} />
+              )}
+            </Field>
+          )
+          const wide = (
+            label: string,
+            key: keyof DeclarationFields,
+            rows?: number
+          ): React.JSX.Element => (
+            <div key={key} style={{ gridColumn: '1 / -1' }}>
+              {fieldRow(label, key, rows)}
             </div>
-            {(() => {
-              const f = declarationFields
-              const update = (key: keyof DeclarationFields, val: string): void =>
-                setDeclarationFields((prev) => (prev ? { ...prev, [key]: val } : prev))
-              const fieldRow = (
-                label: string,
-                key: keyof DeclarationFields,
-                rows?: number
-              ): React.JSX.Element => (
-                <div style={{ marginBottom: '12px' }}>
-                  <label
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '3px'
+          )
+          return (
+            <Modal
+              title="War Declaration"
+              icon={<FileCheck size={18} />}
+              onClose={() => setShowDeclarationModal(false)}
+              width={700}
+              closeOnOverlay={false}
+              footer={
+                <>
+                  <button onClick={() => setShowDeclarationModal(false)} className="btn-secondary">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await exportDeclarationDocx(policyId, f)
+                        showSuccess('Declaration exported')
+                        setShowDeclarationModal(false)
+                      } catch (err) {
+                        showError(errMessage(err, 'Export failed'))
+                      }
                     }}
+                    className="btn-primary"
                   >
-                    {label}
-                  </label>
-                  {rows && rows > 1 ? (
-                    <textarea
-                      value={f[key]}
-                      onChange={(e) => update(key, e.target.value)}
-                      rows={rows}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: '0.85rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)',
-                        fontFamily: 'inherit',
-                        resize: 'vertical'
-                      }}
-                    />
-                  ) : (
-                    <input
-                      value={f[key]}
-                      onChange={(e) => update(key, e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: '0.85rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)'
-                      }}
-                    />
-                  )}
+                    <Download size={14} /> Export
+                  </button>
+                </>
+              }
+            >
+              <div className="form-section">
+                <div className="form-grid cols-2">
+                  {fieldRow('Year of account', 'yearOfAccount')}
+                  {fieldRow('UMR', 'umr')}
+                  {wide('Reinsured', 'reinsured')}
+                  {wide('Assured', 'assuredText', 3)}
                 </div>
-              )
-              return (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                    {fieldRow('Year of Account', 'yearOfAccount')}
-                    {fieldRow('UMR', 'umr')}
-                  </div>
-                  {fieldRow('Reinsured', 'reinsured')}
-                  {fieldRow('Assured', 'assuredText', 3)}
-                  <div
-                    style={{
-                      borderTop: '1px solid var(--glass-border-color)',
-                      margin: '16px 0',
-                      paddingTop: '12px'
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        textTransform: 'uppercase',
-                        marginBottom: '8px'
-                      }}
-                    >
-                      Vessel
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                      {fieldRow('Name', 'vesselName')}
-                      {fieldRow('IMO', 'vesselImo')}
-                      {fieldRow('Sum Insured', 'vesselSumInsured')}
-                      {fieldRow('IV (if applicable)', 'vesselSumInsuredIV')}
-                      {fieldRow('Total Value', 'vesselTotalValue')}
-                      {fieldRow('Built', 'vesselBuilt')}
-                      {fieldRow('GT', 'vesselGT')}
-                      {fieldRow('Type', 'vesselType')}
-                    </div>
-                    {fieldRow('Class', 'vesselClass')}
-                  </div>
-                  <div
-                    style={{
-                      borderTop: '1px solid var(--glass-border-color)',
-                      margin: '16px 0',
-                      paddingTop: '12px'
-                    }}
-                  >
-                    {fieldRow('Period From', 'periodFrom')}
-                    {fieldRow('Period To', 'periodTo')}
-                  </div>
-                  {fieldRow('Wording', 'wording', 8)}
-                  {fieldRow('Warranties', 'warranties', 3)}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                    {fieldRow('Annual Rate', 'annualRate')}
-                    {fieldRow('Our Share', 'ourShare')}
-                  </div>
-                  {fieldRow('Trading', 'trading', 3)}
-                  {fieldRow('Risk Code', 'riskCode')}
-                  {fieldRow('Amlin Ref', 'amlinRef')}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: '8px',
-                      marginTop: '16px'
-                    }}
-                  >
-                    <button
-                      onClick={() => setShowDeclarationModal(false)}
-                      className="btn-secondary"
-                      style={{ padding: '8px 20px' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await exportDeclarationDocx(policyId, f)
-                          showSuccess('Declaration exported')
-                          setShowDeclarationModal(false)
-                        } catch (err) {
-                          showError(errMessage(err, 'Export failed'))
-                        }
-                      }}
-                      className="btn-primary"
-                      style={{
-                        padding: '8px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Download size={14} /> Export
-                    </button>
-                  </div>
+              </div>
+              <div className="form-section">
+                <h4 className="form-section-title">Vessel</h4>
+                <div className="form-grid cols-2">
+                  {fieldRow('Name', 'vesselName')}
+                  {fieldRow('IMO', 'vesselImo')}
+                  {fieldRow('Sum insured', 'vesselSumInsured')}
+                  {fieldRow('IV (if applicable)', 'vesselSumInsuredIV')}
+                  {fieldRow('Total value', 'vesselTotalValue')}
+                  {fieldRow('Built', 'vesselBuilt')}
+                  {fieldRow('GT', 'vesselGT')}
+                  {fieldRow('Type', 'vesselType')}
+                  {wide('Class', 'vesselClass')}
                 </div>
-              )
-            })()}
-          </div>
-        </div>
-      )}
+              </div>
+              <div className="form-section">
+                <div className="form-grid cols-2">
+                  {wide('Period from', 'periodFrom')}
+                  {wide('Period to', 'periodTo')}
+                  {wide('Wording', 'wording', 8)}
+                  {wide('Warranties', 'warranties', 3)}
+                  {fieldRow('Annual rate', 'annualRate')}
+                  {fieldRow('Our share', 'ourShare')}
+                  {wide('Trading', 'trading', 3)}
+                  {wide('Risk code', 'riskCode')}
+                  {wide('Amlin ref', 'amlinRef')}
+                </div>
+              </div>
+            </Modal>
+          )
+        })()}
 
       {/* Cancel Policy Modal */}
       {showCancelModal &&
@@ -5337,125 +4789,97 @@ export default function PolicyDetail({
                 : policy.inceptionDate?.slice(0, 10) || ''
               : cancelDate
 
+          const confirmCancel = async (): Promise<void> => {
+            if (returnPremium <= 0 && cancelMode === 'date') {
+              showError('Enter a valid cancellation date')
+              return
+            }
+            setCancelling(true)
+            try {
+              const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
+              await window.api.endorsementCancelPolicy(policyId, {
+                effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+                endorsementContent: content,
+                returnPremium,
+                premiumCurrency: currency,
+                commissionPercent: commPct,
+                instalments: returnInstalments,
+                isProRata: cancelMode === 'date',
+                annualPremium: cancelMode === 'date' ? Number(policy.premiumAmount) || 0 : null,
+                policyNumber: policy.policyNumber
+              })
+              showSuccess('Policy cancelled')
+              setShowCancelModal(false)
+              // Reload to reflect cancelled status
+              loadData()
+            } catch (err) {
+              showError(errMessage(err, 'Failed to cancel policy'))
+            }
+            setCancelling(false)
+          }
+
           return (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 9999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+            <Modal
+              title="Cancel Policy"
+              onClose={() => setShowCancelModal(false)}
+              width={520}
+              closeOnOverlay={false}
+              footer={
+                <>
+                  <button className="btn-secondary" onClick={() => setShowCancelModal(false)}>
+                    Close
+                  </button>
+                  <button className="btn-danger" onClick={confirmCancel} disabled={cancelling}>
+                    {cancelling ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+                    Cancel Policy
+                  </button>
+                </>
+              }
             >
-              <div
-                style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
-                onClick={() => setShowCancelModal(false)}
-              />
-              <div
+              <p
                 style={{
-                  position: 'relative',
-                  width: '520px',
-                  maxHeight: '85vh',
-                  overflowY: 'auto',
-                  borderRadius: '14px',
-                  padding: '24px',
-                  background: isLight ? '#ffffff' : '#1a1d28',
-                  border: '1px solid var(--glass-border-color)'
+                  fontSize: '0.85rem',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '16px'
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '16px'
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>
-                    Cancel Policy
-                  </h3>
+                {policy.policyNumber} — {policy.vesselName}
+              </p>
+
+              {/* Mode selector */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                {(['instalment', 'date'] as const).map((m) => (
                   <button
-                    title="Cancel"
-                    aria-label="Cancel"
-                    onClick={() => setShowCancelModal(false)}
+                    key={m}
+                    onClick={() => setCancelMode(m)}
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)'
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      border:
+                        cancelMode === m
+                          ? '2px solid var(--accent-primary)'
+                          : '1px solid var(--glass-border-color)',
+                      background:
+                        cancelMode === m ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                      color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      cursor: 'pointer'
                     }}
                   >
-                    <X size={18} />
+                    {m === 'instalment' ? 'Cancel on Instalment' : 'Cancel on Date (Pro-rata)'}
                   </button>
-                </div>
+                ))}
+              </div>
 
-                <p
-                  style={{
-                    fontSize: '0.85rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '16px'
-                  }}
-                >
-                  {policy.policyNumber} — {policy.vesselName}
-                </p>
-
-                {/* Mode selector */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  {(['instalment', 'date'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setCancelMode(m)}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        borderRadius: '8px',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        border:
-                          cancelMode === m
-                            ? '2px solid var(--accent-primary)'
-                            : '1px solid var(--glass-border-color)',
-                        background:
-                          cancelMode === m
-                            ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                            : 'transparent',
-                        color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {m === 'instalment' ? 'Cancel on Instalment' : 'Cancel on Date (Pro-rata)'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Instalment mode */}
-                {cancelMode === 'instalment' && instalments.length > 0 && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <label
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        display: 'block',
-                        marginBottom: '6px'
-                      }}
-                    >
-                      Cancel after instalment
-                    </label>
+              {/* Instalment mode */}
+              {cancelMode === 'instalment' && instalments.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <Field label="Cancel after instalment">
                     <select
                       value={cancelAfterInstalment}
                       onChange={(e) => setCancelAfterInstalment(Number(e.target.value))}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: '0.85rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)'
-                      }}
                     >
                       <option value={0}>From inception (return all)</option>
                       {instalments.map((inst) => (
@@ -5473,63 +4897,52 @@ export default function PolicyDetail({
                         </option>
                       ))}
                     </select>
-                  </div>
-                )}
+                  </Field>
+                </div>
+              )}
 
-                {/* Date mode */}
-                {cancelMode === 'date' && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <label
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        display: 'block',
-                        marginBottom: '6px'
-                      }}
-                    >
-                      Cancellation effective date
-                    </label>
+              {/* Date mode */}
+              {cancelMode === 'date' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <Field label="Cancellation effective date">
                     <input
                       type="date"
                       value={cancelDate}
                       onChange={(e) => setCancelDate(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: '0.85rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--input-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)'
-                      }}
                     />
-                  </div>
-                )}
+                  </Field>
+                </div>
+              )}
 
-                {/* Preview */}
-                {returnPremium > 0 && (
+              {/* Preview */}
+              {returnPremium > 0 && (
+                <div
+                  style={{
+                    background: 'var(--table-header-bg)',
+                    border: '1px solid var(--glass-border-color)',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <div className="field-label" style={{ marginBottom: '8px' }}>
+                    Return summary
+                  </div>
                   <div
                     style={{
-                      background: isLight ? '#f8f9fc' : '#161829',
-                      border: '1px solid var(--glass-border-color)',
-                      borderRadius: '8px',
-                      padding: '14px',
-                      marginBottom: '16px'
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '4px',
+                      fontSize: '0.85rem'
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        marginBottom: '8px'
-                      }}
-                    >
-                      Return Summary
-                    </div>
+                    <span>Return Premium</span>
+                    <span style={{ fontWeight: 700 }}>
+                      {currency}{' '}
+                      {returnPremium.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {returnCommission > 0 && (
                     <div
                       style={{
                         display: 'flex',
@@ -5538,168 +4951,85 @@ export default function PolicyDetail({
                         fontSize: '0.85rem'
                       }}
                     >
-                      <span>Return Premium</span>
+                      <span>Commission to Reclaim ({commPct}%)</span>
                       <span style={{ fontWeight: 700 }}>
                         {currency}{' '}
-                        {returnPremium.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {returnCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    {returnCommission > 0 && (
+                  )}
+                  {returnInstalments.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        borderTop: '1px solid var(--glass-border-color)',
+                        paddingTop: '8px'
+                      }}
+                    >
                       <div
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginBottom: '4px',
-                          fontSize: '0.85rem'
+                          fontSize: '0.72rem',
+                          color: 'var(--text-secondary)',
+                          marginBottom: '4px'
                         }}
                       >
-                        <span>Commission to Reclaim ({commPct}%)</span>
-                        <span style={{ fontWeight: 700 }}>
-                          {currency}{' '}
-                          {returnCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </span>
+                        Instalments to return:
                       </div>
-                    )}
-                    {returnInstalments.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          borderTop: '1px solid var(--glass-border-color)',
-                          paddingTop: '8px'
-                        }}
-                      >
+                      {returnInstalments.map((inst, i) => (
                         <div
+                          key={i}
                           style={{
-                            fontSize: '0.72rem',
-                            color: 'var(--text-secondary)',
-                            marginBottom: '4px'
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.8rem',
+                            marginBottom: '2px'
                           }}
                         >
-                          Instalments to return:
+                          <span>
+                            #{inst.instalmentNumber} —{' '}
+                            {inst.dueDate ? formatDateShort(inst.dueDate) : '—'}
+                          </span>
+                          <span>
+                            {currency}{' '}
+                            {inst.premiumAmount.toLocaleString('en-US', {
+                              minimumFractionDigits: 2
+                            })}
+                          </span>
                         </div>
-                        {returnInstalments.map((inst, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              fontSize: '0.8rem',
-                              marginBottom: '2px'
-                            }}
-                          >
-                            <span>
-                              #{inst.instalmentNumber} —{' '}
-                              {inst.dueDate ? formatDateShort(inst.dueDate) : '—'}
-                            </span>
-                            <span>
-                              {currency}{' '}
-                              {inst.premiumAmount.toLocaleString('en-US', {
-                                minimumFractionDigits: 2
-                              })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* Warnings */}
-                <div style={{ fontSize: '0.8rem', marginBottom: '16px' }}>
+              {/* Warnings */}
+              <div style={{ fontSize: '0.8rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginBottom: '4px',
+                    color: 'var(--danger)'
+                  }}
+                >
+                  <AlertTriangle size={14} /> Policy will be marked as cancelled
+                </div>
+                {isPnI && (
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       marginBottom: '4px',
-                      color: 'var(--danger)'
+                      color: 'var(--warning)'
                     }}
                   >
-                    <AlertTriangle size={14} /> Policy will be marked as cancelled
+                    <AlertTriangle size={14} /> Active blue cards will be superseded
                   </div>
-                  {isPnI && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '4px',
-                        color: '#ffb020'
-                      }}
-                    >
-                      <AlertTriangle size={14} /> Active blue cards will be superseded
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => setShowCancelModal(false)}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      border: '1px solid var(--glass-border-color)',
-                      background: 'transparent',
-                      color: 'var(--text-primary)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Close
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (returnPremium <= 0 && cancelMode === 'date') {
-                        showError('Enter a valid cancellation date')
-                        return
-                      }
-                      setCancelling(true)
-                      try {
-                        const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
-                        await window.api.endorsementCancelPolicy(policyId, {
-                          effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
-                          endorsementContent: content,
-                          returnPremium,
-                          premiumCurrency: currency,
-                          commissionPercent: commPct,
-                          instalments: returnInstalments,
-                          isProRata: cancelMode === 'date',
-                          annualPremium:
-                            cancelMode === 'date' ? Number(policy.premiumAmount) || 0 : null,
-                          policyNumber: policy.policyNumber
-                        })
-                        showSuccess('Policy cancelled')
-                        setShowCancelModal(false)
-                        // Reload to reflect cancelled status
-                        loadData()
-                      } catch (err) {
-                        showError(errMessage(err, 'Failed to cancel policy'))
-                      }
-                      setCancelling(false)
-                    }}
-                    disabled={cancelling}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      background: 'var(--danger)',
-                      color: '#fff',
-                      border: 'none',
-                      cursor: 'pointer',
-                      opacity: cancelling ? 0.6 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    {cancelling ? <Loader2 size={14} className="spin" /> : <X size={14} />}
-                    Cancel Policy
-                  </button>
-                </div>
+                )}
               </div>
-            </div>
+            </Modal>
           )
         })()}
 
@@ -5721,7 +5051,7 @@ export default function PolicyDetail({
         >
           <div
             style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
+              background: 'var(--bg-primary)',
               borderRadius: '12px',
               padding: '32px 40px',
               textAlign: 'center',
@@ -5734,7 +5064,7 @@ export default function PolicyDetail({
                 width: '36px',
                 height: '36px',
                 border: '3px solid var(--glass-border-color)',
-                borderTopColor: 'var(--accent)',
+                borderTopColor: 'var(--accent-primary)',
                 borderRadius: '50%',
                 margin: '0 auto 16px',
                 animation: 'spin 1s linear infinite'
@@ -5764,8 +5094,6 @@ function RevisionHistorySection({
 }): React.JSX.Element {
   const [revisions, setRevisions] = useState<PolicyRevision[]>([])
   const [loadingRevisions, setLoading] = useState(true)
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   // Nothing to load without a policy number
   const loading = !!policyNumber && loadingRevisions
 
@@ -5802,137 +5130,73 @@ function RevisionHistorySection({
     )
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-      <thead>
-        <tr style={{ borderBottom: '1px solid var(--table-border)', textAlign: 'left' }}>
-          <th
-            style={{
-              padding: '8px 12px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase'
-            }}
-          >
-            Rev
-          </th>
-          <th
-            style={{
-              padding: '8px 12px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase'
-            }}
-          >
-            Status
-          </th>
-          <th
-            style={{
-              padding: '8px 12px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase'
-            }}
-          >
-            Created
-          </th>
-          <th
-            style={{
-              padding: '8px 12px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase'
-            }}
-          >
-            By
-          </th>
-          <th
-            style={{
-              padding: '8px 12px',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: '0.75rem',
-              textTransform: 'uppercase'
-            }}
-          >
-            Exported
-          </th>
-          <th style={{ padding: '8px 12px' }}></th>
-        </tr>
-      </thead>
-      <tbody>
-        {revisions.map((rev) => {
-          const isCurrent = rev.id === currentPolicyId
-          return (
-            <tr
-              key={rev.id}
-              style={{
-                borderBottom: '1px solid var(--table-border)',
-                background: isCurrent
-                  ? isLight
-                    ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                    : 'rgba(var(--accent-primary-rgb), 0.08)'
-                  : 'transparent'
-              }}
-            >
-              <td style={{ padding: '8px 12px', fontWeight: isCurrent ? 700 : 400 }}>
-                R{rev.revisionNumber}
-                {isCurrent && (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Rev</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>By</th>
+            <th>Exported</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {revisions.map((rev) => {
+            const isCurrent = rev.id === currentPolicyId
+            return (
+              <tr key={rev.id} className={isCurrent ? 'selected' : undefined}>
+                <td style={{ fontWeight: isCurrent ? 700 : 400 }}>
+                  R{rev.revisionNumber}
+                  {isCurrent && (
+                    <span
+                      style={{
+                        marginLeft: '6px',
+                        fontSize: '0.7rem',
+                        color: 'var(--accent-primary)',
+                        fontWeight: 700
+                      }}
+                    >
+                      CURRENT
+                    </span>
+                  )}
+                </td>
+                <td>
                   <span
                     style={{
-                      marginLeft: '6px',
-                      fontSize: '0.7rem',
-                      color: 'var(--accent-primary)',
-                      fontWeight: 700
+                      padding: '2px 8px',
+                      borderRadius: '8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      background:
+                        rev.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(150,150,150,0.1)',
+                      color: rev.status === 'active' ? 'var(--success)' : 'var(--text-secondary)',
+                      border: `1px solid ${rev.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(150,150,150,0.2)'}`
                     }}
                   >
-                    CURRENT
+                    {(rev.status || '').toUpperCase()}
                   </span>
-                )}
-              </td>
-              <td style={{ padding: '8px 12px' }}>
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '8px',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    background:
-                      rev.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(150,150,150,0.1)',
-                    color: rev.status === 'active' ? '#22c55e' : 'var(--text-secondary)',
-                    border: `1px solid ${rev.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(150,150,150,0.2)'}`
-                  }}
-                >
-                  {(rev.status || '').toUpperCase()}
-                </span>
-              </td>
-              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                {rev.createdAt ? formatDate(rev.createdAt) : '-'}
-              </td>
-              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                {rev.createdByName || '-'}
-              </td>
-              <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                {rev.exportedAt ? formatDate(rev.exportedAt) : '-'}
-              </td>
-              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                {!isCurrent && onViewRevision && (
-                  <button
-                    onClick={() => onViewRevision(rev.id)}
-                    className="btn-secondary"
-                    style={{ padding: '3px 10px', fontSize: '0.75rem' }}
-                  >
-                    View
-                  </button>
-                )}
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+                </td>
+                <td className="muted">{rev.createdAt ? formatDate(rev.createdAt) : '-'}</td>
+                <td className="muted">{rev.createdByName || '-'}</td>
+                <td className="muted">{rev.exportedAt ? formatDate(rev.exportedAt) : '-'}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {!isCurrent && onViewRevision && (
+                    <button
+                      onClick={() => onViewRevision(rev.id)}
+                      className="btn-secondary"
+                      style={{ padding: '3px 10px', fontSize: '0.75rem' }}
+                    >
+                      View
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }

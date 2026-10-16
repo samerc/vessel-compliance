@@ -239,16 +239,11 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
   }
 
   const thStyle = (field: SortField, align: 'left' | 'right' = 'left'): React.CSSProperties => ({
-    padding: '12px 14px',
     textAlign: align,
-    fontSize: '0.75rem',
-    color: sortField === field ? 'var(--accent-primary)' : 'var(--text-secondary)',
-    fontWeight: 600,
+    color: sortField === field ? 'var(--accent-primary)' : undefined,
     cursor: 'pointer',
     userSelect: 'none',
-    whiteSpace: 'nowrap',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em'
+    whiteSpace: 'nowrap'
   })
 
   const selectStyle: React.CSSProperties = {
@@ -398,10 +393,10 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
       </div>
 
       {/* Table */}
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="table-wrap">
+        <table className="data-table">
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+            <tr>
               {visibleSet.has('policyNo') && (
                 <th style={thStyle('policyNumber')} onClick={() => toggleSort('policyNumber')}>
                   Policy No.{' '}
@@ -454,17 +449,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                   Exported <SortIcon field="exportedAt" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
-              <th
-                style={{
-                  padding: '10px 14px',
-                  textAlign: 'right',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-secondary)'
-                }}
-              >
+              <th style={{ textAlign: 'right' }}>
                 <div
                   style={{
                     display: 'flex',
@@ -526,18 +511,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
             ) : (
               paginated.map((p) => {
                 return (
-                  <tr
-                    key={p.id}
-                    style={{ borderBottom: '1px solid var(--table-border)', cursor: 'pointer' }}
-                    className="hover-effect"
-                    onClick={() => onSelectPolicy(p.id)}
-                  >
+                  <tr key={p.id} className="clickable" onClick={() => onSelectPolicy(p.id)}>
                     {visibleSet.has('policyNo') && (
                       <td
+                        className="mono"
                         style={{
-                          padding: '12px 14px',
                           fontWeight: 600,
-                          fontSize: '0.88rem',
                           color: (p.policyNumber || '').startsWith('POL-DRAFT-')
                             ? 'var(--text-secondary)'
                             : 'var(--accent-primary)'
@@ -553,7 +532,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                       </td>
                     )}
                     {visibleSet.has('type') && (
-                      <td style={{ padding: '12px 14px' }}>
+                      <td>
                         <Badge
                           color={getTypeColor(p.policyTypeName)}
                           style={{ borderRadius: '6px' }}
@@ -565,8 +544,6 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                     {visibleSet.has('vessel') && (
                       <td
                         style={{
-                          padding: '12px 14px',
-                          fontSize: '0.85rem',
                           maxWidth: '180px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -582,10 +559,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                     )}
                     {visibleSet.has('customer') && (
                       <td
+                        className="muted"
                         style={{
-                          padding: '12px 14px',
-                          fontSize: '0.82rem',
-                          color: 'var(--text-secondary)',
                           maxWidth: '150px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -596,19 +571,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                       </td>
                     )}
                     {visibleSet.has('period') && (
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
+                      <td className="muted" style={{ whiteSpace: 'nowrap' }}>
                         {formatPeriod(p.inceptionDate, p.expiryDate)}
                       </td>
                     )}
                     {visibleSet.has('status') && (
-                      <td style={{ padding: '12px 14px' }}>
+                      <td>
                         <Badge
                           tone={STATUS_TONES[p.status] || 'neutral'}
                           dot
@@ -620,10 +588,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                     )}
                     {visibleSet.has('premium') && (
                       <td
+                        className="num"
                         style={{
-                          padding: '12px 14px',
-                          textAlign: 'right',
-                          fontSize: '0.82rem',
                           fontWeight: p.premiumAmount ? 600 : 400,
                           whiteSpace: 'nowrap'
                         }}
@@ -632,22 +598,13 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                       </td>
                     )}
                     {visibleSet.has('converted') && (
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
+                      <td className="muted" style={{ whiteSpace: 'nowrap' }}>
                         {p.createdAt ? formatDateShort(p.createdAt) : '-'}
                       </td>
                     )}
                     {visibleSet.has('exported') && (
                       <td
                         style={{
-                          padding: '12px 14px',
-                          fontSize: '0.8rem',
                           whiteSpace: 'nowrap',
                           color: p.exportedAt ? 'var(--success)' : 'var(--text-secondary)'
                         }}
@@ -659,7 +616,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
                         )}
                       </td>
                     )}
-                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }}>
                       {visibleSet.has('actions') && hasPermission('policies:manage') && (
                         <button
                           onClick={(e) => {

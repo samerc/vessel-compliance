@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Receipt, Vessel, VesselAssured, ReceiptInput } from '../../../shared/types'
 import { isIpcError } from '../utils/ipc'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, EmptyState } from './ui'
+import { PageHeader, EmptyState, Modal, Field } from './ui'
 import { exportReceiptDocx, ordinal, formatReceiptAmount } from '../services/ReceiptExportService'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
@@ -15,7 +14,6 @@ import {
   Trash2,
   Pencil,
   Search,
-  X,
   Settings,
   Ship
 } from 'lucide-react'
@@ -66,8 +64,6 @@ export default function ReceiptManager({
   vesselName,
   embedded = false
 }: ReceiptManagerProps): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
 
   const [receipts, setReceipts] = useState<Receipt[]>([])
@@ -79,8 +75,6 @@ export default function ReceiptManager({
   const { hasPermission } = useAuth()
   const canManage = hasPermission('policies:manage') || hasPermission('admin:settings')
   const [editing, setEditing] = useState<Receipt | null>(null)
-
-  const modalBg = isLight ? '#ffffff' : '#1a1d28'
 
   const [reloadKey, setReloadKey] = useState(0)
   const loadReceipts = useCallback((): void => setReloadKey((k) => k + 1), [])
@@ -155,22 +149,6 @@ export default function ReceiptManager({
     }
   }
 
-  const th: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 12px',
-    fontSize: '0.72rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: 'var(--text-secondary)',
-    borderBottom: '1px solid var(--glass-border-color)',
-    whiteSpace: 'nowrap'
-  }
-  const td: React.CSSProperties = {
-    padding: '10px 12px',
-    fontSize: '0.85rem',
-    borderBottom: '1px solid var(--glass-border-color)'
-  }
-
   return (
     <div className={embedded ? undefined : 'fade-in page'}>
       {!embedded && (
@@ -242,36 +220,30 @@ export default function ReceiptManager({
         />
       </div>
 
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="table-wrap">
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
               <tr>
-                <th style={th}>Number</th>
-                <th style={th}>Date</th>
-                {!vesselId && <th style={th}>Vessel</th>}
-                <th style={th}>Received From</th>
-                <th style={th}>Covers</th>
-                <th style={{ ...th, textAlign: 'right' }}>Amount</th>
-                <th style={{ ...th, textAlign: 'right' }}>Actions</th>
+                <th>Number</th>
+                <th>Date</th>
+                {!vesselId && <th>Vessel</th>}
+                <th>Received From</th>
+                <th>Covers</th>
+                <th className="num">Amount</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td style={td} colSpan={vesselId ? 6 : 7}>
-                    Loading…
-                  </td>
+                  <td colSpan={vesselId ? 6 : 7}>Loading…</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    style={{
-                      ...td,
-                      textAlign: 'center',
-                      padding: '40px',
-                      color: 'var(--text-secondary)'
-                    }}
+                    className="muted"
+                    style={{ textAlign: 'center', padding: '40px' }}
                     colSpan={vesselId ? 6 : 7}
                   >
                     <EmptyState
@@ -300,21 +272,21 @@ export default function ReceiptManager({
               ) : (
                 filtered.map((r) => (
                   <tr key={r.id}>
-                    <td style={{ ...td, fontFamily: 'monospace', fontWeight: 600 }}>
+                    <td className="mono" style={{ fontWeight: 600 }}>
                       {r.receiptNumber}
                     </td>
-                    <td style={td}>{formatDate(r.receiptDate) || r.receiptDate}</td>
-                    {!vesselId && <td style={td}>{r.vesselName || '—'}</td>}
-                    <td style={td}>{r.payerName}</td>
-                    <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                    <td>{formatDate(r.receiptDate) || r.receiptDate}</td>
+                    {!vesselId && <td>{r.vesselName || '—'}</td>}
+                    <td>{r.payerName}</td>
+                    <td className="mono" style={{ fontSize: '0.78rem' }}>
                       {r.policies && r.policies.length > 0
                         ? r.policies.map((p) => p.policyNumber).join(' & ')
                         : r.coversText || '—'}
                     </td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+                    <td className="num" style={{ fontWeight: 600 }}>
                       {formatReceiptAmount(r.amount, r.currency)}
                     </td>
-                    <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button title="Export DOCX" onClick={() => handleExport(r)} style={iconBtn}>
                         <FileDown size={16} />
                       </button>
@@ -341,8 +313,6 @@ export default function ReceiptManager({
 
       {showModal && (
         <ReceiptModal
-          isLight={isLight}
-          modalBg={modalBg}
           editing={editing}
           lockedVesselId={vesselId}
           lockedVesselName={vesselName}
@@ -354,7 +324,7 @@ export default function ReceiptManager({
         />
       )}
 
-      {showSettings && <SettingsModal modalBg={modalBg} onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
@@ -370,16 +340,12 @@ const iconBtn: React.CSSProperties = {
 
 // ── Create / Edit modal ──────────────────────────────────────────────────
 function ReceiptModal({
-  isLight,
-  modalBg,
   editing,
   lockedVesselId,
   lockedVesselName,
   onClose,
   onSaved
 }: {
-  isLight: boolean
-  modalBg: string
   editing: Receipt | null
   lockedVesselId?: string
   lockedVesselName?: string
@@ -706,435 +672,354 @@ function ReceiptModal({
     }
   }
 
-  const label: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.72rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: 'var(--text-secondary)',
-    marginBottom: '6px',
-    fontWeight: 600
-  }
-  const input: React.CSSProperties = {
-    width: '100%',
-    padding: '9px 12px',
-    borderRadius: '8px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    fontSize: '0.85rem'
-  }
-
   return (
-    <div style={overlay} onMouseDown={onClose}>
-      <div style={{ ...modalWrap, background: modalBg }} onMouseDown={(e) => e.stopPropagation()}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '18px'
-          }}
-        >
-          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ReceiptIcon size={22} /> {editing ? 'Edit Receipt' : 'New Receipt'}
-          </h2>
-          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}>
-            <X size={20} />
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gap: '16px' }}>
-          {/* Number + Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={label}>Receipt Number</label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  style={{ ...input, fontFamily: 'monospace', opacity: numberOverride ? 1 : 0.7 }}
-                  value={numberPreview}
-                  disabled={!numberOverride}
-                  onChange={(e) => setNumberPreview(e.target.value)}
-                />
-                {!editing && (
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={numberOverride}
-                      onChange={(e) => setNumberOverride(e.target.checked)}
-                    />{' '}
-                    edit
-                  </label>
-                )}
-              </div>
-            </div>
-            <div>
-              <label style={label}>Date</label>
-              <input
-                type="date"
-                style={input}
-                value={receiptDate}
-                onChange={(e) => setReceiptDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Vessel */}
-          <div style={{ position: 'relative' }}>
-            <label style={label}>Vessel (active &amp; inactive)</label>
-            {lockedVesselId ? (
-              <input style={{ ...input, opacity: 0.8 }} value={vName} disabled />
-            ) : (
-              <>
-                <div style={{ position: 'relative' }}>
-                  <Ship
-                    size={15}
-                    style={{
-                      position: 'absolute',
-                      left: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--text-secondary)'
-                    }}
-                  />
-                  <input
-                    style={{ ...input, paddingLeft: '32px' }}
-                    placeholder="Search vessel by name or IMO…"
-                    value={vesselDropOpen ? vesselSearch : vName}
-                    onFocus={() => {
-                      setVesselDropOpen(true)
-                      setVesselSearch('')
-                    }}
-                    onChange={(e) => {
-                      setVesselSearch(e.target.value)
-                      setVesselDropOpen(true)
-                    }}
-                    onBlur={() => setTimeout(() => setVesselDropOpen(false), 150)}
-                  />
-                </div>
-                {vesselDropOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 50,
-                      marginTop: '4px',
-                      maxHeight: '240px',
-                      overflowY: 'auto',
-                      borderRadius: '8px',
-                      border: '1px solid var(--input-border)',
-                      background: modalBg,
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                    }}
-                  >
-                    {filteredVessels.length === 0 ? (
-                      <div
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: '0.82rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        No vessels found
-                      </div>
-                    ) : (
-                      filteredVessels.map((v) => (
-                        <div
-                          key={v.id}
-                          onMouseDown={() => selectVessel(v)}
-                          style={{
-                            padding: '8px 14px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                            borderBottom: '1px solid var(--glass-border-color)'
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = isLight
-                              ? 'rgba(0,0,0,0.04)'
-                              : 'rgba(255,255,255,0.06)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <span>
-                            {v.name}
-                            {!v.isActive && (
-                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
-                                {' '}
-                                (inactive)
-                              </span>
-                            )}
-                          </span>
-                          <span
-                            style={{
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.75rem',
-                              fontFamily: 'monospace'
-                            }}
-                          >
-                            {v.imoNumber || ''}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Amount + currency */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={label}>Amount</label>
-              <StrMoneyInput
-                value={amount}
-                onChange={(s) => setAmount(s)}
-                placeholder="0.00"
-                style={input}
-              />
-            </div>
-            <div>
-              <label style={label}>Currency</label>
-              <select style={input} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Policies */}
-          <div>
-            <label style={label}>Policies covered</label>
-            {vId && policies.length > 0 && (
-              <input
-                style={{ ...input, marginBottom: '8px' }}
-                value={policySearch}
-                onChange={(e) => setPolicySearch(e.target.value)}
-                placeholder="Search policies by number or type…"
-              />
-            )}
-            {vId && policies.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                {policies
-                  .filter((p) => {
-                    const q = policySearch.trim().toLowerCase()
-                    if (!q) return true
-                    return (
-                      p.policyNumber.toLowerCase().includes(q) ||
-                      (p.typeName || '').toLowerCase().includes(q)
-                    )
-                  })
-                  .map((p) => {
-                    const on = selectedPolicies.some((sp) => sp.policyNumber === p.policyNumber)
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => togglePolicy(p)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          fontSize: '0.8rem',
-                          cursor: 'pointer',
-                          fontFamily: 'monospace',
-                          border: on
-                            ? '1.5px solid var(--accent-primary)'
-                            : '1px solid var(--input-border)',
-                          background: on ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
-                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                        }}
-                      >
-                        {p.policyNumber}
-                        {p.typeName ? ` · ${p.typeName}` : ''}
-                        {p.source === 'dynamic' ? ' ·' : ''}
-                      </button>
-                    )
-                  })}
-              </div>
-            ) : (
-              <div
-                style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}
-              >
-                {vId
-                  ? 'No policies on file for this vessel — type policy numbers below.'
-                  : 'Select a vessel to list its policies.'}
-              </div>
-            )}
-            <input
-              style={{ ...input, fontFamily: 'monospace' }}
-              value={freeCovers}
-              onChange={(e) => setFreeCovers(e.target.value)}
-              placeholder="Or type policy numbers, separated by & or comma (e.g. H26209901 & P26209902)"
-            />
-
-            {/* Per-policy instalment (split descriptions) — accepts multiple, e.g. 1 & 2 */}
-            {selectedPolicies.length > 0 && (
-              <div style={{ marginTop: '10px', display: 'grid', gap: '6px' }}>
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em'
-                  }}
-                >
-                  Instalment(s) per policy — description is split
-                </div>
-                {selectedPolicies.map((sp) => (
-                  <div
-                    key={sp.policyNumber}
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
-                  >
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>
-                      {sp.policyNumber}
-                      {sp.typeName ? ` · ${sp.typeName}` : ''}
-                    </span>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                      Instalment(s)
-                    </span>
-                    <input
-                      type="text"
-                      defaultValue={sp.instalments.join(' & ')}
-                      onChange={(e) => setPolicyInstalments(sp.policyNumber, e.target.value)}
-                      placeholder="e.g. 1 & 2"
-                      title="One or more instalment numbers, e.g. 1 & 2"
-                      style={{ ...input, width: '110px', padding: '6px 8px' }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Payer */}
-          <div>
-            <label style={label}>Received From</label>
-            <select
-              style={input}
-              value={payerMode === 'other' ? '__other__' : payerEntityId || ''}
-              onChange={(e) => {
-                const val = e.target.value
-                if (val === '__other__') {
-                  setPayerMode('other')
-                  setPayerEntityId(null)
-                  setPayerName('')
-                } else {
-                  setPayerMode('select')
-                  const a = assureds.find((x) => x.entityId === val)
-                  const name = a ? entityMap[a.entityId] || '' : ''
-                  setPayerEntityId(val || null)
-                  setPayerName(name)
-                }
-              }}
-            >
-              <option value="" disabled>
-                {assureds.length > 0 ? 'Select payer…' : 'No assureds — choose Other'}
-              </option>
-              {assureds.map((a) => {
-                const name = entityMap[a.entityId] || a.entityId
-                return (
-                  <option key={a.id} value={a.entityId}>
-                    {name}
-                    {a.role ? ` (${a.role})` : ''}
-                  </option>
-                )
-              })}
-              <option value="__other__">Other…</option>
-            </select>
-            {payerMode === 'other' && (
-              <input
-                style={{ ...input, marginTop: '8px' }}
-                value={payerName}
-                onChange={(e) => {
-                  setPayerName(e.target.value)
-                  setPayerEntityId(null)
-                }}
-                placeholder="Type payer name"
-                autoFocus
-              />
-            )}
-          </div>
-
-          {/* Auto text: The Sum Of / Being */}
-          <div>
-            <label style={label}>The Sum Of (amount in words)</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <input
-                style={input}
-                value={wordsValue}
-                onChange={(e) => setWordsOverride(e.target.value)}
-              />
-              {wordsOverride != null && (
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
-                  onClick={() => setWordsOverride(null)}
-                >
-                  Auto
-                </button>
-              )}
-            </div>
-          </div>
-          <div>
-            <label style={label}>Being</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <textarea
-                style={{ ...input, minHeight: '58px', resize: 'vertical' }}
-                value={beingValue}
-                onChange={(e) => setBeingOverride(e.target.value)}
-              />
-              {beingOverride != null && (
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
-                  onClick={() => setBeingOverride(null)}
-                >
-                  Auto
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}
-        >
+    <Modal
+      title={editing ? 'Edit Receipt' : 'New Receipt'}
+      icon={<ReceiptIcon size={18} />}
+      onClose={onClose}
+      width={640}
+      closeOnOverlay={false}
+      footer={
+        <>
           <button className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Receipt'}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="form-grid cols-2">
+        <Field label="Receipt number">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              style={{ flex: 1, fontFamily: 'monospace', opacity: numberOverride ? 1 : 0.7 }}
+              value={numberPreview}
+              disabled={!numberOverride}
+              onChange={(e) => setNumberPreview(e.target.value)}
+            />
+            {!editing && (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.72rem',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={numberOverride}
+                  onChange={(e) => setNumberOverride(e.target.checked)}
+                />{' '}
+                edit
+              </label>
+            )}
+          </div>
+        </Field>
+        <Field label="Date">
+          <input type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
+        </Field>
+
+        {/* Vessel */}
+        <Field label="Vessel (active &amp; inactive)" span="all">
+          {lockedVesselId ? (
+            <input style={{ opacity: 0.8 }} value={vName} disabled />
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <Ship
+                  size={15}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-secondary)'
+                  }}
+                />
+                <input
+                  style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '32px' }}
+                  placeholder="Search vessel by name or IMO…"
+                  value={vesselDropOpen ? vesselSearch : vName}
+                  onFocus={() => {
+                    setVesselDropOpen(true)
+                    setVesselSearch('')
+                  }}
+                  onChange={(e) => {
+                    setVesselSearch(e.target.value)
+                    setVesselDropOpen(true)
+                  }}
+                  onBlur={() => setTimeout(() => setVesselDropOpen(false), 150)}
+                />
+              </div>
+              {vesselDropOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    marginTop: '4px',
+                    maxHeight: '240px',
+                    overflowY: 'auto',
+                    borderRadius: '8px',
+                    border: '1px solid var(--input-border)',
+                    background: 'var(--bg-primary)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {filteredVessels.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        fontSize: '0.82rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      No vessels found
+                    </div>
+                  ) : (
+                    filteredVessels.map((v) => (
+                      <div
+                        key={v.id}
+                        onMouseDown={() => selectVessel(v)}
+                        style={{
+                          padding: '8px 14px',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          borderBottom: '1px solid var(--glass-border-color)'
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = 'var(--row-hover)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span>
+                          {v.name}
+                          {!v.isActive && (
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                              {' '}
+                              (inactive)
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className="mono"
+                          style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}
+                        >
+                          {v.imoNumber || ''}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </Field>
+
+        {/* Amount + currency */}
+        <Field label="Amount">
+          <StrMoneyInput value={amount} onChange={(s) => setAmount(s)} placeholder="0.00" />
+        </Field>
+        <Field label="Currency">
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {/* Policies */}
+        <Field label="Policies covered" span="all">
+          {vId && policies.length > 0 && (
+            <input
+              value={policySearch}
+              onChange={(e) => setPolicySearch(e.target.value)}
+              placeholder="Search policies by number or type…"
+            />
+          )}
+          {vId && policies.length > 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {policies
+                .filter((p) => {
+                  const q = policySearch.trim().toLowerCase()
+                  if (!q) return true
+                  return (
+                    p.policyNumber.toLowerCase().includes(q) ||
+                    (p.typeName || '').toLowerCase().includes(q)
+                  )
+                })
+                .map((p) => {
+                  const on = selectedPolicies.some((sp) => sp.policyNumber === p.policyNumber)
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePolicy(p)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        fontFamily: 'monospace',
+                        border: on
+                          ? '1.5px solid var(--accent-primary)'
+                          : '1px solid var(--input-border)',
+                        background: on ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
+                        color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                      }}
+                    >
+                      {p.policyNumber}
+                      {p.typeName ? ` · ${p.typeName}` : ''}
+                      {p.source === 'dynamic' ? ' ·' : ''}
+                    </button>
+                  )
+                })}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {vId
+                ? 'No policies on file for this vessel — type policy numbers below.'
+                : 'Select a vessel to list its policies.'}
+            </div>
+          )}
+          <input
+            style={{ fontFamily: 'monospace' }}
+            value={freeCovers}
+            onChange={(e) => setFreeCovers(e.target.value)}
+            placeholder="Or type policy numbers, separated by & or comma (e.g. H26209901 & P26209902)"
+          />
+
+          {/* Per-policy instalment (split descriptions) — accepts multiple, e.g. 1 & 2 */}
+          {selectedPolicies.length > 0 && (
+            <div style={{ marginTop: '4px', display: 'grid', gap: '6px' }}>
+              <div className="field-hint">Instalment(s) per policy — description is split</div>
+              {selectedPolicies.map((sp) => (
+                <div
+                  key={sp.policyNumber}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+                >
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>
+                    {sp.policyNumber}
+                    {sp.typeName ? ` · ${sp.typeName}` : ''}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                    Instalment(s)
+                  </span>
+                  <input
+                    type="text"
+                    defaultValue={sp.instalments.join(' & ')}
+                    onChange={(e) => setPolicyInstalments(sp.policyNumber, e.target.value)}
+                    placeholder="e.g. 1 & 2"
+                    title="One or more instalment numbers, e.g. 1 & 2"
+                    style={{ width: '110px', padding: '6px 8px' }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </Field>
+
+        {/* Payer */}
+        <Field label="Received from" span="all">
+          <select
+            value={payerMode === 'other' ? '__other__' : payerEntityId || ''}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '__other__') {
+                setPayerMode('other')
+                setPayerEntityId(null)
+                setPayerName('')
+              } else {
+                setPayerMode('select')
+                const a = assureds.find((x) => x.entityId === val)
+                const name = a ? entityMap[a.entityId] || '' : ''
+                setPayerEntityId(val || null)
+                setPayerName(name)
+              }
+            }}
+          >
+            <option value="" disabled>
+              {assureds.length > 0 ? 'Select payer…' : 'No assureds — choose Other'}
+            </option>
+            {assureds.map((a) => {
+              const name = entityMap[a.entityId] || a.entityId
+              return (
+                <option key={a.id} value={a.entityId}>
+                  {name}
+                  {a.role ? ` (${a.role})` : ''}
+                </option>
+              )
+            })}
+            <option value="__other__">Other…</option>
+          </select>
+          {payerMode === 'other' && (
+            <input
+              value={payerName}
+              onChange={(e) => {
+                setPayerName(e.target.value)
+                setPayerEntityId(null)
+              }}
+              placeholder="Type payer name"
+              autoFocus
+            />
+          )}
+        </Field>
+
+        {/* Auto text: The Sum Of / Being */}
+        <Field label="The sum of (amount in words)" span="all">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <input
+              style={{ flex: 1 }}
+              value={wordsValue}
+              onChange={(e) => setWordsOverride(e.target.value)}
+            />
+            {wordsOverride != null && (
+              <button
+                className="btn-secondary"
+                style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
+                onClick={() => setWordsOverride(null)}
+              >
+                Auto
+              </button>
+            )}
+          </div>
+        </Field>
+        <Field label="Being" span="all">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <textarea
+              style={{ flex: 1, minHeight: '58px', resize: 'vertical' }}
+              value={beingValue}
+              onChange={(e) => setBeingOverride(e.target.value)}
+            />
+            {beingOverride != null && (
+              <button
+                className="btn-secondary"
+                style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
+                onClick={() => setBeingOverride(null)}
+              >
+                Auto
+              </button>
+            )}
+          </div>
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
 }
 
 // ── Settings modal ───────────────────────────────────────────────────────
-function SettingsModal({
-  modalBg,
-  onClose
-}: {
-  modalBg: string
-  onClose: () => void
-}): React.JSX.Element {
+function SettingsModal({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { showError, showSuccess } = useToast()
   const [nextSerial, setNextSerial] = useState('')
   const [city, setCity] = useState('BEIRUT')
@@ -1168,102 +1053,41 @@ function SettingsModal({
     }
   }
 
-  const label: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.72rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: 'var(--text-secondary)',
-    marginBottom: '6px',
-    fontWeight: 600
-  }
-  const input: React.CSSProperties = {
-    width: '100%',
-    padding: '9px 12px',
-    borderRadius: '8px',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    fontSize: '0.85rem'
-  }
-
   return (
-    <div style={overlay} onMouseDown={onClose}>
-      <div
-        style={{ ...modalWrap, background: modalBg, maxWidth: '420px' }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '18px'
-          }}
-        >
-          <h2 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Settings size={20} /> Receipt Settings
-          </h2>
-          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}>
-            <X size={20} />
-          </button>
-        </div>
-        <div style={{ display: 'grid', gap: '16px' }}>
-          <div>
-            <label style={label}>Next Receipt Number</label>
-            <input
-              style={input}
-              type="number"
-              min={1}
-              value={nextSerial}
-              onChange={(e) => setNextSerial(e.target.value)}
-            />
-            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-              The running serial used for the next auto-numbered receipt (H&lt;n&gt;/year). It never
-              resets by year.
-            </p>
-          </div>
-          <div>
-            <label style={label}>City (on receipt date line)</label>
-            <input
-              style={input}
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="BEIRUT"
-            />
-          </div>
-        </div>
-        <div
-          style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}
-        >
+    <Modal
+      title="Receipt Settings"
+      icon={<Settings size={18} />}
+      onClose={onClose}
+      width={420}
+      closeOnOverlay={false}
+      footer={
+        <>
           <button className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
           <button className="btn-primary" onClick={save} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="form-grid">
+        <Field
+          label="Next receipt number"
+          span="all"
+          hint="The running serial used for the next auto-numbered receipt (H<n>/year). It never resets by year."
+        >
+          <input
+            type="number"
+            min={1}
+            value={nextSerial}
+            onChange={(e) => setNextSerial(e.target.value)}
+          />
+        </Field>
+        <Field label="City (on receipt date line)" span="all">
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="BEIRUT" />
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
-}
-
-const overlay: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.5)',
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'center',
-  zIndex: 1000,
-  padding: '40px 20px',
-  overflowY: 'auto'
-}
-const modalWrap: React.CSSProperties = {
-  borderRadius: '14px',
-  padding: '24px',
-  width: '100%',
-  maxWidth: '640px',
-  border: '1px solid var(--glass-border-color)',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
 }
