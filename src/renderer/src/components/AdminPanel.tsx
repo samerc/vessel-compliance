@@ -830,7 +830,11 @@ export default function AdminPanel({
   }
 
   const handleDeletePolicyType = async (id: string): Promise<void> => {
-    if (!(await confirmDialog('Delete this policy type? It will be removed from all vessels.')))
+    if (
+      !(await confirmDialog(
+        'Delete this policy type? A type still used by policies or quotations cannot be deleted.'
+      ))
+    )
       return
     await window.api.deletePolicyType(id)
     loadPolicyTypes()
@@ -1162,7 +1166,11 @@ export default function AdminPanel({
   }
 
   const handleDeleteDocType = async (id: string): Promise<void> => {
-    if (await confirmDialog('Delete this document type? It will be removed from all vessels.')) {
+    if (
+      await confirmDialog(
+        'Delete this document type? It is removed from all vessels; a type with filed documents cannot be deleted (set it inactive instead).'
+      )
+    ) {
       await window.api.deleteDocumentType(id)
       await loadDocTypes()
     }

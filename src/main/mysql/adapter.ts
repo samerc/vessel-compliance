@@ -1866,6 +1866,23 @@ export class MySQLAdapter {
         }
       }
 
+      // Migration: remove rows whose parent was deleted before the deletes cleaned up after
+      // themselves (open defects of deleted surveys counted as overdue, values of deleted policies)
+      for (const sql of [
+        'DELETE da FROM defect_attachments da LEFT JOIN survey_defects d ON d.id = da.defect_id WHERE d.id IS NULL',
+        'DELETE d FROM survey_defects d LEFT JOIN condition_surveys s ON s.id = d.survey_id WHERE s.id IS NULL',
+        'DELETE a FROM survey_attachments a LEFT JOIN condition_surveys s ON s.id = a.survey_id WHERE s.id IS NULL',
+        'DELETE v FROM vessel_policy_values v LEFT JOIN vessel_dynamic_policies p ON p.id = v.policy_id WHERE p.id IS NULL',
+        'DELETE ed FROM entity_documents ed LEFT JOIN entities e ON e.id = ed.entity_id WHERE e.id IS NULL',
+        'DELETE ea FROM entity_addresses ea LEFT JOIN entities e ON e.id = ea.entity_id WHERE e.id IS NULL'
+      ]) {
+        try {
+          await this.pool.query(sql)
+        } catch (e) {
+          console.error('Migration warning (orphan cleanup):', e)
+        }
+      }
+
       // Migration: quotations on the Converted step that have policies are 'converted'
       // (conversion used to move only the workflow step, so the Active / Converted views were wrong)
       try {
@@ -5955,6 +5972,20 @@ export class MySQLAdapter {
 
   async deleteDocumentType(id: string): Promise<void> {
     if (!this.pool) return
+    // Removing the type from all vessels must not silently drop filed documents
+    const [[use]] = (await this.pool.query(
+      "SELECT COUNT(DISTINCT vessel_id) AS n FROM vessel_documents WHERE document_type_id = ? AND file_path IS NOT NULL AND file_path <> ''",
+      [id]
+    )) as QueryRows
+    const n = Number(use?.n || 0)
+    if (n > 0)
+      throw new Error(
+        `${n} vessel${n === 1 ? ' has a file' : 's have files'} filed under this document type, so it cannot be deleted. Set it inactive instead.`
+      )
+    await this.pool.execute('DELETE FROM vessel_documents WHERE document_type_id = ?', [id])
+    await this.pool.execute('DELETE FROM document_type_policy_types WHERE document_type_id = ?', [
+      id
+    ])
     await this.pool.execute('DELETE FROM document_types WHERE id = ?', [id])
   }
 
@@ -6001,6 +6032,8 @@ export class MySQLAdapter {
 
   async deleteFleet(id: string): Promise<void> {
     if (!this.pool) return
+    // Its vessels become standalone instead of pointing at a fleet that no longer exists
+    await this.pool.execute('UPDATE vessels SET fleet_id = NULL WHERE fleet_id = ?', [id])
     await this.pool.execute('DELETE FROM fleets WHERE id = ?', [id])
   }
 
@@ -7157,9 +7190,47 @@ export class MySQLAdapter {
 
   async deleteEntity(id: string): Promise<void> {
     if (!this.pool) return
-    // Clear customer_id on vessels that reference this entity as their customer
+    // Business records keep pointing at the entity (customer, insured, payer): deleting it would
+    // drop those vessels out of customer views. Merge it into the right entity instead.
+    const [[use]] = (await this.pool.query(
+      `SELECT (SELECT COUNT(*) FROM quotations WHERE customer_entity_id = ? AND deleted_at IS NULL)
+                + (SELECT COUNT(*) FROM quotation_assureds WHERE entity_id = ?) AS quots,
+              (SELECT COUNT(*) FROM vessel_dynamic_policies WHERE customer_entity_id = ? OR broker_entity_id = ?)
+                + (SELECT COUNT(*) FROM policy_doc_addresses WHERE entity_id = ?)
+                + (SELECT COUNT(*) FROM policy_blue_cards WHERE owner_entity_id = ?) AS pols,
+              (SELECT COUNT(*) FROM receipts WHERE payer_entity_id = ?) AS recs`,
+      [id, id, id, id, id, id, id]
+    )) as QueryRows
+    const quots = Number(use?.quots || 0)
+    const pols = Number(use?.pols || 0)
+    const recs = Number(use?.recs || 0)
+    if (quots + pols + recs > 0) {
+      const parts = [
+        quots ? `${quots} quotation record${quots === 1 ? '' : 's'}` : '',
+        pols ? `${pols} policy record${pols === 1 ? '' : 's'}` : '',
+        recs ? `${recs} receipt${recs === 1 ? '' : 's'}` : ''
+      ].filter(Boolean)
+      throw new Error(
+        `This entity is used by ${parts.join(', ')}, so it cannot be deleted. Use Find Duplicates to merge it into the right entity instead.`
+      )
+    }
+    // Its own rows go with it (most databases lack the cascading foreign keys)
     await this.pool.execute(
       'UPDATE vessels SET customer_id = NULL, customer_type = NULL WHERE customer_id = ?',
+      [id]
+    )
+    for (const [table, col] of [
+      ['entity_addresses', 'entity_id'],
+      ['entity_commission_overrides', 'entity_id'],
+      ['entity_documents', 'entity_id'],
+      ['entity_ubos', 'assured_entity_id'],
+      ['entity_ubos', 'ubo_entity_id'],
+      ['vessel_assureds', 'entity_id'],
+      ['compliance_check_results', 'entity_id']
+    ])
+      await this.pool.execute(`DELETE FROM ${table} WHERE ${col} = ?`, [id])
+    await this.pool.execute(
+      'UPDATE sanctions_report_checks SET entity_id = NULL WHERE entity_id = ?',
       [id]
     )
     await this.pool.execute('DELETE FROM entities WHERE id = ?', [id])
@@ -8686,6 +8757,18 @@ export class MySQLAdapter {
 
   async deleteConditionSurvey(id: string): Promise<void> {
     if (!this.pool) return
+    // Most databases lack the cascading foreign keys: remove the survey's own rows explicitly
+    await this.pool.execute(
+      'DELETE FROM defect_attachments WHERE defect_id IN (SELECT id FROM survey_defects WHERE survey_id = ?)',
+      [id]
+    )
+    await this.pool.execute('DELETE FROM survey_defects WHERE survey_id = ?', [id])
+    await this.pool.execute('DELETE FROM survey_attachments WHERE survey_id = ?', [id])
+    // A warranty that this survey satisfied stays, unlinked
+    await this.pool.execute(
+      'UPDATE survey_warranties SET condition_survey_id = NULL WHERE condition_survey_id = ?',
+      [id]
+    )
     await this.pool.execute('DELETE FROM condition_surveys WHERE id = ?', [id])
   }
 
@@ -9995,6 +10078,28 @@ export class MySQLAdapter {
 
   async deletePolicyType(id: string): Promise<void> {
     if (!this.pool) return
+    // There are no foreign keys here: a type still used by policies or quotations would leave
+    // them pointing at nothing (and its code drives quotation behaviour)
+    const [[use]] = (await this.pool.query(
+      `SELECT (SELECT COUNT(*) FROM vessel_dynamic_policies WHERE policy_type_id = ?) AS pols,
+              (SELECT COUNT(*) FROM quotations WHERE quotation_type_id = ? OR policy_type_id = ?) AS quots`,
+      [id, id, id]
+    )) as QueryRows
+    const pols = Number(use?.pols || 0)
+    const quots = Number(use?.quots || 0)
+    if (pols + quots > 0)
+      throw new Error(
+        `This type is used by ${pols} vessel polic${pols === 1 ? 'y' : 'ies'} and ${quots} quotation${quots === 1 ? '' : 's'}, so it cannot be deleted. Rename it instead.`
+      )
+    for (const table of [
+      'policy_type_characteristics',
+      'policy_type_commissions',
+      'policy_type_conditions',
+      'document_type_policy_types',
+      'entity_commission_overrides',
+      'vessel_policies'
+    ])
+      await this.pool.execute(`DELETE FROM ${table} WHERE policy_type_id = ?`, [id])
     await this.pool.execute('DELETE FROM policy_types WHERE id = ?', [id])
   }
 
@@ -11744,8 +11849,8 @@ export class MySQLAdapter {
   }
 
   async deleteQuotationType(id: string): Promise<void> {
-    if (!this.pool) return
-    await this.pool.execute('DELETE FROM policy_types WHERE id = ?', [id])
+    // Quotation types are policy_types rows: same checks and clean-up
+    return this.deletePolicyType(id)
   }
 
   async reorderQuotationTypes(ids: string[]): Promise<void> {
@@ -22263,28 +22368,25 @@ export class MySQLAdapter {
   // --- Bulk Entity Operations ---
   async bulkDeleteEntities(entityIds: string[]): Promise<number> {
     if (!this.pool || entityIds.length === 0) return 0
-    const placeholders = entityIds.map(() => '?').join(',')
-    // Clear customer references
-    await this.pool.execute(
-      `UPDATE vessels SET customer_id = NULL, customer_type = NULL WHERE customer_id IN (${placeholders})`,
-      entityIds
-    )
-    // Delete assured links
-    await this.pool.execute(
-      `DELETE FROM vessel_assureds WHERE entity_id IN (${placeholders})`,
-      entityIds
-    )
-    // Delete UBO links
-    await this.pool.execute(
-      `DELETE FROM entity_ubos WHERE assured_entity_id IN (${placeholders}) OR ubo_entity_id IN (${placeholders})`,
-      [...entityIds, ...entityIds]
-    )
-    // Delete entities
-    const [result] = await this.pool.execute(
-      `DELETE FROM entities WHERE id IN (${placeholders})`,
-      entityIds
-    )
-    return (result as ResultSetHeader).affectedRows || 0
+    // Same rules as a single delete: entities still used by business records are kept
+    let deleted = 0
+    const kept: string[] = []
+    for (const id of entityIds) {
+      try {
+        await this.deleteEntity(id)
+        deleted++
+      } catch {
+        const [[row]] = (await this.pool.query('SELECT name FROM entities WHERE id = ?', [
+          id
+        ])) as QueryRows
+        kept.push(String(row?.name || id))
+      }
+    }
+    if (kept.length > 0)
+      throw new Error(
+        `Deleted ${deleted}. Not deleted because quotations, policies or receipts use them (merge them instead): ${kept.slice(0, 5).join(', ')}${kept.length > 5 ? ` and ${kept.length - 5} more` : ''}`
+      )
+    return deleted
   }
 
   // --- Document Templates ---

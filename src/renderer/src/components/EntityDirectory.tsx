@@ -340,6 +340,10 @@ export default function EntityDirectory({
       loadData()
     } catch (error) {
       showError((error instanceof Error && error.message) || 'Failed to delete entities')
+      // Some may have been deleted before one was refused
+      setSelectedEntityIds(new Set())
+      setShowBulkDeleteConfirm(false)
+      loadData()
     }
   }
 
