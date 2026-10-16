@@ -1849,6 +1849,36 @@ export class MySQLAdapter {
         )
       }
 
+      // Migration: link vessel policies to the policy document a conversion made them from
+      for (const [col, ddl] of [
+        ['policy_document_id', 'VARCHAR(36) NULL'],
+        ['conversion_created', 'TINYINT(1) NOT NULL DEFAULT 0'],
+        ['expired_by_policy_document_id', 'VARCHAR(36) NULL']
+      ] as const) {
+        try {
+          const [vdpCols] = await this.pool.query(
+            `SHOW COLUMNS FROM vessel_dynamic_policies LIKE '${col}'`
+          )
+          if ((vdpCols as RowDataPacket[]).length === 0)
+            await this.pool.query(`ALTER TABLE vessel_dynamic_policies ADD COLUMN ${col} ${ddl}`)
+        } catch (e) {
+          console.error(`Migration warning (vessel_dynamic_policies.${col}):`, e)
+        }
+      }
+
+      // Migration: quotations on the Converted step that have policies are 'converted'
+      // (conversion used to move only the workflow step, so the Active / Converted views were wrong)
+      try {
+        await this.pool.query(`
+          UPDATE quotations q
+          JOIN quotation_workflow_steps ws ON ws.id = q.workflow_step_id AND LOWER(ws.name) = 'converted'
+          SET q.status = 'converted'
+          WHERE q.status <> 'converted'
+            AND EXISTS (SELECT 1 FROM policy_documents pd WHERE pd.quotation_id = q.id)`)
+      } catch (e) {
+        console.error('Migration warning (converted status):', e)
+      }
+
       // Migration: Add customer_entity_id + customer_type to vessel_dynamic_policies
       try {
         const [custColVdp] = (await this.pool.query(
@@ -13193,6 +13223,11 @@ export class MySQLAdapter {
       policyNumber,
       policyId
     ])
+    // The vessel's policy record still shows the draft number the conversion gave it
+    await this.pool.execute(
+      "UPDATE vessel_dynamic_policies SET policy_number = ? WHERE policy_document_id = ? AND (policy_number IS NULL OR policy_number = '' OR policy_number LIKE 'POL-DRAFT-%')",
+      [policyNumber, policyId]
+    )
 
     // Also update any blue cards that reference the old draft number
     const oldNumber = row.policy_number
@@ -17662,6 +17697,26 @@ export class MySQLAdapter {
     )
     const quotationId = (polRows as RowDataPacket[])[0]?.quotation_id || null
 
+    // Undo what the conversion did to the vessel's policy records: remove the record it created,
+    // unlink one it updated, and make the record it expired active again
+    try {
+      const [made] = await this.pool.query(
+        'SELECT id FROM vessel_dynamic_policies WHERE policy_document_id = ? AND conversion_created = 1',
+        [id]
+      )
+      for (const r of made as RowDataPacket[]) await this.deleteVesselDynamicPolicy(r.id)
+      await this.pool.execute(
+        'UPDATE vessel_dynamic_policies SET policy_document_id = NULL WHERE policy_document_id = ?',
+        [id]
+      )
+      await this.pool.execute(
+        "UPDATE vessel_dynamic_policies SET status = 'active', expired_by_policy_document_id = NULL WHERE expired_by_policy_document_id = ? AND status = 'expired'",
+        [id]
+      )
+    } catch (e) {
+      console.error('[deletePolicyDocument] vessel policy revert failed:', e)
+    }
+
     // Delete the policy and all its own rows (instalments, addresses, blue cards, endorsements,
     // ...); receipt lines keep their text but lose the link
     await this.purgePolicyRows([id])
@@ -17701,6 +17756,12 @@ export class MySQLAdapter {
     const allCovered = vessels.length > 0 && vessels.every((v) => covered.has(v.vesselId || v.id))
     if (allCovered) return
 
+    // No longer fully converted: back to exported (it was exported before it could be converted)
+    await this.pool.execute(
+      "UPDATE quotations SET status = 'exported' WHERE id = ? AND status = 'converted'",
+      [quotationId]
+    )
+
     const [stepRows] = await this.pool.query(
       'SELECT id, name, is_initial, order_index FROM quotation_workflow_steps'
     )
@@ -17716,6 +17777,159 @@ export class MySQLAdapter {
         target.id,
         quotationId
       ])
+    }
+  }
+
+  /**
+   * Brings the vessel's policy record (vessel_dynamic_policies) in line with a converted policy.
+   * A record the user already entered for the same period is updated; otherwise one is created.
+   * Earlier active records of the type that end by the new inception are marked expired (they
+   * stay active until the renewal is converted). deletePolicyDocument undoes all of it.
+   */
+  private async syncVesselPolicyFromConversion(p: {
+    vesselId: string
+    policyTypeId: string
+    policyDocumentId: string
+    policyNumber: string
+    inceptionDate: string
+    expiryDate: string
+    premium: number
+    currency: string
+    customerEntityId: string | null
+    customerType: string | null
+  }): Promise<void> {
+    if (!this.pool) return
+    const pool = this.pool
+    const inception = String(p.inceptionDate || '').slice(0, 10)
+    const expiry = String(p.expiryDate || '').slice(0, 10)
+    const [charRows] = await pool.query(
+      'SELECT id, name, field_type FROM policy_type_characteristics WHERE policy_type_id = ?',
+      [p.policyTypeId]
+    )
+    const chars = (charRows as RowDataPacket[]).map((c) => ({
+      id: c.id as string,
+      name: String(c.name).toLowerCase(),
+      type: String(c.field_type)
+    }))
+    const incChar = chars.find(
+      (c) => c.type === 'date' && (c.name.includes('inception') || c.name.includes('start'))
+    )
+    const endChar = chars.find(
+      (c) => c.type === 'date' && (c.name.includes('end') || c.name.includes('expir'))
+    )
+    // Only a single premium field is filled (H&M / IV split premiums stay as typed)
+    const premChar = chars.find(
+      (c) => c.type === 'amount' && (c.name === 'premium' || c.name === 'war premium')
+    )
+
+    const [vdpRows] = await pool.query(
+      `SELECT vdp.id, vdp.status, vdp.policy_document_id,
+              (SELECT value_date FROM vessel_policy_values WHERE policy_id = vdp.id AND characteristic_id = ? LIMIT 1) AS inc,
+              (SELECT value_date FROM vessel_policy_values WHERE policy_id = vdp.id AND characteristic_id = ? LIMIT 1) AS endd
+         FROM vessel_dynamic_policies vdp
+        WHERE vdp.vessel_id = ? AND vdp.policy_type_id = ? AND COALESCE(vdp.status, '') <> 'cancelled'`,
+      [incChar?.id || '', endChar?.id || '', p.vesselId, p.policyTypeId]
+    )
+    const existing = (vdpRows as RowDataPacket[]).map((r) => ({
+      id: r.id as string,
+      status: String(r.status || ''),
+      docId: (r.policy_document_id as string) || null,
+      inc: r.inc ? String(r.inc).slice(0, 10) : '',
+      end: r.endd ? String(r.endd).slice(0, 10) : ''
+    }))
+    // Same period entered by hand (or an earlier sync for this policy)
+    const target =
+      existing.find((r) => r.docId === p.policyDocumentId) ||
+      existing.find(
+        (r) =>
+          !r.docId &&
+          r.status === 'active' &&
+          ((inception !== '' && r.inc === inception) || (expiry !== '' && r.end === expiry))
+      )
+
+    const isBroker = p.customerType === 'broker'
+    const customerType = p.customerEntityId ? p.customerType || 'broker' : null
+    let targetId: string
+    if (target) {
+      targetId = target.id
+      await pool.execute(
+        `UPDATE vessel_dynamic_policies
+            SET policy_document_id = ?, status = 'active', currency = ?,
+                policy_number = COALESCE(NULLIF(policy_number, ''), ?),
+                customer_entity_id = COALESCE(?, customer_entity_id),
+                customer_type = COALESCE(?, customer_type),
+                broker_entity_id = COALESCE(broker_entity_id, ?)
+          WHERE id = ?`,
+        [
+          p.policyDocumentId,
+          p.currency,
+          p.policyNumber,
+          p.customerEntityId,
+          customerType,
+          isBroker ? p.customerEntityId : null,
+          targetId
+        ]
+      )
+    } else {
+      targetId = uuidv4()
+      await pool.execute(
+        `INSERT INTO vessel_dynamic_policies
+           (id, vessel_id, policy_type_id, policy_number, status, currency, broker_entity_id,
+            customer_entity_id, customer_type, policy_document_id, conversion_created)
+         VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 1)`,
+        [
+          targetId,
+          p.vesselId,
+          p.policyTypeId,
+          p.policyNumber,
+          p.currency,
+          isBroker ? p.customerEntityId : null,
+          p.customerEntityId,
+          customerType,
+          p.policyDocumentId
+        ]
+      )
+    }
+
+    // Period from the policy; the premium only where none was typed
+    const setValue = async (
+      charId: string | undefined,
+      field: 'value_date' | 'value_amount',
+      value: string | number,
+      onlyIfEmpty: boolean
+    ): Promise<void> => {
+      if (!charId || value === '') return
+      const [cur] = await pool.query(
+        `SELECT id, ${field} AS v FROM vessel_policy_values WHERE policy_id = ? AND characteristic_id = ? LIMIT 1`,
+        [targetId, charId]
+      )
+      const row = (cur as RowDataPacket[])[0]
+      if (row) {
+        if (onlyIfEmpty && row.v != null && row.v !== '') return
+        await pool.execute(`UPDATE vessel_policy_values SET ${field} = ? WHERE id = ?`, [
+          value,
+          row.id
+        ])
+      } else {
+        await pool.execute(
+          `INSERT INTO vessel_policy_values (id, policy_id, characteristic_id, ${field}) VALUES (?, ?, ?, ?)`,
+          [uuidv4(), targetId, charId, value]
+        )
+      }
+    }
+    await setValue(incChar?.id, 'value_date', inception, false)
+    await setValue(endChar?.id, 'value_date', expiry, false)
+    if (p.premium > 0) await setValue(premChar?.id, 'value_amount', p.premium, true)
+
+    // The previous period ends when this one starts
+    if (inception) {
+      for (const r of existing) {
+        if (r.id === targetId || r.status !== 'active' || !r.end || r.end > inception) continue
+        await pool.execute(
+          "UPDATE vessel_dynamic_policies SET status = 'expired', expired_by_policy_document_id = ? WHERE id = ?",
+          [p.policyDocumentId, r.id]
+        )
+      }
     }
   }
 
@@ -18236,27 +18450,21 @@ export class MySQLAdapter {
         }
       }
 
-      // Sync customer from quotation to the vessel's dynamic policy for this policy type
-      if (quotation.customerEntityId) {
-        const typeId = quotation.quotationTypeId
-        if (typeId) {
-          // Find matching active dynamic policy
-          const [dynPols] = await this.pool.query(
-            "SELECT id FROM vessel_dynamic_policies WHERE vessel_id = ? AND policy_type_id = ? AND status = 'active' LIMIT 1",
-            [actualVesselId, typeId]
-          )
-          if ((dynPols as RowDataPacket[]).length > 0) {
-            await this.pool.execute(
-              'UPDATE vessel_dynamic_policies SET customer_entity_id = ?, customer_type = ?, broker_entity_id = COALESCE(broker_entity_id, ?) WHERE id = ?',
-              [
-                quotation.customerEntityId,
-                quotation.customerType || 'broker',
-                quotation.customerType === 'broker' ? quotation.customerEntityId : null,
-                (dynPols as RowDataPacket[])[0].id
-              ]
-            )
-          }
-        }
+      // The vessel's own policy record (Renewals, annual documents, customer views) follows the
+      // converted policy: new period, number, premium and customer; the previous one expires
+      if (quotation.quotationTypeId) {
+        await this.syncVesselPolicyFromConversion({
+          vesselId: actualVesselId,
+          policyTypeId: quotation.quotationTypeId,
+          policyDocumentId: policyId,
+          policyNumber,
+          inceptionDate: options.inceptionDate,
+          expiryDate: options.expiryDate,
+          premium: premiumAmount,
+          currency: quotation.premiumCurrency || 'USD',
+          customerEntityId: quotation.customerEntityId || null,
+          customerType: quotation.customerType || null
+        })
       }
 
       createdPolicies.push({ id: policyId, policyNumber, vesselId: actualVesselId })
@@ -18286,6 +18494,9 @@ export class MySQLAdapter {
             quotationId
           ])
         }
+        await this.pool.execute("UPDATE quotations SET status = 'converted' WHERE id = ?", [
+          quotationId
+        ])
       }
     } catch {
       /* ignore if step doesn't exist */
@@ -18409,6 +18620,8 @@ export class MySQLAdapter {
 
   async deleteVesselDynamicPolicy(id: string): Promise<void> {
     if (!this.pool) return
+    // Its field values first: there is no cascading foreign key in most databases
+    await this.pool.execute('DELETE FROM vessel_policy_values WHERE policy_id = ?', [id])
     await this.pool.execute('DELETE FROM vessel_dynamic_policies WHERE id = ?', [id])
   }
 
