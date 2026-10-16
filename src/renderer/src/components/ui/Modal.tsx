@@ -1,5 +1,7 @@
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+
+const openModals: object[] = []
 
 interface ModalProps {
   title: ReactNode
@@ -23,13 +25,26 @@ export default function Modal({
   width = 520,
   closeOnOverlay = true
 }: ModalProps): React.JSX.Element {
+  // Escape closes only the top dialog when one opens another
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+  useEffect(() => {
+    const token = {}
+    openModals.push(token)
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === token) {
+        e.stopPropagation()
+        onCloseRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      openModals.splice(openModals.indexOf(token), 1)
+    }
+  }, [])
 
   return (
     <div

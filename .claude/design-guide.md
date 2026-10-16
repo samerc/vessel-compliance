@@ -19,9 +19,10 @@ React components in `src/renderer/src/components/ui/` (import from `./ui`) and m
 | Filter toggle pill | `<button className="chip active">` + `.chip-count` |
 | Empty list / no results | `<EmptyState icon title text action />` |
 | Loading | `<Spinner size label? />` |
-| Modal | `<Modal title icon onClose footer width closeOnOverlay>` (Escape closes) |
+| Modal | `<Modal title icon onClose footer width closeOnOverlay>` (Escape closes the top one; `closeOnOverlay={false}` for forms). Every dialog uses it, never a hand-built overlay |
+| Form | `.form-section` (+ `.form-section-title`) > `.form-grid` (auto columns, or `.cols-2`/`.cols-3`) > `<Field label hint error required span>` wrapping the control; buttons in `.form-actions` (or the Modal footer) |
 | Buttons | `.btn-primary` / `.btn-secondary` / `.btn-danger` / `.btn-ghost` + size `.btn-sm`, icon-only `.btn-icon` (all inline-flex with 8px gap) |
-| Table | `.table-wrap` > `table.data-table` (sticky header, `.num` right-aligned, `tr.clickable`, `tr.selected`) |
+| Table | `.table-wrap` > `table.data-table` (sticky header, `.num` right-aligned, `.muted`, `tr.clickable`, `tr.selected`). Every list table uses it; inline styles only for column widths/alignment |
 
 **Discoverability**: a new page, sub-tab or notable action gets an entry in `src/renderer/src/features.ts` (it then shows in Ctrl+K and on the Features page). Keep the one or two main actions of a screen as visible buttons; only secondary ones go in an Actions menu. Bulk-select toggles read "Bulk select" / "Done" with a tooltip saying what the selection is for. Empty lists use `EmptyState` with the next step as its action.
 
