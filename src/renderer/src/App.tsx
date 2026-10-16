@@ -5,7 +5,6 @@ import {
   Settings,
   ShieldAlert,
   LogOut,
-  UserCog,
   Sun,
   Moon,
   Search,
@@ -320,6 +319,8 @@ function App(): React.JSX.Element {
         runAction(t.action)
         return
       }
+      // User Management lives in the Settings hub
+      if (t.tab === 'users') t = { tab: 'admin', sub: 'users' }
       if (!t.tab) return
       if (t.tab === 'policies-list') setPolicyView(t.sub === 'settings' ? 'settings' : 'list')
       if (t.tab === 'compliance' && t.sub) setComplianceSubTab(t.sub as typeof complianceSubTab)
@@ -1094,8 +1095,6 @@ function App(): React.JSX.Element {
             }}
           >
             {navItem('dashboard', <LayoutDashboard size={18} />, 'Dashboard')}
-            {navItem('features', <Compass size={18} />, 'Features')}
-
             {recentItems.length > 0 && (
               <NavGroup
                 id="recent"
@@ -1179,38 +1178,10 @@ function App(): React.JSX.Element {
             )}
 
             <NavGroup
-              id="fleet"
-              label="Fleet"
-              icon={<Ship size={14} />}
-              groupCollapsed={collapsedGroups.has('fleet')}
-              onToggle={toggleGroup}
-              sidebarCollapsed={sc}
-            >
-              {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
-              {hasPermission('vessels:view') &&
-                navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
-              {hasPermission('fleets:view') && navItem('fleets', <Layers size={18} />, 'Fleets')}
-            </NavGroup>
-
-            <NavGroup
-              id="compliance"
-              label="Compliance"
-              icon={<ShieldAlert size={14} />}
-              groupCollapsed={collapsedGroups.has('compliance')}
-              onToggle={toggleGroup}
-              sidebarCollapsed={sc}
-            >
-              {hasPermission('compliance:view') &&
-                navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
-              {hasPermission('sanctions:search') &&
-                navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
-            </NavGroup>
-
-            <NavGroup
-              id="business"
-              label="Business"
+              id="underwriting"
+              label="Underwriting"
               icon={<FileText size={14} />}
-              groupCollapsed={collapsedGroups.has('business')}
+              groupCollapsed={collapsedGroups.has('underwriting')}
               onToggle={toggleGroup}
               sidebarCollapsed={sc}
             >
@@ -1225,28 +1196,44 @@ function App(): React.JSX.Element {
             </NavGroup>
 
             <NavGroup
-              id="operations"
-              label="Operations"
-              icon={<Layers size={14} />}
-              groupCollapsed={collapsedGroups.has('operations')}
+              id="fleet"
+              label="Fleet"
+              icon={<Ship size={14} />}
+              groupCollapsed={collapsedGroups.has('fleet')}
               onToggle={toggleGroup}
               sidebarCollapsed={sc}
             >
-              {hasPermission('entities:view') &&
-                navItem('directory', <BookOpen size={18} />, 'Directory')}
+              {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
+              {hasPermission('vessels:view') &&
+                navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
+              {hasPermission('fleets:view') && navItem('fleets', <Layers size={18} />, 'Fleets')}
               {hasPermission('surveys:view') &&
                 navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
               {hasPermission('surveys:view') &&
                 navItem('survey-followup', <FileWarning size={18} />, 'Survey Follow-Up')}
-              {navItem('templates', <Mail size={18} />, 'Templates')}
-              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
             </NavGroup>
 
             <NavGroup
-              id="reports"
-              label="Reports"
+              id="compliance"
+              label="Compliance"
+              icon={<ShieldAlert size={14} />}
+              groupCollapsed={collapsedGroups.has('compliance')}
+              onToggle={toggleGroup}
+              sidebarCollapsed={sc}
+            >
+              {hasPermission('compliance:view') &&
+                navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
+              {hasPermission('sanctions:search') &&
+                navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
+              {hasPermission('entities:view') &&
+                navItem('directory', <BookOpen size={18} />, 'Directory')}
+            </NavGroup>
+
+            <NavGroup
+              id="insights"
+              label="Insights"
               icon={<BarChart2 size={14} />}
-              groupCollapsed={collapsedGroups.has('reports')}
+              groupCollapsed={collapsedGroups.has('insights')}
               onToggle={toggleGroup}
               sidebarCollapsed={sc}
             >
@@ -1259,18 +1246,35 @@ function App(): React.JSX.Element {
             </NavGroup>
 
             <NavGroup
-              id="admin"
-              label="Admin"
-              icon={<Settings size={14} />}
-              groupCollapsed={collapsedGroups.has('admin')}
+              id="tools"
+              label="Tools"
+              icon={<Calculator size={14} />}
+              groupCollapsed={collapsedGroups.has('tools')}
               onToggle={toggleGroup}
               sidebarCollapsed={sc}
             >
-              {(hasPermission('admin:settings') || hasPermission('fileManager:view')) &&
-                navItem('admin', <Settings size={18} />, 'Settings')}
-              {hasPermission('admin:users') &&
-                navItem('users', <UserCog size={18} />, 'User Management')}
+              {navItem('calculators', <Calculator size={18} />, 'Calculators')}
+              {navItem('templates', <Mail size={18} />, 'Templates')}
             </NavGroup>
+
+            {/* Help and settings sit at the bottom of the menu */}
+            <div
+              style={{
+                marginTop: 'auto',
+                paddingTop: '8px',
+                borderTop: '1px solid var(--glass-border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}
+            >
+              {navItem('features', <Compass size={18} />, 'Features')}
+              {(hasPermission('admin:settings') ||
+                hasPermission('fileManager:view') ||
+                hasPermission('quotations:settings') ||
+                hasPermission('admin:users')) &&
+                navItem('admin', <Settings size={18} />, 'Settings')}
+            </div>
           </nav>
 
           {/* Footer: version + collapse toggle */}

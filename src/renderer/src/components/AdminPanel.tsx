@@ -30,7 +30,8 @@ import {
   Save,
   RefreshCw,
   CheckCircle,
-  ExternalLink
+  Search,
+  Wrench
 } from 'lucide-react'
 import {
   DocumentType,
@@ -61,6 +62,58 @@ import {
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 const FileManager = lazy(() => import('./FileManager'))
+// The Settings hub also hosts the quotation, policy and user settings pages
+const QuotationSettings = lazy(() => import('./QuotationSettings'))
+const PolicySettings = lazy(() => import('./PolicySettings'))
+const UserManager = lazy(() => import('./UserManager'))
+
+// Hub sections that are whole pages with their own permissions (outside the read-only fieldset)
+const HUB_PAGES = new Set(['quotationSettings', 'policySettings', 'users', 'fileManager'])
+
+// Settings hub groups, in display order. A section not listed here goes under System.
+const SETTINGS_GROUPS: { label: string; ids: string[] }[] = [
+  {
+    label: 'Quotations & policies',
+    ids: ['quotationSettings', 'policySettings', 'policyTypes', 'reportSettings']
+  },
+  {
+    label: 'Vessels & documents',
+    ids: [
+      'docTypes',
+      'entityDocTypes',
+      'roles',
+      'vesselTypes',
+      'classSocieties',
+      'surveyTypes',
+      'reminders'
+    ]
+  },
+  { label: 'Compliance', ids: ['compliance', 'sanctionsData', 'dailyAlerts'] },
+  { label: 'Users & access', ids: ['users', 'userGroups', 'userAccess', 'notifGroups'] },
+  { label: 'Files', ids: ['fileManager', 'filePaths', 'fileTypes'] }
+]
+
+// Extra words the settings search matches (besides the section name)
+const SECTION_KEYWORDS: Record<string, string> = {
+  quotationSettings:
+    'warranties subjectivities clauses deductibles exclusions trading countries standard texts section order instalments hull war cargo fdd',
+  policySettings:
+    'banks opening clause closing important notice premium intro header titles signatures qr blue cards t&c terms cancel replace commission declaration',
+  users: 'user management password reset permissions accounts',
+  userGroups: 'permissions rbac roles',
+  userAccess: 'sections shared visible',
+  reportSettings: 'logo company accent pdf header footer',
+  docTypes: 'vessel documents required annual',
+  entityDocTypes: 'passport kyc coi aoa',
+  compliance: 'scheduled sanctions check threshold weekly',
+  sanctionsData: 'ofac eu un uk isf refresh lists',
+  filePaths: 'network local vpn hot updates registry',
+  fileTypes: 'extensions upload allowed blocked',
+  backup: 'restore export database',
+  dbConfig: 'mysql connection',
+  logRetention: 'activity log cleanup',
+  reminders: 'grace annual renewal'
+}
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog } from './DialogHost'
@@ -131,6 +184,7 @@ export default function AdminPanel({
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
   const canSettings = hasPermission('admin:settings')
+  const [settingsSearch, setSettingsSearch] = useState('')
 
   // Compliance schedule state
   const [complianceSettings, setComplianceSettings] = useState<ComplianceScheduleSettings>({
@@ -1507,6 +1561,15 @@ export default function AdminPanel({
     icon: React.ReactNode
     adminOnly?: boolean
   }[] = [
+    ...(hasPermission('quotations:settings')
+      ? [{ id: 'quotationSettings', label: 'Quotation Settings', icon: <FileText size={16} /> }]
+      : []),
+    ...(canSettings
+      ? [{ id: 'policySettings', label: 'Policy Settings & Banks', icon: <Landmark size={16} /> }]
+      : []),
+    ...(hasPermission('admin:users')
+      ? [{ id: 'users', label: 'User Management', icon: <Users size={16} /> }]
+      : []),
     ...(isAdmin
       ? [{ id: 'userAccess', label: 'User Access', icon: <UserCheck size={16} />, adminOnly: true }]
       : []),
@@ -1611,202 +1674,123 @@ export default function AdminPanel({
             Settings
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            {isAdmin ? 'Administrator' : 'User'}
+            {isAdmin ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: 'var(--accent-primary)'
+                  }}
+                />
+                Also open to regular users
+              </span>
+            ) : (
+              'User'
+            )}
           </div>
         </div>
-        <nav style={{ flex: 1, padding: '8px 0' }}>
-          {onNavigate &&
-            (() => {
-              const allLinks: {
-                label: string
-                icon: React.ReactNode
-                target: NavTarget
-                show: boolean
-              }[] = [
-                {
-                  label: 'Quotation Settings',
-                  icon: <FileText size={16} />,
-                  target: { tab: 'quotations', sub: 'settings' },
-                  show: hasPermission('quotations:settings')
-                },
-                {
-                  label: 'Policy Settings & Banks',
-                  icon: <Landmark size={16} />,
-                  target: { tab: 'policies-list', sub: 'settings' },
-                  show: hasPermission('admin:settings')
-                },
-                {
-                  label: 'User Management',
-                  icon: <Users size={16} />,
-                  target: { tab: 'users' },
-                  show: hasPermission('admin:users')
-                },
-                {
-                  label: 'My Preferences',
-                  icon: <UserCheck size={16} />,
-                  target: { action: 'profile' },
-                  show: true
-                }
-              ]
-              const links = allLinks.filter((l) => l.show)
-              return (
-                <>
-                  <div
-                    style={{
-                      padding: '8px 16px 2px',
-                      fontSize: '0.65rem',
-                      fontWeight: '700',
-                      letterSpacing: '0.9px',
-                      textTransform: 'uppercase',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    Other settings
-                  </div>
-                  {links.map((l) => (
-                    <button
-                      key={l.label}
-                      onClick={() => onNavigate(l.target)}
-                      className="hover-effect"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '9px 16px',
-                        width: '100%',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        borderLeft: '3px solid transparent',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.82rem',
-                        fontWeight: 400,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {l.icon}
-                      <span style={{ flex: 1 }}>{l.label}</span>
-                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                    </button>
-                  ))}
-                  <div
-                    style={{
-                      height: '1px',
-                      background: 'var(--glass-border-color)',
-                      margin: '8px 16px'
-                    }}
-                  />
-                </>
-              )
-            })()}
+        <nav aria-label="Settings sections" style={{ flex: 1, padding: '8px 0' }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              margin: '4px 12px 8px',
+              padding: '0 10px',
+              height: '34px',
+              border: '1px solid var(--input-border)',
+              borderRadius: '8px',
+              background: 'var(--input-bg)',
+              color: 'var(--text-secondary)'
+            }}
+          >
+            <Search size={14} />
+            <span className="sr-only">Search settings</span>
+            <input
+              type="search"
+              value={settingsSearch}
+              onChange={(e) => setSettingsSearch(e.target.value)}
+              placeholder="Search settings"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                boxShadow: 'none',
+                fontSize: '0.82rem'
+              }}
+            />
+          </label>
           {(() => {
-            const grantable = sidebarSections.filter((s) => !s.adminOnly)
-            const adminSystemSections = sidebarSections.filter((s) => s.adminOnly)
+            const q = settingsSearch.trim().toLowerCase()
+            const matches = (sec: (typeof sidebarSections)[0]): boolean =>
+              !q || `${sec.label} ${SECTION_KEYWORDS[sec.id] ?? ''}`.toLowerCase().includes(q)
 
-            const renderBtn = (
-              sec: (typeof sidebarSections)[0],
-              isDanger = false
-            ): React.JSX.Element => {
+            const renderBtn = (sec: (typeof sidebarSections)[0]): React.JSX.Element => {
               const isActive = effectiveSection === sec.id
+              // Admins see which sections regular users can also open
+              const shared = isAdmin && !sec.adminOnly && userSectionAccess.includes(sec.id)
               return (
                 <button
                   key={sec.id}
                   onClick={() => setActiveSection(sec.id)}
+                  aria-current={isActive ? 'page' : undefined}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '9px 16px',
-                    width: '100%',
+                    padding: '8px 12px',
+                    margin: '1px 8px',
+                    width: 'calc(100% - 16px)',
                     textAlign: 'left',
-                    background: isActive
-                      ? isDanger
-                        ? 'rgba(255,77,77,0.1)'
-                        : 'rgba(var(--accent-primary-rgb,0,210,255),0.1)'
-                      : 'transparent',
+                    background: isActive ? 'var(--accent-tint)' : 'transparent',
                     border: 'none',
-                    borderLeft: isActive
-                      ? isDanger
-                        ? '3px solid var(--danger)'
-                        : '3px solid var(--accent-primary)'
-                      : '3px solid transparent',
-                    color: isActive
-                      ? isDanger
-                        ? 'var(--danger)'
-                        : 'var(--accent-primary)'
-                      : isDanger
-                        ? 'var(--danger)'
-                        : 'var(--text-primary)',
-                    fontWeight: isActive ? '600' : '400',
+                    borderRadius: '8px',
+                    color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
+                    fontWeight: isActive ? 600 : 400,
                     fontSize: '0.82rem',
                     cursor: 'pointer'
                   }}
                 >
                   {sec.icon}
-                  {sec.label}
+                  <span style={{ flex: 1 }}>{sec.label}</span>
+                  {shared && (
+                    <span
+                      title="Regular users can open this section"
+                      aria-label="Shared with users"
+                      style={{
+                        flexShrink: 0,
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: 'var(--accent-primary)'
+                      }}
+                    />
+                  )}
                 </button>
               )
             }
 
-            const groupLabel = (
-              text: string,
-              color = 'var(--text-secondary)'
-            ): React.JSX.Element => (
+            const groupLabel = (text: string): React.JSX.Element => (
               <div
                 style={{
-                  padding: '8px 16px 2px',
+                  padding: '12px 20px 4px',
                   fontSize: '0.65rem',
                   fontWeight: '700',
                   letterSpacing: '0.9px',
                   textTransform: 'uppercase',
-                  color
+                  color: 'var(--text-secondary)'
                 }}
               >
                 {text}
               </div>
             )
-            const divider = (key: string): React.JSX.Element => (
-              <div
-                key={key}
-                style={{
-                  height: '1px',
-                  background: 'var(--glass-border-color)',
-                  margin: '8px 16px'
-                }}
-              />
-            )
 
-            if (isAdmin) {
-              const shared = grantable.filter((s) => userSectionAccess.includes(s.id))
-              const adminOnly = grantable.filter((s) => !userSectionAccess.includes(s.id))
-              return (
-                <>
-                  {shared.length > 0 && (
-                    <>
-                      {groupLabel('Shared with Users', 'var(--accent-primary)')}
-                      {shared.map((s) => renderBtn(s))}
-                    </>
-                  )}
-                  {adminOnly.length > 0 && (
-                    <>
-                      {shared.length > 0 && divider('div-grantable')}
-                      {groupLabel('Admin Only')}
-                      {adminOnly.map((s) => renderBtn(s))}
-                    </>
-                  )}
-                  {adminSystemSections.length > 0 && (
-                    <>
-                      {divider('div-admin')}
-                      {groupLabel('Administration')}
-                      {adminSystemSections.map((s) => renderBtn(s, s.id === 'dangerZone'))}
-                    </>
-                  )}
-                </>
-              )
-            }
-
-            // Regular user — show their accessible sections, or empty state
-            if (grantable.length === 0) {
+            if (sidebarSections.length === 0) {
               return (
                 <div
                   style={{
@@ -1821,13 +1805,87 @@ export default function AdminPanel({
                 </div>
               )
             }
-            return <>{grantable.map((s) => renderBtn(s))}</>
+
+            const listed = new Set(SETTINGS_GROUPS.flatMap((g) => g.ids))
+            const groups = [
+              ...SETTINGS_GROUPS.map((g) => ({
+                label: g.label,
+                items: g.ids
+                  .map((id) => sidebarSections.find((sec) => sec.id === id))
+                  .filter((sec): sec is (typeof sidebarSections)[0] => !!sec)
+              })),
+              { label: 'System', items: sidebarSections.filter((sec) => !listed.has(sec.id)) }
+            ]
+              .map((g) => ({ ...g, items: g.items.filter(matches) }))
+              .filter((g) => g.items.length > 0)
+
+            return (
+              <>
+                {groups.map((g) => (
+                  <div key={g.label}>
+                    {groupLabel(g.label)}
+                    {g.items.map((sec) => renderBtn(sec))}
+                  </div>
+                ))}
+                {groups.length === 0 && (
+                  <div
+                    style={{
+                      padding: '16px 20px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    No settings match this search.
+                  </div>
+                )}
+                {onNavigate && !q && (
+                  <div>
+                    {groupLabel('You')}
+                    <button
+                      onClick={() => onNavigate({ action: 'profile' })}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 12px',
+                        margin: '1px 8px',
+                        width: 'calc(100% - 16px)',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontWeight: 400,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Wrench size={16} />
+                      My password and preferences
+                    </button>
+                  </div>
+                )}
+              </>
+            )
           })()}
         </nav>
       </aside>
 
       {/* ── Content area ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+        {(effectiveSection === 'quotationSettings' ||
+          effectiveSection === 'policySettings' ||
+          effectiveSection === 'users') && (
+          <Suspense
+            fallback={
+              <div style={{ padding: '40px', color: 'var(--text-secondary)' }}>Loading…</div>
+            }
+          >
+            {effectiveSection === 'quotationSettings' && <QuotationSettings />}
+            {effectiveSection === 'policySettings' && <PolicySettings />}
+            {effectiveSection === 'users' && <UserManager />}
+          </Suspense>
+        )}
         {effectiveSection === 'fileManager' && (
           <Suspense
             fallback={
@@ -1841,7 +1899,7 @@ export default function AdminPanel({
         )}
 
         {/* Read-only notice when user lacks admin:settings permission */}
-        {!canSettings && sidebarSections.length > 0 && (
+        {!canSettings && sidebarSections.length > 0 && !HUB_PAGES.has(effectiveSection) && (
           <div
             style={{
               padding: '12px 16px',

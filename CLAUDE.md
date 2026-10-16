@@ -365,7 +365,7 @@ Named screening report generated from the Sanctions Search page ("Check Report" 
 
 ### Admin Panel
 
-System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with collapsible sections (all collapsed by default):
+System configuration page (`src/renderer/src/components/AdminPanel.tsx`), now the Settings hub (see Feature Registry & Navigation): a grouped, searchable section list on the left, the chosen section on the right. Sections:
 
 1. **Document Types**: CRUD with reorder and active/inactive toggle
 2. **Assured Roles**: CRUD for entity role types
@@ -950,7 +950,8 @@ Customizable reports with 9 data sources:
 - **`navigateTo(target)`** in App.tsx is the one way to go anywhere: sets the tab, a requested sub-tab (`pageRequest`), or runs an `AppAction` (new vessel/quotation/entity, what's new, release history, profile, check updates, theme, density)
 - **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
 - **What's New "Try it"**: `featureId` on a `WHATS_NEW` item, or `[try:feature-id]` at the end of a release-note line
-- **Settings hub**: the Settings page's "Other settings" links go to Quotation Settings, Policy Settings & Banks, User Management and the profile. Banks are managed only in Policy Settings (the duplicate in Settings was removed)
+- **Sidebar menu** (redesign 2026-10, App.tsx): Dashboard, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Vessel Filter, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
+- **Settings hub** (AdminPanel = the Settings page): one place for every setting. The left list is grouped (`SETTINGS_GROUPS`: Quotations & policies, Vessels & documents, Compliance, Users & access, Files, System) with a search box (section names + `SECTION_KEYWORDS`). Quotation Settings, Policy Settings & Banks and User Management open INSIDE it (`HUB_PAGES`, outside the read-only fieldset, each with its own permission); a dot marks sections shared with regular users. The sidebar shows Settings when the user has admin:settings, fileManager:view, quotations:settings or admin:users. `navigateTo({ tab: 'users' })` redirects to `{ tab: 'admin', sub: 'users' }`; the Quotations and Policies pages keep their own Settings toggle too. Banks are managed only in Policy Settings
 - **First-run tip**: one-time Dashboard banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
 
 ### Customizable Dashboard

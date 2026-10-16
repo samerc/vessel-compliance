@@ -51,8 +51,9 @@ export interface NavTarget {
   action?: AppAction
 }
 
+// Same areas, in the same order, as the sidebar menu
 export type FeatureArea =
-  'Fleet' | 'Compliance' | 'Business' | 'Operations' | 'Reports' | 'Settings' | 'Personal'
+  'Underwriting' | 'Fleet' | 'Compliance' | 'Insights' | 'Tools' | 'Settings' | 'Personal'
 
 export interface Feature {
   id: string
@@ -69,11 +70,11 @@ export interface Feature {
 }
 
 export const FEATURE_AREAS: FeatureArea[] = [
+  'Underwriting',
   'Fleet',
   'Compliance',
-  'Business',
-  'Operations',
-  'Reports',
+  'Insights',
+  'Tools',
   'Settings',
   'Personal'
 ]
@@ -233,11 +234,11 @@ export const FEATURES: Feature[] = [
     keywords: 'screening pdf certificate'
   },
 
-  // ── Business ──
+  // ── Underwriting ──
   {
     id: 'renewals',
     title: 'Renewals',
-    area: 'Business',
+    area: 'Underwriting',
     kind: 'page',
     permission: 'policies:view',
     target: { tab: 'renewals' },
@@ -248,7 +249,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'quotations',
     title: 'Quotations',
-    area: 'Business',
+    area: 'Underwriting',
     kind: 'page',
     permission: 'quotations:view',
     target: { tab: 'quotations', sub: 'list' },
@@ -259,7 +260,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'new-quotation',
     title: 'New quotation',
-    area: 'Business',
+    area: 'Underwriting',
     kind: 'action',
     permission: 'quotations:create',
     target: { action: 'new-quotation' },
@@ -272,7 +273,7 @@ export const FEATURES: Feature[] = [
     area: 'Settings',
     kind: 'view',
     permission: 'quotations:settings',
-    target: { tab: 'quotations', sub: 'settings' },
+    target: { tab: 'admin', sub: 'quotationSettings' },
     description:
       'Quotation types, warranties, subjectivities, clauses, standard texts, section order and logo.',
     keywords: 'warranties clauses deductibles exclusions templates wording'
@@ -280,7 +281,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'policies',
     title: 'Policies',
-    area: 'Business',
+    area: 'Underwriting',
     kind: 'page',
     permission: 'policies:view',
     target: { tab: 'policies-list', sub: 'list' },
@@ -294,7 +295,7 @@ export const FEATURES: Feature[] = [
     area: 'Settings',
     kind: 'view',
     permission: 'admin:settings',
-    target: { tab: 'policies-list', sub: 'settings' },
+    target: { tab: 'admin', sub: 'policySettings' },
     description:
       'Policy wording, banks, signatures, T&C, blue card texts, commissions, declaration and QR verification.',
     keywords: 'banks signature terms conditions commission wording'
@@ -302,7 +303,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'receipts',
     title: 'Receipts',
-    area: 'Business',
+    area: 'Underwriting',
     kind: 'page',
     permission: 'policies:view',
     target: { tab: 'receipts' },
@@ -310,11 +311,11 @@ export const FEATURES: Feature[] = [
     keywords: 'payment'
   },
 
-  // ── Operations ──
+  // ── Directory, surveys, tools ──
   {
     id: 'entities',
     title: 'Entities',
-    area: 'Operations',
+    area: 'Compliance',
     kind: 'page',
     permission: 'entities:view',
     target: { tab: 'directory', sub: 'entities' },
@@ -325,7 +326,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'new-entity',
     title: 'New entity',
-    area: 'Operations',
+    area: 'Compliance',
     kind: 'action',
     permission: 'entities:create',
     target: { action: 'new-entity' },
@@ -336,7 +337,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'surveyors',
     title: 'Surveyors',
-    area: 'Operations',
+    area: 'Compliance',
     kind: 'view',
     permission: 'entities:view',
     target: { tab: 'directory', sub: 'surveyors' },
@@ -346,7 +347,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'flag-states',
     title: 'Flag states',
-    area: 'Operations',
+    area: 'Compliance',
     kind: 'view',
     permission: 'entities:view',
     target: { tab: 'directory', sub: 'flag-states' },
@@ -357,7 +358,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'address-book',
     title: 'Address book',
-    area: 'Operations',
+    area: 'Compliance',
     kind: 'view',
     permission: 'entities:view',
     target: { tab: 'directory', sub: 'address-book' },
@@ -368,7 +369,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'surveys',
     title: 'Surveys',
-    area: 'Operations',
+    area: 'Fleet',
     kind: 'page',
     permission: 'surveys:view',
     target: { tab: 'surveys' },
@@ -379,7 +380,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'survey-warranties',
     title: 'Survey follow-up',
-    area: 'Operations',
+    area: 'Fleet',
     kind: 'page',
     permission: 'surveys:view',
     target: { tab: 'survey-followup', sub: 'warranties' },
@@ -389,7 +390,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'survey-endorsements',
     title: 'Endorsements due',
-    area: 'Operations',
+    area: 'Fleet',
     kind: 'view',
     permission: 'surveys:view',
     target: { tab: 'survey-followup', sub: 'endorsements' },
@@ -399,7 +400,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'templates',
     title: 'Templates',
-    area: 'Operations',
+    area: 'Tools',
     kind: 'page',
     target: { tab: 'templates' },
     description:
@@ -409,7 +410,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'calc-premium',
     title: 'Pro-rata premium calculator',
-    area: 'Operations',
+    area: 'Tools',
     kind: 'view',
     target: { tab: 'calculators', sub: 'premium' },
     description: 'Pro-rata premium, instalments and commission for any period.',
@@ -418,7 +419,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'calc-tlo',
     title: 'TLO rate calculator',
-    area: 'Operations',
+    area: 'Tools',
     kind: 'view',
     target: { tab: 'calculators', sub: 'tlo' },
     description: 'New Total Loss Only premium and rate when the vessel value changes.',
@@ -427,18 +428,18 @@ export const FEATURES: Feature[] = [
   {
     id: 'calc-warbreach',
     title: 'War breach calculator',
-    area: 'Operations',
+    area: 'Tools',
     kind: 'view',
     target: { tab: 'calculators', sub: 'warbreach' },
     description: 'Net due on war breaches, with saved history and Excel export.',
     keywords: 'calculator war breach'
   },
 
-  // ── Reports ──
+  // ── Insights ──
   {
     id: 'report-builder',
     title: 'Report builder',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'report-builder' },
@@ -449,7 +450,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-loss',
     title: 'Loss record report',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'loss-record' },
@@ -459,7 +460,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-statement',
     title: 'Statement of account',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'statement' },
@@ -470,7 +471,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-customer',
     title: 'Customer compliance report',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'customer-compliance' },
@@ -481,7 +482,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-assured',
     title: 'Assured report',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'assured-report' },
@@ -491,7 +492,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-surveys',
     title: 'Condition survey report',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'condition-survey' },
@@ -501,7 +502,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'report-pipeline',
     title: 'Renewal pipeline',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'view',
     permission: 'reports:view',
     target: { tab: 'reports', sub: 'renewal-pipeline' },
@@ -511,7 +512,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'analytics',
     title: 'Fleet analytics',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'page',
     permission: 'analytics:view',
     target: { tab: 'analytics' },
@@ -522,7 +523,7 @@ export const FEATURES: Feature[] = [
   {
     id: 'activity-log',
     title: 'Activity log',
-    area: 'Reports',
+    area: 'Insights',
     kind: 'page',
     permission: 'admin:activityLog',
     target: { tab: 'activity-log' },
@@ -660,7 +661,7 @@ export const FEATURES: Feature[] = [
     area: 'Settings',
     kind: 'page',
     permission: 'admin:users',
-    target: { tab: 'users' },
+    target: { tab: 'admin', sub: 'users' },
     description: 'User accounts, groups, permission overrides and app versions in use.',
     keywords: 'accounts password'
   },
