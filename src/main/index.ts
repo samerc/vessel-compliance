@@ -5787,7 +5787,14 @@ app.whenReady().then(() => {
     return result
   })
   safeHandle('db:updateQuotation', async (event, id: string, updates: Partial<Quotation>) => {
-    await requirePermission(event, 'quotations:edit')
+    const user = await requirePermission(event, 'quotations:edit')
+    // The editor lock is enforced here too: after a network blip the lock may have expired on
+    // one PC while another user opened the quotation - the last save must not silently win
+    const lockedBy = await db.getActiveQuotationLock(id)
+    if (lockedBy && lockedBy.userId !== user.id)
+      throw new Error(
+        `${lockedBy.username || 'Another user'} is editing this quotation now, so this change was not saved. Reopen it when they are done.`
+      )
     return db.updateQuotation(id, updates)
   })
   safeHandle('db:deleteQuotation', async (event, id: string) => {

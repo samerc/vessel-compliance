@@ -5690,6 +5690,21 @@ export class MySQLAdapter {
 
   // --- Quotation Locking ---
 
+  /** The user holding a live (under 5 minutes old) editing lock on a quotation, if any */
+  async getActiveQuotationLock(
+    quotationId: string
+  ): Promise<{ userId: string; username: string | null } | null> {
+    if (!this.pool) return null
+    const [rows] = await this.pool.query(
+      `SELECT q.locked_by AS userId, u.username FROM quotations q
+         LEFT JOIN users u ON u.id = q.locked_by
+        WHERE q.id = ? AND q.locked_by IS NOT NULL AND q.locked_at > NOW() - INTERVAL 5 MINUTE`,
+      [quotationId]
+    )
+    const r = (rows as RowDataPacket[])[0]
+    return r ? { userId: r.userId, username: r.username || null } : null
+  }
+
   async lockQuotation(
     quotationId: string,
     userId: string

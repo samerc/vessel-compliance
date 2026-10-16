@@ -58,7 +58,9 @@ export class SanctionsDatabase {
   open(dbDir: string): void {
     const dbPath = path.join(dbDir, 'sanctions.db')
     this.db = new Database(dbPath)
-    this.db.pragma('journal_mode = WAL')
+    // WAL needs shared memory and does not work on a network share (SMB): the lists sit next
+    // to db-config.json, which can be a shared folder for all PCs
+    this.db.pragma(dbDir.startsWith('\\') ? 'journal_mode = DELETE' : 'journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
     this.createSchema()
   }
