@@ -27,11 +27,16 @@ const SOURCES: { code: string; label: string }[] = [
 
 type Decision = 'CLEARED' | 'SANCTIONED' | null
 
-export default function SanctionsCheckReport(): React.JSX.Element {
+export default function SanctionsCheckReport({
+  initialSubject
+}: {
+  /** A name searched on the Search tab, carried over to be screened as a report */
+  initialSubject?: string
+} = {}): React.JSX.Element {
   const { showError, showSuccess } = useToast()
   const { user } = useAuth()
 
-  const [subjectName, setSubjectName] = useState('')
+  const [subjectName, setSubjectName] = useState(initialSubject || '')
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [entities, setEntities] = useState<Entity[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)

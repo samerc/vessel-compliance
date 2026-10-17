@@ -16,6 +16,7 @@ import {
   Users,
   Settings,
   FileText,
+  Download,
   RefreshCw,
   Loader2,
   ScanText
@@ -30,6 +31,7 @@ import { PageHeader, Modal, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 import { hasArabic } from '../utils/arabicNames'
+import { saveFile, SaveCancelledError } from '../utils/saveFile'
 
 interface SicEntry {
   id: number
@@ -75,6 +77,8 @@ export default function SanctionsSearch({
   const isLight = theme === 'light' || theme === 'aurora'
 
   const [activeTab, setActiveTab] = useState<'search' | 'sic' | 'report'>('search')
+  // A searched name taken to the Check Report tab (remounts it with that subject)
+  const [reportSubject, setReportSubject] = useState<{ name: string; nonce: number } | null>(null)
   useRequestedSubTab(subTab, subTabNonce, ['search', 'sic', 'report'] as const, setActiveTab)
   const [updatingLists, setUpdatingLists] = useState(false)
   const [updateProgress, setUpdateProgress] = useState('')
@@ -202,6 +206,39 @@ export default function SanctionsSearch({
       showSuccess(`${threshold}% is now your default match threshold`)
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to save the threshold')
+    }
+  }
+
+  const exportResults = async (): Promise<void> => {
+    try {
+      const XLSX = (await import('xlsx-js-style')).default
+      const rows = results.map((m) => ({
+        'Searched name': query.trim(),
+        'Name on list': m.names?.[0] || '',
+        'Also known as': (m.names || []).slice(1).join('; '),
+        List: m.source,
+        'List reference': m.source_id,
+        Kind: m.target_type,
+        'Score %': Math.round((m.score || 0) * 100),
+        IMO: m.imo_number || '',
+        'Listed on': m.listed_on || '',
+        Remarks: m.remarks || ''
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [22, 30, 40, 8, 16, 12, 8, 10, 12, 60].map((wch) => ({ wch }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Results')
+      const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+      await saveFile(
+        new Blob([out], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }),
+        `Sanctions search - ${query.trim().slice(0, 40) || 'results'}.xlsx`
+      )
+      showSuccess('Results exported')
+    } catch (err) {
+      if (err instanceof SaveCancelledError) return
+      showError((err instanceof Error && err.message) || 'Export failed')
     }
   }
 
@@ -755,6 +792,25 @@ export default function SanctionsSearch({
                   {type}: {count}
                 </span>
               ))}
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => void exportResults()}
+                  title="Export these results to Excel"
+                >
+                  <Download size={14} /> Export
+                </button>
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => {
+                    setReportSubject({ name: query.trim(), nonce: Date.now() })
+                    setActiveTab('report')
+                  }}
+                  title="Screen this name as a check report: link it to an entity, record the decision, export a PDF"
+                >
+                  <FileText size={14} /> Check report
+                </button>
+              </div>
             </div>
           )}
 
@@ -1576,7 +1632,12 @@ export default function SanctionsSearch({
       )}
 
       {/* ============ CHECK REPORT TAB ============ */}
-      {activeTab === 'report' && <SanctionsCheckReport />}
+      {activeTab === 'report' && (
+        <SanctionsCheckReport
+          key={reportSubject?.nonce ?? 0}
+          initialSubject={reportSubject?.name}
+        />
+      )}
     </div>
   )
 }
