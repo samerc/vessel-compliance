@@ -835,10 +835,12 @@ export default function QuotationEditor({
   ): Promise<void> => {
     const { exportQuotationToWord } = await import('../services/QuotationExportService')
     await exportQuotationToWord(quotation)
-    // Mark as exported if approved
+    // Mark as exported if approved (a converted quotation stays converted)
     if (
-      quotation.status === 'approved' ||
-      (quotation.referenceNumber && !quotation.referenceNumber.startsWith('DRAFT-'))
+      quotation.status !== 'converted' &&
+      quotation.status !== 'exported' &&
+      (quotation.status === 'approved' ||
+        (quotation.referenceNumber && !quotation.referenceNumber.startsWith('DRAFT-')))
     ) {
       try {
         ok(await window.api.updateQuotation(quotation.id, { status: 'exported' }))

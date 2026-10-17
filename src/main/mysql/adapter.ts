@@ -16058,7 +16058,8 @@ export class MySQLAdapter {
   async getQuotationExcludedCountries(quotationId: string): Promise<QuotationExcludedCountry[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      `SELECT id, quotation_id as quotationId, name, list_type as listType FROM quotation_excluded_countries WHERE quotation_id = ?`,
+      // Alphabetical: the quotation and its policy print the same list in the same order
+      `SELECT id, quotation_id as quotationId, name, list_type as listType FROM quotation_excluded_countries WHERE quotation_id = ? ORDER BY name`,
       [quotationId]
     )
     return rows as Row<QuotationExcludedCountry>[]

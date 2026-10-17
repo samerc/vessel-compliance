@@ -839,9 +839,18 @@ export default function PolicySetupWizard({
           }
         }
         return null
-      case 3: // Details
+      case 3: {
+        // Details. Every vessel needs an insured: the policy prints none otherwise
+        const noInsured = data.selectedVesselIds.find(
+          (vid) => !(data.insuredByVessel[vid] || []).some((r) => r.entityName.trim())
+        )
+        if (noInsured) {
+          const qv = qVessels.find((v) => (v.vesselId || v.id) === noInsured)
+          return `Add the insured for ${(qv?.name || qv?.vesselLabel || 'the vessel').toUpperCase()}`
+        }
         if (!data.bankId && banks.length > 0) return 'Please select a bank'
         return null
+      }
       case 4: // Blue Cards
         if (!data.blueCardNone && data.blueCards.length === 0)
           return 'Please select blue cards or choose "None"'
