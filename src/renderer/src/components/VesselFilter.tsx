@@ -111,8 +111,7 @@ function MultiSelectDropdown({
   options,
   selected,
   onChange,
-  placeholder = 'Any',
-  isLight
+  placeholder = 'Any'
 }: {
   options: { id: string; label: string; sublabel?: string }[]
   selected: string[]
@@ -125,7 +124,7 @@ function MultiSelectDropdown({
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
   const btnRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
+  const dropdownBg = 'var(--bg-primary)'
   const showSearch = options.length > 6
 
   const close = (): void => {

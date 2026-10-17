@@ -1280,7 +1280,7 @@ export default function QuotationEditor({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 background: 'rgba(150, 150, 150, 0.15)',
-                color: isLight ? '#666' : '#999',
+                color: 'var(--text-secondary)',
                 letterSpacing: '0.05em'
               }}
             >

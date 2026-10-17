@@ -779,7 +779,7 @@ export default function ConditionSurveyManager({
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'flex-start',
-                          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                          background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
                         }}
                       >
                         <div style={{ flex: 1 }}>

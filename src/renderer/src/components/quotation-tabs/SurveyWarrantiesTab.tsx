@@ -263,7 +263,7 @@ export default function SurveyWarrantiesTab({
                   borderRadius: '6px',
                   border: '1px solid var(--glass-border-color)',
                   cursor: 'pointer',
-                  background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                  background: 'var(--table-header-bg)',
                   color: 'var(--text-primary)',
                   fontSize: '0.82rem',
                   lineHeight: 1.4
@@ -338,7 +338,7 @@ export default function SurveyWarrantiesTab({
             style={{
               padding: '12px',
               marginBottom: '6px',
-              background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+              background: 'var(--table-header-bg)',
               borderRadius: '8px',
               border: '1px solid var(--glass-border-color)',
               borderLeft: item.customText ? '3px solid #ffb020' : '3px solid var(--accent-primary)'

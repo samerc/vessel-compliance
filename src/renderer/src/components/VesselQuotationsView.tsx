@@ -215,7 +215,7 @@ export default function VesselQuotationsView({
       case 'draft':
         return {
           background: 'rgba(136,136,136,0.12)',
-          color: isLight ? '#666' : '#aaa',
+          color: 'var(--text-secondary)',
           border: '1px solid rgba(136,136,136,0.2)'
         }
       case 'sent':
@@ -233,7 +233,7 @@ export default function VesselQuotationsView({
       default:
         return {
           background: 'rgba(136,136,136,0.12)',
-          color: isLight ? '#666' : '#aaa',
+          color: 'var(--text-secondary)',
           border: '1px solid rgba(136,136,136,0.2)'
         }
     }
@@ -294,7 +294,7 @@ export default function VesselQuotationsView({
                       position: 'fixed',
                       top: rect ? rect.bottom + 4 : 0,
                       right: rect ? window.innerWidth - rect.right : 0,
-                      background: isLight ? '#fff' : '#1e222a',
+                      background: 'var(--bg-primary)',
                       border: '1px solid var(--glass-border-color)',
                       borderRadius: '10px',
                       boxShadow: '0 8px 24px rgba(0,0,0,0.25)',

@@ -611,17 +611,11 @@ export default function WarBreachCalculator(): React.JSX.Element {
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'flex-start',
           marginBottom: '24px'
         }}
       >
-        <div>
-          <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem' }}>War Breach Calculator</h2>
-          <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-            Compute war/breach premiums with Lebanese government taxes
-          </p>
-        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => setShowHistory((v) => !v)}

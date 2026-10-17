@@ -1488,7 +1488,7 @@ export default function VesselDetail({
                           left: 0,
                           zIndex: 200,
                           marginTop: '4px',
-                          background: isLight ? '#ffffff' : '#1a1d28',
+                          background: 'var(--bg-primary)',
                           border: '1px solid var(--input-border)',
                           borderRadius: '8px',
                           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
@@ -1518,7 +1518,7 @@ export default function VesselDetail({
                                 padding: '4px 8px',
                                 borderRadius: '5px',
                                 border: '1px solid var(--input-border)',
-                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                background: 'var(--bg-dark)',
                                 color: 'var(--text-primary)',
                                 fontSize: '0.8rem',
                                 boxSizing: 'border-box',
@@ -1650,7 +1650,7 @@ export default function VesselDetail({
                                 width: '110px',
                                 fontSize: '0.78rem',
                                 border: '1px solid var(--input-border)',
-                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                background: 'var(--bg-dark)',
                                 color: 'var(--text-primary)'
                               }}
                             />
@@ -1672,7 +1672,7 @@ export default function VesselDetail({
                                 width: '60px',
                                 fontSize: '0.78rem',
                                 border: '1px solid var(--input-border)',
-                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                background: 'var(--bg-dark)',
                                 color: 'var(--text-primary)'
                               }}
                             />
@@ -1819,7 +1819,7 @@ export default function VesselDetail({
                           left: 0,
                           zIndex: 200,
                           marginTop: '4px',
-                          background: isLight ? '#ffffff' : '#1a1d28',
+                          background: 'var(--bg-primary)',
                           border: '1px solid var(--input-border)',
                           borderRadius: '8px',
                           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
@@ -1848,7 +1848,7 @@ export default function VesselDetail({
                               padding: '4px 8px',
                               borderRadius: '5px',
                               border: '1px solid var(--input-border)',
-                              background: isLight ? '#f0f2f5' : '#0f1118',
+                              background: 'var(--bg-dark)',
                               color: 'var(--text-primary)',
                               fontSize: '0.8rem',
                               boxSizing: 'border-box',
@@ -2220,7 +2220,7 @@ export default function VesselDetail({
                         top: '100%',
                         right: 0,
                         marginTop: '4px',
-                        background: isLight ? '#ffffff' : '#1e222a',
+                        background: 'var(--bg-primary)',
                         border: '1px solid var(--glass-border-color)',
                         borderRadius: '8px',
                         boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
@@ -3413,7 +3413,7 @@ export default function VesselDetail({
                                   background: isLight
                                     ? 'rgba(59, 130, 246, 0.1)'
                                     : 'rgba(59, 130, 246, 0.2)',
-                                  color: isLight ? '#3b82f6' : '#93c5fd',
+                                  color: 'var(--info)',
                                   fontWeight: '500'
                                 }}
                               >
@@ -4234,7 +4234,7 @@ export default function VesselDetail({
                       style={{
                         marginLeft: '24px',
                         marginTop: '6px',
-                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
                         borderRadius: '8px',
                         padding: '10px 12px',
                         borderLeft: '2px solid var(--glass-border-color)'
@@ -4852,7 +4852,7 @@ function DynamicPoliciesView({
     expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
     cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)' },
     inactive: {
-      bg: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+      bg: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
       color: 'var(--text-secondary)'
     }
   }
@@ -5259,7 +5259,7 @@ function DynamicPoliciesView({
                         right: 0,
                         maxHeight: '200px',
                         overflowY: 'auto',
-                        background: isLight ? '#ffffff' : '#1a1d28',
+                        background: 'var(--bg-primary)',
                         border: isLight
                           ? '1px solid rgba(0,0,0,0.1)'
                           : '1px solid rgba(255,255,255,0.1)',
@@ -6172,7 +6172,7 @@ function VesselTimeline({
                       position: 'relative',
                       marginBottom: '12px',
                       padding: '10px 16px',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)',
                       borderRadius: '8px',
                       borderLeft: `3px solid ${me.color}`,
                       transition: 'background 0.15s',

@@ -211,7 +211,7 @@ export default function QuotationSettings(): React.JSX.Element {
           display: 'flex',
           gap: '2px',
           marginBottom: '16px',
-          background: isLight ? '#e8eaf0' : 'rgba(255,255,255,0.06)',
+          background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
           borderRadius: '10px',
           padding: '3px',
           width: 'fit-content'
@@ -995,7 +995,7 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps): React.JSX.Elem
 
 // ==================== Clauses Tab ====================
 
-function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
+function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [clauses, setClauses] = useState<PIClause[]>([])
   const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
   const [newNumber, setNewNumber] = useState('')
@@ -1484,7 +1484,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
             style={{
               padding: '16px',
               borderRadius: '10px',
-              background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+              background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
               border: '1px solid var(--glass-border-color)'
             }}
           >
@@ -6234,8 +6234,6 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
   const [editName, setEditName] = useState('')
   const [editText, setEditText] = useState('')
   const [showAdd, setShowAdd] = useState(false)
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.piGetTradingCustomTexts()
@@ -6376,7 +6374,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
             borderRadius: '8px',
             border: '1px solid var(--table-border)',
             marginBottom: '8px',
-            background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
+            background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
           }}
         >
           {editingId === t.id ? (
@@ -6519,8 +6517,6 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editText, setEditText] = useState('')
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.premiumGetTextTemplates()
@@ -6638,7 +6634,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
               <code
                 style={{
                   fontSize: '0.76rem',
-                  background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)',
+                  background: 'color-mix(in srgb, var(--text-primary) 6%, transparent)',
                   padding: '1px 5px',
                   borderRadius: '3px'
                 }}
@@ -6649,7 +6645,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
               <code
                 style={{
                   fontSize: '0.76rem',
-                  background: isLight ? '#eef1f6' : 'rgba(255,255,255,0.06)',
+                  background: 'color-mix(in srgb, var(--text-primary) 6%, transparent)',
                   padding: '1px 5px',
                   borderRadius: '3px'
                 }}
@@ -11259,7 +11255,6 @@ function WorkflowDesignerTab({ showSuccess, showError }: TabProps): React.JSX.El
 function SurveyWarrantyTemplatesTab({
   showSuccess,
   showError,
-  isLight,
   readOnly
 }: TabProps): React.JSX.Element {
   const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
@@ -11475,7 +11470,7 @@ function SurveyWarrantyTemplatesTab({
               gap: '8px',
               padding: '10px 12px',
               marginBottom: '4px',
-              background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+              background: 'var(--table-header-bg)',
               borderRadius: '8px',
               border: '1px solid var(--glass-border-color)'
             }}
@@ -11530,7 +11525,7 @@ function SurveyWarrantyTemplatesTab({
                       padding: '5px 8px',
                       borderRadius: '6px',
                       border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+                      background: 'var(--input-bg)',
                       color: 'var(--text-primary)',
                       fontSize: '0.82rem'
                     }}
@@ -11545,7 +11540,7 @@ function SurveyWarrantyTemplatesTab({
                         padding: '6px 8px',
                         borderRadius: '6px',
                         border: '1px solid var(--input-border)',
-                        background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+                        background: 'var(--input-bg)',
                         color: 'var(--text-primary)',
                         fontSize: '0.82rem',
                         resize: 'vertical'
@@ -11679,7 +11674,7 @@ function SurveyWarrantyTemplatesTab({
                 padding: '5px 8px',
                 borderRadius: '6px',
                 border: '1px solid var(--input-border)',
-                background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+                background: 'var(--input-bg)',
                 color: 'var(--text-primary)',
                 fontSize: '0.82rem'
               }}
@@ -11695,7 +11690,7 @@ function SurveyWarrantyTemplatesTab({
                   padding: '6px 8px',
                   borderRadius: '6px',
                   border: '1px solid var(--input-border)',
-                  background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+                  background: 'var(--input-bg)',
                   color: 'var(--text-primary)',
                   fontSize: '0.82rem',
                   resize: 'vertical'
@@ -11742,7 +11737,7 @@ function SurveyWarrantyTemplatesTab({
           style={{
             padding: '10px 12px',
             marginBottom: '6px',
-            background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+            background: 'var(--table-header-bg)',
             borderRadius: '8px',
             border: '1px solid var(--glass-border-color)'
           }}
@@ -11758,7 +11753,7 @@ function SurveyWarrantyTemplatesTab({
                   padding: '6px 8px',
                   borderRadius: '6px',
                   border: '1px solid var(--input-border)',
-                  background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+                  background: 'var(--input-bg)',
                   color: 'var(--text-primary)',
                   fontSize: '0.85rem',
                   marginBottom: '8px'
@@ -11895,7 +11890,7 @@ function SurveyWarrantyTemplatesTab({
           style={{
             marginTop: '8px',
             padding: '12px',
-            background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+            background: 'var(--table-header-bg)',
             borderRadius: '8px',
             border: '1px solid var(--glass-border-color)'
           }}
@@ -11909,7 +11904,7 @@ function SurveyWarrantyTemplatesTab({
               padding: '6px 8px',
               borderRadius: '6px',
               border: '1px solid var(--input-border)',
-              background: isLight ? '#fff' : 'rgba(255,255,255,0.06)',
+              background: 'var(--input-bg)',
               color: 'var(--text-primary)',
               fontSize: '0.85rem',
               marginBottom: '8px'
@@ -12281,8 +12276,7 @@ function CargoClauseSetsManager({
 function ClausePicker({
   clauses,
   selectedIds,
-  toggle,
-  isLight
+  toggle
 }: {
   clauses: CargoClause[]
   selectedIds: Set<string>
@@ -12297,7 +12291,7 @@ function ClausePicker({
         border: '1px solid var(--input-border)',
         borderRadius: '8px',
         padding: '8px',
-        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+        background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
       }}
     >
       {clauses.length === 0 && (

@@ -129,7 +129,7 @@ function HullClauseDropdown({
                     fontWeight: active ? 600 : 400,
                     fontSize: '0.86rem',
                     background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
-                    borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`
+                    borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 6%, transparent)'}`
                   }}
                   onMouseEnter={(e) => {
                     if (!active)
@@ -347,7 +347,7 @@ function HullConditionPicker({
                   <div
                     style={{
                       padding: '6px 10px',
-                      borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
+                      borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 6%, transparent)'}`,
                       display: 'flex',
                       gap: '6px',
                       position: 'sticky',
@@ -1997,7 +1997,7 @@ export default function HullConditionsTab({
                             fontSize: '0.82rem',
                             cursor: 'pointer',
                             color: 'var(--text-primary)',
-                            borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`
+                            borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 7%, transparent)'}`
                           }}
                           onMouseEnter={(e) =>
                             (e.currentTarget.style.background = isLight
@@ -2025,7 +2025,7 @@ export default function HullConditionsTab({
                 textAlign: 'center',
                 borderRadius: '10px',
                 border: '1px dashed var(--input-border)',
-                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)',
                 marginBottom: '16px'
               }}
             >
@@ -2205,7 +2205,7 @@ export default function HullConditionsTab({
                 padding: '32px 24px',
                 borderRadius: '10px',
                 border: '1px dashed var(--input-border)',
-                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)',
                 marginBottom: '16px'
               }}
             >
@@ -2340,7 +2340,7 @@ export default function HullConditionsTab({
               <>
                 <div
                   style={{
-                    borderTop: `2px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+                    borderTop: `2px solid ${'color-mix(in srgb, var(--text-primary) 10%, transparent)'}`,
                     margin: '16px 0',
                     position: 'relative'
                   }}
@@ -2521,7 +2521,7 @@ export default function HullConditionsTab({
                 <div
                   style={{
                     marginTop: '16px',
-                    borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                    borderTop: `1px solid ${'color-mix(in srgb, var(--text-primary) 8%, transparent)'}`,
                     paddingTop: '12px'
                   }}
                 >

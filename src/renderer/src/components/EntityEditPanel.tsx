@@ -988,7 +988,7 @@ export default function EntityEditPanel({
                 style={{
                   padding: '8px 10px',
                   borderRadius: '8px',
-                  background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                  background: 'var(--table-header-bg)',
                   border: '1px solid var(--table-border)',
                   fontSize: '0.8rem'
                 }}
@@ -1073,7 +1073,7 @@ export default function EntityEditPanel({
                 marginBottom: '12px',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+                background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
                 border: '1px solid var(--table-border)'
               }}
             >

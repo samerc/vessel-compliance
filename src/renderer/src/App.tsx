@@ -628,7 +628,7 @@ function App(): React.JSX.Element {
   const userInitials = user?.username ? user.username.slice(0, 2).toUpperCase() : '??'
   const sc = sidebarCollapsed
 
-  const menuBg = isLight ? '#ffffff' : '#1e1e28'
+  const menuBg = 'var(--bg-primary)'
   const menuBorder = isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
   const menuShadow = isLight ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
 

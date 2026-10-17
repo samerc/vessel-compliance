@@ -785,7 +785,7 @@ export default function SanctionsSearch({
                     fontSize: '0.78rem',
                     padding: '3px 10px',
                     borderRadius: '12px',
-                    background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                    background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
                     color: 'var(--text-secondary)'
                   }}
                 >

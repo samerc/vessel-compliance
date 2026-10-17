@@ -279,7 +279,7 @@ export function PickerDropdown({
             maxHeight: '260px',
             overflowY: 'auto',
             borderRadius: '8px',
-            border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+            border: `1px solid ${'color-mix(in srgb, var(--text-primary) 15%, transparent)'}`,
             background: dropdownBg,
             boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
           }}
@@ -296,7 +296,7 @@ export function PickerDropdown({
                 fontSize,
                 cursor: 'pointer',
                 color: 'var(--text-primary)',
-                borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}`,
+                borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 7%, transparent)'}`,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'

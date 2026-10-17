@@ -147,7 +147,7 @@ function InstituteClauseDropdown({
                         ? 'rgba(var(--accent-primary-rgb), 0.06)'
                         : 'rgba(var(--accent-primary-rgb), 0.06)'
                       : 'transparent',
-                    borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}`
+                    borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 5%, transparent)'}`
                   }}
                   onMouseEnter={(e) => {
                     if (!active)
@@ -461,7 +461,7 @@ export default function CargoClausesTab({
                         padding: '8px 12px',
                         cursor: 'pointer',
                         fontSize: '0.82rem',
-                        borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}`
+                        borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 5%, transparent)'}`
                       }}
                       onMouseEnter={(e) =>
                         (e.currentTarget.style.background = isLight
@@ -514,7 +514,7 @@ export default function CargoClausesTab({
             padding: '14px',
             borderRadius: '8px',
             border: '1px solid var(--input-border)',
-            background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+            background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
           }}
         >
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>

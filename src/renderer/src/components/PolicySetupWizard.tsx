@@ -1014,7 +1014,7 @@ export default function PolicySetupWizard({
     boxSizing: 'border-box'
   }
 
-  const cardBg = isLight ? '#ffffff' : 'var(--bg-card)'
+  const cardBg = 'var(--bg-card)'
   const stepDivider: React.CSSProperties = {
     border: 'none',
     borderTop: '1px solid var(--glass-border-color)',
@@ -1653,7 +1653,7 @@ function StepVesselAlternative({
                     padding: '3px 10px',
                     borderRadius: '6px',
                     background: 'rgba(34,197,94,0.1)',
-                    color: isLight ? '#166534' : '#86efac',
+                    color: 'var(--success)',
                     fontWeight: 600
                   }}
                 >
@@ -1860,7 +1860,6 @@ function StepPeriodPremium({
 function StepInstalments({
   data,
   quotation,
-  isLight,
   onUpdate,
   recalcPremiumFromInstalments,
   onChangeCount,
@@ -2117,7 +2116,9 @@ function StepInstalments({
 
       {count > 0 && (
         <>
-          <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '0 0 16px' }} />
+          <div
+            style={{ height: '1px', background: 'var(--glass-border-color)', margin: '0 0 16px' }}
+          />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {data.instalmentDates.map((date, i) => (
@@ -2130,7 +2131,7 @@ function StepInstalments({
                   padding: '10px 14px',
                   borderRadius: '10px',
                   border: '1px solid var(--table-border)',
-                  background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
+                  background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
                 }}
               >
                 <span
@@ -2313,7 +2314,6 @@ function StepDetails({
   allEntities,
   entityAddrs,
   qVessels,
-  isLight,
   labelStyle,
   inputStyle,
   onEditSectionOrder
@@ -2535,7 +2535,7 @@ function StepDetails({
                   border: '1px solid var(--table-border)',
                   borderRadius: '8px',
                   padding: '10px 12px',
-                  background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
+                  background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
                 }}
               >
                 <div
@@ -3324,7 +3324,6 @@ function StepReview({
   hasAlts,
   banks,
   isPI,
-  isLight,
   onGoToStep
 }: {
   data: WizardData
@@ -3353,7 +3352,7 @@ function StepReview({
     padding: '14px 16px',
     borderRadius: '10px',
     border: '1px solid var(--table-border)',
-    background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)',
+    background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)',
     marginBottom: '12px'
   }
 

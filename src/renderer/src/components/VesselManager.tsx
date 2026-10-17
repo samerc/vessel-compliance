@@ -24,7 +24,6 @@ import { decideSanctionsSubject } from '../utils/sanctionsDecision'
 import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import ColumnSelector from './ColumnSelector'
@@ -80,9 +79,7 @@ export default function VesselManager({
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
   const [openInEditMode, setOpenInEditMode] = useState(false)
   const { showError, showSuccess } = useToast()
-  const { theme } = useTheme()
   const { hasPermission } = useAuth()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   // Pagination State
   const [page, setPage] = useState(1)
@@ -724,7 +721,7 @@ export default function VesselManager({
                             left: addFleetRect.left,
                             width: addFleetRect.width,
                             zIndex: 3000,
-                            background: isLight ? '#ffffff' : '#1a1d28',
+                            background: 'var(--bg-primary)',
                             border: '1px solid var(--input-border)',
                             borderRadius: '8px',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',

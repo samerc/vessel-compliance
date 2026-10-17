@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Settings } from 'lucide-react'
-import { useTheme } from '../contexts/ThemeContext'
 import type { ColumnDef } from '../utils/useColumnPrefs'
 
 interface ColumnSelectorProps {
@@ -18,8 +17,6 @@ export default function ColumnSelector({
 }: ColumnSelectorProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const ref = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -129,7 +126,7 @@ export default function ColumnSelector({
               minWidth: '200px',
               maxHeight: '320px',
               overflowY: 'auto',
-              background: isLight ? '#ffffff' : '#1e222a',
+              background: 'var(--bg-primary)',
               border: '1px solid var(--glass-border-color)',
               borderRadius: '10px',
               boxShadow: '0 12px 40px rgba(0,0,0,0.3)',

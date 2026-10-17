@@ -1947,7 +1947,8 @@ export default function EntityDirectory({
                                 fontSize: '0.7rem',
                                 padding: '1px 6px',
                                 borderRadius: '4px',
-                                background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                                background:
+                                  'color-mix(in srgb, var(--text-primary) 4%, transparent)',
                                 color: 'var(--text-secondary)',
                                 border: '1px solid var(--table-border)'
                               }}
@@ -2015,7 +2016,7 @@ export default function EntityDirectory({
                     marginTop: '2px',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+                    background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
                     border: isLight
                       ? '1px solid rgba(200,120,0,0.2)'
                       : '1px solid rgba(255,193,7,0.15)',

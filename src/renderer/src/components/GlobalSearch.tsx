@@ -208,8 +208,8 @@ export default function GlobalSearch({
 
   if (!isOpen) return null
 
-  const modalBg = isLight ? '#ffffff' : '#1a1d28'
-  const borderColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
+  const modalBg = 'var(--bg-primary)'
+  const borderColor = 'color-mix(in srgb, var(--text-primary) 10%, transparent)'
   const accentBg = isLight
     ? 'rgba(var(--accent-primary-rgb), 0.1)'
     : 'rgba(var(--accent-primary-rgb), 0.1)'
@@ -367,7 +367,7 @@ export default function GlobalSearch({
               fontSize: '0.68rem',
               padding: '2px 6px',
               borderRadius: '4px',
-              background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+              background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
               color: 'var(--text-secondary)',
               border: `1px solid ${borderColor}`,
               flexShrink: 0
@@ -644,7 +644,7 @@ export default function GlobalSearch({
                 style={{
                   padding: '1px 4px',
                   borderRadius: '3px',
-                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
                   border: `1px solid ${borderColor}`,
                   fontSize: '0.65rem'
                 }}
@@ -658,7 +658,7 @@ export default function GlobalSearch({
                 style={{
                   padding: '1px 4px',
                   borderRadius: '3px',
-                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
                   border: `1px solid ${borderColor}`,
                   fontSize: '0.65rem'
                 }}
@@ -672,7 +672,7 @@ export default function GlobalSearch({
                 style={{
                   padding: '1px 4px',
                   borderRadius: '3px',
-                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
                   border: `1px solid ${borderColor}`,
                   fontSize: '0.65rem'
                 }}

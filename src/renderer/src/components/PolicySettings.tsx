@@ -259,7 +259,7 @@ export default function PolicySettings(): React.JSX.Element {
           display: 'flex',
           gap: '2px',
           marginBottom: '16px',
-          background: isLight ? '#e8eaf0' : 'rgba(255,255,255,0.06)',
+          background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
           borderRadius: '10px',
           padding: '3px',
           width: 'fit-content'
@@ -2363,8 +2363,7 @@ function RichTextSettingTab({
 // ==================== Signatures Tab ====================
 function SignaturesTab({
   showSuccess,
-  showError,
-  isLight
+  showError
 }: {
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
@@ -2550,7 +2549,7 @@ function SignaturesTab({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: isLight ? '#ffffff' : 'rgba(255,255,255,0.06)',
+                    background: 'var(--input-bg)',
                     borderRadius: '8px',
                     border: '1px solid var(--glass-border-color)',
                     overflow: 'hidden'

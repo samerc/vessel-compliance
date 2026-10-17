@@ -174,12 +174,11 @@ export default function PremiumCalculator(): React.JSX.Element {
         <div
           style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             alignItems: 'center',
             marginBottom: '20px'
           }}
         >
-          <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Pro-Rata Premium Calculator</h3>
           <button
             onClick={handleReset}
             className="btn-secondary"

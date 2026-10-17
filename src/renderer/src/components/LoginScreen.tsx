@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Shield } from 'lucide-react'
+import { Shield, Eye, EyeOff } from 'lucide-react'
 
 export const LoginScreen: React.FC = () => {
   const { login } = useAuth()
@@ -10,6 +10,9 @@ export const LoginScreen: React.FC = () => {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  // Caps Lock on while typing the password (the usual reason a correct password fails)
+  const [capsLock, setCapsLock] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target
@@ -146,16 +149,50 @@ export const LoginScreen: React.FC = () => {
             >
               Password
             </label>
-            <input
-              id="login-password"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              style={{ width: '100%' }}
-              placeholder="••••••••"
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                onKeyDown={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                onBlur={() => setCapsLock(false)}
+                style={{ width: '100%', paddingRight: '40px' }}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '4px',
+                  display: 'flex'
+                }}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+            {capsLock && (
+              <div
+                role="status"
+                style={{ fontSize: '0.78rem', color: 'var(--warning)', marginTop: '6px' }}
+              >
+                Caps Lock is on
+              </div>
+            )}
           </div>
 
           <button

@@ -1605,7 +1605,7 @@ export default function PolicyDetail({
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   background: 'rgba(150, 150, 150, 0.15)',
-                  color: isLight ? '#666' : '#999',
+                  color: 'var(--text-secondary)',
                   letterSpacing: '0.05em'
                 }}
               >
@@ -3328,7 +3328,7 @@ export default function PolicyDetail({
                                     padding: '1px 6px',
                                     borderRadius: '4px',
                                     background: 'rgba(34,197,94,0.15)',
-                                    color: isLight ? '#166534' : '#86efac',
+                                    color: 'var(--success)',
                                     fontWeight: 600
                                   }}
                                 >
@@ -3438,7 +3438,7 @@ export default function PolicyDetail({
                       style={{
                         padding: '12px 16px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)',
+                        background: 'color-mix(in srgb, var(--warning) 7%, transparent)',
                         border: '1px solid var(--glass-border-color)'
                       }}
                     >

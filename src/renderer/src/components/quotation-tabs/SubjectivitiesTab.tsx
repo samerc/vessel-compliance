@@ -343,8 +343,7 @@ async function autoSetSubjectivityScopes(
 
 export default function SubjectivitiesTab({
   quotation,
-  showSuccess,
-  isLight
+  showSuccess
 }: {
   quotation: Quotation
   showSuccess: (m: string) => void
@@ -562,7 +561,7 @@ export default function SubjectivitiesTab({
           marginBottom: '14px',
           padding: '10px 14px',
           borderRadius: '8px',
-          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+          background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
           border: '1px solid var(--table-border)'
         }}
       >

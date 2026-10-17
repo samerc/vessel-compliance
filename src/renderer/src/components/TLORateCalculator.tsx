@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Copy, RotateCcw, CheckCircle } from 'lucide-react'
 import { StrMoneyInput } from './quotation-tabs/shared'
 import { Field } from './ui'
 
@@ -6,6 +7,7 @@ export default function TLORateCalculator(): React.JSX.Element {
   const [currentValue, setCurrentValue] = useState('')
   const [premium, setPremium] = useState('')
   const [newValue, setNewValue] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const calculation = useMemo(() => {
     const cv = parseFloat(currentValue) || 0
@@ -54,12 +56,42 @@ export default function TLORateCalculator(): React.JSX.Element {
     background: 'var(--table-header-bg)'
   }
 
+  // The figures as plain text, e.g. for an email
+  const copyResult = (): void => {
+    if (!calculation) return
+    const text = [
+      `Current value: ${fmt(parseFloat(currentValue) || 0)}`,
+      `Current premium: ${fmt(parseFloat(premium) || 0)} (rate ${fmtRate(calculation.rate)})`,
+      `New value: ${fmt(parseFloat(newValue) || 0)}`,
+      `Additional premium: ${fmt(calculation.additionalPremium)}`,
+      `New premium: ${fmt(calculation.newPremium)} (rate ${fmtRate(calculation.newRate)})`
+    ].join('\n')
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
   return (
     <div className="glass-card" style={{ padding: '28px' }}>
-      <h2 style={{ margin: '0 0 8px 0', fontSize: '1.4rem' }}>TLO Rate Calculator</h2>
-      <p style={{ color: 'var(--text-secondary)', margin: '0 0 24px 0', fontSize: '0.9rem' }}>
-        Calculate the adjusted Total Loss Only premium when the vessel value changes.
-      </p>
+      <div
+        style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '16px' }}
+      >
+        <button
+          className="btn-secondary"
+          onClick={() => {
+            setCurrentValue('')
+            setPremium('')
+            setNewValue('')
+          }}
+          disabled={!currentValue && !premium && !newValue}
+        >
+          <RotateCcw size={14} /> Reset
+        </button>
+        <button className="btn-primary" onClick={copyResult} disabled={!calculation}>
+          {copied ? <CheckCircle size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
 
       {/* Inputs */}
       <div className="form-grid" style={{ marginBottom: '28px' }}>

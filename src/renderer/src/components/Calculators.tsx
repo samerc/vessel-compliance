@@ -44,6 +44,9 @@ export default function Calculators({ subTab, subTabNonce }: SubTabProps = {}): 
         onChange={setActiveCalc}
         items={calculators.map((c) => ({ key: c.id, label: c.label }))}
       />
+      <p style={{ color: 'var(--text-secondary)', margin: '-12px 0 16px', fontSize: '0.88rem' }}>
+        {calculators.find((c) => c.id === activeCalc)?.description}
+      </p>
 
       {/* Opened calculators stay mounted: switching tabs keeps the figures entered */}
       <KeepAlive

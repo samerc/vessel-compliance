@@ -1045,7 +1045,7 @@ export default function DefectManager({
                           fontSize: '10px',
                           fontWeight: '500',
                           color: 'var(--text-secondary)',
-                          background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                          background: 'color-mix(in srgb, var(--text-primary) 4%, transparent)',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -1064,7 +1064,7 @@ export default function DefectManager({
                           borderRadius: '10px',
                           fontSize: '10px',
                           fontWeight: '600',
-                          background: isLight ? 'rgba(200, 0, 0, 0.08)' : 'rgba(255, 77, 77, 0.08)',
+                          background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
                           color: 'var(--danger)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.4px',
@@ -1773,7 +1773,6 @@ type DefectAttachment = Awaited<ReturnType<typeof window.api.defectGetAttachment
 function DefectAttachments({
   defectId,
   canManage,
-  isLight,
   uploadedBy,
   showError
 }: {
@@ -1904,7 +1903,7 @@ function DefectAttachments({
               padding: '4px 8px',
               borderRadius: '6px',
               border: '1px solid var(--input-border)',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
               fontSize: '0.76rem',
               maxWidth: '220px'
             }}

@@ -1966,7 +1966,7 @@ export default function QuotationList({
                           gap: '8px',
                           padding: '6px 10px',
                           borderRadius: '8px',
-                          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                          background: 'color-mix(in srgb, var(--text-primary) 2%, transparent)'
                         }}
                       >
                         {editingGroup === g.id ? (

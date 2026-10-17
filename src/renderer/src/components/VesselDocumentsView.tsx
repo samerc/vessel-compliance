@@ -275,31 +275,31 @@ export default function VesselDocumentsView({
     compliant: {
       border: 'transparent',
       bg: 'transparent',
-      badge: isLight ? 'rgba(0,140,70,0.12)' : 'rgba(0,194,100,0.12)',
+      badge: 'color-mix(in srgb, var(--success) 12%, transparent)',
       label: 'COMPLIANT'
     },
     expiring: {
       border: 'var(--warning)',
-      bg: isLight ? 'rgba(180,83,9,0.04)' : 'rgba(245,158,11,0.04)',
-      badge: isLight ? 'rgba(180,83,9,0.12)' : 'rgba(245,158,11,0.12)',
+      bg: 'color-mix(in srgb, var(--warning) 4%, transparent)',
+      badge: 'color-mix(in srgb, var(--warning) 12%, transparent)',
       label: 'EXPIRING SOON'
     },
     expired: {
       border: 'var(--danger)',
-      bg: isLight ? 'rgba(192,0,0,0.04)' : 'rgba(255,77,77,0.04)',
-      badge: isLight ? 'rgba(192,0,0,0.12)' : 'rgba(255,77,77,0.12)',
+      bg: 'color-mix(in srgb, var(--danger) 4%, transparent)',
+      badge: 'color-mix(in srgb, var(--danger) 12%, transparent)',
       label: 'EXPIRED'
     },
     missing: {
       border: 'var(--danger)',
-      bg: isLight ? 'rgba(192,0,0,0.04)' : 'rgba(255,77,77,0.04)',
-      badge: isLight ? 'rgba(192,0,0,0.12)' : 'rgba(255,77,77,0.12)',
+      bg: 'color-mix(in srgb, var(--danger) 4%, transparent)',
+      badge: 'color-mix(in srgb, var(--danger) 12%, transparent)',
       label: 'MISSING'
     },
     optional: {
       border: 'transparent',
       bg: 'transparent',
-      badge: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+      badge: 'color-mix(in srgb, var(--text-primary) 6%, transparent)',
       label: 'OPTIONAL'
     }
   }
@@ -421,8 +421,8 @@ export default function VesselDocumentsView({
                       fontSize: '0.65rem',
                       fontWeight: 600,
                       color: 'var(--success)',
-                      background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)',
-                      border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                      background: 'color-mix(in srgb, var(--success) 9%, transparent)',
+                      border: `1px solid ${'color-mix(in srgb, var(--success) 20%, transparent)'}`,
                       borderRadius: '4px',
                       padding: '2px 6px'
                     }}
@@ -655,8 +655,8 @@ export default function VesselDocumentsView({
                 fontSize: '0.72rem',
                 fontWeight: 600,
                 color: 'var(--success)',
-                background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)',
-                border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                background: 'color-mix(in srgb, var(--success) 9%, transparent)',
+                border: `1px solid ${'color-mix(in srgb, var(--success) 20%, transparent)'}`,
                 borderRadius: '4px',
                 padding: '1px 6px'
               }}
@@ -987,7 +987,7 @@ export default function VesselDocumentsView({
           fontSize: '0.72rem',
           padding: '2px 7px',
           borderRadius: '10px',
-          background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+          background: 'color-mix(in srgb, var(--text-primary) 7%, transparent)',
           color: 'var(--text-secondary)',
           fontWeight: '600'
         }}
@@ -1122,7 +1122,7 @@ export default function VesselDocumentsView({
             style={{
               height: '6px',
               borderRadius: '3px',
-              background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+              background: 'color-mix(in srgb, var(--text-primary) 8%, transparent)',
               overflow: 'hidden'
             }}
           >
@@ -1271,8 +1271,8 @@ export default function VesselDocumentsView({
                     fontSize: '0.65rem',
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    background: isLight ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.2)',
-                    color: isLight ? '#3b82f6' : '#93c5fd',
+                    background: 'color-mix(in srgb, var(--info) 15%, transparent)',
+                    color: 'var(--info)',
                     fontWeight: '500'
                   }}
                 >
@@ -1346,7 +1346,7 @@ export default function VesselDocumentsView({
             borderRadius: '8px',
             fontSize: '0.85rem',
             background: 'transparent',
-            border: `1px dashed ${isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`,
+            border: `1px dashed ${'color-mix(in srgb, var(--text-primary) 20%, transparent)'}`,
             color: 'var(--text-secondary)',
             cursor: 'pointer'
           }}

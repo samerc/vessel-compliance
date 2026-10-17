@@ -630,7 +630,7 @@ export default function WarrantyManager({
                 fontFamily: 'monospace',
                 padding: '2px 8px',
                 borderRadius: '6px',
-                background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
                 color: 'var(--text-secondary)'
               }}
             >
@@ -675,7 +675,7 @@ export default function WarrantyManager({
                 color: 'var(--text-secondary)',
                 padding: '2px 7px',
                 borderRadius: '8px',
-                background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)'
+                background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)'
               }}
             >
               <Bell size={11} />
@@ -855,7 +855,7 @@ export default function WarrantyManager({
                       style={{
                         padding: '8px 10px',
                         borderRadius: '8px',
-                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                        background: 'color-mix(in srgb, var(--text-primary) 4%, transparent)',
                         fontSize: '0.8rem'
                       }}
                     >
