@@ -1,14 +1,25 @@
-import { AlertTriangle, Shield, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Shield, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { formatDate } from '../utils/dateUtils'
-import { Modal } from './ui'
+import { Field, Modal } from './ui'
 
 interface SanctionsModalProps {
   searchedName: string
   matches: SanctionsMatch[]
   onClose: () => void
-  onMarkClean: () => void
-  onConfirmMatch: () => void
+  /** Each decision gets the reviewer's reason; the modal stays open while it saves */
+  onMarkClean: (note: string) => Promise<void> | void
+  onConfirmMatch: (note: string) => Promise<void> | void
+}
+
+const SOURCE_INFO: Record<string, { label: string; color: string }> = {
+  ofac: { label: 'OFAC (US)', color: '#ff6b6b' },
+  eu: { label: 'EU Sanctions', color: '#4dabf7' },
+  uk: { label: 'UK (FCDO)', color: '#ff922b' },
+  un: { label: 'UN Sanctions', color: '#69db7c' },
+  isf: { label: 'ISF (Lebanon)', color: '#e599f7' },
+  sic: { label: 'SIC (Lebanon)', color: '#ffd43b' }
 }
 
 const sectionLabel: React.CSSProperties = {
@@ -25,29 +36,19 @@ export default function SanctionsModal({
   onMarkClean,
   onConfirmMatch
 }: SanctionsModalProps): React.JSX.Element {
-  const getSourceLabel = (source: string): string => {
-    switch (source.toLowerCase()) {
-      case 'ofac':
-        return 'OFAC (US)'
-      case 'eu':
-        return 'EU Sanctions'
-      case 'un':
-        return 'UN Sanctions'
-      default:
-        return source.toUpperCase()
-    }
-  }
+  const getSourceLabel = (source: string): string =>
+    SOURCE_INFO[source.toLowerCase()]?.label || source.toUpperCase()
+  const getSourceColor = (source: string): string =>
+    SOURCE_INFO[source.toLowerCase()]?.color || '#adb5bd'
 
-  const getSourceColor = (source: string): '#ff6b6b' | '#4dabf7' | '#69db7c' | '#ffd43b' => {
-    switch (source.toLowerCase()) {
-      case 'ofac':
-        return '#ff6b6b'
-      case 'eu':
-        return '#4dabf7'
-      case 'un':
-        return '#69db7c'
-      default:
-        return '#ffd43b'
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState<'clean' | 'match' | null>(null)
+  const decide = async (which: 'clean' | 'match'): Promise<void> => {
+    setBusy(which)
+    try {
+      await (which === 'clean' ? onMarkClean(note) : onConfirmMatch(note))
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -57,6 +58,7 @@ export default function SanctionsModal({
       icon={<AlertTriangle size={18} />}
       onClose={onClose}
       width={700}
+      closeOnOverlay={false}
       footer={
         <>
           <span
@@ -70,14 +72,14 @@ export default function SanctionsModal({
             }}
           >
             <Shield size={14} />
-            Data from Sanctions API (OFAC, UN, EU)
+            Local copies of the OFAC, EU, UK, UN, ISF and SIC lists
           </span>
-          <button onClick={onMarkClean} className="btn-primary">
-            <ShieldCheck size={16} />
-            Mark as Clean
+          <button onClick={() => void decide('clean')} className="btn-primary" disabled={!!busy}>
+            {busy === 'clean' ? <Loader2 size={16} className="spin" /> : <ShieldCheck size={16} />}
+            Not a match (clear)
           </button>
-          <button onClick={onConfirmMatch} className="btn-danger">
-            <ShieldAlert size={16} />
+          <button onClick={() => void decide('match')} className="btn-danger" disabled={!!busy}>
+            {busy === 'match' ? <Loader2 size={16} className="spin" /> : <ShieldAlert size={16} />}
             Confirm Match
           </button>
         </>
@@ -97,6 +99,18 @@ export default function SanctionsModal({
         Found {matches.length} potential match{matches.length !== 1 ? 'es' : ''} in sanctions
         databases. Please review carefully before proceeding.
       </p>
+      <div style={{ marginBottom: '16px' }}>
+        <Field label="Reason (optional, kept with the decision)" htmlFor="sanctions-modal-note">
+          <textarea
+            id="sanctions-modal-note"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. different date of birth / nationality"
+            style={{ resize: 'vertical' }}
+          />
+        </Field>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {matches.map((match, index) => (
@@ -193,12 +207,39 @@ export default function SanctionsModal({
               </div>
             </div>
 
-            {/* Target Type */}
-            <div style={{ marginBottom: match.remarks ? '12px' : 0 }}>
-              <div style={sectionLabel}>Type</div>
-              <span style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>
-                {match.target_type}
-              </span>
+            {/* Type, IMO, listing date, positions */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '24px',
+                flexWrap: 'wrap',
+                marginBottom: match.remarks ? '12px' : 0
+              }}
+            >
+              <div>
+                <div style={sectionLabel}>Type</div>
+                <span style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                  {match.target_type}
+                </span>
+              </div>
+              {match.imo_number && (
+                <div>
+                  <div style={sectionLabel}>IMO</div>
+                  <span style={{ fontSize: '0.85rem' }}>{match.imo_number}</span>
+                </div>
+              )}
+              {match.listed_on && (
+                <div>
+                  <div style={sectionLabel}>Listed on</div>
+                  <span style={{ fontSize: '0.85rem' }}>{formatDate(match.listed_on)}</span>
+                </div>
+              )}
+              {match.positions && match.positions.length > 0 && (
+                <div style={{ minWidth: 0 }}>
+                  <div style={sectionLabel}>Positions</div>
+                  <span style={{ fontSize: '0.85rem' }}>{match.positions.join('; ')}</span>
+                </div>
+              )}
             </div>
 
             {/* Remarks */}

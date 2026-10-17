@@ -38,6 +38,7 @@ import MissingFilePath from './MissingFilePath'
 import { confirmDialog } from './DialogHost'
 import { SanctionsBadge, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
+import { decideSanctionsSubject } from '../utils/sanctionsDecision'
 
 interface EntityEditPanelProps {
   /** The entity being edited (entity-level fields only — vessel-specific bits stay in the parent). */
@@ -330,27 +331,25 @@ export default function EntityEditPanel({
     }
   }
 
-  const handleMarkClean = async (): Promise<void> => {
-    if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, {
-        ofacStatus: 'CLEARED',
-        ofacMatchFound: false
-      })
+  // Clear / Confirm match from the sanctions modal: the same path as the Compliance Center
+  // (reason kept, pending results decided, cleared entries remembered)
+  const decideFromModal = async (
+    decision: 'cleared' | 'sanctioned',
+    note: string
+  ): Promise<void> => {
+    try {
+      await decideSanctionsSubject(sanctionsModal, decision, note, sanctionsModal.matches)
+      showSuccess(
+        `${sanctionsModal.searchedName} marked ${decision === 'cleared' ? 'cleared' : 'sanctioned'}`
+      )
+      setSanctionsModal({ show: false, searchedName: '', matches: [] })
+      refresh()
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the decision')
     }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    refresh()
   }
-
-  const handleConfirmMatch = async (): Promise<void> => {
-    if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, {
-        ofacStatus: 'MATCH',
-        ofacMatchFound: true
-      })
-    }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    refresh()
-  }
+  const handleMarkClean = (note: string): Promise<void> => decideFromModal('cleared', note)
+  const handleConfirmMatch = (note: string): Promise<void> => decideFromModal('sanctioned', note)
 
   // ── Document handlers ───────────────────────────────────────────────────────────
   const handleClickUploadDoc = async (

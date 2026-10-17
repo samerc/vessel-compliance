@@ -3568,6 +3568,50 @@ app.whenReady().then(() => {
   })
 
   safeHandle(
+    'compliance:decideSubject',
+    async (
+      event,
+      data: {
+        subjectType: 'entity' | 'vessel'
+        subjectId: string
+        decision: 'sanctioned' | 'cleared'
+        note?: string | null
+        matches?: { source?: string; source_id?: string; names?: string[] }[]
+      }
+    ) => {
+      const user = await requirePermission(
+        event,
+        'compliance:review',
+        data?.subjectType === 'vessel' ? 'vessels:edit' : 'entities:edit'
+      )
+      if (!data || !['entity', 'vessel'].includes(data.subjectType) || !data.subjectId)
+        throw new Error('Invalid subject')
+      if (data.decision !== 'sanctioned' && data.decision !== 'cleared')
+        throw new Error('Invalid decision')
+      const note = typeof data.note === 'string' ? data.note.slice(0, 2000) : null
+      const matches = Array.isArray(data.matches) ? data.matches.slice(0, 200) : []
+      const res = await db.decideSanctionsSubject(
+        data.subjectType,
+        data.subjectId,
+        data.decision,
+        user.username,
+        note,
+        matches
+      )
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'DECIDE',
+        module: 'Compliance',
+        entityType: data.subjectType,
+        entityId: data.subjectId,
+        details: `Sanctions ${data.decision}${note ? `: ${note}` : ''}`
+      }).catch(() => {})
+      return res
+    }
+  )
+
+  safeHandle(
     'compliance:decideResult',
     async (event, resultId: string, decision: 'sanctioned' | 'cleared', note?: string | null) => {
       const user = await requirePermission(event, 'compliance:review')

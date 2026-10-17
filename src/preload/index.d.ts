@@ -472,6 +472,15 @@ export interface Api {
     decision: 'sanctioned' | 'cleared',
     note?: string | null
   ) => Promise<{ success: boolean; message?: string }>
+  /** A sanctions decision on the subject itself: decides its pending check results (or
+   *  remembers the shown entries as cleared) and sets its status */
+  complianceDecideSubject: (data: {
+    subjectType: 'entity' | 'vessel'
+    subjectId: string
+    decision: 'sanctioned' | 'cleared'
+    note?: string | null
+    matches?: { source?: string; source_id?: string; names?: string[] }[]
+  }) => Promise<{ resultsDecided: number }>
   complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
   onComplianceCheckProgress: (
     callback: (data: { current: number; total: number; entityName: string }) => void

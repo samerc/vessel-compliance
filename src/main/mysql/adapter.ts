@@ -10212,6 +10212,49 @@ export class MySQLAdapter {
     }
   }
 
+  /**
+   * A sanctions decision taken on the subject itself (entity panel, vessel list): the same
+   * path as the Compliance Center. Pending check results for the subject are decided with the
+   * reason (audit, cleared hits remembered); without any, the shown list entries are remembered
+   * as cleared. Either way the subject ends with the chosen status.
+   */
+  async decideSanctionsSubject(
+    subjectType: 'entity' | 'vessel',
+    subjectId: string,
+    decision: 'sanctioned' | 'cleared',
+    reviewedBy: string,
+    note: string | null,
+    matches: { source?: string; source_id?: string; names?: string[] }[]
+  ): Promise<{ resultsDecided: number }> {
+    if (!this.pool) throw new Error('DB not connected')
+    const [pending] = await this.pool.query<RowDataPacket[]>(
+      `SELECT id FROM compliance_check_results
+        WHERE entity_type = ? AND entity_id = ? AND status = 'pending_review'`,
+      [subjectType, subjectId]
+    )
+    for (const r of pending) await this.decideComplianceResult(r.id, decision, reviewedBy, note)
+    if (decision === 'cleared')
+      for (const h of matches)
+        await this.pool.execute(
+          `INSERT INTO sanctions_cleared_hits (subject_type, subject_id, hit_key, cleared_by, cleared_at, note)
+           VALUES (?, ?, ?, ?, NOW(), ?)
+           ON DUPLICATE KEY UPDATE cleared_by = VALUES(cleared_by), cleared_at = NOW(), note = VALUES(note)`,
+          [
+            subjectType,
+            subjectId,
+            MySQLAdapter.sanctionsHitKey(h),
+            reviewedBy,
+            note?.trim() || null
+          ]
+        )
+    const table = subjectType === 'vessel' ? 'vessels' : 'entities'
+    await this.pool.execute(
+      `UPDATE ${table} SET ofac_status = ?, ofac_match_found = ?, ofac_checked_at = NOW() WHERE id = ?`,
+      decision === 'sanctioned' ? ['SANCTIONED', 1, subjectId] : ['CLEARED', 0, subjectId]
+    )
+    return { resultsDecided: pending.length }
+  }
+
   // --- Policy Types ---
   async getPolicyTypes(): Promise<PolicyType[]> {
     if (!this.pool) return []

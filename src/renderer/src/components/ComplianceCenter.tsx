@@ -38,7 +38,7 @@ import {
   VesselAssured,
   EndorsementDueRow,
   PolicyExpiryRow,
-  SanctionsMatch,
+  Entity,
   VesselDynamicPolicy
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -50,6 +50,7 @@ import { confirmDialog, promptDialog } from './DialogHost'
 import { PageHeader, Tabs, Badge, Field, EmptyState, Spinner } from './ui'
 import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
 import AlertsByCustomer from './AlertsByCustomer'
+import SanctionsReviewDetail from './SanctionsReviewDetail'
 
 const STATIC_RULES = [
   {
@@ -238,7 +239,10 @@ export default function ComplianceCenter({
   const [policyExpiringSoon, setPolicyExpiringSoon] = useState<PolicyExpiryRow[]>([])
   const [policyFilter, setPolicyFilter] = useState<'expired' | 'expiring'>('expired')
   const [selectedSanctions, setSelectedSanctions] = useState<Set<string>>(new Set())
-  const [expandedResult, setExpandedResult] = useState<string | null>(null)
+  // The pending hit open in the review panel (undefined = the first one, null = panel closed)
+  const [selectedResultId, setSelectedResultId] = useState<string | null | undefined>(undefined)
+  const [reviewEntities, setReviewEntities] = useState<Record<string, Entity>>({})
+  const [decidingOne, setDecidingOne] = useState(false)
   const [resultsPage, setResultsPage] = useState(1)
   const [resultsLimit, setResultsLimit] = useState(10)
   const [resultsTotal, setResultsTotal] = useState(0)
@@ -519,6 +523,7 @@ export default function ComplianceCenter({
     resultId: string,
     decision: 'sanctioned' | 'cleared'
   ): Promise<void> => {
+    if (decidingOne) return
     // The reason is kept with the decision (audit); cancelling the prompt cancels the decision
     const note = await promptDialog(
       decision === 'cleared'
@@ -526,15 +531,68 @@ export default function ComplianceCenter({
         : 'Reason for sanctioning (optional, kept with the decision)'
     )
     if (note === null) return
+    // The next hit opens after the decision (the one below, or the last)
+    const idx = pendingResults.findIndex((r) => r.id === resultId)
+    const next = pendingResults[idx + 1] || pendingResults[idx - 1]
+    setDecidingOne(true)
     try {
       await window.api.complianceDecideResult(resultId, decision, note)
       showSuccess(`Match marked as ${decision}`)
+      if (selectedResultId === resultId) setSelectedResultId(next ? next.id : undefined)
       loadSanctionsData()
     } catch (error) {
       console.error('Failed to decide match:', error)
       showError((error as { message?: string } | null)?.message || 'Failed to update the match')
+    } finally {
+      setDecidingOne(false)
     }
   }
+
+  // Selected hit: the chosen one while it is still pending, else the first on the page
+  const selectedResult =
+    selectedResultId === null
+      ? undefined
+      : (pendingResults.find((r) => r.id === selectedResultId) ?? pendingResults[0])
+
+  // Entities for the review panel's "our record" (loaded once, when the tab is first opened)
+  const reviewEntitiesLoaded = useRef(false)
+  useEffect(() => {
+    if (activeTab !== 'sanctions' || reviewEntitiesLoaded.current) return
+    reviewEntitiesLoaded.current = true
+    window.api
+      .getEntities()
+      .then((list) => {
+        if (Array.isArray(list)) setReviewEntities(Object.fromEntries(list.map((e) => [e.id, e])))
+      })
+      .catch(() => {})
+  }, [activeTab])
+
+  // Keyboard review: J / K move, C clears, S sanctions (not while typing or in a dialog)
+  useEffect(() => {
+    if (activeTab !== 'sanctions') return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target instanceof Element ? e.target : null
+      if (
+        t &&
+        (t.closest('input, textarea, select, [contenteditable=true]') || t.closest('[role=dialog]'))
+      )
+        return
+      if (document.querySelector('[role=dialog]')) return
+      const key = e.key.toLowerCase()
+      if (!['j', 'k', 'c', 's'].includes(key) || pendingResults.length === 0) return
+      const idx = selectedResult ? pendingResults.findIndex((r) => r.id === selectedResult.id) : -1
+      if (key === 'j' || key === 'k') {
+        const n = key === 'j' ? Math.min(pendingResults.length - 1, idx + 1) : Math.max(0, idx - 1)
+        setSelectedResultId(pendingResults[n].id)
+      } else if (selectedResult && canReview) {
+        void handleDecideMatch(selectedResult.id, key === 'c' ? 'cleared' : 'sanctioned')
+      } else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   // Bulk Clear / Sanction: confirm once, one call per result, ONE reload + summary toast.
   // Guarded so a second click cannot start a parallel run over the same selection.
@@ -2411,19 +2469,23 @@ export default function ComplianceCenter({
                       <th scope="col">Type</th>
                       <th scope="col">Match Score</th>
                       <th scope="col">Date</th>
-                      <th scope="col" style={{ textAlign: 'right' }}>
-                        Actions
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingResults.map((result) => (
-                      <>
-                        <tr key={result.id}>
+                    {pendingResults.map((result) => {
+                      const isSel = result.id === selectedResult?.id
+                      return (
+                        <tr
+                          key={result.id}
+                          className={`clickable${isSel ? ' selected' : ''}`}
+                          onClick={() => setSelectedResultId(result.id)}
+                          aria-selected={isSel}
+                        >
                           {canReview && (
-                            <td style={{ width: '32px' }}>
+                            <td style={{ width: '32px' }} onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
+                                aria-label={`Select ${result.entityName}`}
                                 checked={selectedSanctions.has(result.id)}
                                 onChange={(e) => {
                                   const next = new Set(selectedSanctions)
@@ -2434,50 +2496,11 @@ export default function ComplianceCenter({
                               />
                             </td>
                           )}
-                          <td style={{ fontWeight: '600' }}>
-                            {/* Open the screened vessel / entity to see what it is linked to */}
-                            <button
-                              type="button"
-                              title={`Open ${result.entityType === 'vessel' ? 'vessel' : 'entity'}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (result.entityType === 'vessel')
-                                  onNavigateToVessel?.(result.entityId, 'assureds')
-                                else onNavigateToEntity?.(result.entityId)
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                padding: 0,
-                                font: 'inherit',
-                                fontWeight: 600,
-                                color: 'var(--accent-primary)',
-                                cursor: 'pointer',
-                                textAlign: 'left'
-                              }}
-                            >
-                              {result.entityName}
-                            </button>
-                          </td>
+                          <td style={{ fontWeight: 600 }}>{result.entityName}</td>
                           <td>
-                            <span
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                background:
-                                  result.entityType === 'vessel'
-                                    ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                                    : 'rgba(180, 140, 255, 0.1)',
-                                color:
-                                  result.entityType === 'vessel'
-                                    ? 'var(--accent-primary)'
-                                    : 'var(--violet)',
-                                textTransform: 'capitalize'
-                              }}
-                            >
-                              {result.entityType}
-                            </span>
+                            <Badge tone={result.entityType === 'vessel' ? 'accent' : 'violet'}>
+                              {result.entityType === 'vessel' ? 'Vessel' : 'Entity'}
+                            </Badge>
                           </td>
                           <td>
                             <span
@@ -2497,135 +2520,13 @@ export default function ComplianceCenter({
                           <td className="muted">
                             {result.createdAt ? formatDate(result.createdAt) : '-'}
                           </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div
-                              style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
-                            >
-                              <button
-                                onClick={() =>
-                                  setExpandedResult(expandedResult === result.id ? null : result.id)
-                                }
-                                aria-expanded={expandedResult === result.id}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--accent-primary)',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '0.85rem'
-                                }}
-                              >
-                                <Eye size={14} />
-                                {expandedResult === result.id ? 'Hide' : 'View'}
-                              </button>
-                              {canReview && (
-                                <button
-                                  onClick={() => handleDecideMatch(result.id, 'cleared')}
-                                  title="False positive - this entity is not sanctioned"
-                                  style={{
-                                    background: 'rgba(0, 255, 136, 0.1)',
-                                    border: '1px solid rgba(0, 255, 136, 0.3)',
-                                    color: 'var(--success)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  <CheckCircle size={14} />
-                                  Cleared
-                                </button>
-                              )}
-                              {canReview && (
-                                <button
-                                  onClick={() => handleDecideMatch(result.id, 'sanctioned')}
-                                  title="True positive - this entity is sanctioned"
-                                  style={{
-                                    background: 'rgba(255, 77, 77, 0.1)',
-                                    border: '1px solid rgba(255, 77, 77, 0.3)',
-                                    color: 'var(--danger)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.85rem'
-                                  }}
-                                >
-                                  <ShieldAlert size={14} />
-                                  Sanctioned
-                                </button>
-                              )}
-                            </div>
-                          </td>
                         </tr>
-                        {expandedResult === result.id && (
-                          <tr>
-                            <td
-                              colSpan={canReview ? 6 : 5}
-                              style={{
-                                padding: '0 16px 16px 16px',
-                                background: 'var(--table-header-bg)'
-                              }}
-                            >
-                              <div
-                                style={{
-                                  padding: '12px',
-                                  background: 'var(--bg-card)',
-                                  borderRadius: '8px',
-                                  fontSize: '0.85rem'
-                                }}
-                              >
-                                <div style={{ fontWeight: '600', marginBottom: '8px' }}>
-                                  Match Details:
-                                </div>
-                                {(() => {
-                                  try {
-                                    const matches: Partial<SanctionsMatch>[] = JSON.parse(
-                                      result.matchDetails || '[]'
-                                    )
-                                    return matches.map((m, i) => (
-                                      <div
-                                        key={i}
-                                        style={{
-                                          marginBottom: '8px',
-                                          padding: '8px',
-                                          background: 'var(--table-header-bg)',
-                                          borderRadius: '4px'
-                                        }}
-                                      >
-                                        <div>
-                                          <strong>Source:</strong> {m.source || 'Unknown'}
-                                        </div>
-                                        <div>
-                                          <strong>Names:</strong> {(m.names || []).join(', ')}
-                                        </div>
-                                        <div>
-                                          <strong>Score:</strong>{' '}
-                                          {((m.score || 0) * 100).toFixed(0)}%
-                                        </div>
-                                      </div>
-                                    ))
-                                  } catch {
-                                    return <div>Unable to parse match details</div>
-                                  }
-                                })()}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))}
+                      )
+                    })}
                     {pendingResults.length === 0 && sanctionsLoading && (
                       <tr>
                         <td
-                          colSpan={canReview ? 6 : 5}
+                          colSpan={canReview ? 5 : 4}
                           style={{ padding: '48px', textAlign: 'center' }}
                         >
                           <Spinner size={20} label="Loading reviews..." />
@@ -2635,7 +2536,7 @@ export default function ComplianceCenter({
                     {pendingResults.length === 0 && !sanctionsLoading && (
                       <tr>
                         <td
-                          colSpan={canReview ? 6 : 5}
+                          colSpan={canReview ? 5 : 4}
                           style={{ padding: '48px', textAlign: 'center' }}
                         >
                           <CheckCircle
@@ -2726,95 +2627,142 @@ export default function ComplianceCenter({
                 )}
               </div>
 
-              {/* Recent Check History */}
-              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    padding: '16px 20px',
-                    borderBottom: '1px solid var(--table-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}
-                >
-                  <History size={20} color="var(--accent-primary)" />
-                  <h3 style={{ margin: 0 }}>Check History</h3>
-                </div>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {checkLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      style={{
-                        padding: '14px 20px',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                    >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+                {selectedResult && (
+                  <SanctionsReviewDetail
+                    result={selectedResult}
+                    vessel={
+                      selectedResult.entityType === 'vessel'
+                        ? vessels.find((v) => v.id === selectedResult.entityId)
+                        : undefined
+                    }
+                    entity={
+                      selectedResult.entityType === 'entity'
+                        ? reviewEntities[selectedResult.entityId]
+                        : undefined
+                    }
+                    entityVessels={
+                      selectedResult.entityType === 'entity'
+                        ? allAssureds
+                            .filter((a) => a.entityId === selectedResult.entityId)
+                            .map((a) => ({
+                              vesselName:
+                                vessels.find((v) => v.id === a.vesselId)?.name || 'Inactive vessel',
+                              role: a.role
+                            }))
+                        : []
+                    }
+                    vesselAssureds={
+                      selectedResult.entityType === 'vessel'
+                        ? allAssureds.filter((a) => a.vesselId === selectedResult.entityId)
+                        : []
+                    }
+                    canReview={canReview}
+                    deciding={decidingOne}
+                    position={{
+                      index: pendingResults.findIndex((r) => r.id === selectedResult.id),
+                      total: pendingResults.length
+                    }}
+                    onDecide={(d) => void handleDecideMatch(selectedResult.id, d)}
+                    onOpen={() => {
+                      if (selectedResult.entityType === 'vessel')
+                        onNavigateToVessel?.(selectedResult.entityId, 'assureds')
+                      else onNavigateToEntity?.(selectedResult.entityId)
+                    }}
+                    onClose={() => setSelectedResultId(null)}
+                  />
+                )}
+                {/* Recent Check History */}
+                <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      padding: '16px 20px',
+                      borderBottom: '1px solid var(--table-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}
+                  >
+                    <History size={20} color="var(--accent-primary)" />
+                    <h3 style={{ margin: 0 }}>Check History</h3>
+                  </div>
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    {checkLogs.map((log) => (
                       <div
+                        key={log.id}
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '6px'
+                          padding: '14px 20px',
+                          borderBottom: '1px solid var(--table-border)'
                         }}
                       >
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                          {log.runAt ? formatDateTime(log.runAt) : '-'}
-                        </span>
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            background:
-                              log.status === 'completed'
-                                ? 'rgba(0, 255, 136, 0.1)'
-                                : log.status === 'failed'
-                                  ? 'rgba(255, 77, 77, 0.1)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.1)',
-                            color:
-                              log.status === 'completed'
-                                ? 'var(--success)'
-                                : log.status === 'failed'
-                                  ? 'var(--danger)'
-                                  : 'var(--accent-primary)',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {log.status}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.9rem' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Checked:</span>{' '}
-                        {log.totalChecked} |{' '}
-                        <span
-                          style={{
-                            color: log.matchesFound > 0 ? 'var(--warning)' : 'var(--text-secondary)'
-                          }}
-                        >
-                          Matches: {log.matchesFound}
-                        </span>
-                      </div>
-                      {log.error && (
                         <div
-                          style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px'
+                          }}
                         >
-                          Error: {log.error}
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            {log.runAt ? formatDateTime(log.runAt) : '-'}
+                          </span>
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              background:
+                                log.status === 'completed'
+                                  ? 'rgba(0, 255, 136, 0.1)'
+                                  : log.status === 'failed'
+                                    ? 'rgba(255, 77, 77, 0.1)'
+                                    : 'rgba(var(--accent-primary-rgb), 0.1)',
+                              color:
+                                log.status === 'completed'
+                                  ? 'var(--success)'
+                                  : log.status === 'failed'
+                                    ? 'var(--danger)'
+                                    : 'var(--accent-primary)',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            {log.status}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  {checkLogs.length === 0 && (
-                    <div
-                      style={{
-                        padding: '32px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      No compliance checks have been run yet.
-                    </div>
-                  )}
+                        <div style={{ fontSize: '0.9rem' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Checked:</span>{' '}
+                          {log.totalChecked} |{' '}
+                          <span
+                            style={{
+                              color:
+                                log.matchesFound > 0 ? 'var(--warning)' : 'var(--text-secondary)'
+                            }}
+                          >
+                            Matches: {log.matchesFound}
+                          </span>
+                        </div>
+                        {log.error && (
+                          <div
+                            style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}
+                          >
+                            Error: {log.error}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {checkLogs.length === 0 && (
+                      <div
+                        style={{
+                          padding: '32px',
+                          textAlign: 'center',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        No compliance checks have been run yet.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -57,6 +57,7 @@ import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
+import { decideSanctionsSubject } from '../utils/sanctionsDecision'
 import { SanctionsBadge, EmptyState, Modal, Field } from './ui'
 
 /** A vessel linked to an entity, directly (roles) or through an assured it is UBO of */
@@ -707,37 +708,25 @@ export default function EntityDirectory({
     }
   }
 
-  const handleMarkClean = async (): Promise<void> => {
-    if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, {
-        ofacStatus: 'CLEARED',
-        ofacMatchFound: false
-      })
-    } else if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, {
-        ofacStatus: 'CLEARED',
-        ofacMatchFound: false
-      })
+  // Clear / Confirm match from the sanctions modal: the same path as the Compliance Center
+  // (reason kept, pending results decided, cleared entries remembered)
+  const decideFromModal = async (
+    decision: 'cleared' | 'sanctioned',
+    note: string
+  ): Promise<void> => {
+    try {
+      await decideSanctionsSubject(sanctionsModal, decision, note, sanctionsModal.matches)
+      showSuccess(
+        `${sanctionsModal.searchedName} marked ${decision === 'cleared' ? 'cleared' : 'sanctioned'}`
+      )
+      setSanctionsModal({ show: false, searchedName: '', matches: [] })
+      loadData()
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the decision')
     }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    loadData()
   }
-
-  const handleConfirmMatch = async (): Promise<void> => {
-    if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, {
-        ofacStatus: 'MATCH',
-        ofacMatchFound: true
-      })
-    } else if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, {
-        ofacStatus: 'MATCH',
-        ofacMatchFound: true
-      })
-    }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    loadData()
-  }
+  const handleMarkClean = (note: string): Promise<void> => decideFromModal('cleared', note)
+  const handleConfirmMatch = (note: string): Promise<void> => decideFromModal('sanctioned', note)
 
   const handleViewPotentialMatch = async (entity?: Entity, vessel?: Vessel): Promise<void> => {
     const id = entity?.id || vessel?.id

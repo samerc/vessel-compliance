@@ -290,6 +290,7 @@ const api: Api = {
     decision: 'sanctioned' | 'cleared',
     note?: string | null
   ) => ipcRenderer.invoke('compliance:decideResult', resultId, decision, note),
+  complianceDecideSubject: (data) => ipcRenderer.invoke('compliance:decideSubject', data),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
   onComplianceCheckProgress: (
     callback: (data: { current: number; total: number; entityName: string }) => void

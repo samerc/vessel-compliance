@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
+import { decideSanctionsSubject } from '../utils/sanctionsDecision'
 import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -358,27 +359,25 @@ export default function VesselManager({
     }
   }
 
-  const handleMarkClean = async (): Promise<void> => {
-    if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, {
-        ofacStatus: 'CLEARED',
-        ofacMatchFound: false
-      })
+  // Clear / Confirm match from the sanctions modal: the same path as the Compliance Center
+  // (reason kept, pending results decided, cleared entries remembered)
+  const decideFromModal = async (
+    decision: 'cleared' | 'sanctioned',
+    note: string
+  ): Promise<void> => {
+    try {
+      await decideSanctionsSubject(sanctionsModal, decision, note, sanctionsModal.matches)
+      showSuccess(
+        `${sanctionsModal.searchedName} marked ${decision === 'cleared' ? 'cleared' : 'sanctioned'}`
+      )
+      setSanctionsModal({ show: false, searchedName: '', matches: [] })
+      loadData()
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the decision')
     }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    loadData()
   }
-
-  const handleConfirmMatch = async (): Promise<void> => {
-    if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, {
-        ofacStatus: 'MATCH',
-        ofacMatchFound: true
-      })
-    }
-    setSanctionsModal({ show: false, searchedName: '', matches: [] })
-    loadData()
-  }
+  const handleMarkClean = (note: string): Promise<void> => decideFromModal('cleared', note)
+  const handleConfirmMatch = (note: string): Promise<void> => decideFromModal('sanctioned', note)
 
   // Bulk operations
   const toggleSelectVessel = (vesselId: string): void => {
