@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Pencil,
   Shield,
   X,
   Database,
@@ -115,8 +116,8 @@ const SECTION_KEYWORDS: Record<string, string> = {
   reminders: 'grace annual renewal'
 }
 import { formatDateTime } from '../utils/dateUtils'
-import { confirmDialog, alertDialog } from './DialogHost'
-import { PageHeader, Modal, Field } from './ui'
+import { confirmDialog, alertDialog, promptDialog } from './DialogHost'
+import { PageHeader, Modal, Field, SaveStatus } from './ui'
 import type { SubTabProps } from '../utils/useRequestedSubTab'
 import type { NavTarget } from '../features'
 import { ok } from '../utils/ipc'
@@ -1413,6 +1414,36 @@ export default function AdminPanel({
     await loadSurveyTypes()
   }
 
+  const handleRenameSurveyType = async (type: ConditionSurveyType): Promise<void> => {
+    const name = (await promptDialog(`Rename "${type.name}" to:`, type.name))?.trim()
+    if (!name || name === type.name) return
+    try {
+      const r = await window.api.renameConditionSurveyType(type.id, name)
+      showSuccess(
+        r.surveysUpdated
+          ? `Renamed; ${r.surveysUpdated} survey${r.surveysUpdated === 1 ? '' : 's'} updated`
+          : 'Renamed'
+      )
+      loadSurveyTypes()
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to rename')
+    }
+  }
+
+  const handleMoveSurveyType = async (index: number, dir: -1 | 1): Promise<void> => {
+    const j = index + dir
+    if (j < 0 || j >= surveyTypes.length) return
+    const next = [...surveyTypes]
+    ;[next[index], next[j]] = [next[j], next[index]]
+    setSurveyTypes(next)
+    try {
+      await window.api.reorderConditionSurveyTypes(next.map((t) => t.id))
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to reorder')
+      loadSurveyTypes()
+    }
+  }
+
   const handleDeleteSurveyType = async (id: string): Promise<void> => {
     if (await confirmDialog('Delete this survey type? Existing surveys will keep their type.')) {
       await window.api.deleteConditionSurveyType(id)
@@ -2032,7 +2063,11 @@ export default function AdminPanel({
       </aside>
 
       {/* ── Content area ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px', position: 'relative' }}>
+        {/* Saves of any section (auto-saved or with a Save button) confirm here */}
+        <div style={{ position: 'absolute', top: '10px', right: '36px' }}>
+          <SaveStatus />
+        </div>
         {restartReason && (
           <div
             role="status"
@@ -2610,12 +2645,20 @@ export default function AdminPanel({
                           )}
                         </td>
                         <td>
-                          <span
+                          <button
+                            type="button"
                             onClick={() => handleToggleDocRequired(doc)}
+                            aria-pressed={doc.required}
+                            title={
+                              doc.required
+                                ? 'Required: click to make optional'
+                                : 'Optional: click to make required'
+                            }
                             style={{
                               padding: '4px 8px',
                               borderRadius: '4px',
                               fontSize: '0.75rem',
+                              fontFamily: 'inherit',
                               background: doc.required
                                 ? 'rgba(255, 77, 77, 0.1)'
                                 : 'var(--table-header-bg)',
@@ -2627,10 +2670,18 @@ export default function AdminPanel({
                             }}
                           >
                             {doc.required ? 'REQUIRED' : 'OPTIONAL'}
-                          </span>{' '}
-                          <span
+                          </button>{' '}
+                          <button
+                            type="button"
                             onClick={() => handleToggleAnnualRenewal(doc)}
+                            aria-pressed={!!doc.annualRenewal}
+                            title={
+                              doc.annualRenewal
+                                ? 'Annual: renewed every year with the P&I policy. Click for one-time'
+                                : 'One-time: click to make it annual'
+                            }
                             style={{
+                              fontFamily: 'inherit',
                               padding: '4px 8px',
                               borderRadius: '4px',
                               fontSize: '0.75rem',
@@ -2648,7 +2699,7 @@ export default function AdminPanel({
                             }}
                           >
                             {doc.annualRenewal ? 'ANNUAL' : 'ONE-TIME'}
-                          </span>
+                          </button>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <button
@@ -3268,10 +3319,36 @@ export default function AdminPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {surveyTypes.map((type) => (
+                    {surveyTypes.map((type, i) => (
                       <tr key={type.id}>
                         <td>{type.name}</td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => void handleMoveSurveyType(i, -1)}
+                            disabled={i === 0}
+                            aria-label="Move up"
+                            title="Move up"
+                          >
+                            <ChevronUp size={16} />
+                          </button>
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => void handleMoveSurveyType(i, 1)}
+                            disabled={i === surveyTypes.length - 1}
+                            aria-label="Move down"
+                            title="Move down"
+                          >
+                            <ChevronDown size={16} />
+                          </button>
+                          <button
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={() => void handleRenameSurveyType(type)}
+                            aria-label="Rename survey type"
+                            title="Rename (the surveys of this type follow)"
+                          >
+                            <Pencil size={15} />
+                          </button>
                           <button
                             onClick={() => handleDeleteSurveyType(type.id)}
                             style={{

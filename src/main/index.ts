@@ -2343,6 +2343,14 @@ app.whenReady().then(() => {
     return db.addConditionSurveyType(name)
   })
 
+  safeHandle('db:renameConditionSurveyType', async (event, id: string, name: string) => {
+    await requirePermission(event, 'admin:settings')
+    return db.renameConditionSurveyType(id, String(name || ''))
+  })
+  safeHandle('db:reorderConditionSurveyTypes', async (event, ids: string[]) => {
+    await requirePermission(event, 'admin:settings')
+    return db.reorderConditionSurveyTypes(Array.isArray(ids) ? ids : [])
+  })
   safeHandle('db:deleteConditionSurveyType', async (event, id: string) => {
     await requirePermission(event, 'admin:settings')
     return db.deleteConditionSurveyType(id)

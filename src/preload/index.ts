@@ -363,6 +363,10 @@ const api: Api = {
   getConditionSurveyTypes: () => ipcRenderer.invoke('db:getConditionSurveyTypes'),
   addConditionSurveyType: (name) => ipcRenderer.invoke('db:addConditionSurveyType', name),
   deleteConditionSurveyType: (id) => ipcRenderer.invoke('db:deleteConditionSurveyType', id),
+  renameConditionSurveyType: (id: string, name: string) =>
+    ipcRenderer.invoke('db:renameConditionSurveyType', id, name),
+  reorderConditionSurveyTypes: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderConditionSurveyTypes', ids),
 
   getSurveyDefects: (surveyId) => ipcRenderer.invoke('db:getSurveyDefects', surveyId),
   addSurveyDefect: (defect) => ipcRenderer.invoke('db:addSurveyDefect', defect),

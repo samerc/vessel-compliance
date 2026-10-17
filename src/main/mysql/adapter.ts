@@ -5426,6 +5426,18 @@ export class MySQLAdapter {
       } catch {
         /* idempotent migration: already applied or not applicable */
       }
+      // Migration: survey types can be ordered
+      try {
+        const [stOrd] = await this.pool.query(
+          "SHOW COLUMNS FROM condition_survey_types LIKE 'order_index'"
+        )
+        if ((stOrd as RowDataPacket[]).length === 0)
+          await this.pool.query(
+            'ALTER TABLE condition_survey_types ADD COLUMN order_index INT NULL DEFAULT NULL'
+          )
+      } catch (e) {
+        console.error('Migration warning (condition_survey_types.order_index):', e)
+      }
       // Migration: quotations remember that their subjectivities were filled once, so the
       // defaults never come back after the user deleted them all
       try {
@@ -8915,9 +8927,37 @@ export class MySQLAdapter {
   async getConditionSurveyTypes(): Promise<{ id: string; name: string }[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, name FROM condition_survey_types ORDER BY name ASC'
+      'SELECT id, name FROM condition_survey_types ORDER BY COALESCE(order_index, 999999), name ASC'
     )
     return rows as { id: string; name: string }[]
+  }
+
+  /** Rename a survey type; the surveys of that type (which store the name) follow */
+  async renameConditionSurveyType(id: string, name: string): Promise<{ surveysUpdated: number }> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const clean = name.trim()
+    if (!clean) throw new Error('The name cannot be empty')
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT name FROM condition_survey_types WHERE id = ?',
+      [id]
+    )
+    if (rows.length === 0) throw new Error('Survey type not found')
+    const oldName = String(rows[0].name)
+    await this.pool.execute('UPDATE condition_survey_types SET name = ? WHERE id = ?', [clean, id])
+    const [res] = await this.pool.execute(
+      'UPDATE condition_surveys SET survey_type = ? WHERE survey_type = ?',
+      [clean, oldName]
+    )
+    return { surveysUpdated: (res as { affectedRows?: number }).affectedRows || 0 }
+  }
+
+  async reorderConditionSurveyTypes(ids: string[]): Promise<void> {
+    if (!this.pool) return
+    for (let i = 0; i < ids.length; i++)
+      await this.pool.execute('UPDATE condition_survey_types SET order_index = ? WHERE id = ?', [
+        i,
+        ids[i]
+      ])
   }
 
   async addConditionSurveyType(name: string): Promise<{ id: string; name: string }> {

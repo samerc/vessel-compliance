@@ -535,6 +535,9 @@ export interface Api {
   getConditionSurveyTypes: () => Promise<{ id: string; name: string }[]>
   addConditionSurveyType: (name: string) => Promise<{ id: string; name: string }>
   deleteConditionSurveyType: (id: string) => Promise<void>
+  /** Renames the type and the surveys that use it */
+  renameConditionSurveyType: (id: string, name: string) => Promise<{ surveysUpdated: number }>
+  reorderConditionSurveyTypes: (ids: string[]) => Promise<void>
   getSurveyDefects: (surveyId?: string) => Promise<SurveyDefect[]>
   addSurveyDefect: (defect: Omit<SurveyDefect, 'id'>) => Promise<SurveyDefect>
   updateSurveyDefect: (id: string, updates: Partial<SurveyDefect>) => Promise<void>
