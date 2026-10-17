@@ -1162,7 +1162,7 @@ export default function EntityDirectory({
           <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>
             {selectedEntityIds.size} selected
           </span>
-          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border)' }} />
+          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border-color)' }} />
           <button
             className="btn-secondary"
             onClick={handleBulkExportEntities}

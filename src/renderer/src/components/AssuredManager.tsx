@@ -32,9 +32,14 @@ import { ok, isIpcError } from '../utils/ipc'
 
 interface AssuredManagerProps {
   vessel: Vessel
+  /** Told when the assured panel opens / closes (the vessel page then makes room for it) */
+  onPanelOpenChange?: (open: boolean) => void
 }
 
-export default function AssuredManager({ vessel }: AssuredManagerProps): React.JSX.Element {
+export default function AssuredManager({
+  vessel,
+  onPanelOpenChange
+}: AssuredManagerProps): React.JSX.Element {
   const [entities, setEntities] = useState<Entity[]>([])
   const [roles, setRoles] = useState<AssuredRole[]>([])
   const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
@@ -51,6 +56,12 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
   const [newRole, setNewRole] = useState('')
   const [newIdentifier, setNewIdentifier] = useState('')
   const [selectedAssuredId, setSelectedAssuredId] = useState<string | null>(null)
+  // Only assureds still missing required documents
+  const [onlyMissingDocs, setOnlyMissingDocs] = useState(false)
+  useEffect(() => {
+    onPanelOpenChange?.(!!selectedAssuredId)
+  }, [selectedAssuredId, onPanelOpenChange])
+  useEffect(() => () => onPanelOpenChange?.(false), [onPanelOpenChange])
   const [newEmail, setNewEmail] = useState('')
   const [newPhone, setNewPhone] = useState('')
 
@@ -511,6 +522,33 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
         </div>
       )}
 
+      {sortedAssureds.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+          <button
+            className={!onlyMissingDocs ? 'chip active' : 'chip'}
+            aria-pressed={!onlyMissingDocs}
+            onClick={() => setOnlyMissingDocs(false)}
+          >
+            All <span className="chip-count">{sortedAssureds.length}</span>
+          </button>
+          <button
+            className={onlyMissingDocs ? 'chip active' : 'chip'}
+            aria-pressed={onlyMissingDocs}
+            onClick={() => setOnlyMissingDocs(true)}
+          >
+            Missing documents{' '}
+            <span className="chip-count">
+              {
+                sortedAssureds.filter((va) => {
+                  const e = entities.find((x) => x.id === va.entityId)
+                  const sc = e ? getDocScore(e.id, e.type) : { have: 0, total: 0 }
+                  return sc.have < sc.total
+                }).length
+              }
+            </span>
+          </button>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '0' }}>
         {/* Left: Assured table */}
         <div
@@ -536,6 +574,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                 const ubos = entityUBOs.filter((u) => u.assuredEntityId === va.entityId)
                 const isSelected = selectedAssuredId === va.id
                 const score = entity ? getDocScore(entity.id, entity.type) : { have: 0, total: 0 }
+                if (onlyMissingDocs && score.have >= score.total) return null
                 const docColor =
                   score.total === 0
                     ? 'var(--text-secondary)'

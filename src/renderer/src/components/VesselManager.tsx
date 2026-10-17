@@ -1049,7 +1049,7 @@ export default function VesselManager({
           <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>
             {selectedVesselIds.size} selected
           </span>
-          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border)' }} />
+          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border-color)' }} />
           {hasPermission('vessels:edit') && (
             <div style={{ position: 'relative' }}>
               <button

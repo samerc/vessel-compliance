@@ -366,7 +366,7 @@ export default function VesselQuotationsView({
                         <div
                           style={{
                             height: '1px',
-                            background: 'var(--glass-border)',
+                            background: 'var(--glass-border-color)',
                             margin: '4px 0'
                           }}
                         />

@@ -95,6 +95,10 @@ export default function VesselDocumentsView({
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [newCustomName, setNewCustomName] = useState('')
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
+  // Show only documents with this status ('attention' = missing, expired or expiring)
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'attention' | 'missing' | 'expired' | 'expiring' | 'compliant'
+  >('all')
   // Asked after a file is linked or replaced: its received and expiry dates
   const [datesRequest, setDatesRequest] = useState<DocumentDatesRequest | null>(null)
 
@@ -302,6 +306,27 @@ export default function VesselDocumentsView({
 
   const cardBorder = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
 
+  // Status of one document card (same rule as the card itself)
+  const cardStatus = (
+    id: string,
+    required: boolean,
+    doc: VesselDocument | undefined,
+    annualRenewal = false
+  ): DocStatus => {
+    const hasFile = !!doc?.filePath
+    const fileExists = fileStatus[id] !== false
+    const effectiveExpiry = annualRenewal
+      ? effectivePolicyExpiry || doc?.expiryDate
+      : doc?.expiryDate
+    return getDocStatus(
+      hasFile && fileExists,
+      effectiveExpiry,
+      required,
+      annualRenewal,
+      doc?.receivedDate
+    )
+  }
+
   // ── Card renderer ──────────────────────────────────────────────────────────
   const renderCard = (
     id: string,
@@ -312,20 +337,15 @@ export default function VesselDocumentsView({
     isCustom = false,
     annualRenewal = false,
     description?: string
-  ): React.JSX.Element => {
+  ): React.JSX.Element | null => {
     const hasFile = !!doc?.filePath
     const fileExists = fileStatus[id] !== false
-    // Annual docs inherit the P&I policy expiry; fall back to the stored expiry date
-    const effectiveExpiry = annualRenewal
-      ? effectivePolicyExpiry || doc?.expiryDate
-      : doc?.expiryDate
-    const status: DocStatus = getDocStatus(
-      hasFile && fileExists,
-      effectiveExpiry,
-      required,
-      annualRenewal,
-      doc?.receivedDate
-    )
+    const status: DocStatus = cardStatus(id, required, doc, annualRenewal)
+    // Status filter: hide cards that do not match
+    if (statusFilter === 'attention' && !['missing', 'expired', 'expiring'].includes(status))
+      return null
+    if (statusFilter !== 'all' && statusFilter !== 'attention' && status !== statusFilter)
+      return null
     const meta = statusMeta[status]
     const isDragOver = dragOverId === id
 
@@ -1118,6 +1138,63 @@ export default function VesselDocumentsView({
           </div>
         </div>
       </div>
+
+      {/* Status filter */}
+      {(() => {
+        const all = [
+          ...requiredDocTypes.map((t) =>
+            cardStatus(
+              t.id,
+              true,
+              vesselDocs.find((d) => d.documentTypeId === t.id),
+              t.annualRenewal
+            )
+          ),
+          ...optionalDocTypes.map((t) =>
+            cardStatus(
+              t.id,
+              false,
+              vesselDocs.find((d) => d.documentTypeId === t.id),
+              t.annualRenewal
+            )
+          ),
+          ...customDocTypes.map((t) =>
+            cardStatus(
+              t.id,
+              true,
+              vesselDocs.find((d) => d.documentTypeId === t.id)
+            )
+          )
+        ]
+        const count = (s: string): number =>
+          s === 'attention'
+            ? all.filter((x) => x === 'missing' || x === 'expired' || x === 'expiring').length
+            : all.filter((x) => x === s).length
+        return (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {(
+              [
+                ['all', 'All'],
+                ['attention', 'Needs attention'],
+                ['missing', 'Missing'],
+                ['expired', 'Expired'],
+                ['expiring', 'Expiring'],
+                ['compliant', 'Compliant']
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                className={statusFilter === key ? 'chip active' : 'chip'}
+                aria-pressed={statusFilter === key}
+                onClick={() => setStatusFilter(key)}
+              >
+                {label}
+                {key !== 'all' && <span className="chip-count">{count(key)}</span>}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Required documents */}
       {requiredDocTypes.length > 0 && (

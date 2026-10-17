@@ -9,7 +9,10 @@ import {
   Ship,
   X,
   Loader2,
-  GitCompareArrows
+  GitCompareArrows,
+  Download,
+  Bookmark,
+  Trash2
 } from 'lucide-react'
 import {
   Vessel,
@@ -59,6 +62,45 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { PageHeader, Modal, Badge } from './ui'
 import SanctionsBadge from './ui/SanctionsBadge'
+import { promptDialog, confirmDialog } from './DialogHost'
+import { saveFile, SaveCancelledError } from '../utils/saveFile'
+
+// Saved filter views (per computer): the criteria only, applied with one click
+interface SavedFilterView {
+  name: string
+  logic: 'AND' | 'OR'
+  selectedPolicyTypes: string[]
+  policyStatus: 'active' | 'expired' | 'all'
+  selectedFlagStates: string[]
+  flagUnassigned: boolean
+  selectedClassifications: string[]
+  selectedVesselTypes: string[]
+  selectedCustomerId: string
+  customerType: 'broker' | 'direct' | 'both'
+  vesselStatus: 'active' | 'inactive' | 'all'
+  yearFrom: string
+  yearTo: string
+  gtFrom: string
+  gtTo: string
+}
+const VIEWS_KEY = 'vessel_filter_views'
+const readViews = (): SavedFilterView[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEWS_KEY) || '[]')
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
+}
+const writeViews = (views: SavedFilterView[]): void => {
+  try {
+    localStorage.setItem(VIEWS_KEY, JSON.stringify(views))
+  } catch {
+    /* per-computer convenience only */
+  }
+}
+
+type ResultSortKey = 'name' | 'imo' | 'type' | 'flag' | 'year' | 'gt' | 'customer' | 'status'
 
 interface VesselFilterProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -430,7 +472,7 @@ const _cache = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps): React.JSX.Element {
-  const { showError } = useToast()
+  const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -595,8 +637,10 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
   const hasAnyCriteria = activeFilterCount > 0
 
-  const handleSearch = async (): Promise<void> => {
-    if (!hasAnyCriteria) {
+  // view: a saved view was just applied (state not updated yet): load the lookups it needs
+  const handleSearch = async (opts?: { view?: SavedFilterView }): Promise<void> => {
+    const view = opts?.view
+    if (!view && !hasAnyCriteria) {
       showError('Please select at least one filter criterion')
       return
     }
@@ -605,7 +649,11 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
     try {
       const pMap = new Map<string, VesselDynamicPolicy[]>()
       const cMap = new Map<string, string[]>()
-      if (selectedPolicyTypes.length > 0 || policyStatus !== 'all') {
+      if (
+        view
+          ? view.selectedPolicyTypes.length > 0 || view.policyStatus !== 'all'
+          : selectedPolicyTypes.length > 0 || policyStatus !== 'all'
+      ) {
         // One bulk query (policies + values) instead of one round-trip per vessel
         const all = await window.api.getAllVesselDynamicPolicies()
         for (const p of (Array.isArray(all) ? all : []) as VesselDynamicPolicy[]) {
@@ -614,7 +662,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
           else pMap.set(p.vesselId, [p])
         }
       }
-      if (selectedClassifications.length > 0) {
+      if ((view ? view.selectedClassifications : selectedClassifications).length > 0) {
         // Parallel in small batches (was strictly one vessel after another)
         const BATCH = 16
         for (let i = 0; i < vessels.length; i += BATCH) {
@@ -833,13 +881,148 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
     logic
   ])
 
+  const [resultSort, setResultSort] = useState<{ key: ResultSortKey; dir: 'asc' | 'desc' }>({
+    key: 'name',
+    dir: 'asc'
+  })
   const displayedVessels = useMemo(() => {
-    if (!nameSearch.trim()) return filteredVessels
-    const q = nameSearch.toLowerCase()
-    return filteredVessels.filter(
-      (v) => v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)
+    const q = nameSearch.trim().toLowerCase()
+    const list = q
+      ? filteredVessels.filter(
+          (v) => v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)
+        )
+      : [...filteredVessels]
+    const val = (v: Vessel): string | number => {
+      switch (resultSort.key) {
+        case 'imo':
+          return v.imoNumber || ''
+        case 'type':
+          return (v.vesselType || '').toLowerCase()
+        case 'flag':
+          return (flagMap.get(v.flagStateId || '') || '').toLowerCase()
+        case 'year':
+          return Number(v.builtYear) || 0
+        case 'gt':
+          return Number(v.grossTonnage) || 0
+        case 'customer':
+          return (customerMap.get(v.customerId || '') || '').toLowerCase()
+        case 'status':
+          return v.isActive ? 0 : 1
+        default:
+          return v.name.toLowerCase()
+      }
+    }
+    return list.sort((a, b) => {
+      const x = val(a)
+      const y = val(b)
+      const c = x < y ? -1 : x > y ? 1 : 0
+      return resultSort.dir === 'asc' ? c : -c
+    })
+  }, [filteredVessels, nameSearch, resultSort, flagMap, customerMap])
+  const sortTh = (key: ResultSortKey, label: string, cls?: string): React.JSX.Element => (
+    <th
+      scope="col"
+      className={cls}
+      style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+      aria-sort={
+        resultSort.key === key ? (resultSort.dir === 'asc' ? 'ascending' : 'descending') : undefined
+      }
+      onClick={() =>
+        setResultSort((s) =>
+          s.key === key
+            ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+            : { key, dir: key === 'year' || key === 'gt' ? 'desc' : 'asc' }
+        )
+      }
+    >
+      {label}
+      {resultSort.key === key && (resultSort.dir === 'asc' ? ' ▲' : ' ▼')}
+    </th>
+  )
+
+  // Saved views
+  const [savedViews, setSavedViews] = useState<SavedFilterView[]>(readViews)
+  const saveCurrentView = async (): Promise<void> => {
+    const name = (await promptDialog('Name this filter view'))?.trim()
+    if (!name) return
+    const view: SavedFilterView = {
+      name,
+      logic,
+      selectedPolicyTypes,
+      policyStatus,
+      selectedFlagStates,
+      flagUnassigned,
+      selectedClassifications,
+      selectedVesselTypes,
+      selectedCustomerId,
+      customerType,
+      vesselStatus,
+      yearFrom,
+      yearTo,
+      gtFrom,
+      gtTo
+    }
+    const next = [...savedViews.filter((v) => v.name !== name), view].sort((a, b) =>
+      a.name.localeCompare(b.name)
     )
-  }, [filteredVessels, nameSearch])
+    setSavedViews(next)
+    writeViews(next)
+    showSuccess(`View "${name}" saved`)
+  }
+  const applyView = (v: SavedFilterView): void => {
+    setLogic(v.logic)
+    setSelectedPolicyTypes(v.selectedPolicyTypes)
+    setPolicyStatus(v.policyStatus)
+    setSelectedFlagStates(v.selectedFlagStates)
+    setFlagUnassigned(v.flagUnassigned)
+    setSelectedClassifications(v.selectedClassifications)
+    setSelectedVesselTypes(v.selectedVesselTypes)
+    setSelectedCustomerId(v.selectedCustomerId)
+    setCustomerType(v.customerType)
+    setVesselStatus(v.vesselStatus)
+    setYearFrom(v.yearFrom)
+    setYearTo(v.yearTo)
+    setGtFrom(v.gtFrom)
+    setGtTo(v.gtTo)
+    void handleSearch({ view: v })
+  }
+  const deleteView = async (name: string): Promise<void> => {
+    if (!(await confirmDialog(`Delete the saved view "${name}"?`))) return
+    const next = savedViews.filter((v) => v.name !== name)
+    setSavedViews(next)
+    writeViews(next)
+  }
+
+  const exportResults = async (): Promise<void> => {
+    try {
+      const XLSX = (await import('xlsx-js-style')).default
+      const rows = displayedVessels.map((v) => ({
+        Vessel: v.name,
+        IMO: v.imoNumber,
+        Type: v.vesselType || '',
+        Flag: flagMap.get(v.flagStateId || '') || '',
+        Built: v.builtYear || '',
+        GT: v.grossTonnage != null ? Number(v.grossTonnage) : '',
+        Customer: customerMap.get(v.customerId || '') || '',
+        Status: v.isActive ? 'Active' : 'Inactive'
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [24, 10, 14, 18, 7, 10, 28, 9].map((wch) => ({ wch }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Vessels')
+      const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+      await saveFile(
+        new Blob([out], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }),
+        `Vessel filter ${new Date().toISOString().slice(0, 10)}.xlsx`
+      )
+      showSuccess(`${rows.length} vessel${rows.length === 1 ? '' : 's'} exported`)
+    } catch (err) {
+      if (err instanceof SaveCancelledError) return
+      showError((err instanceof Error && err.message) || 'Export failed')
+    }
+  }
 
   const customerEntities = useMemo(() => {
     const ids = new Set(vessels.filter((v) => v.customerId).map((v) => v.customerId!))
@@ -1208,7 +1391,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
             >
               <button
                 className="btn-primary"
-                onClick={handleSearch}
+                onClick={() => void handleSearch()}
                 disabled={loading || !hasAnyCriteria}
                 style={{
                   flex: 1,
@@ -1223,6 +1406,17 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
               </button>
               {hasAnyCriteria && (
                 <button
+                  onClick={() => void saveCurrentView()}
+                  className="btn-secondary"
+                  style={{ padding: '6px 10px' }}
+                  title="Save these criteria as a view"
+                  aria-label="Save view"
+                >
+                  <Bookmark size={14} />
+                </button>
+              )}
+              {hasAnyCriteria && (
+                <button
                   onClick={clearAll}
                   className="btn-secondary"
                   style={{ padding: '6px 10px' }}
@@ -1232,6 +1426,37 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                 </button>
               )}
             </div>
+            {savedViews.length > 0 && (
+              <div
+                style={{
+                  padding: '0 20px 14px',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                  alignItems: 'center'
+                }}
+              >
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  Saved views:
+                </span>
+                {savedViews.map((v) => (
+                  <span key={v.name} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <button className="chip" onClick={() => applyView(v)} title="Apply this view">
+                      {v.name}
+                    </button>
+                    <button
+                      className="btn-ghost btn-sm"
+                      style={{ padding: '2px 4px' }}
+                      onClick={() => void deleteView(v.name)}
+                      aria-label={`Delete view ${v.name}`}
+                      title="Delete this view"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1349,6 +1574,16 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                     ` (filtered from ${filteredVessels.length})`}
                 </span>
               )}
+              {hasSearched && displayedVessels.length > 0 && (
+                <button
+                  className="btn-ghost btn-sm"
+                  style={{ marginLeft: '10px' }}
+                  onClick={() => void exportResults()}
+                  title="Export these vessels to Excel"
+                >
+                  <Download size={14} /> Export
+                </button>
+              )}
             </div>
           </div>
 
@@ -1401,16 +1636,14 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                     >
                       Compare
                     </th>
-                    <th scope="col">Vessel</th>
-                    <th scope="col">IMO</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Flag</th>
-                    <th scope="col">Year</th>
-                    <th scope="col" className="num">
-                      GT
-                    </th>
-                    <th scope="col">Customer</th>
-                    <th scope="col">Status</th>
+                    {sortTh('name', 'Vessel')}
+                    {sortTh('imo', 'IMO')}
+                    {sortTh('type', 'Type')}
+                    {sortTh('flag', 'Flag')}
+                    {sortTh('year', 'Year')}
+                    {sortTh('gt', 'GT', 'num')}
+                    {sortTh('customer', 'Customer')}
+                    {sortTh('status', 'Status')}
                   </tr>
                 </thead>
                 <tbody>

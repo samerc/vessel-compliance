@@ -1864,7 +1864,7 @@ export default function ComplianceCenter({
               </div>
 
               {/* Divider */}
-              <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+              <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '16px 0' }} />
 
               {/* Custom Rules Section */}
               <div

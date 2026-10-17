@@ -74,6 +74,14 @@ export default function SurveyorDirectory(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false)
   const [filterCountry, setFilterCountry] = useState('all')
   const [sortBy, setSortBy] = useState<'name' | 'country'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const sortOn = (col: 'name' | 'country'): void => {
+    if (sortBy === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortBy(col)
+      setSortDir('asc')
+    }
+  }
   const [searchTerm, setSearchTerm] = useState('')
   const [allCountries, setAllCountries] = useState<string[]>([])
   const debouncedSearch = useDebounceValue(searchTerm, 500)
@@ -96,7 +104,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   // Back to page 1 whenever the search, filter, sort or page size changes
-  const filterKey = JSON.stringify([debouncedSearch, filterCountry, sortBy, limit])
+  const filterKey = JSON.stringify([debouncedSearch, filterCountry, sortBy, sortDir, limit])
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey)
@@ -120,7 +128,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
           search: debouncedSearch || undefined,
           country: filterCountry !== 'all' ? filterCountry : undefined,
           sortField: sortBy === 'name' ? 'companyName' : 'country',
-          sortOrder: 'asc'
+          sortOrder: sortDir
         }
         const result = await window.api.getSurveyorsPaginated(params)
         if (!alive) return
@@ -138,7 +146,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
     return () => {
       alive = false
     }
-  }, [page, limit, debouncedSearch, filterCountry, sortBy, showError, surveyorsKey])
+  }, [page, limit, debouncedSearch, filterCountry, sortBy, sortDir, showError, surveyorsKey])
 
   useEffect(() => {
     let alive = true
@@ -458,14 +466,6 @@ export default function SurveyorDirectory(): React.JSX.Element {
             </option>
           ))}
         </select>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as 'name' | 'country')}
-          style={{ padding: '7px 10px', fontSize: '0.82rem' }}
-        >
-          <option value="name">Sort by Name</option>
-          <option value="country">Sort by Country</option>
-        </select>
         <div style={{ position: 'relative' }}>
           <Search
             style={{
@@ -513,9 +513,26 @@ export default function SurveyorDirectory(): React.JSX.Element {
                     { id: 'surveys', label: 'Surveys' }
                   ]
                     .filter((col) => survVisibleSet.has(col.id))
-                    .map((col) => (
-                      <th key={col.id}>{col.label}</th>
-                    ))}
+                    .map((col) => {
+                      // Company and Country sort (click again to reverse)
+                      const sortCol =
+                        col.id === 'company' ? 'name' : col.id === 'country' ? 'country' : null
+                      if (!sortCol) return <th key={col.id}>{col.label}</th>
+                      const active = sortBy === sortCol
+                      return (
+                        <th
+                          key={col.id}
+                          onClick={() => sortOn(sortCol)}
+                          style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          aria-sort={
+                            active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined
+                          }
+                        >
+                          {col.label}
+                          {active && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                        </th>
+                      )
+                    })}
                   <th style={{ textAlign: 'right', width: '40px' }}>
                     <ColumnSelector
                       pageKey="surveyors"

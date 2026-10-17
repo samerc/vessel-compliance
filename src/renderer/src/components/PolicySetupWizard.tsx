@@ -2117,7 +2117,7 @@ function StepInstalments({
 
       {count > 0 && (
         <>
-          <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 16px' }} />
+          <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '0 0 16px' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {data.instalmentDates.map((date, i) => (
