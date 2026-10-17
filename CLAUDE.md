@@ -539,6 +539,7 @@ Quotation management system:
 - **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Two-tier navigation — category selector (General / P&I / H&M) on top, filtered tab chips below. General: Quotation Types, Warranties, Subjectivities, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Section Order, Logo. P&I: Conditions, Deductibles, Exclusions, Limits of Liability, Addl. Clauses. H&M: Agreed Value, Clauses, Addl. Conditions.
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
+- **Settings lists cache** (`quotation-tabs/masterDataCache.ts`): the editor tabs read settings lists once per editor session. Every successful save on a settings-list channel (`isSettingsListSave` in index.ts `safeHandle`: pi/hull/war/cargo/premium/survey templates/entity doc types without `Quotation` in the name, db document/vessel/quotation types, classification societies, subjectivities, `settings:set`) bumps `app_settings.quotation_settings_version`; on each tab switch the editor reads it (`checkSettingsVersion`) and, if it changed, clears the cache, remounts the tab and reloads its standard texts / sanctions versions (never the quotation itself). A new settings-list channel is covered when it follows that naming
 
 ### Quotation Vessel Scope
 

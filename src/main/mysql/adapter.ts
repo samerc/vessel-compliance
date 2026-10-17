@@ -8569,6 +8569,17 @@ export class MySQLAdapter {
     )
   }
 
+  /** Counter bumped on every save of a quotation settings list (see SETTINGS_VERSION_KEY) */
+  async bumpSettingsVersion(): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute(
+      `INSERT INTO app_settings (setting_key, setting_value, updated_by)
+             VALUES ('quotation_settings_version', '1', 'system')
+             ON DUPLICATE KEY UPDATE setting_value = CAST(setting_value AS UNSIGNED) + 1,
+                                     updated_at = CURRENT_TIMESTAMP`
+    )
+  }
+
   async getPISectionTexts(): Promise<PISectionTexts> {
     const val = await this.getSetting('pi_section_texts')
     if (!val) return {}

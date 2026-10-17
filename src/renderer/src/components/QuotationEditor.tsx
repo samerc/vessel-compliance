@@ -72,7 +72,11 @@ import InsuredValueTab from './quotation-tabs/InsuredValueTab'
 import VoyageTab from './quotation-tabs/VoyageTab'
 import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
-import { clearMasterDataCache, masterData } from './quotation-tabs/masterDataCache'
+import {
+  checkSettingsVersion,
+  clearMasterDataCache,
+  masterData
+} from './quotation-tabs/masterDataCache'
 import { Modal, Field } from './ui'
 import { ok } from '../utils/ipc'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
@@ -404,7 +408,27 @@ export default function QuotationEditor({
   }
 
   // Settings lists cached by the tabs live for this editor session only
-  useEffect(() => clearMasterDataCache, [])
+  useEffect(() => {
+    // Baseline of the settings version: later tab switches compare against it
+    void checkSettingsVersion()
+    return clearMasterDataCache
+  }, [])
+
+  // Someone saved a settings list since the last check: the open tab is remounted (key) so it
+  // re-reads its lists, and the editor's own settings lists are reloaded. The quotation itself
+  // is not reloaded (that would drop edits in progress)
+  const [settingsNonce, setSettingsNonce] = useState(0)
+  const refreshIfSettingsChanged = async (): Promise<void> => {
+    if (!(await checkSettingsVersion())) return
+    setSettingsNonce((n) => n + 1)
+    const [gt, sv] = await Promise.all([
+      masterData('piGetSectionTexts'),
+      masterData('piGetSanctionsVersions')
+    ])
+    if (gt && !hasIpcError(gt) && Object.keys(gt).length > 0)
+      setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
+    if (Array.isArray(sv)) setSanctionsVersions(sv)
+  }
 
   // Initial load, once on mount (loadMasterData sets state only after its first await)
   const loadMasterDataOnMount = useEffectEvent(loadMasterData)
@@ -2069,7 +2093,10 @@ export default function QuotationEditor({
           return (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => {
+                setActiveTab(t.key)
+                void refreshIfSettingsChanged()
+              }}
               style={{
                 padding: '8px 14px',
                 borderRadius: '8px 8px 0 0',
@@ -2192,6 +2219,7 @@ export default function QuotationEditor({
       {/* Tab Content */}
       {activeTab !== 'hullConditions' && (
         <div
+          key={settingsNonce}
           className="glass-card"
           style={{ padding: '24px', minHeight: '300px', position: 'relative' }}
         >
@@ -2425,7 +2453,7 @@ export default function QuotationEditor({
       )}
 
       {activeTab === 'hullConditions' && (
-        <div style={{ position: 'relative' }}>
+        <div key={settingsNonce} style={{ position: 'relative' }}>
           {!canEdit && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'not-allowed' }} />
           )}

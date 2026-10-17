@@ -339,13 +339,52 @@ function errorMessage(err: unknown): string | undefined {
 // Safe IPC handler wrapper - catches errors and returns them as values
 // The renderer sends the arguments declared for this channel in src/preload/index.ts: each handler
 // annotates them (they are not validated at runtime).
+// Saves of the settings lists the quotation editor caches (clauses, warranties, texts...).
+// Each one bumps app_settings.quotation_settings_version, so an editor open on another PC
+// re-reads its lists on the next tab switch. Per-quotation channels of the same prefixes
+// are left out: they change one quotation, not the settings.
+const SETTINGS_LIST_PREFIXES = new Set([
+  'pi',
+  'hull',
+  'war',
+  'cargo',
+  'premium',
+  'surveyWarrantyTemplate',
+  'surveyWarrantyTemplateSet',
+  'entityDocTypes'
+])
+const SETTINGS_SAVE_RE =
+  /^(add|create|update|delete|remove|set|save|reorder|toggle|import|replace|reset|upsert)/
+const isSettingsListSave = (channel: string): boolean => {
+  if (channel === 'settings:set') return true
+  const i = channel.indexOf(':')
+  if (i < 0) return false
+  const prefix = channel.slice(0, i)
+  const name = channel.slice(i + 1)
+  if (!SETTINGS_SAVE_RE.test(name)) return false
+  if (prefix === 'db')
+    return /(DocumentType|ClassificationSociet|VesselType|QuotationType|PISubjectivit)/.test(name)
+  return (
+    SETTINGS_LIST_PREFIXES.has(prefix) && !/Quotation|AgreedValueOption|AltVesselPremium/.test(name)
+  )
+}
+
 function safeHandle<Args extends unknown[]>(
   channel: string,
   handler: (event: Electron.IpcMainInvokeEvent, ...args: Args) => unknown
 ): void {
+  const bumpsSettings = isSettingsListSave(channel)
   ipcMain.handle(channel, async (event, ...args) => {
     try {
-      return await handler(event, ...(args as Args))
+      const result = await handler(event, ...(args as Args))
+      if (bumpsSettings && !(result && typeof result === 'object' && 'error' in result)) {
+        try {
+          await db.bumpSettingsVersion()
+        } catch {
+          /* open editors then see the change on reopen, as before */
+        }
+      }
+      return result
     } catch (error) {
       console.error(`IPC handler error[${channel}]: `, errorMessage(error) || error)
       // Sanitize error messages — don't expose SQL details or stack traces to renderer

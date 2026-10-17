@@ -20,6 +20,10 @@ type Resolved<K extends NoArgKey> = Api[K] extends () => Promise<infer R> ? R : 
 
 const cache = new Map<string, Promise<unknown>>()
 
+// app_settings.quotation_settings_version: the main process bumps it on every save of a
+// settings list (any user, any PC). undefined = no baseline yet for this editor session
+let knownVersion: string | null | undefined
+
 /** Read through the session cache. Errors and IPC error values are not kept. */
 export function cachedIpc<T>(key: string, load: () => Promise<T>): Promise<T> {
   let hit = cache.get(key) as Promise<T> | undefined
@@ -52,4 +56,25 @@ export function cachedSetting(key: string): ReturnType<Api['getSetting']> {
 
 export function clearMasterDataCache(): void {
   cache.clear()
+  knownVersion = undefined
+}
+
+/**
+ * One cheap read: when someone saved a settings list since the last check, the cache is
+ * cleared and true is returned (the caller reloads what it shows). The first call of an
+ * editor session only records the version.
+ */
+export async function checkSettingsVersion(): Promise<boolean> {
+  let v: string | null
+  try {
+    const r = await window.api.getSetting('quotation_settings_version')
+    if (isIpcError(r)) return false
+    v = typeof r === 'string' ? r : null
+  } catch {
+    return false
+  }
+  const changed = knownVersion !== undefined && v !== knownVersion
+  knownVersion = v
+  if (changed) cache.clear()
+  return changed
 }
