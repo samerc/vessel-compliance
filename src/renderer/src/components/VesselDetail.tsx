@@ -63,6 +63,7 @@ import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
 import VesselDocumentsView from './VesselDocumentsView'
+import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
@@ -288,6 +289,7 @@ export default function VesselDetail({
 
     await window.api.upsertVesselDocument(newDoc)
     await loadDocuments()
+    askDocDates(docTypeId)
   }
 
   const handleClickUpload = async (docTypeId: string): Promise<void> => {
@@ -320,8 +322,8 @@ export default function VesselDetail({
     }
 
     await window.api.upsertVesselDocument(newDoc)
-    showSuccess('Document linked successfully')
     await loadDocuments()
+    askDocDates(docTypeId)
   }
 
   const handleToggleRequired = async (docTypeId: string): Promise<void> => {
@@ -347,7 +349,7 @@ export default function VesselDetail({
   }
 
   const handleUpdateExpiry = async (docTypeId: string, expiryDate: string): Promise<void> => {
-    await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
+    await saveDocExpiry(vessel.id, docTypeId, expiryDate)
     loadDocuments()
   }
 
@@ -415,6 +417,44 @@ export default function VesselDetail({
   const [editImo, setEditImo] = useState(vessel.imoNumber)
   const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
   const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
+  // Asked after a file is linked or replaced (table view): its received and expiry dates
+  const [docDatesRequest, setDocDatesRequest] = useState<DocumentDatesRequest | null>(null)
+  const askDocDates = (docTypeId: string): void => {
+    const type = docTypes.find((t) => t.id === docTypeId)
+    setDocDatesRequest({
+      vesselId: vessel.id,
+      documentTypeId: docTypeId,
+      documentName:
+        type?.name || customDocTypes.find((c) => c.id === docTypeId)?.name || 'The document',
+      annualRenewal: !!type?.annualRenewal,
+      piEndDate: resolveEffectivePolicyExpiry(dynamicPolicies || []) || undefined
+    })
+  }
+  // Inline date edits of the table view: confirmed with a toast, failures reported
+  const saveDocExpiry = async (
+    vesselId: string,
+    docTypeId: string,
+    val: string | null
+  ): Promise<void> => {
+    try {
+      await window.api.updateVesselDocumentExpiry(vesselId, docTypeId, val)
+      showSuccess(val ? `Expiry date saved (${formatDate(val)})` : 'Expiry date cleared')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the expiry date')
+    }
+  }
+  const saveDocReceived = async (
+    vesselId: string,
+    docTypeId: string,
+    val: string
+  ): Promise<void> => {
+    try {
+      await window.api.updateVesselDocumentReceivedDate(vesselId, docTypeId, val)
+      showSuccess(`Received date saved (${formatDate(val)})`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the received date')
+    }
+  }
   const [detailView, setDetailView] = useState<
     'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
   >(
@@ -2654,6 +2694,13 @@ export default function VesselDetail({
             </button>
           </div>
 
+          {docDatesRequest && (
+            <DocumentDatesModal
+              request={docDatesRequest}
+              onClose={() => setDocDatesRequest(null)}
+              onSaved={loadDocuments}
+            />
+          )}
           {detailView === 'documents' && useCardDocs && (
             <VesselDocumentsView
               vessel={vessel}
@@ -2905,11 +2952,7 @@ export default function VesselDetail({
                                     return n
                                   })
                                   if (val) {
-                                    await window.api.updateVesselDocumentReceivedDate(
-                                      vessel.id,
-                                      rowType.id,
-                                      val
-                                    )
+                                    await saveDocReceived(vessel.id, rowType.id, val)
                                     loadDocuments()
                                   }
                                 }}
@@ -2991,11 +3034,7 @@ export default function VesselDetail({
                                             delete n[rowType.id]
                                             return n
                                           })
-                                          await window.api.updateVesselDocumentExpiry(
-                                            vessel.id,
-                                            rowType.id,
-                                            val || null
-                                          )
+                                          await saveDocExpiry(vessel.id, rowType.id, val || null)
                                           loadDocuments()
                                         }}
                                         min="1900-01-01"
@@ -3114,11 +3153,7 @@ export default function VesselDetail({
                                       delete n[rowType.id]
                                       return n
                                     })
-                                    await window.api.updateVesselDocumentExpiry(
-                                      vessel.id,
-                                      rowType.id,
-                                      val || null
-                                    )
+                                    await saveDocExpiry(vessel.id, rowType.id, val || null)
                                     loadDocuments()
                                   }}
                                   min="1900-01-01"
@@ -3137,11 +3172,7 @@ export default function VesselDetail({
                                 <button
                                   title="Clear expiry date"
                                   onClick={async () => {
-                                    await window.api.updateVesselDocumentExpiry(
-                                      vessel.id,
-                                      rowType.id,
-                                      null
-                                    )
+                                    await saveDocExpiry(vessel.id, rowType.id, null)
                                     loadDocuments()
                                   }}
                                   style={{
@@ -3179,6 +3210,17 @@ export default function VesselDetail({
                                   >
                                     <Eye size={18} />
                                   </button>
+                                  {!isExtra && hasPermission('documents:upload') && (
+                                    <button
+                                      onClick={() => handleClickUpload(rowType.id)}
+                                      className="btn-secondary"
+                                      style={{ padding: '6px' }}
+                                      title="Replace with a newer file"
+                                      aria-label="Replace file"
+                                    >
+                                      <Upload size={18} />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() =>
                                       window.api.shellShowItemInFolder(rowDoc!.filePath)
@@ -3398,11 +3440,7 @@ export default function VesselDetail({
                                   return n
                                 })
                                 if (val) {
-                                  await window.api.updateVesselDocumentReceivedDate(
-                                    vessel.id,
-                                    customType.id,
-                                    val
-                                  )
+                                  await saveDocReceived(vessel.id, customType.id, val)
                                   loadDocuments()
                                 }
                               }}
@@ -3458,11 +3496,7 @@ export default function VesselDetail({
                                     delete n[customType.id]
                                     return n
                                   })
-                                  await window.api.updateVesselDocumentExpiry(
-                                    vessel.id,
-                                    customType.id,
-                                    val || null
-                                  )
+                                  await saveDocExpiry(vessel.id, customType.id, val || null)
                                   loadDocuments()
                                 }}
                                 min="1900-01-01"
@@ -3482,11 +3516,7 @@ export default function VesselDetail({
                                 <button
                                   title="Clear expiry date"
                                   onClick={async () => {
-                                    await window.api.updateVesselDocumentExpiry(
-                                      vessel.id,
-                                      customType.id,
-                                      null
-                                    )
+                                    await saveDocExpiry(vessel.id, customType.id, null)
                                     loadDocuments()
                                   }}
                                   style={{
@@ -3523,6 +3553,17 @@ export default function VesselDetail({
                                 >
                                   <Eye size={18} />
                                 </button>
+                                {hasPermission('documents:upload') && (
+                                  <button
+                                    onClick={() => handleClickUpload(customType.id)}
+                                    className="btn-secondary"
+                                    style={{ padding: '6px' }}
+                                    title="Replace with a newer file"
+                                    aria-label="Replace file"
+                                  >
+                                    <Upload size={18} />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => window.api.shellShowItemInFolder(doc!.filePath)}
                                   className="btn-secondary"

@@ -28,6 +28,7 @@ import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/poli
 import { formatDate } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
 import MissingFilePath from './MissingFilePath'
+import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
 import { getDocStatus as sharedDocStatus, type DocStatus } from '../utils/docStatus'
 
 interface Props {
@@ -94,6 +95,28 @@ export default function VesselDocumentsView({
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [newCustomName, setNewCustomName] = useState('')
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
+  // Asked after a file is linked or replaced: its received and expiry dates
+  const [datesRequest, setDatesRequest] = useState<DocumentDatesRequest | null>(null)
+
+  // Inline date edits: saved with a confirmation, failures reported
+  const saveExpiry = async (docTypeId: string, name: string, val: string | null): Promise<void> => {
+    try {
+      await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, val)
+      showSuccess(val ? `${name}: expiry ${formatDate(val)}` : `${name}: expiry cleared`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the expiry date')
+    }
+    loadData()
+  }
+  const saveReceived = async (docTypeId: string, name: string, val: string): Promise<void> => {
+    try {
+      await window.api.updateVesselDocumentReceivedDate(vessel.id, docTypeId, val)
+      showSuccess(`${name}: received ${formatDate(val)}`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the received date')
+    }
+    loadData()
+  }
 
   const loadData = onReload
 
@@ -122,8 +145,18 @@ export default function VesselDocumentsView({
         uploadedBy: user?.username || 'Unknown',
         receivedDate: new Date().toISOString().split('T')[0]
       })
-      showSuccess('Document linked successfully')
       loadData()
+      const type = docTypes.find((t) => t.id === docTypeId)
+      setDatesRequest({
+        vesselId: vessel.id,
+        documentTypeId: docTypeId,
+        documentName:
+          type?.name || customDocTypes.find((c) => c.id === docTypeId)?.name || 'The document',
+        annualRenewal: !!type?.annualRenewal,
+        piEndDate: effectivePolicyExpiry
+      })
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to link the document')
     } finally {
       setUploadingId(null)
     }
@@ -458,10 +491,8 @@ export default function VesselDocumentsView({
                         delete n[id]
                         return n
                       })
-                      if (val) {
-                        await window.api.updateVesselDocumentReceivedDate(vessel.id, id, val)
-                        loadData()
-                      }
+                      if (val && val !== (doc?.receivedDate?.split('T')[0] || ''))
+                        await saveReceived(id, name, val)
                     }}
                     style={{
                       fontSize: '0.74rem',
@@ -553,8 +584,7 @@ export default function VesselDocumentsView({
                     delete n[id]
                     return n
                   })
-                  await window.api.updateVesselDocumentExpiry(vessel.id, id, val || null)
-                  loadData()
+                  if (val !== (doc?.expiryDate || '')) await saveExpiry(id, name, val || null)
                 }}
                 min="1900-01-01"
                 max="2100-12-31"
@@ -571,10 +601,7 @@ export default function VesselDocumentsView({
               {doc?.expiryDate && (
                 <button
                   title="Clear expiry date"
-                  onClick={async () => {
-                    await window.api.updateVesselDocumentExpiry(vessel.id, id, null)
-                    loadData()
-                  }}
+                  onClick={() => void saveExpiry(id, name, null)}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -630,11 +657,8 @@ export default function VesselDocumentsView({
                   delete n[id]
                   return n
                 })
-                if (val) {
-                  await window.api.updateVesselDocumentExpiry(vessel.id, id, val)
-                  loadData()
-                }
                 // no-op if still empty (user focused without entering anything)
+                if (val) await saveExpiry(id, name, val)
               }}
               min="1900-01-01"
               max="2100-12-31"
@@ -665,8 +689,7 @@ export default function VesselDocumentsView({
                   delete n[id]
                   return n
                 })
-                await window.api.updateVesselDocumentExpiry(vessel.id, id, val || null)
-                loadData()
+                if (val !== (doc.expiryDate || '')) await saveExpiry(id, name, val || null)
               }}
               min="1900-01-01"
               max="2100-12-31"
@@ -682,10 +705,7 @@ export default function VesselDocumentsView({
             />
             <button
               title="Clear expiry date"
-              onClick={async () => {
-                await window.api.updateVesselDocumentExpiry(vessel.id, id, null)
-                loadData()
-              }}
+              onClick={() => void saveExpiry(id, name, null)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -805,6 +825,23 @@ export default function VesselDocumentsView({
               >
                 <Eye size={13} /> View
               </button>
+              {hasPermission('documents:upload') && (
+                <button
+                  onClick={() => handleClickUpload(id)}
+                  disabled={uploadingId === id}
+                  className="btn-secondary"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.78rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Link a newer file in place of this one"
+                >
+                  <Upload size={13} /> Replace
+                </button>
+              )}
               <button
                 onClick={() => window.api.shellShowItemInFolder(doc!.filePath)}
                 className="btn-secondary"
@@ -948,6 +985,13 @@ export default function VesselDocumentsView({
         style={{ display: 'none' }}
         onChange={handleFileInput}
       />
+      {datesRequest && (
+        <DocumentDatesModal
+          request={datesRequest}
+          onClose={() => setDatesRequest(null)}
+          onSaved={loadData}
+        />
+      )}
 
       {/* P&I policy picker when multiple P&I policies exist */}
       {piPolicies.length > 1 && (
