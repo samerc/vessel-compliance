@@ -29,7 +29,8 @@ import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { PageHeader, SanctionsBadge, EmptyState, Field } from './ui'
+import { PageHeader, SanctionsBadge, EmptyState, Field, Badge } from './ui'
+import { vesselDocCounts, type VesselDocCounts } from '../utils/vesselDocCompliance'
 
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
@@ -55,9 +56,12 @@ export default function VesselManager({
   onNavigateBack,
   navigateBackLabel,
   onNavigateToQuotation,
+  onOpenAdvancedFilter,
   openCreate,
   onCreateConsumed
 }: {
+  /** Opens the Vessel Filter page (more criteria than this list) */
+  onOpenAdvancedFilter?: () => void
   initialVesselId?: string | null
   initialVesselSection?:
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'
@@ -92,6 +96,10 @@ export default function VesselManager({
   const [sortField, setSortField] = useState<'name' | 'imoNumber'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active')
+  // Document compliance per vessel (vessel documents only) and the chip filter on it
+  const [docFilter, setDocFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
+  const [docCounts, setDocCounts] = useState<Map<string, VesselDocCounts> | null>(null)
+  const [vesselActive, setVesselActive] = useState<Map<string, boolean>>(new Map())
 
   // Fleet combobox state for per-vessel assignment
   const [fleetComboOpen, setFleetComboOpen] = useState<string | null>(null) // vesselId of open combobox
@@ -147,6 +155,7 @@ export default function VesselManager({
     { id: 'imo', label: 'IMO Number', defaultVisible: true },
     { id: 'vesselType', label: 'Vessel Type', defaultVisible: true },
     { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
+    { id: 'compliance', label: 'Documents', defaultVisible: true },
     { id: 'fleet', label: 'Fleet', defaultVisible: true },
     { id: 'actions', label: 'Actions', defaultVisible: true }
   ]
@@ -210,7 +219,7 @@ export default function VesselManager({
   }, [initialVesselId])
 
   // Reset page when filters change (adjust state during render, before the load effect runs)
-  const filterKey = JSON.stringify([debouncedSearch, fleetFilter, statusFilter, limit])
+  const filterKey = JSON.stringify([debouncedSearch, fleetFilter, statusFilter, limit, docFilter])
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey)
@@ -232,7 +241,12 @@ export default function VesselManager({
           fleetId: fleetFilter,
           status: statusFilter,
           sortField,
-          sortOrder
+          sortOrder,
+          ...(docFilter !== 'all' && docCounts
+            ? {
+                vesselIds: [...docCounts].filter(([, c]) => c[docFilter] > 0).map(([id]) => id)
+              }
+            : {})
         }
 
         const result = await window.api.getVesselsPaginated(params)
@@ -260,8 +274,53 @@ export default function VesselManager({
     sortField,
     sortOrder,
     reloadKey,
-    showError
+    showError,
+    docFilter,
+    docCounts
   ])
+
+  // Document counts for every vessel (same rule as the Compliance Center), reloaded with the list
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      window.api.getVessels(),
+      window.api.getVesselDocuments(),
+      window.api.getDocumentTypes(),
+      window.api.getVesselPolicyExpiries()
+    ])
+      .then(([vs, ds, ts, pe]) => {
+        if (!alive) return
+        const list = Array.isArray(vs) ? vs : []
+        setVesselActive(new Map(list.map((v) => [v.id, v.isActive !== false])))
+        setDocCounts(
+          vesselDocCounts(
+            list,
+            Array.isArray(ds) ? ds : [],
+            Array.isArray(ts) ? ts : [],
+            pe && typeof pe === 'object' && !('error' in pe) ? (pe as Record<string, string>) : {}
+          )
+        )
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [reloadKey])
+
+  // Vessels per chip, within the status filter
+  const docChipCounts = (() => {
+    const c = { missing: 0, expired: 0, soon: 0 }
+    if (!docCounts) return c
+    for (const [id, n] of docCounts) {
+      const active = vesselActive.get(id) !== false
+      if (statusFilter === 'active' && !active) continue
+      if (statusFilter === 'inactive' && active) continue
+      if (n.missing) c.missing++
+      if (n.expired) c.expired++
+      if (n.soon) c.soon++
+    }
+    return c
+  })()
 
   const handleAddVessel = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -919,6 +978,48 @@ export default function VesselManager({
         </button>
       </div>
 
+      {/* Document compliance chips (vessel documents; same rule as the Compliance Center) */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          margin: '-12px 0 16px'
+        }}
+      >
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Documents:</span>
+        {(
+          [
+            ['all', 'All'],
+            ['missing', 'Missing'],
+            ['expired', 'Expired'],
+            ['soon', 'Expiring 30d']
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            className={docFilter === key ? 'chip active' : 'chip'}
+            aria-pressed={docFilter === key}
+            disabled={key !== 'all' && !docCounts}
+            onClick={() => setDocFilter(key)}
+          >
+            {label}
+            {key !== 'all' && docCounts && <span className="chip-count">{docChipCounts[key]}</span>}
+          </button>
+        ))}
+        {onOpenAdvancedFilter && (
+          <button
+            className="btn-ghost btn-sm"
+            style={{ marginLeft: 'auto' }}
+            onClick={onOpenAdvancedFilter}
+            title="Flag, type, age, tonnage, class, policies and more"
+          >
+            <Filter size={14} /> Advanced filter
+          </button>
+        )}
+      </div>
+
       {/* Bulk Action Toolbar */}
       {selectMode && selectedVesselIds.size > 0 && (
         <div
@@ -1201,6 +1302,7 @@ export default function VesselManager({
                     Sanctions
                   </th>
                 )}
+                {visibleSet.has('compliance') && <th scope="col">Documents</th>}
                 {visibleSet.has('fleet') && <th scope="col">Fleet</th>}
                 {visibleSet.has('actions') && (
                   <th scope="col" style={{ textAlign: 'right' }}>
@@ -1347,6 +1449,40 @@ export default function VesselManager({
                     {visibleSet.has('sanctions') && (
                       <td>
                         <OfacBadge vessel={v} />
+                      </td>
+                    )}
+                    {visibleSet.has('compliance') && (
+                      <td>
+                        {(() => {
+                          const c = docCounts?.get(v.id)
+                          if (!c) return <span className="muted">—</span>
+                          if (!c.missing && !c.expired && !c.soon)
+                            return <Badge tone="success">Complete</Badge>
+                          return (
+                            <button
+                              type="button"
+                              title="Open the vessel's documents"
+                              onClick={() => {
+                                setOpenInEditMode(false)
+                                setAppliedSection('documents')
+                                setSelectedVessel(v)
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                gap: '4px',
+                                flexWrap: 'wrap',
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {c.missing > 0 && <Badge tone="danger">{c.missing} missing</Badge>}
+                              {c.expired > 0 && <Badge tone="danger">{c.expired} expired</Badge>}
+                              {c.soon > 0 && <Badge tone="warning">{c.soon} expiring</Badge>}
+                            </button>
+                          )
+                        })()}
                       </td>
                     )}
                     {visibleSet.has('fleet') && (

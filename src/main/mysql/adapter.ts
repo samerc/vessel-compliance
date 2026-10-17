@@ -6194,6 +6194,7 @@ export class MySQLAdapter {
       search,
       fleetId,
       customerId,
+      vesselIds,
       status,
       sortField = 'name',
       sortOrder = 'asc'
@@ -6234,6 +6235,15 @@ export class MySQLAdapter {
     if (status && status !== 'all') {
       if (status === 'active') conditions.push('vessels.is_active = 1')
       if (status === 'inactive') conditions.push('vessels.is_active = 0')
+    }
+
+    if (Array.isArray(vesselIds)) {
+      const ids = vesselIds.filter((x) => typeof x === 'string').slice(0, 5000)
+      if (ids.length === 0) conditions.push('FALSE')
+      else {
+        conditions.push(`vessels.id IN (${ids.map(() => '?').join(',')})`)
+        values.push(...ids)
+      }
     }
 
     if (conditions.length > 0) {

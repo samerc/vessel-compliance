@@ -511,6 +511,8 @@ export interface VesselQueryParams {
   fleetId?: string
   status?: 'all' | 'active' | 'inactive'
   customerId?: string
+  /** Only these vessels (e.g. the ones with missing documents); [] = none */
+  vesselIds?: string[]
   sortField?: 'name' | 'imoNumber'
   sortOrder?: 'asc' | 'desc'
 }

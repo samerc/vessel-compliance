@@ -1642,6 +1642,7 @@ function App(): React.JSX.Element {
                   setInitialQuotationId(qId)
                   setActiveTab('quotations')
                 }}
+                onOpenAdvancedFilter={() => navigateTo({ tab: 'vessel-filter' })}
                 openCreate={createIntent === 'vessel'}
                 onCreateConsumed={() => setCreateIntent(null)}
               />
