@@ -27,7 +27,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
 import SicLetterImport from './SicLetterImport'
-import { PageHeader, Modal, Field } from './ui'
+import { PageHeader, Modal, Field, Tabs } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 import { hasArabic } from '../utils/arabicNames'
@@ -490,58 +490,21 @@ export default function SanctionsSearch({
         }
       />
 
-      {/* Tab bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '24px',
-          borderBottom: '1px solid var(--glass-border-color)',
-          paddingBottom: '0'
-        }}
-      >
-        {[
-          { key: 'search' as const, label: 'Search', icon: <Search size={15} /> },
-          { key: 'sic' as const, label: 'SIC List', icon: <Users size={15} /> },
-          { key: 'report' as const, label: 'Check Report', icon: <FileText size={15} /> }
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 20px',
-              border: 'none',
-              borderBottom:
-                activeTab === tab.key ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              background: 'none',
-              color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              fontWeight: activeTab === tab.key ? 700 : 500,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            {tab.icon} {tab.label}
-            {tab.key === 'sic' && sicEntries.length > 0 && (
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  padding: '1px 7px',
-                  borderRadius: '10px',
-                  background: '#ffd43b22',
-                  color: '#ffd43b'
-                }}
-              >
-                {sicEntries.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        style={{ marginBottom: '24px' }}
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { key: 'search', label: 'Search', icon: <Search size={15} /> },
+          {
+            key: 'sic',
+            label: 'SIC List',
+            icon: <Users size={15} />,
+            count: sicEntries.length || undefined
+          },
+          { key: 'report', label: 'Check Report', icon: <FileText size={15} /> }
+        ]}
+      />
 
       {/* ============ SEARCH TAB ============ */}
       {activeTab === 'search' && (

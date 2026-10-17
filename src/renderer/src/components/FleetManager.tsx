@@ -31,7 +31,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
-import { PageHeader } from './ui'
+import { PageHeader, Tabs, EmptyState } from './ui'
 
 interface CustomerGroup {
   entity: Entity
@@ -667,47 +667,15 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
         ))}
       </div>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          marginBottom: '20px',
-          borderBottom: '1px solid var(--table-border)'
-        }}
-      >
-        {(['fleets', 'customers'] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            style={{
-              padding: '10px 22px',
-              background: 'none',
-              border: 'none',
-              borderBottom:
-                viewMode === mode ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              color: viewMode === mode ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontWeight: viewMode === mode ? 600 : 400,
-              fontSize: '0.9rem',
-              transition: 'var(--transition)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '7px',
-              marginBottom: '-1px'
-            }}
-          >
-            {mode === 'fleets' ? (
-              <>
-                <Folder size={15} /> By Fleet
-              </>
-            ) : (
-              <>
-                <Users size={15} /> By Customer
-              </>
-            )}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        style={{ marginBottom: '20px' }}
+        value={viewMode}
+        onChange={setViewMode}
+        items={[
+          { key: 'fleets', label: 'By Fleet', icon: <Folder size={15} /> },
+          { key: 'customers', label: 'By Customer', icon: <Users size={15} /> }
+        ]}
+      />
 
       {/* ===== FLEET VIEW ===== */}
       {viewMode === 'fleets' ? (
@@ -885,20 +853,23 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
                 <tbody>
                   {sortedFleets.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={3}
-                        className="muted"
-                        style={{ padding: '56px', textAlign: 'center' }}
-                      >
-                        <Folder
-                          size={40}
-                          style={{ opacity: 0.15, display: 'block', margin: '0 auto 14px' }}
+                      <td colSpan={3}>
+                        <EmptyState
+                          compact
+                          icon={<Folder size={32} />}
+                          title={fleetSearch ? 'No fleets match your search' : 'No fleets yet'}
+                          text={fleetSearch ? undefined : 'Click "Add Fleet" to get started.'}
+                          action={
+                            fleetSearch ? (
+                              <button
+                                className="btn-secondary btn-sm"
+                                onClick={() => setFleetSearch('')}
+                              >
+                                Clear search
+                              </button>
+                            ) : undefined
+                          }
                         />
-                        <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
-                          {fleetSearch
-                            ? 'No fleets match your search.'
-                            : 'No fleets yet. Click "Add Fleet" to get started.'}
-                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -1713,15 +1684,11 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
           {brokerGroups.length === 0 &&
             directGroups.length === 0 &&
             customerUnassigned.length === 0 && (
-              <div
-                className="glass-card"
-                style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
-              >
-                <Users
-                  size={40}
-                  style={{ opacity: 0.18, display: 'block', margin: '0 auto 12px' }}
+              <div className="glass-card">
+                <EmptyState
+                  icon={<Users size={36} />}
+                  title="No vessels match the current filters"
                 />
-                <p>No vessels match the current filters.</p>
               </div>
             )}
         </>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Download, RefreshCw, AlertCircle, FileText, Sparkles } from 'lucide-react'
 import ChangelogModal from './ChangelogModal'
+import { Modal } from './ui'
 
 interface UpdateInfo {
   version: string
@@ -255,206 +256,139 @@ export function UpdateNotification(): React.ReactElement | null {
           updateState.type === 'downloading' ||
           updateState.type === 'ready') &&
         updateState.info.releaseNotes && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1100,
-              padding: '20px'
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowPreview(false)
-            }}
+          <Modal
+            title={`What's New in v${updateState.info.version}`}
+            icon={<Sparkles size={18} />}
+            onClose={() => setShowPreview(false)}
+            width={460}
           >
-            <div
-              style={{
-                background: 'var(--bg-primary, #1a1d28)',
-                borderRadius: '16px',
-                padding: '28px',
-                width: '100%',
-                maxWidth: '460px',
-                maxHeight: '70vh',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
-                position: 'relative'
-              }}
-            >
+            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              {updateState.type === 'downloading'
+                ? `Downloading... ${Math.round(updateState.progress.percent)}%`
+                : updateState.type === 'ready'
+                  ? 'Ready to install'
+                  : 'Downloading in background'}
+            </p>
+
+            {/* Download progress bar */}
+            {updateState.type === 'downloading' && (
+              <div style={{ marginBottom: '16px' }}>
+                <div
+                  style={{
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      borderRadius: '3px',
+                      background:
+                        'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))',
+                      width: `${updateState.progress.percent}%`,
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '4px',
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <span>
+                    {formatBytes(updateState.progress.transferred)} /{' '}
+                    {formatBytes(updateState.progress.total)}
+                  </span>
+                  <span>{formatSpeed(updateState.progress.bytesPerSecond)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Release notes preview */}
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '18px' }}>
+              {parsePreviewItems(updateState.info.releaseNotes || '').map((item, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    padding: '5px 0'
+                  }}
+                >
+                  <span
+                    style={{
+                      color: 'var(--accent-primary)',
+                      marginTop: '5px',
+                      flexShrink: 0,
+                      fontSize: '0.5rem'
+                    }}
+                  >
+                    ●
+                  </span>
+                  <span style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+              {parsePreviewItems(updateState.info.releaseNotes || '').length === 0 && (
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.88rem',
+                    fontStyle: 'italic'
+                  }}
+                >
+                  A new version is available with improvements and bug fixes.
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowPreview(false)}
+                onClick={() => setShowNotes(true)}
                 style={{
-                  position: 'absolute',
-                  top: '14px',
-                  right: '14px',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px',
-                  display: 'flex'
+                  color: 'var(--accent-primary)',
+                  fontSize: '0.8rem',
+                  padding: 0,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  marginRight: 'auto'
                 }}
               >
-                <X size={18} />
+                Full changelog
               </button>
-
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}
+              <button
+                onClick={() => setShowPreview(false)}
+                className="btn-secondary"
+                style={{ padding: '8px 20px' }}
               >
-                <div
+                Later
+              </button>
+              {updateState.type === 'ready' && (
+                <button
+                  onClick={handleInstall}
+                  className="btn-primary"
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '12px',
-                    background:
-                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    padding: '8px 20px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
+                    gap: '6px'
                   }}
                 >
-                  <Sparkles size={20} color="white" />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                    What&apos;s New in v{updateState.info.version}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    {updateState.type === 'downloading'
-                      ? `Downloading... ${Math.round(updateState.progress.percent)}%`
-                      : updateState.type === 'ready'
-                        ? 'Ready to install'
-                        : 'Downloading in background'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Download progress bar */}
-              {updateState.type === 'downloading' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div
-                    style={{
-                      height: '6px',
-                      borderRadius: '3px',
-                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        borderRadius: '3px',
-                        background:
-                          'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))',
-                        width: `${updateState.progress.percent}%`,
-                        transition: 'width 0.3s ease'
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginTop: '4px',
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    <span>
-                      {formatBytes(updateState.progress.transferred)} /{' '}
-                      {formatBytes(updateState.progress.total)}
-                    </span>
-                    <span>{formatSpeed(updateState.progress.bytesPerSecond)}</span>
-                  </div>
-                </div>
+                  <Download size={14} /> Update Now
+                </button>
               )}
-
-              {/* Release notes preview */}
-              <div style={{ flex: 1, overflowY: 'auto', marginBottom: '18px' }}>
-                {parsePreviewItems(updateState.info.releaseNotes || '').map((item, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      padding: '5px 0'
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: 'var(--accent-primary)',
-                        marginTop: '5px',
-                        flexShrink: 0,
-                        fontSize: '0.5rem'
-                      }}
-                    >
-                      ●
-                    </span>
-                    <span style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>{item}</span>
-                  </div>
-                ))}
-                {parsePreviewItems(updateState.info.releaseNotes || '').length === 0 && (
-                  <p
-                    style={{
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.88rem',
-                      fontStyle: 'italic'
-                    }}
-                  >
-                    A new version is available with improvements and bug fixes.
-                  </p>
-                )}
-              </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => setShowNotes(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--accent-primary)',
-                    fontSize: '0.8rem',
-                    padding: 0,
-                    textDecoration: 'underline',
-                    textUnderlineOffset: '3px',
-                    marginRight: 'auto'
-                  }}
-                >
-                  Full changelog
-                </button>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="btn-secondary"
-                  style={{ padding: '8px 20px' }}
-                >
-                  Later
-                </button>
-                {updateState.type === 'ready' && (
-                  <button
-                    onClick={handleInstall}
-                    className="btn-primary"
-                    style={{
-                      padding: '8px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Download size={14} /> Update Now
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
+          </Modal>
         )}
     </div>
   )

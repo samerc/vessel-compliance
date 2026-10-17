@@ -22,7 +22,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
-import { Field, Modal } from './ui'
+import { Field, Modal, EmptyState } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 
 interface WarrantyManagerProps {
@@ -1139,16 +1139,7 @@ export default function WarrantyManager({
 
       {/* Content */}
       {warranties.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '32px 24px',
-            color: 'var(--text-secondary)',
-            fontSize: '0.85rem'
-          }}
-        >
-          No survey warranties added yet.
-        </div>
+        <EmptyState compact title="No survey warranties yet" />
       ) : (
         <>
           {Array.from(grouped.entries()).map(([, { label, items }]) => renderGroup(label, items))}

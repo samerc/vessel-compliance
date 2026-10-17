@@ -68,7 +68,7 @@ import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesMo
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
-import { TypeChip, Modal, Field } from './ui'
+import { TypeChip, Modal, Field, EmptyState } from './ui'
 import { addRegistryVessel } from '../utils/addRegistryVessel'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
@@ -2158,42 +2158,46 @@ export default function VesselDetail({
                 {vesselActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                 {vesselActive ? 'Set inactive' : 'Set active'}
               </button>
-              <button
-                onClick={handleOpenVesselNotes}
-                className="btn-secondary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  fontSize: '0.82rem',
-                  position: 'relative'
-                }}
-              >
-                <MessageSquare size={16} /> Notes
-                {vesselNoteCount > 0 && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      right: '-6px',
-                      background: 'var(--accent-primary)',
-                      color: '#fff',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      minWidth: '16px',
-                      height: '16px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 4px'
-                    }}
-                  >
-                    {vesselNoteCount}
-                  </span>
-                )}
-              </button>
+              {/* The notes side panel already shows the notes (and opens them all): this
+                  button is for when the panel is hidden */}
+              {!showSidePanel && (
+                <button
+                  onClick={handleOpenVesselNotes}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem',
+                    position: 'relative'
+                  }}
+                >
+                  <MessageSquare size={16} /> Notes
+                  {vesselNoteCount > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        background: 'var(--accent-primary)',
+                        color: '#fff',
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        minWidth: '16px',
+                        height: '16px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 4px'
+                      }}
+                    >
+                      {vesselNoteCount}
+                    </span>
+                  )}
+                </button>
+              )}
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
@@ -5103,23 +5107,16 @@ function DynamicPoliciesView({
           })}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
-          <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-          <div
-            style={{
-              fontWeight: '600',
-              fontSize: '1rem',
-              color: 'var(--text-primary)',
-              marginBottom: '6px'
-            }}
-          >
-            {dynamicPolicies.length > 0 ? 'No matching policies' : 'No policies yet'}
-          </div>
-          <div style={{ fontSize: '0.85rem' }}>
-            {dynamicPolicies.length > 0
-              ? 'Try switching to a different type tab.'
-              : 'Add a policy to start tracking insurance coverage.'}
-          </div>
+        <div>
+          <EmptyState
+            icon={<ClipboardList size={40} />}
+            title={dynamicPolicies.length > 0 ? 'No matching policies' : 'No policies yet'}
+            text={
+              dynamicPolicies.length > 0
+                ? 'Try switching to a different type tab.'
+                : 'Add a policy to start tracking insurance coverage.'
+            }
+          />
         </div>
       )}
 

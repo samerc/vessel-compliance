@@ -29,7 +29,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
-import { Field, Modal } from './ui'
+import { Field, Modal, EmptyState } from './ui'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
@@ -752,7 +752,11 @@ export default function DefectManager({
 
       {/* Defect List */}
       {defects.length === 0 ? (
-        <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No defects recorded</p>
+        <EmptyState
+          compact
+          title="No defects recorded"
+          text="Add a defect or import them from the survey report."
+        />
       ) : filteredDefects.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
           {searchQuery ? `No defects matching "${searchQuery}"` : `No ${statusFilter} defects`}

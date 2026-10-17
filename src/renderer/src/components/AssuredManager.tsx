@@ -26,7 +26,7 @@ import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import ConfirmationModal from './ConfirmationModal'
-import { Badge, Field } from './ui'
+import { Badge, Field, EmptyState } from './ui'
 import EntityEditPanel from './EntityEditPanel'
 import { ok, isIpcError } from '../utils/ipc'
 
@@ -657,12 +657,12 @@ export default function AssuredManager({
               })}
               {vesselAssureds.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="muted"
-                    style={{ padding: '32px', textAlign: 'center', fontStyle: 'italic' }}
-                  >
-                    No assureds assigned to this vessel.
+                  <td colSpan={5}>
+                    <EmptyState
+                      compact
+                      title="No assureds yet"
+                      text="Add the owners, managers and other parties of this vessel."
+                    />
                   </td>
                 </tr>
               )}

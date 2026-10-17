@@ -5270,9 +5270,12 @@ export default function PolicyDetail({
           )
         })()}
 
-      {/* Export overlay */}
+      {/* Export overlay: blocks the page until the PDF + T&C is built (cannot be closed) */}
       {exportingPdfTC && (
         <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
           style={{
             position: 'fixed',
             top: 0,

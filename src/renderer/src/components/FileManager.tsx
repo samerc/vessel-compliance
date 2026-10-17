@@ -114,6 +114,36 @@ function TreeNode({
         onClick={() => onSelect(node.path)}
         onContextMenu={(e) => onContextMenu(e, node.path)}
         title={node.name}
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-selected={isSelected}
+        onKeyDown={(e) => {
+          // Enter / Space open the folder; arrows expand / collapse; Shift+F10 or the menu key
+          // opens its context menu
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(node.path)
+          } else if (e.key === 'ArrowRight' && !isExpanded) {
+            e.preventDefault()
+            onToggle(node.path)
+          } else if (e.key === 'ArrowLeft' && isExpanded) {
+            e.preventDefault()
+            onToggle(node.path)
+          } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+            e.preventDefault()
+            const r = e.currentTarget.getBoundingClientRect()
+            onContextMenu(
+              {
+                clientX: r.left + 24,
+                clientY: r.bottom,
+                preventDefault: () => {},
+                stopPropagation: () => {}
+              } as unknown as React.MouseEvent,
+              node.path
+            )
+          }
+        }}
       >
         <span
           onClick={(e) => {
@@ -389,6 +419,31 @@ export default function FileManager(): React.JSX.Element {
     },
     []
   )
+
+  // Context menu by keyboard: first item focused on open, arrows move, Enter runs, Esc closes
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!contextMenu) return
+    const first = contextMenuRef.current?.querySelector<HTMLElement>('[role=menuitem]')
+    first?.focus()
+  }, [contextMenu])
+  const onContextMenuKey = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem]'))
+    const i = items.indexOf(document.activeElement as HTMLElement)
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      items[(i + 1) % items.length]?.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      items[(i - 1 + items.length) % items.length]?.focus()
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      ;(document.activeElement as HTMLElement | null)?.click()
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      e.preventDefault()
+      setContextMenu(null)
+    }
+  }
 
   // Close context menu on any click
   useEffect(() => {
@@ -1177,6 +1232,9 @@ export default function FileManager(): React.JSX.Element {
             fontSize: '0.87rem'
           }}
           onClick={(e) => e.stopPropagation()}
+          role="menu"
+          ref={contextMenuRef}
+          onKeyDown={onContextMenuKey}
         >
           {contextMenu.isDir && (
             <>
@@ -1189,6 +1247,8 @@ export default function FileManager(): React.JSX.Element {
                   cursor: 'pointer',
                   color: 'var(--text-primary)'
                 }}
+                role="menuitem"
+                tabIndex={-1}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
@@ -1207,6 +1267,8 @@ export default function FileManager(): React.JSX.Element {
                   cursor: 'pointer',
                   color: 'var(--text-primary)'
                 }}
+                role="menuitem"
+                tabIndex={-1}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
@@ -1226,6 +1288,8 @@ export default function FileManager(): React.JSX.Element {
                   cursor: 'pointer',
                   color: 'var(--text-primary)'
                 }}
+                role="menuitem"
+                tabIndex={-1}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
@@ -1247,6 +1311,8 @@ export default function FileManager(): React.JSX.Element {
               cursor: 'pointer',
               color: 'var(--text-primary)'
             }}
+            role="menuitem"
+            tabIndex={-1}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             onClick={() => {

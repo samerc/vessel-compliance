@@ -77,7 +77,7 @@ import {
   clearMasterDataCache,
   masterData
 } from './quotation-tabs/masterDataCache'
-import { Modal, Field, SaveStatus } from './ui'
+import { Modal, Field, SaveStatus, Badge, TypeChip } from './ui'
 import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
@@ -1271,36 +1271,10 @@ export default function QuotationEditor({
             </button>
           ) : null}
           {/* DRAFT badge */}
-          {(q.referenceNumber || '').startsWith('DRAFT-') && (
-            <span
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                background: 'rgba(150, 150, 150, 0.15)',
-                color: 'var(--text-secondary)',
-                letterSpacing: '0.05em'
-              }}
-            >
-              Draft
-            </span>
-          )}
-          {/* Type badge */}
+          {(q.referenceNumber || '').startsWith('DRAFT-') && <Badge tone="neutral">Draft</Badge>}
+          {/* Type badge (same chip as the quotation list) */}
           {q.quotationTypeName && (
-            <span
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                background: 'rgba(var(--accent-primary-rgb), 0.15)',
-                color: 'var(--accent-primary)'
-              }}
-            >
-              {q.quotationTypeName}
-            </span>
+            <TypeChip code={q.quotationTypeCode} name={q.quotationTypeName} />
           )}
           {/* Vessel/Fleet name */}
           {qVessels.length > 0 && (

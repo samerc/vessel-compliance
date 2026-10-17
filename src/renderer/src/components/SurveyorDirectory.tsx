@@ -34,7 +34,7 @@ import { formatDateShort } from '../utils/dateUtils'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
-import { Badge, Field, Modal } from './ui'
+import { Badge, Field, Modal, EmptyState } from './ui'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -561,16 +561,8 @@ export default function SurveyorDirectory(): React.JSX.Element {
                   </tr>
                 ) : surveyors.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={survVisibleCols.length + 1}
-                      className="muted"
-                      style={{ padding: '48px', textAlign: 'center' }}
-                    >
-                      <Anchor
-                        size={30}
-                        style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }}
-                      />
-                      No surveyors found
+                    <td colSpan={survVisibleCols.length + 1}>
+                      <EmptyState compact icon={<Anchor size={30} />} title="No surveyors found" />
                     </td>
                   </tr>
                 ) : (

@@ -59,7 +59,7 @@ import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { decideSanctionsSubject } from '../utils/sanctionsDecision'
-import { SanctionsBadge, EmptyState, Modal, Field } from './ui'
+import { SanctionsBadge, EmptyState, Modal, Field, SegmentedControl } from './ui'
 
 /** A vessel linked to an entity, directly (roles) or through an assured it is UBO of */
 type AssociatedVessel = Vessel & { roles: string[]; viaAssureds: string[] }
@@ -1033,35 +1033,14 @@ export default function EntityDirectory({
         }}
       >
         {/* View mode */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '3px',
-            background: 'var(--table-header-bg)',
-            padding: '3px',
-            borderRadius: '8px'
-          }}
-        >
-          {(['all', 'customers'] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: '6px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                background: viewMode === mode ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontWeight: viewMode === mode ? '600' : '400',
-                fontSize: '0.83rem',
-                transition: 'var(--transition)'
-              }}
-            >
-              {mode === 'all' ? 'All Entities' : 'Customers'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={viewMode}
+          onChange={setViewMode}
+          items={[
+            { key: 'all', label: 'All Entities' },
+            { key: 'customers', label: 'Customers' }
+          ]}
+        />
 
         <div style={{ flex: 1 }} />
 

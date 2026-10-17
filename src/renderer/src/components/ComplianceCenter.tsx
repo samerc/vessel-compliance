@@ -47,7 +47,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog, promptDialog } from './DialogHost'
-import { PageHeader, Tabs, Badge, Field, EmptyState, Spinner } from './ui'
+import { PageHeader, Tabs, Badge, Field, EmptyState, Spinner, SegmentedControl } from './ui'
 import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
 import AlertsByCustomer from './AlertsByCustomer'
 import SanctionsReviewDetail from './SanctionsReviewDetail'
@@ -964,16 +964,7 @@ export default function ComplianceCenter({
               flexWrap: 'wrap'
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                gap: '4px',
-                background: 'var(--table-header-bg)',
-                padding: '4px',
-                borderRadius: '8px',
-                width: 'fit-content'
-              }}
-            >
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <FilterButton
                 active={filter === 'all'}
                 onClick={() => setFilter('all')}
@@ -1002,56 +993,16 @@ export default function ComplianceCenter({
                 count={alertCounts.soon}
               />
             </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: '4px',
-                background: 'var(--table-header-bg)',
-                padding: '4px',
-                borderRadius: '8px'
-              }}
-            >
-              {(['vessel', 'document', 'flat', 'customer'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setDocViewMode(mode)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: docViewMode === mode ? 'var(--bg-card)' : 'transparent',
-                    color: docViewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontWeight: docViewMode === mode ? 600 : 400,
-                    fontSize: '0.78rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  {mode === 'vessel' && (
-                    <>
-                      <Layers size={13} /> Vessel
-                    </>
-                  )}
-                  {mode === 'document' && (
-                    <>
-                      <FileText size={13} /> Document
-                    </>
-                  )}
-                  {mode === 'flat' && (
-                    <>
-                      <List size={13} /> Flat
-                    </>
-                  )}
-                  {mode === 'customer' && (
-                    <>
-                      <Briefcase size={13} /> Customer
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              value={docViewMode}
+              onChange={setDocViewMode}
+              items={[
+                { key: 'vessel', label: 'Vessel', icon: <Layers size={13} /> },
+                { key: 'document', label: 'Document', icon: <FileText size={13} /> },
+                { key: 'flat', label: 'Flat', icon: <List size={13} /> },
+                { key: 'customer', label: 'Customer', icon: <Briefcase size={13} /> }
+              ]}
+            />
             {(docViewMode === 'vessel' || docViewMode === 'document') && alerts.length > 0 && (
               <button
                 className="btn-ghost btn-sm"
@@ -1553,17 +1504,7 @@ export default function ComplianceCenter({
           const activePolicies = policyFilter === 'expired' ? policyAlerts : policyExpiringSoon
           return (
             <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies">
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '4px',
-                  background: 'var(--table-header-bg)',
-                  padding: '4px',
-                  borderRadius: '8px',
-                  marginBottom: '20px',
-                  width: 'fit-content'
-                }}
-              >
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
                 <FilterButton
                   active={policyFilter === 'expired'}
                   onClick={() => setPolicyFilter('expired')}
@@ -1864,7 +1805,9 @@ export default function ComplianceCenter({
               </div>
 
               {/* Divider */}
-              <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '16px 0' }} />
+              <div
+                style={{ height: '1px', background: 'var(--glass-border-color)', margin: '16px 0' }}
+              />
 
               {/* Custom Rules Section */}
               <div
@@ -2927,6 +2870,7 @@ interface FilterButtonProps {
   count?: number
 }
 
+// A filter chip (shared chip style) with an optional colour dot and count
 function FilterButton({
   active,
   onClick,
@@ -2935,27 +2879,15 @@ function FilterButton({
   count
 }: FilterButtonProps): React.JSX.Element {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '6px 16px',
-        borderRadius: '6px',
-        border: 'none',
-        background: active ? 'var(--bg-card-hover)' : 'transparent',
-        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        cursor: 'pointer',
-        fontSize: '0.85rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        transition: 'var(--transition)'
-      }}
-    >
+    <button onClick={onClick} className={active ? 'chip active' : 'chip'} aria-pressed={active}>
       {color && (
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }}></div>
+        <span
+          aria-hidden="true"
+          style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }}
+        />
       )}
       {label}
-      {count !== undefined && <span style={{ opacity: 0.5 }}>({count})</span>}
+      {count !== undefined && <span className="chip-count">{count}</span>}
     </button>
   )
 }
