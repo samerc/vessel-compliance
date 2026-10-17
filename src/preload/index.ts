@@ -212,6 +212,8 @@ const api: Api = {
     ipcRenderer.invoke('setup:loadConfigFromDir', directory),
   setupLoadConfigFromFile: (filePath: string) =>
     ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
+  setupPreviewConfig: (target: { filePath?: string; directory?: string }) =>
+    ipcRenderer.invoke('setup:previewConfig', target),
   // Both return an unsubscribe function (React effects remove their listener on unmount)
   onDbStatus: (callback) => {
     const h = (_: IpcRendererEvent, status: Parameters<typeof callback>[0]): void =>

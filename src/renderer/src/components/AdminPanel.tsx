@@ -120,6 +120,7 @@ import { PageHeader, Modal, Field } from './ui'
 import type { SubTabProps } from '../utils/useRequestedSubTab'
 import type { NavTarget } from '../features'
 import { ok } from '../utils/ipc'
+import { confirmLeave, useUnsavedGuard } from '../utils/useUnsavedGuard'
 
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
@@ -255,7 +256,14 @@ export default function AdminPanel({
 
   // Reminder settings state
   const [savingGrace, setSavingGrace] = useState(false)
-  const [annualGraceDays, setAnnualGraceDays] = useState(90)
+  // Kept as typed (validated on save) so the field does not jump while typing
+  const [annualGraceDays, setAnnualGraceDays] = useState('90')
+
+  // The settings forms as last loaded/saved (null = not loaded yet): a form that differs is
+  // unsaved, so leaving the section or the page asks first
+  const [savedCompliance, setSavedCompliance] = useState<ComplianceScheduleSettings | null>(null)
+  const [savedGrace, setSavedGrace] = useState<string | null>(null)
+  const [savedReport, setSavedReport] = useState<ReportSettings | null>(null)
 
   // User Groups state
   const [userGroups, setUserGroups] = useState<UserGroup[]>([])
@@ -273,6 +281,8 @@ export default function AdminPanel({
   const [logEntryCount, setLogEntryCount] = useState<number>(0)
   const [cleaningLog, setCleaningLog] = useState(false)
   const [savingRetention, setSavingRetention] = useState(false)
+  // Retention period picked but not saved yet (null = unchanged)
+  const [pendingRetention, setPendingRetention] = useState<number | null>(null)
 
   // Backup & Restore state
   const [backupInProgress, setBackupInProgress] = useState(false)
@@ -510,10 +520,33 @@ export default function AdminPanel({
     }
   }
 
+  // Entries a cleanup with this retention would delete (older than `days` days)
+  const countEntriesOlderThan = async (days: number): Promise<number> => {
+    const d = new Date()
+    d.setDate(d.getDate() - days - 1)
+    const dateTo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    try {
+      const r = await window.api.activityGetLog({ page: 1, limit: 1, dateTo })
+      return typeof r?.total === 'number' ? r.total : 0
+    } catch {
+      return 0
+    }
+  }
+
   const handleSaveRetention = async (days: number): Promise<void> => {
+    if (days > 0) {
+      const toDelete = await countEntriesOlderThan(days)
+      if (
+        toDelete > 0 &&
+        !(await confirmDialog(
+          `Saving a ${days}-day retention deletes about ${toDelete.toLocaleString()} log entries older than ${days} days right away. This cannot be undone.`,
+          { title: 'Delete old log entries?', confirmLabel: 'Save and delete' }
+        ))
+      )
+        return
+    }
     setSavingRetention(true)
     try {
-      setLogRetentionDays(days)
       const result = await window.api.activitySetRetention(days)
       if (result?.deleted > 0) {
         showSuccess(
@@ -522,6 +555,7 @@ export default function AdminPanel({
       } else {
         showSuccess(`Retention set to ${days === 0 ? 'never delete' : days + ' days'}`)
       }
+      setPendingRetention(null)
       await loadLogRetention()
     } catch (err) {
       showError((err as { message?: string } | null)?.message || 'Failed to save retention setting')
@@ -531,6 +565,18 @@ export default function AdminPanel({
   }
 
   const handleCleanNow = async (): Promise<void> => {
+    const toDelete = await countEntriesOlderThan(logRetentionDays)
+    if (toDelete === 0) {
+      showSuccess('No old entries to clean')
+      return
+    }
+    if (
+      !(await confirmDialog(
+        `Delete about ${toDelete.toLocaleString()} log entries older than ${logRetentionDays} days? This cannot be undone.`,
+        { title: 'Clean activity log', confirmLabel: 'Delete' }
+      ))
+    )
+      return
     setCleaningLog(true)
     try {
       const result = await window.api.activityCleanup()
@@ -711,7 +757,10 @@ export default function AdminPanel({
   const loadComplianceSettings = async (): Promise<void> => {
     try {
       const settings = await window.api.complianceGetScheduleSettings()
-      if (settings && !(settings as { error?: unknown }).error) setComplianceSettings(settings)
+      if (settings && !(settings as { error?: unknown }).error) {
+        setComplianceSettings(settings)
+        setSavedCompliance(settings)
+      }
     } catch {
       /* ignore */
     }
@@ -765,7 +814,9 @@ export default function AdminPanel({
   const loadGraceSettings = async (): Promise<void> => {
     try {
       const grace = await window.api.getSetting('annual_grace_days')
-      if (grace) setAnnualGraceDays(parseInt(grace) || 90)
+      const g = String(parseInt(grace ?? '') || 90)
+      setAnnualGraceDays(g)
+      setSavedGrace(g)
     } catch {
       /* ignore */
     }
@@ -773,13 +824,16 @@ export default function AdminPanel({
 
   const loadReportSettings = async (): Promise<void> => {
     const settings = await window.api.reportSettingsGet()
-    setReportSettings({ ...REPORT_SETTINGS_DEFAULTS, ...settings })
+    const loaded = { ...REPORT_SETTINGS_DEFAULTS, ...settings }
+    setReportSettings(loaded)
+    setSavedReport(loaded)
   }
 
   const handleSaveReportSettings = async (): Promise<void> => {
     setSavingReportSettings(true)
     try {
       await window.api.reportSettingsSet(reportSettings)
+      setSavedReport(reportSettings)
       showSuccess('Report settings saved')
     } catch (error) {
       showError((error as { message?: string } | null)?.message || 'Failed to save report settings')
@@ -788,10 +842,23 @@ export default function AdminPanel({
     }
   }
 
+  const graceValue = Number(annualGraceDays)
+  const graceValid =
+    annualGraceDays.trim() !== '' &&
+    Number.isInteger(graceValue) &&
+    graceValue >= 30 &&
+    graceValue <= 180
+
   const handleSaveGraceSettings = async (): Promise<void> => {
+    if (!graceValid) {
+      showError('Annual doc grace must be a whole number of days from 30 to 180')
+      return
+    }
     setSavingGrace(true)
     try {
-      await window.api.setSetting('annual_grace_days', String(annualGraceDays))
+      await window.api.setSetting('annual_grace_days', String(graceValue))
+      setAnnualGraceDays(String(graceValue))
+      setSavedGrace(String(graceValue))
       showSuccess('Settings saved')
     } catch (error) {
       showError(
@@ -800,6 +867,25 @@ export default function AdminPanel({
     } finally {
       setSavingGrace(false)
     }
+  }
+
+  // Unsaved settings forms (compared with what was last loaded or saved)
+  const complianceDirty =
+    !!savedCompliance && JSON.stringify(complianceSettings) !== JSON.stringify(savedCompliance)
+  const graceDirty = savedGrace !== null && annualGraceDays !== savedGrace
+  const reportDirty =
+    !!savedReport && JSON.stringify(reportSettings) !== JSON.stringify(savedReport)
+  useUnsavedGuard(complianceDirty || graceDirty || reportDirty)
+
+  // Another section: asks when a form here (or a settings page opened inside the hub) has
+  // unsaved changes; leaving puts the forms back to their saved values
+  const switchSection = async (id: string): Promise<void> => {
+    if (id === effectiveSection) return
+    if (!(await confirmLeave())) return
+    if (savedCompliance) setComplianceSettings(savedCompliance)
+    if (savedGrace !== null) setAnnualGraceDays(savedGrace)
+    if (savedReport) setReportSettings(savedReport)
+    setActiveSection(id)
   }
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -1003,6 +1089,13 @@ export default function AdminPanel({
 
   const handleDeleteCharacteristic = async (id: string): Promise<void> => {
     if (!expandedPolicyTypeId) return
+    const name = ptCharacteristics.find((c) => c.id === id)?.name || 'this field'
+    if (
+      !(await confirmDialog(
+        `Delete the field "${name}"? Vessel policies of this type no longer show the values entered for it.`
+      ))
+    )
+      return
     await window.api.deletePolicyTypeCharacteristic(id)
     loadPolicyTypeDetails(expandedPolicyTypeId)
     showSuccess('Characteristic deleted')
@@ -1023,6 +1116,8 @@ export default function AdminPanel({
 
   const handleDeleteCondition = async (id: string): Promise<void> => {
     if (!expandedPolicyTypeId) return
+    const name = ptConditions.find((c) => c.id === id)?.name || 'this condition'
+    if (!(await confirmDialog(`Delete the condition "${name}" from this policy type?`))) return
     await window.api.deletePolicyTypeCondition(id)
     loadPolicyTypeDetails(expandedPolicyTypeId)
     showSuccess('Condition deleted')
@@ -1420,6 +1515,13 @@ export default function AdminPanel({
   }
 
   const handleRemoveBlockedExt = async (ext: string): Promise<void> => {
+    if (
+      !(await confirmDialog(`Allow uploading ${ext} files again? They are blocked for safety.`, {
+        title: 'Unblock file type',
+        confirmLabel: 'Unblock'
+      }))
+    )
+      return
     const updated = {
       ...fileTypeSettings,
       blockedExtensions: fileTypeSettings.blockedExtensions.filter((e) => e !== ext)
@@ -1431,9 +1533,38 @@ export default function AdminPanel({
     setTimeout(() => setFileTypeStatus(''), 3000)
   }
 
+  // Shows where the picked config points (and where the app is now) before switching
+  const confirmConfigSwitch = async (target: {
+    filePath?: string
+    directory?: string
+  }): Promise<boolean> => {
+    const preview = await window.api.setupPreviewConfig(target).catch(() => null)
+    if (!preview || 'error' in preview) {
+      await alertDialog(
+        (preview && 'message' in preview && preview.message) || 'Could not read that configuration'
+      )
+      return false
+    }
+    const fmt = (c: { host: string; port: number; database: string }): string =>
+      `database "${c.database}" on ${c.host}:${c.port}`
+    const { next, current } = preview
+    const same =
+      current &&
+      current.host === next.host &&
+      current.port === next.port &&
+      current.database === next.database
+    return confirmDialog(
+      `${same ? 'This is the database already in use' : 'Switch to'} ${fmt(next)}?` +
+        (current && !same ? `\n\nNow connected to ${fmt(current)}.` : '') +
+        '\n\nThe app reloads and every user of this computer works on that database.',
+      { title: 'Change database', confirmLabel: 'Switch and reload' }
+    )
+  }
+
   const handleBrowseConfigFile = async (): Promise<void> => {
     const filePath = await window.api.setupSelectConfigFile()
     if (filePath) {
+      if (!(await confirmConfigSwitch({ filePath }))) return
       const result = await window.api.setupLoadConfigFromFile(filePath)
       if (result.success) {
         window.location.reload()
@@ -1446,6 +1577,7 @@ export default function AdminPanel({
   const handleBrowseConfigDir = async (): Promise<void> => {
     const dir = await window.api.setupSelectDirectory()
     if (dir) {
+      if (!(await confirmConfigSwitch({ directory: dir }))) return
       const result = await window.api.setupLoadConfigFromDir(dir)
       if (result.success) {
         window.location.reload()
@@ -1728,7 +1860,7 @@ export default function AdminPanel({
               return (
                 <button
                   key={sec.id}
-                  onClick={() => setActiveSection(sec.id)}
+                  onClick={() => void switchSection(sec.id)}
                   aria-current={isActive ? 'page' : undefined}
                   style={{
                     display: 'flex',
@@ -3470,9 +3602,15 @@ export default function AdminPanel({
                       min={30}
                       max={180}
                       value={annualGraceDays}
-                      onChange={(e) => setAnnualGraceDays(Number(e.target.value) || 90)}
+                      onChange={(e) => setAnnualGraceDays(e.target.value)}
+                      aria-invalid={!graceValid}
                     />
                   </Field>
+                  {!graceValid && (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '4px' }}>
+                      Enter a whole number from 30 to 180.
+                    </p>
+                  )}
                   <p
                     style={{
                       fontSize: '0.75rem',
@@ -3489,7 +3627,7 @@ export default function AdminPanel({
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={handleSaveGraceSettings}
-                  disabled={savingGrace}
+                  disabled={savingGrace || !graceValid}
                   className="btn-primary"
                   style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
@@ -3914,23 +4052,45 @@ export default function AdminPanel({
                       { label: '180 days', value: 180 },
                       { label: '365 days', value: 365 },
                       { label: 'Never', value: 0 }
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleSaveRetention(opt.value)}
-                        disabled={savingRetention}
-                        className={logRetentionDays === opt.value ? 'btn-primary' : 'btn-secondary'}
-                        style={{
-                          padding: '8px 20px',
-                          fontSize: '0.85rem',
-                          ...(logRetentionDays === opt.value ? {} : { opacity: 0.7 })
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                    ].map((opt) => {
+                      const picked = (pendingRetention ?? logRetentionDays) === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() =>
+                            setPendingRetention(opt.value === logRetentionDays ? null : opt.value)
+                          }
+                          disabled={savingRetention}
+                          className={picked ? 'chip active' : 'chip'}
+                          aria-pressed={picked}
+                        >
+                          {opt.label}
+                          {opt.value === logRetentionDays &&
+                            pendingRetention !== null &&
+                            ' (current)'}
+                        </button>
+                      )
+                    })}
                   </div>
                 </Field>
+                {pendingRetention !== null && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <button
+                      className="btn-primary btn-sm"
+                      disabled={savingRetention}
+                      onClick={() => handleSaveRetention(pendingRetention)}
+                    >
+                      {savingRetention ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      className="btn-secondary btn-sm"
+                      disabled={savingRetention}
+                      onClick={() => setPendingRetention(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
 
               <button
@@ -6480,6 +6640,13 @@ function FilePathSettingsSection({
           <button
             className="btn-secondary"
             onClick={async () => {
+              if (
+                !(await confirmDialog(
+                  'Remove the downloaded update? After the next restart this computer runs the version that came with the installer, until the update is downloaded again.',
+                  { title: 'Clear update cache', confirmLabel: 'Clear cache' }
+                ))
+              )
+                return
               try {
                 await window.api.hotUpdateClearCache()
                 showSuccess('Cache cleared — app will use built-in version on restart')

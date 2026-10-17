@@ -84,7 +84,16 @@ export default function ConfirmationModal({
         </div>
 
         <div className="modal-body">
-          <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{message}</p>
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-line'
+            }}
+          >
+            {message}
+          </p>
         </div>
 
         <div className="modal-footer">

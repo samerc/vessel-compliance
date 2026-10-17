@@ -1132,6 +1132,35 @@ app.whenReady().then(() => {
     return getConfigPath()
   })
 
+  // Read-only look at a db-config.json picked in Settings > Database, so the admin can confirm
+  // the host and database before the app switches to it (no password returned)
+  ipcMain.handle(
+    'setup:previewConfig',
+    async (event, target: { filePath?: string; directory?: string }) => {
+      if (!isAdminRequest(event)) return { error: true, message: 'Admin access required' }
+      const describe = (
+        p: string | null
+      ): { host: string; port: number; database: string } | null => {
+        try {
+          if (!p || !existsSync(p) || statSync(p).size > 1024 * 1024) return null
+          const c = JSON.parse(readFileSync(p, 'utf-8'))
+          if (!isValidDbConfig(c)) return null
+          return { host: c.host, port: c.port, database: c.database }
+        } catch {
+          return null
+        }
+      }
+      let p: string | null = null
+      if (typeof target?.filePath === 'string' && allowedConfigPaths.has(target.filePath))
+        p = target.filePath
+      else if (typeof target?.directory === 'string' && target.directory)
+        p = join(target.directory, 'db-config.json')
+      const next = describe(p)
+      if (!next) return { error: true, message: 'No valid db-config.json found there' }
+      return { next, current: describe(getConfigPath()) }
+    }
+  )
+
   ipcMain.handle('setup:loadConfigFromDir', async (event, directory: string) => {
     // Security: Only admins can change database configuration
     if (!isAdminRequest(event)) {

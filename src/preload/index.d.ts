@@ -215,6 +215,13 @@ export interface Api {
   setupGetConfigPath: () => Promise<string | null>
   setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
   setupLoadConfigFromFile: (filePath: string) => Promise<{ success: boolean; message?: string }>
+  setupPreviewConfig: (target: { filePath?: string; directory?: string }) => Promise<
+    | {
+        next: { host: string; port: number; database: string }
+        current: { host: string; port: number; database: string } | null
+      }
+    | { error: true; message: string }
+  >
   onDbStatus: (callback: (status: { connected: boolean }) => void) => () => void
   onHotUpdateAvailable: (callback: (version: HotUpdateVersion) => void) => () => void
   getDocumentTypes: () => Promise<DocumentType[]>
