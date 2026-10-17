@@ -115,7 +115,7 @@ interface IpcResultLike {
   message?: string
 }
 
-type SettingsCategory = 'general' | 'pi' | 'hull' | 'war' | 'cargo'
+type SettingsCategory = 'general' | 'wordings' | 'trading' | 'pi' | 'hull' | 'war' | 'cargo'
 
 const SCOPE_BADGE_COLORS: Record<string, string> = {
   pi: '#6464ff',
@@ -127,6 +127,8 @@ const SCOPE_BADGE_COLORS: Record<string, string> = {
 
 const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
+  { id: 'wordings', label: 'Wordings & lists', color: 'var(--accent-primary)' },
+  { id: 'trading', label: 'Trading', color: 'var(--accent-primary)' },
   { id: 'pi', label: 'P&I / FD&D', color: '#6464ff' },
   { id: 'hull', label: 'H&M', color: '#ff64c8' },
   { id: 'war', label: 'War', color: '#ff8c32' },
@@ -137,25 +139,30 @@ const CATEGORY_TABS: Record<
   SettingsCategory,
   { id: SettingsTab; label: string; icon: React.ReactNode }[]
 > = {
+  // General was 14 tabs: split into the set-up, the reusable wordings, and trading
   general: [
     { id: 'quotationTypes', label: 'Quotation Types', icon: <List size={15} /> },
-    { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
-    { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
-    { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
-    { id: 'tradingWarrantyTemplates', label: 'Trading Templates', icon: <FileText size={15} /> },
-    { id: 'tradingCustomTexts', label: 'Trading Custom', icon: <FileText size={15} /> },
-    { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> },
-    { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
-    { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> },
-    { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
+    { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> },
     { id: 'sectionOrder', label: 'Section Order', icon: <List size={15} /> },
+    { id: 'instalmentDefaults', label: 'Instalment Defaults', icon: <Calendar size={15} /> },
+    { id: 'premiumTexts', label: 'NCB / UPCC', icon: <DollarSign size={15} /> }
+  ],
+  wordings: [
+    { id: 'standardTexts', label: 'Standard Texts', icon: <StickyNote size={15} /> },
     { id: 'warranties', label: 'Warranties', icon: <Shield size={15} /> },
+    { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
     {
       id: 'surveyWarrantyTemplates',
       label: 'Survey Warranties',
       icon: <ClipboardCheck size={15} />
     },
-    { id: 'workflow', label: 'Workflow', icon: <GitBranch size={15} /> }
+    { id: 'sanctionsVersions', label: 'Sanctions Versions', icon: <Shield size={15} /> }
+  ],
+  trading: [
+    { id: 'tradingCountries', label: 'Countries', icon: <Globe size={15} /> },
+    { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },
+    { id: 'tradingWarrantyTemplates', label: 'Templates', icon: <FileText size={15} /> },
+    { id: 'tradingCustomTexts', label: 'Custom Texts', icon: <FileText size={15} /> }
   ],
   pi: [
     { id: 'clauses', label: 'Conditions', icon: <BookOpen size={15} /> },

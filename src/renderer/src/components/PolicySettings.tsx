@@ -137,7 +137,7 @@ async function savePolicyExportSettings(patch: Record<string, unknown>): Promise
   ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, ...patch })))
 }
 
-type PolicySettingsCategory = 'general' | 'pi' | 'fdd' | 'hull' | 'war'
+type PolicySettingsCategory = 'general' | 'documents' | 'signing' | 'pi' | 'fdd' | 'hull' | 'war'
 
 type PolicySettingsTab =
   | 'fontSize'
@@ -174,6 +174,8 @@ type PolicySettingsTab =
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
+  { id: 'documents', label: 'Document texts', color: 'var(--accent-primary)' },
+  { id: 'signing', label: 'Signing & money', color: 'var(--accent-primary)' },
   { id: 'pi', label: 'P&I', color: '#6464ff' },
   { id: 'fdd', label: 'FD&D', color: '#a855f7' },
   { id: 'hull', label: 'H&M', color: '#ff64c8' },
@@ -184,23 +186,29 @@ const CATEGORY_TABS: Record<
   PolicySettingsCategory,
   { id: PolicySettingsTab; label: string; icon: React.ReactNode }[]
 > = {
+  // General was 16 tabs: split into layout, the wordings printed on documents, and
+  // signing / money
   general: [
     { id: 'fontSize', label: 'Font Size', icon: <Type size={15} /> },
     { id: 'timezones', label: 'Timezones', icon: <Globe size={15} /> },
-    { id: 'baseCurrency', label: 'Base Currency', icon: <DollarSign size={15} /> },
-    { id: 'footerText', label: 'Footer Text', icon: <FileText size={15} /> },
     { id: 'headerTitles', label: 'Header Titles', icon: <BookOpen size={15} /> },
-    { id: 'banks', label: 'Banks', icon: <Landmark size={15} /> },
-    { id: 'cancelReplace', label: 'Cancel & Replace', icon: <AlertTriangle size={15} /> },
+    { id: 'footerText', label: 'Footer Text', icon: <FileText size={15} /> },
+    { id: 'sectionOrder', label: 'Section Order', icon: <LayoutList size={15} /> }
+  ],
+  documents: [
     { id: 'premiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> },
+    { id: 'cancelReplace', label: 'Cancel & Replace', icon: <AlertTriangle size={15} /> },
     { id: 'blueCardTexts', label: 'Blue Card Texts', icon: <Shield size={15} /> },
-    { id: 'tcTemplates', label: 'T&C Templates', icon: <FileCheck size={15} /> },
+    { id: 'endorsements', label: 'Endorsements', icon: <FileCheck size={15} /> },
+    { id: 'declaration', label: 'Declaration', icon: <FileText size={15} /> },
+    { id: 'tcTemplates', label: 'T&C Templates', icon: <FileCheck size={15} /> }
+  ],
+  signing: [
     { id: 'signatures', label: 'Signatures', icon: <PenTool size={15} /> },
     { id: 'qrVerification', label: 'QR Verification', icon: <QrCode size={15} /> },
+    { id: 'banks', label: 'Banks', icon: <Landmark size={15} /> },
     { id: 'commissions', label: 'Commissions', icon: <Percent size={15} /> },
-    { id: 'declaration', label: 'Declaration', icon: <FileText size={15} /> },
-    { id: 'endorsements', label: 'Endorsements', icon: <FileCheck size={15} /> },
-    { id: 'sectionOrder', label: 'Section Order', icon: <LayoutList size={15} /> }
+    { id: 'baseCurrency', label: 'Base Currency', icon: <DollarSign size={15} /> }
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
