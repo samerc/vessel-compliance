@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { Modal } from '../ui'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
+import { confirmDelete } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
@@ -275,6 +276,7 @@ export default function ExclusionsTab({
   }
 
   const deleteCustom = async (id: string): Promise<void> => {
+    if (!(await confirmDelete('exclusion', customExclusions.find((x) => x.id === id)?.text))) return
     await window.api.deleteQuotationCustomExclusion(id)
     setCustomExclusions((prev) => prev.filter((ce) => ce.id !== id))
     showSuccess('Deleted')

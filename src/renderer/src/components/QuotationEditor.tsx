@@ -79,6 +79,7 @@ import {
 } from './quotation-tabs/masterDataCache'
 import { Modal, Field } from './ui'
 import { ok } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
 // A safeHandle IPC call resolved with { error, message } instead of the value
@@ -918,6 +919,13 @@ export default function QuotationEditor({
 
   const handleRemoveLastPIAlternative = async (): Promise<void> => {
     if (isLocked || !canEdit || piAlternatives.length < 2) return
+    const last = piAlternatives[piAlternatives.length - 1]
+    const message =
+      piAlternatives.length === 2
+        ? `Remove the alternatives? With only one option left the quotation goes back to a single cover: both "${piAlternatives[0].label}" and "${last.label}" are removed, with their premiums.`
+        : `Remove "${last.label}" and its premium?`
+    if (!(await confirmDialog(message, { title: 'Remove alternative', confirmLabel: 'Remove' })))
+      return
     try {
       if (piAlternatives.length === 2) {
         // Remove both — exit alternatives mode
@@ -926,7 +934,6 @@ export default function QuotationEditor({
         setSelectedPIAltId(null)
         showSuccess('Alternatives removed')
       } else {
-        const last = piAlternatives[piAlternatives.length - 1]
         await window.api.piDeleteQuotationAlternative(last.id)
         setPiAlternatives((prev) => prev.slice(0, -1))
         if (selectedPIAltId === last.id) setSelectedPIAltId(null)
@@ -1027,33 +1034,6 @@ export default function QuotationEditor({
         </div>
       )}
 
-      {/* Locked banner */}
-      {isLockedByOther && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '12px 18px',
-            marginBottom: '12px',
-            borderRadius: '10px',
-            background: 'rgba(255, 176, 32, 0.12)',
-            border: '1px solid rgba(255, 176, 32, 0.3)',
-            color: isLight ? '#8a6400' : '#ffb020',
-            fontSize: '0.85rem',
-            fontWeight: 600
-          }}
-        >
-          <Lock size={16} />{' '}
-          {q.workflowStepName?.toLowerCase() === 'converted'
-            ? 'This quotation has been converted to a policy (read-only).'
-            : (q.revisionNumber || 0) > 0 &&
-                revisions.some((r) => (r.revisionNumber || 0) > (q.revisionNumber || 0))
-              ? `This is an older revision (read-only). ${revisions.length > 1 ? 'Switch to the latest revision to make changes.' : ''}`
-              : 'This quotation is locked (read-only).'}
-        </div>
-      )}
-
       {/* Renewal indicator banner */}
       {q.renewedFromPolicyId && (
         <div
@@ -1093,70 +1073,64 @@ export default function QuotationEditor({
         </div>
       )}
 
-      {/* Locked banner */}
-      {isLockedByOther && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '10px 16px',
-            marginBottom: '12px',
-            borderRadius: '8px',
-            background: isLight ? 'rgba(255,176,32,0.1)' : 'rgba(255,176,32,0.15)',
-            border: '1px solid rgba(255,176,32,0.3)',
-            color: isLight ? '#92400e' : '#fbbf24',
-            fontSize: '0.85rem',
-            fontWeight: 600
-          }}
-        >
-          <Lock size={16} />
-          This quotation is being edited by {lockedByName}. You are viewing in read-only mode.
-        </div>
-      )}
-
-      {isApproved && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '10px 16px',
-            marginBottom: '12px',
-            borderRadius: '8px',
-            background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(0,200,100,0.1)',
-            border: '1px solid rgba(0,200,100,0.3)',
-            color: isLight ? '#006630' : '#00c864',
-            fontSize: '0.85rem',
-            fontWeight: 600
-          }}
-        >
-          <Shield size={16} />
-          This quotation is approved and read-only. To make changes, create a new revision from the
-          Actions menu.
-        </div>
-      )}
-
-      {!stepCanEdit && !isLockedByOther && !isApproved && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '10px 16px',
-            marginBottom: '12px',
-            borderRadius: '8px',
-            background: isLight ? 'rgba(100,100,255,0.08)' : 'rgba(100,100,255,0.12)',
-            border: '1px solid rgba(100,100,255,0.3)',
-            color: isLight ? '#4338ca' : '#818cf8',
-            fontSize: '0.85rem',
-            fontWeight: 600
-          }}
-        >
-          <Lock size={16} />
-          Editing is disabled at the &quot;{currentStep?.name}&quot; workflow step.
-        </div>
-      )}
+      {/* One read-only banner: the strongest reason wins */}
+      {(() => {
+        const olderRevision = revisions.some(
+          (r) => (r.revisionNumber || 0) > (q.revisionNumber || 0)
+        )
+        const banner: { tone: string; icon: React.ReactNode; text: string } | null = isLockedByOther
+          ? {
+              tone: 'var(--warning)',
+              icon: <Lock size={16} />,
+              text: `This quotation is being edited by ${lockedByName}. You are viewing it read-only.`
+            }
+          : isLocked || q.status === 'converted'
+            ? {
+                tone: 'var(--warning)',
+                icon: <Lock size={16} />,
+                text:
+                  q.status === 'converted' || q.workflowStepName?.toLowerCase() === 'converted'
+                    ? 'This quotation has been converted to a policy (read-only).'
+                    : olderRevision
+                      ? 'This is an older revision (read-only). Switch to the latest revision to make changes.'
+                      : 'This quotation is locked (read-only).'
+              }
+            : isApproved
+              ? {
+                  tone: 'var(--success)',
+                  icon: <Shield size={16} />,
+                  text: 'This quotation is approved and read-only. To make changes, create a new revision from the Actions menu.'
+                }
+              : !stepCanEdit
+                ? {
+                    tone: 'var(--info)',
+                    icon: <Lock size={16} />,
+                    text: `Editing is disabled at the "${currentStep?.name}" workflow step.`
+                  }
+                : null
+        if (!banner) return null
+        return (
+          <div
+            role="status"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 16px',
+              marginBottom: '12px',
+              borderRadius: '8px',
+              background: `color-mix(in srgb, ${banner.tone} 12%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${banner.tone} 35%, transparent)`,
+              color: banner.tone,
+              fontSize: '0.85rem',
+              fontWeight: 600
+            }}
+          >
+            {banner.icon}
+            {banner.text}
+          </div>
+        )
+      })()}
 
       {/* Type title */}
       {q.quotationTypeName && (

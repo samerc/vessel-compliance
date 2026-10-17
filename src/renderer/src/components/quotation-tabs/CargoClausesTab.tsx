@@ -12,6 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { ok } from '../../utils/ipc'
 import { Field } from '../ui'
 import { cachedIpc, masterData } from './masterDataCache'
+import { confirmDelete } from './sharedUtils'
 
 const SECTION_LABELS: Record<string, string> = {
   conditions: 'Conditions',
@@ -369,6 +370,7 @@ export default function CargoClausesTab({
   }
 
   const deleteCustom = async (id: string): Promise<void> => {
+    if (!(await confirmDelete('clause', customClauses.find((x) => x.id === id)?.text))) return
     await window.api.cargoDeleteQuotationCustomClause(id)
     setCustomClauses((prev) => prev.filter((c) => c.id !== id))
   }

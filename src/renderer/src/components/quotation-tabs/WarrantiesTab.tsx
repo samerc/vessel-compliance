@@ -25,7 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
-import { ALT_COLORS } from './sharedUtils'
+import { ALT_COLORS, confirmDelete } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { Modal, Field } from '../ui'
@@ -270,6 +270,7 @@ export default function WarrantiesTab({
   }
 
   const deleteCustom = async (id: string): Promise<void> => {
+    if (!(await confirmDelete('warranty', customWarranties.find((x) => x.id === id)?.text))) return
     await window.api.deleteQuotationCustomWarranty(id)
     await reloadCustom()
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save } from 'lucide-react'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
+import { confirmDelete } from './sharedUtils'
 import RichTextEditor from '../RichTextEditor'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { isIpcError } from '../../utils/ipc'
@@ -54,6 +55,9 @@ export default function CustomSectionsTab({
   }
 
   const handleDelete = async (id: string): Promise<void> => {
+    const s = sections.find((x) => x.id === id)
+    if (!(await confirmDelete('section', s ? `${s.title}${s.text ? ': ' + s.text : ''}` : '')))
+      return
     try {
       await window.api.deleteQuotationCustomSection(id)
       showSuccess('Section deleted')

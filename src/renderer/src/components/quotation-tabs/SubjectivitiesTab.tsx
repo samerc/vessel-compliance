@@ -26,6 +26,7 @@ import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
+import { confirmDelete } from './sharedUtils'
 import { masterData } from './masterDataCache'
 
 /** Where the subjectivity loaders put what they load */
@@ -446,6 +447,7 @@ export default function SubjectivitiesTab({
   }
 
   const handleDelete = async (id: string): Promise<void> => {
+    if (!(await confirmDelete('subjectivity', items.find((x) => x.id === id)?.text))) return
     await window.api.deleteQuotationSubjectivity(id)
     loadData()
   }

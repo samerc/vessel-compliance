@@ -1,5 +1,21 @@
 // Helpers shared by the quotation tabs (the shared components are in shared.tsx)
 
+import { confirmDialog } from '../DialogHost'
+
+/** Asks before deleting a quotation item, quoting the start of its text */
+export function confirmDelete(what: string, text?: string | null): Promise<boolean> {
+  const plain = (text || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const excerpt = plain.length > 140 ? plain.slice(0, 140) + '...' : plain
+  return confirmDialog(excerpt ? `Delete this ${what}?\n\n"${excerpt}"` : `Delete this ${what}?`, {
+    title: `Delete ${what}`,
+    confirmLabel: 'Delete'
+  })
+}
+
 export const ALT_COLORS = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
 
 /** Format a number with thousand separators */
