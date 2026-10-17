@@ -9,7 +9,7 @@ import {
   Receipt,
   type LucideIcon
 } from 'lucide-react'
-import { PageHeader, Tabs } from './ui'
+import { KeepAlive, PageHeader, Tabs } from './ui'
 import LossRecordReport from './LossRecordReport'
 import StatementReport from './StatementReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
@@ -62,23 +62,31 @@ export default function Reports({ subTab, subTabNonce }: SubTabProps = {}): Reac
         items={TABS.map((t) => ({ key: t.id, label: t.label, icon: <t.icon size={16} /> }))}
       />
 
-      {activeTab === 'report-builder' && (
-        <Suspense
-          fallback={
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              Loading...
-            </div>
-          }
-        >
-          <ReportBuilder />
-        </Suspense>
-      )}
-      {activeTab === 'loss-record' && <LossRecordReport />}
-      {activeTab === 'statement' && <StatementReport />}
-      {activeTab === 'customer-compliance' && <CustomerComplianceReport />}
-      {activeTab === 'assured-report' && <AssuredReport />}
-      {activeTab === 'condition-survey' && <ConditionSurveyReport />}
-      {activeTab === 'renewal-pipeline' && <RenewalPipelineReport />}
+      {/* Opened reports stay mounted: switching tabs keeps their filters and results */}
+      <KeepAlive
+        active={activeTab}
+        panes={{
+          'report-builder': () => (
+            <Suspense
+              fallback={
+                <div
+                  style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                >
+                  Loading...
+                </div>
+              }
+            >
+              <ReportBuilder />
+            </Suspense>
+          ),
+          'loss-record': () => <LossRecordReport />,
+          statement: () => <StatementReport />,
+          'customer-compliance': () => <CustomerComplianceReport />,
+          'assured-report': () => <AssuredReport />,
+          'condition-survey': () => <ConditionSurveyReport />,
+          'renewal-pipeline': () => <RenewalPipelineReport />
+        }}
+      />
     </div>
   )
 }

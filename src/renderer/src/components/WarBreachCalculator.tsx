@@ -20,6 +20,7 @@ import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 import { asArray } from '../utils/ipc'
 import { StrMoneyInput } from './quotation-tabs/shared'
 import { Field, Modal, EmptyState } from './ui'
+import { confirmDialog } from './DialogHost'
 import type { WarBreachRecord } from '../../../shared/types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -208,6 +209,19 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
   const hasAnyResult = calculations.some((c) => c.calc !== null)
 
+  // The inputs as last saved: Save turns into "Saved" until something changes, so the same
+  // calculation is not stored twice, and New calculation only asks when there is unsaved work
+  const inputKey = JSON.stringify({
+    coverNoteNo,
+    currency,
+    breachDetails,
+    baseDays,
+    settings,
+    vessels
+  })
+  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const isSaved = savedKey === inputKey
+
   // ── Vessel row handlers ───────────────────────────────────────────────────
 
   const addVessel = (): void =>
@@ -275,9 +289,9 @@ export default function WarBreachCalculator(): React.JSX.Element {
         vesselsJson: JSON.stringify(vesselsWithCalcs),
         totalNetDue
       })
-      showSuccess('Saved — fields cleared for new entry')
+      showSuccess('Calculation saved')
+      setSavedKey(inputKey)
       if (showHistory) loadHistory()
-      clearAll()
     } catch {
       showError('Failed to save record')
     } finally {
@@ -616,15 +630,34 @@ export default function WarBreachCalculator(): React.JSX.Element {
           >
             <History size={16} /> History
           </button>
-          <button onClick={clearAll} className="btn-secondary" title="Clear all fields">
-            <RotateCcw size={16} /> Clear
+          <button
+            onClick={async () => {
+              if (
+                hasAnyResult &&
+                !isSaved &&
+                !(await confirmDialog(
+                  'Start a new calculation? The figures entered are not saved.',
+                  {
+                    title: 'New calculation',
+                    confirmLabel: 'Clear'
+                  }
+                ))
+              )
+                return
+              clearAll()
+            }}
+            className="btn-secondary"
+            title="Clear all fields for a new calculation"
+          >
+            <RotateCcw size={16} /> New calculation
           </button>
           <button
             onClick={handleSaveRecord}
-            disabled={!hasAnyResult || saving}
+            disabled={!hasAnyResult || saving || isSaved}
             className="btn-secondary"
           >
-            <Save size={16} /> {saving ? 'Saving...' : 'Save'}
+            {isSaved ? <CheckCircle size={16} /> : <Save size={16} />}{' '}
+            {saving ? 'Saving...' : isSaved ? 'Saved' : 'Save'}
           </button>
           <button onClick={exportToExcel} disabled={!hasAnyResult} className="btn-secondary">
             <FileSpreadsheet size={16} /> Export Excel

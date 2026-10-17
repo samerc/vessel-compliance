@@ -17,6 +17,7 @@ import type { DocumentTemplate } from '../../../shared/types'
 import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/types'
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
+import { useUnsavedGuard } from '../utils/useUnsavedGuard'
 import { PageHeader, Modal, Field, EmptyState } from './ui'
 
 const CATEGORY_TABS = [
@@ -177,6 +178,36 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
+  // Leaving the open template (another template, a category, a new one) asks first when its
+  // edits are not saved; the app-level guard covers leaving the page
+  const editsUnsaved = canManage && dirty && !!selected
+  useUnsavedGuard(editsUnsaved, 'Leave without saving? Your changes to this template will be lost.')
+  const discardThen = async (next: () => void): Promise<void> => {
+    if (
+      editsUnsaved &&
+      !(await confirmDialog(`Discard your unsaved changes to "${selected?.name}"?`, {
+        title: 'Unsaved changes',
+        confirmLabel: 'Discard'
+      }))
+    )
+      return
+    setDirty(false)
+    next()
+  }
+
+  // Ctrl+S saves the open template
+  useEffect(() => {
+    if (!editsUnsaved) return
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   const handleDelete = async (): Promise<void> => {
     if (!selected) return
     if (!(await confirmDialog(`Delete template "${selected.name}"?`))) return
@@ -249,7 +280,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
         subtitle="Create and manage document and email templates with placeholders"
         actions={
           canManage && (
-            <button className="btn-primary" onClick={() => setShowCreate(true)}>
+            <button
+              className="btn-primary"
+              onClick={() => void discardThen(() => setShowCreate(true))}
+            >
               <Plus size={16} /> New Template
             </button>
           )
@@ -261,10 +295,12 @@ export default function DocumentTemplateManager(): React.JSX.Element {
         {CATEGORY_TABS.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => {
-              setActiveCategory(cat.id)
-              setSelectedId(null)
-            }}
+            onClick={() =>
+              void discardThen(() => {
+                setActiveCategory(cat.id)
+                setSelectedId(null)
+              })
+            }
             className={activeCategory === cat.id ? 'chip active' : 'chip'}
           >
             {cat.label}
@@ -301,7 +337,9 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               {filteredTemplates.map((t, i) => (
                 <div
                   key={t.id}
-                  onClick={() => setSelectedId(t.id)}
+                  onClick={() => {
+                    if (t.id !== selectedId) void discardThen(() => setSelectedId(t.id))
+                  }}
                   style={{
                     padding: '12px 16px',
                     cursor: 'pointer',
@@ -444,6 +482,69 @@ export default function DocumentTemplateManager(): React.JSX.Element {
             </div>
           ) : (
             <div style={{ padding: '24px', maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
+              {/* Action bar: stays at the top while the template scrolls */}
+              <div
+                style={{
+                  position: 'sticky',
+                  top: '-24px',
+                  zIndex: 2,
+                  margin: '-24px -24px 16px',
+                  padding: '12px 24px',
+                  background: 'var(--bg-card)',
+                  borderBottom: '1px solid var(--table-border)',
+                  display: 'flex',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                  alignItems: 'center'
+                }}
+              >
+                {canManage && (
+                  <button
+                    className="btn-primary btn-sm"
+                    onClick={handleSave}
+                    disabled={!dirty}
+                    title="Save (Ctrl+S)"
+                  >
+                    <Save size={14} /> {dirty ? 'Save Changes' : 'Saved'}
+                  </button>
+                )}
+                {canManage && dirty && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--warning)' }}>
+                    Unsaved changes
+                  </span>
+                )}
+                <div style={{ flex: 1 }} />
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => {
+                    setGenerateMode('docx')
+                    setShowGenerate(true)
+                  }}
+                  disabled={!editBody}
+                >
+                  <FileDown size={14} /> Generate DOCX
+                </button>
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => {
+                    setGenerateMode('copy')
+                    setShowGenerate(true)
+                  }}
+                  disabled={!editBody}
+                >
+                  <Copy size={14} /> Copy Text
+                </button>
+                {canManage && (
+                  <button
+                    className="btn-secondary btn-sm"
+                    style={{ color: 'var(--danger)' }}
+                    onClick={handleDelete}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
+              </div>
+
               {/* Template Info */}
               <div
                 className="form-grid"
@@ -507,44 +608,6 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     placeholderItems={PLACEHOLDER_ITEMS}
                   />
                 </Field>
-              </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {canManage && dirty && (
-                  <button className="btn-primary btn-sm" onClick={handleSave}>
-                    <Save size={14} /> Save Changes
-                  </button>
-                )}
-                <button
-                  className="btn-secondary btn-sm"
-                  onClick={() => {
-                    setGenerateMode('docx')
-                    setShowGenerate(true)
-                  }}
-                  disabled={!editBody}
-                >
-                  <FileDown size={14} /> Generate DOCX
-                </button>
-                <button
-                  className="btn-secondary btn-sm"
-                  onClick={() => {
-                    setGenerateMode('copy')
-                    setShowGenerate(true)
-                  }}
-                  disabled={!editBody}
-                >
-                  <Copy size={14} /> Copy Text
-                </button>
-                {canManage && (
-                  <button
-                    className="btn-secondary btn-sm"
-                    style={{ color: 'var(--danger)' }}
-                    onClick={handleDelete}
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
-                )}
               </div>
 
               {/* Available Placeholders Reference */}

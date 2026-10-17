@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { Calculator } from 'lucide-react'
-import { PageHeader, Tabs } from './ui'
+import { KeepAlive, PageHeader, Tabs } from './ui'
 import PremiumCalculator from './PremiumCalculator'
 import TLORateCalculator from './TLORateCalculator'
 import WarBreachCalculator from './WarBreachCalculator'
@@ -45,9 +45,15 @@ export default function Calculators({ subTab, subTabNonce }: SubTabProps = {}): 
         items={calculators.map((c) => ({ key: c.id, label: c.label }))}
       />
 
-      {activeCalc === 'premium' && <PremiumCalculator />}
-      {activeCalc === 'tlo' && <TLORateCalculator />}
-      {activeCalc === 'warbreach' && <WarBreachCalculator />}
+      {/* Opened calculators stay mounted: switching tabs keeps the figures entered */}
+      <KeepAlive
+        active={activeCalc}
+        panes={{
+          premium: () => <PremiumCalculator />,
+          tlo: () => <TLORateCalculator />,
+          warbreach: () => <WarBreachCalculator />
+        }}
+      />
     </div>
   )
 }

@@ -700,7 +700,12 @@ export default function CustomerComplianceReport(): React.JSX.Element {
         <Field label="Customer">
           <select
             value={selectedCustomerId}
-            onChange={(e) => setSelectedCustomerId(e.target.value)}
+            onChange={(e) => {
+              // The exports and Copy Missing use the selection: never pair it with the report
+              // of another customer still on screen
+              setSelectedCustomerId(e.target.value)
+              setGroups([])
+            }}
             style={{ minWidth: '220px' }}
           >
             <option value="all">All Customers</option>
