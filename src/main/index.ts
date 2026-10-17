@@ -2258,10 +2258,10 @@ app.whenReady().then(() => {
   safeHandle('db:deleteSurveyor', async (event, id: string) => {
     const user = await requirePermission(event, 'surveys:manage')
     const [survRows] = await db.pool!.query<RowDataPacket[]>(
-      'SELECT name FROM surveyors WHERE id = ?',
+      'SELECT company_name FROM surveyors WHERE id = ?',
       [id]
     )
-    const surveyorName = survRows[0]?.name || id
+    const surveyorName = survRows[0]?.company_name || id
     const result = await db.deleteSurveyor(id)
     db.logActivity({
       userId: user.id,

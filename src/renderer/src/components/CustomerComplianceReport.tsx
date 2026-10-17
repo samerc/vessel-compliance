@@ -370,7 +370,10 @@ export default function CustomerComplianceReport(): React.JSX.Element {
     setExportingPortfolio(custId)
     try {
       const { exportCustomerPortfolioPDF } = await import('../services/CustomerPortfolioService')
-      await exportCustomerPortfolioPDF(custId, custName, custType)
+      const exported = await exportCustomerPortfolioPDF(custId, custName, custType)
+      if (!exported) showError(`${custName} has no active vessels to put in a portfolio`)
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to export the portfolio')
     } finally {
       setExportingPortfolio(null)
     }
@@ -399,8 +402,13 @@ export default function CustomerComplianceReport(): React.JSX.Element {
   }, [groups, zipSearch])
 
   const handleExportZip = async (): Promise<void> => {
-    const allVessels = groups.flatMap((g) => g.vessels)
-    const selected = allVessels.filter((v) => zipSelectedIds.has(v.vesselId))
+    // A vessel with several customers is listed once per customer: zip it once
+    const seen = new Set<string>()
+    const selected = groups
+      .flatMap((g) => g.vessels)
+      .filter(
+        (v) => zipSelectedIds.has(v.vesselId) && !seen.has(v.vesselId) && seen.add(v.vesselId)
+      )
     if (selected.length === 0) return
     setShowZipModal(false)
     setExportingZip(true)
@@ -452,9 +460,12 @@ export default function CustomerComplianceReport(): React.JSX.Element {
             Array.isArray(vDocs) ? vDocs : [],
             { returnBytes: true }
           )
-          zip.file(`${vessel.name}_Compliance_Report.pdf`, bytes as Uint8Array, {
-            date: new Date()
-          })
+          // Two vessels can share a name: the IMO (or a counter) keeps one from replacing the other
+          const safeName = vessel.name.replace(/[\\/:*?"<>|]/g, '_')
+          let fileName = `${safeName}_Compliance_Report.pdf`
+          if (zip.file(fileName))
+            fileName = `${safeName} (${vessel.imoNumber || i + 1})_Compliance_Report.pdf`
+          zip.file(fileName, bytes as Uint8Array, { date: new Date() })
         } catch {
           failed++
         }

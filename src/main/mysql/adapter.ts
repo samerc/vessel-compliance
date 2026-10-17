@@ -18149,10 +18149,11 @@ export class MySQLAdapter {
     if (!this.pool) return
     // Capture the source quotation before deleting so we can revert its workflow step.
     const [polRows] = await this.pool.query(
-      'SELECT quotation_id FROM policy_documents WHERE id = ?',
+      'SELECT quotation_id, policy_number, revision_number, status FROM policy_documents WHERE id = ?',
       [id]
     )
-    const quotationId = (polRows as RowDataPacket[])[0]?.quotation_id || null
+    const deleted = (polRows as RowDataPacket[])[0]
+    const quotationId = deleted?.quotation_id || null
 
     // Undo what the conversion did to the vessel's policy records: remove the record it created,
     // unlink one it updated, and make the record it expired active again
@@ -18177,6 +18178,17 @@ export class MySQLAdapter {
     // Delete the policy and all its own rows (instalments, addresses, blue cards, endorsements,
     // ...); receipt lines keep their text but lose the link
     await this.purgePolicyRows([id])
+
+    // Deleting the current revision makes the newest earlier revision the policy again
+    // (creating the revision had superseded it)
+    if (deleted && Number(deleted.revision_number) > 0 && deleted.status !== 'superseded') {
+      await this.pool.execute(
+        `UPDATE policy_documents SET status = 'active'
+         WHERE policy_number = ? AND status = 'superseded'
+         ORDER BY revision_number DESC LIMIT 1`,
+        [deleted.policy_number]
+      )
+    }
 
     // If the source quotation sits on the "Converted" workflow step but no longer has a
     // policy for every vessel, revert it so it can be re-converted (the "Convert to Policy"
@@ -22611,8 +22623,9 @@ export class MySQLAdapter {
                  LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
                  WHERE q.revision_number = (
                      SELECT MAX(q2.revision_number) FROM quotations q2
-                     WHERE q2.revision_group_id = q.revision_group_id
+                     WHERE q2.revision_group_id = q.revision_group_id AND q2.deleted_at IS NULL
                  )
+                 AND q.deleted_at IS NULL
                  AND q.reference_number LIKE ?
                  ORDER BY q.quotation_date DESC
                  LIMIT ?`,

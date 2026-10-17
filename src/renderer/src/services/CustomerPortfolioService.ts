@@ -96,17 +96,17 @@ export async function exportCustomerPortfolioPDF(
   customerId: string,
   customerName: string,
   customerType: string | null
-): Promise<void> {
+): Promise<boolean> {
   // Gather all data up front
-  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, flagStatesRaw, entitiesRaw] = await Promise.all(
-    [
+  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, flagStatesRaw, entitiesRaw, policiesRaw] =
+    await Promise.all([
       window.api.getVessels(),
       window.api.getDocumentTypes(),
       window.api.getVesselDocuments(),
       window.api.getFlagStates(),
-      window.api.getEntities()
-    ]
-  )
+      window.api.getEntities(),
+      window.api.getAllVesselDynamicPolicies()
+    ])
 
   const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
   const docTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
@@ -114,8 +114,14 @@ export async function exportCustomerPortfolioPDF(
   const flagStates = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
   const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
 
-  const customerVessels = vessels.filter((v) => v.isActive && v.customerId === customerId)
-  if (customerVessels.length === 0) return
+  // The customer is set per policy: its vessels are those it has an active policy on
+  const customerVesselIds = new Set(
+    (Array.isArray(policiesRaw) ? policiesRaw : [])
+      .filter((p) => p.status === 'active' && p.customerEntityId === customerId)
+      .map((p) => p.vesselId)
+  )
+  const customerVessels = vessels.filter((v) => v.isActive && customerVesselIds.has(v.id))
+  if (customerVessels.length === 0) return false
 
   // Batch-fetch custom doc types, policies, and warranties per vessel
   const [customDocResults, policyResults, warrantyResults] = await Promise.all([
@@ -594,4 +600,5 @@ export async function exportCustomerPortfolioPDF(
 
   const safeName = customerName.replace(/[^a-z0-9]/gi, '_')
   doc.save(`Portfolio_${safeName}_${new Date().toISOString().split('T')[0]}.pdf`)
+  return true
 }

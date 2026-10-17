@@ -2005,10 +2005,8 @@ export default function PolicyDetail({
                                       setShowActionsMenu(false)
                                       setExportingBC(true)
                                       try {
+                                        // toasts the result itself
                                         await handleExportSingleBC(bc)
-                                        showSuccess(`${bc.cardType} exported`)
-                                      } catch (err) {
-                                        showError(errMessage(err, 'Export failed'))
                                       } finally {
                                         setExportingBC(false)
                                       }

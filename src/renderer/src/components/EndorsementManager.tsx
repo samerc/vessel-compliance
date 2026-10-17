@@ -236,13 +236,16 @@ export default function EndorsementManager({
     }
   }
 
-  // Handle initialAddMode (latest handleAdd via ref so the effect only re-runs on these deps)
+  // Handle initialAddMode (latest handleAdd via ref so the effect only re-runs on these deps).
+  // Once per mount: the list reloads after each save, which must not open a new form again
   const handleAddRef = useRef(handleAdd)
+  const initialAddDone = useRef(false)
   useEffect(() => {
     handleAddRef.current = handleAdd
   })
   useEffect(() => {
-    if (initialAddMode && !loading && canManage) {
+    if (initialAddMode && !loading && canManage && !initialAddDone.current) {
+      initialAddDone.current = true
       void handleAddRef.current()
     }
   }, [initialAddMode, loading, canManage])
@@ -940,24 +943,28 @@ export default function EndorsementManager({
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
               {editState.sections.map((s) => (
-                <span
+                <button
+                  type="button"
                   key={s.sectionKey}
+                  aria-pressed={s.isEnabled}
                   onClick={() => toggleSection(s.sectionKey)}
-                  style={chipStyle(s.isEnabled)}
+                  style={{ ...chipStyle(s.isEnabled), fontFamily: 'inherit' }}
                 >
                   {s.sectionTitle}
-                </span>
+                </button>
               ))}
-              <span
+              <button
+                type="button"
                 onClick={addCustomSection}
                 style={{
                   ...chipStyle(false),
-                  borderStyle: 'dashed'
+                  borderStyle: 'dashed',
+                  fontFamily: 'inherit'
                 }}
               >
                 <Plus size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                 Custom
-              </span>
+              </button>
             </div>
           </div>
 

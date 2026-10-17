@@ -775,7 +775,7 @@ export default function QuotationEditor({
       const entityById = new Map((Array.isArray(entities) ? entities : []).map((e) => [e.id, e]))
       const seen = new Set<string>()
       for (const a of Array.isArray(assureds) ? assureds : []) {
-        const key = a.entityId || `name:${a.name.trim().toLowerCase()}`
+        const key = a.entityId || `name:${a.name.trim().replace(/\s+/g, ' ').toLowerCase()}`
         if (seen.has(key)) continue
         seen.add(key)
         if (!a.entityId) {
