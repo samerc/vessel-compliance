@@ -7165,45 +7165,51 @@ app.whenReady().then(() => {
             quotationRef = ''
           }
         }
-        const movedTitle = quotationRef
-          ? `Quotation ${quotationRef} moved to ${toStepName}`
-          : `Quotation moved to ${toStepName}`
-        db.notifyUsersWithPermission(
-          'quotations:approve',
-          'workflow_action_needed',
-          movedTitle,
-          comment || undefined,
-          'quotation',
-          quotationId,
-          user.id
-        ).catch(() => {})
-        // Also notify groups subscribed to quotation_workflow
-        db.notifyGroupsForEvent(
-          'quotation_workflow',
-          movedTitle,
-          comment || undefined,
-          'quotation',
-          quotationId,
-          user.id
-        ).catch(() => {})
-        // If the target step requires approval permission, also fire approval event
+        // "Quotation Q/N/P/26/1896 (MV NAME) moved to Approved by Samer": which quotation, for
+        // which vessel / fleet, and who moved it
+        const subject = await db.quotationSubjectLabel(quotationId).catch(() => '')
+        const who = user.fullName?.trim() || user.username
+        const movedTitle =
+          `Quotation${quotationRef ? ` ${quotationRef}` : ''}${subject ? ` (${subject})` : ''}` +
+          ` moved to ${toStepName} by ${who}`
+        // One notification per person: approvers, then the groups subscribed to workflow moves,
+        // then (for a move that needs approval rights) the approval groups not told yet
+        const notified = new Set<string>()
         const transitionsToStep = transitions.filter((t) => t.toStepId === toStepId)
         const needsApproval = transitionsToStep.some(
           (t) => t.permissionKey === 'quotations:approve'
         )
-        if (needsApproval) {
-          const approvalTitle = quotationRef
-            ? `Quotation ${quotationRef} requires approval (${toStepName})`
-            : `Quotation requires approval (${toStepName})`
-          db.notifyGroupsForEvent(
-            'quotation_approval_needed',
-            approvalTitle,
+        void (async () => {
+          await db.notifyUsersWithPermission(
+            'quotations:approve',
+            'workflow_action_needed',
+            movedTitle,
             comment || undefined,
             'quotation',
             quotationId,
-            user.id
-          ).catch(() => {})
-        }
+            user.id,
+            notified
+          )
+          await db.notifyGroupsForEvent(
+            'quotation_workflow',
+            movedTitle,
+            comment || undefined,
+            'quotation',
+            quotationId,
+            user.id,
+            notified
+          )
+          if (needsApproval)
+            await db.notifyGroupsForEvent(
+              'quotation_approval_needed',
+              movedTitle,
+              comment || undefined,
+              'quotation',
+              quotationId,
+              user.id,
+              notified
+            )
+        })().catch(() => {})
       } catch (err) {
         console.error('Workflow notification error:', err)
       }

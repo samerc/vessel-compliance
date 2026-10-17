@@ -22560,7 +22560,9 @@ export class MySQLAdapter {
     message?: string,
     linkType?: string,
     linkId?: string,
-    excludeUserId?: string
+    excludeUserId?: string,
+    /** Users already told about this event: skipped, and the users notified here are added */
+    notified?: Set<string>
   ): Promise<void> {
     if (!this.pool) return
     // Find all users who have the permission (via group membership or are admin)
@@ -22575,8 +22577,36 @@ export class MySQLAdapter {
     )
     for (const row of rows as RowDataPacket[]) {
       if (excludeUserId && row.id === excludeUserId) continue
+      if (notified?.has(row.id)) continue
+      notified?.add(row.id)
       await this.createNotification({ userId: row.id, type, title, message, linkType, linkId })
     }
+  }
+
+  /**
+   * What a quotation is for, for notification titles: one vessel = its name, two = "A & B",
+   * more in one fleet = the fleet name, otherwise "A + N others". Empty when it has no vessel.
+   */
+  async quotationSubjectLabel(quotationId: string): Promise<string> {
+    if (!this.pool) return ''
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT COALESCE(v.name, qv.name) AS name, v.fleet_id AS fleetId, f.name AS fleetName
+         FROM quotation_vessels qv
+         LEFT JOIN vessels v ON v.id = qv.vessel_id
+         LEFT JOIN fleets f ON f.id = v.fleet_id
+        WHERE qv.quotation_id = ?
+        ORDER BY qv.order_index ASC`,
+      [quotationId]
+    )
+    const names = rows.map((r) => String(r.name || '').trim()).filter(Boolean)
+    if (names.length === 0) return ''
+    if (names.length === 1) return names[0]
+    if (names.length === 2) return `${names[0]} & ${names[1]}`
+    const fleets = new Set(rows.map((r) => r.fleetId || ''))
+    const fleetName = String(rows[0].fleetName || '').trim()
+    if (fleets.size === 1 && fleetName)
+      return /\bfleet$/i.test(fleetName) ? fleetName : `${fleetName} fleet`
+    return `${names[0]} + ${names.length - 1} others`
   }
 
   async getUsersByUsername(usernames: string[]): Promise<{ id: string; username: string }[]> {
@@ -22725,7 +22755,9 @@ export class MySQLAdapter {
     message?: string,
     linkType?: string,
     linkId?: string,
-    excludeUserId?: string
+    excludeUserId?: string,
+    /** Users already told about this event: skipped, and the users notified here are added */
+    notified?: Set<string>
   ): Promise<void> {
     if (!this.pool) return
     const groups = await this.getGroupsSubscribedToEvent(eventType)
@@ -22734,10 +22766,12 @@ export class MySQLAdapter {
     for (const g of groups) {
       for (const uid of g.userIds) {
         if (excludeUserId && uid === excludeUserId) continue
+        if (notified?.has(uid)) continue
         userIdSet.add(uid)
       }
     }
     for (const userId of userIdSet) {
+      notified?.add(userId)
       await this.createNotification({ userId, type: eventType, title, message, linkType, linkId })
     }
   }
