@@ -78,6 +78,18 @@ export const LEGACY_ERROR_VALUE_CHANNELS: ReadonlySet<string> = new Set([
   'workflow:moveQuotation'
 ])
 
+// Background writes that are not the user's edits (lock heartbeat, recent items, window and
+// column preferences...): they do not show as "Saving..."
+const QUIET_SAVE_RE =
+  /heartbeat|:lock|:unlock|forceUnlock|recent|columnPrefs|^users:|notifications:|activity:|session|accent:|theme/i
+
+/** A user's save: shown by the save indicators (vc-save-start / -end / -error DOM events) */
+export function isSaveActivity(channel: string): boolean {
+  if (QUIET_SAVE_RE.test(channel)) return false
+  const action = channel.includes(':') ? channel.slice(channel.indexOf(':') + 1) : channel
+  return MUTATION_RE.test(action)
+}
+
 export function throwsOnError(channel: string): boolean {
   if (LEGACY_ERROR_VALUE_CHANNELS.has(channel)) return false
   const action = channel.includes(':') ? channel.slice(channel.indexOf(':') + 1) : channel

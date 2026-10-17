@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer as electronIpc, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import { throwsOnError } from './ipcErrorPolicy'
+import { isSaveActivity, throwsOnError } from './ipcErrorPolicy'
 import type { Api } from './index.d'
 
 // Thin wrapper over Electron's ipcRenderer: a failed MUTATION ({ error: true, message } from
@@ -9,18 +9,27 @@ import type { Api } from './index.d'
 const ipcRenderer = {
   // T is the result type the window.api declaration (index.d.ts) gives the calling method
   invoke: async <T = unknown>(channel: string, ...args: unknown[]): Promise<T> => {
-    const result: unknown = await electronIpc.invoke(channel, ...args)
-    if (
-      result &&
-      typeof result === 'object' &&
-      'error' in result &&
-      result.error === true &&
-      throwsOnError(channel)
-    ) {
-      const message = 'message' in result ? result.message : undefined
-      throw new Error(String(message || 'The operation failed'))
+    // Saves are announced as plain DOM events (they cross the context isolation; a detail
+    // object would not), so pages can show Saving... / Saved / Not saved
+    const announce = isSaveActivity(channel)
+    if (announce) window.dispatchEvent(new Event('vc-save-start'))
+    let failed = false
+    try {
+      const result: unknown = await electronIpc.invoke(channel, ...args)
+      if (result && typeof result === 'object' && 'error' in result && result.error === true) {
+        failed = true
+        if (throwsOnError(channel)) {
+          const message = 'message' in result ? result.message : undefined
+          throw new Error(String(message || 'The operation failed'))
+        }
+      }
+      return result as T
+    } catch (err) {
+      failed = true
+      throw err
+    } finally {
+      if (announce) window.dispatchEvent(new Event(failed ? 'vc-save-error' : 'vc-save-end'))
     }
-    return result as T
   },
   on: electronIpc.on.bind(electronIpc),
   removeListener: electronIpc.removeListener.bind(electronIpc)

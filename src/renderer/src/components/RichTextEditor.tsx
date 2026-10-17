@@ -6,6 +6,7 @@ import { TextAlign } from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import { Extension, Node as TipTapNode, type AnyExtension } from '@tiptap/react'
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
+import { useReadOnly } from '../contexts/ReadOnlyContext'
 import {
   Bold,
   Italic,
@@ -162,6 +163,8 @@ export default function RichTextEditor({
   placeholderItems
 }: RichTextEditorProps): React.JSX.Element | null {
   const { theme } = useTheme()
+  // Inside a read-only view the text stays readable and copyable but cannot be changed
+  const readOnly = useReadOnly()
   const iconColor = useMemo(
     () => (theme === 'light' || theme === 'aurora' ? '#606770' : 'rgba(255,255,255,0.6)'),
     [theme]
@@ -234,6 +237,10 @@ export default function RichTextEditor({
     },
     [extensions]
   )
+
+  useEffect(() => {
+    if (editor && editor.isEditable === readOnly) editor.setEditable(!readOnly)
+  }, [editor, readOnly])
 
   useEffect(() => {
     if (!editor) return

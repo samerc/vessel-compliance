@@ -64,6 +64,7 @@ import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { Modal, Field } from './ui'
+import { confirmDialog } from './DialogHost'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
 
@@ -1286,8 +1287,19 @@ export default function PolicyDetail({
     }
   }
 
+  // The first export of the policy document locks it (no more Edit, only New Revision or
+  // Endorsement): say so before it happens
+  const confirmFirstExport = async (): Promise<boolean> => {
+    if (!policy || policy.exportedAt || !hasPermission('policies:manage')) return true
+    return confirmDialog(
+      'This is the first export of the policy. After it the policy can no longer be edited: changes need a New Revision or an Endorsement. Export now?',
+      { title: 'First export', confirmLabel: 'Export', isDangerous: false }
+    )
+  }
+
   const handleExportBundle = async (): Promise<void> => {
     setShowActionsMenu(false)
+    if (!(await confirmFirstExport())) return
     setExportingBundle(true)
     try {
       const reportSettings = await getReportSettings()
@@ -1427,6 +1439,7 @@ export default function PolicyDetail({
   }
 
   const handleExportPolicy = async (): Promise<void> => {
+    if (!(await confirmFirstExport())) return
     setExportingPolicy(true)
     try {
       const { exportPolicyDocx } = await import('../services/PolicyExportService')
@@ -1441,6 +1454,7 @@ export default function PolicyDetail({
   }
 
   const handleExportPdfTC = async (): Promise<void> => {
+    if (!(await confirmFirstExport())) return
     setExportingPdfTC(true)
     try {
       const { exportPolicyPdfWithTC } = await import('../services/PolicyExportService')
@@ -1606,6 +1620,22 @@ export default function PolicyDetail({
               >
                 <Edit3 size={16} /> Edit Policy
               </button>
+            )}
+          {/* After the first export: Edit stays visible but explains the way forward */}
+          {!isEditing &&
+            hasPermission('policies:manage') &&
+            policy.status === 'active' &&
+            !!policy.exportedAt && (
+              <span title="Exported: use New Revision or an Endorsement to make changes">
+                <button
+                  className="btn-secondary"
+                  style={{ ...headerBtnStyle, pointerEvents: 'none' }}
+                  disabled
+                  aria-label="Edit Policy (exported: use New Revision or an Endorsement)"
+                >
+                  <Edit3 size={16} /> Edit Policy
+                </button>
+              </span>
             )}
 
           {/* Sign Policy button — only for users with policies:sign AND policy not yet signed */}

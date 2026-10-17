@@ -77,7 +77,8 @@ import {
   clearMasterDataCache,
   masterData
 } from './quotation-tabs/masterDataCache'
-import { Modal, Field } from './ui'
+import { Modal, Field, SaveStatus } from './ui'
+import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
@@ -180,6 +181,22 @@ interface QuotationEditorProps {
   onNavigateToPolicySetup?: (quotationId: string) => void
   policyContext?: { policyId: string; policyNumber: string } | null
   onReturnToPolicy?: (policyId: string) => void
+}
+
+// The tab area of a read-only quotation: a plain block (no fieldset border / min-content width)
+const READONLY_FIELDSET: React.CSSProperties = {
+  border: 'none',
+  margin: 0,
+  padding: 0,
+  minWidth: 0
+}
+
+// Read-only quotation: clicks on clickable rows / chips (not form controls, which the fieldset
+// disables) do nothing; text selection still works (it uses mousedown, not click)
+const blockReadOnlyClick = (e: React.SyntheticEvent): void => {
+  if ((e.target as Element).closest?.('a[href], [data-readonly-ok]')) return
+  e.preventDefault()
+  e.stopPropagation()
 }
 
 export default function QuotationEditor({
@@ -1169,6 +1186,8 @@ export default function QuotationEditor({
               fontWeight: 700
             }}
           />
+          {/* Every save of the editor and its tabs: Saving... / Saved / Last change not saved */}
+          {canEdit && !isLocked && <SaveStatus />}
           {/* DRAFT badge */}
           {(q.referenceNumber || '').startsWith('DRAFT-') && (
             <span
@@ -2219,224 +2238,240 @@ export default function QuotationEditor({
               ))}
             </div>
           )}
-          {!canEdit && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'not-allowed' }} />
-          )}
-          {activeTab === 'insured' && (
-            <InsuredTab
-              key={vesselVersion}
-              quotation={q}
-              vessels={vessels}
-              showSuccess={showSuccess}
-              showError={showError}
-              updateField={updateField}
-            />
-          )}
-          {activeTab === 'vessel' && (
-            <VesselTab
-              quotation={q}
-              vessels={vessels}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-              onVesselsChanged={() => setVesselVersion((v) => v + 1)}
-              setQ={setQ}
-            />
-          )}
-          {activeTab === 'agreedValue' && (
-            <AgreedValueTab
-              quotation={q}
-              updateField={updateField}
-              setQ={setQ}
-              showSuccess={showSuccess}
-              showError={showError}
-            />
-          )}
-          {activeTab === 'liability' && (
-            <LiabilityTab
-              quotation={q}
-              updateField={updateField}
-              setQ={setQ}
-              showSuccess={showSuccess}
-              showError={showError}
-              getEffectiveText={getEffectiveText}
-            />
-          )}
-          {activeTab === 'sumInsured' && (
-            <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'warConditions' && (
-            <WarConditionsTab quotation={q} showError={showError} />
-          )}
-          {activeTab === 'conditions' && (
-            <ConditionsTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              piAlternatives={piAlternatives}
-              selectedPIAltId={selectedPIAltId}
-            />
-          )}
-          {activeTab === 'period' && (
-            <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'trading' && (
-            <TradingTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              updateField={updateField}
-              setQ={setQ}
-              getEffectiveText={getEffectiveText}
-            />
-          )}
-          {activeTab === 'warTrading' && (
-            <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'warranties' && (
-            <WarrantiesTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              updateField={updateField}
-              setQ={setQ}
-              getEffectiveText={getEffectiveText}
-              piAlternatives={piAlternatives}
-              selectedPIAltId={selectedPIAltId}
-            />
-          )}
-          {activeTab === 'surveyWarranties' && (
-            <SurveyWarrantiesTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              piAlternatives={piAlternatives}
-              qVessels={qVessels}
-            />
-          )}
-          {activeTab === 'deductibles' && (
-            <DeductiblesTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-              updateField={updateField}
-              setQ={setQ}
-              getEffectiveText={getEffectiveText}
-              piAlternatives={piAlternatives}
-              selectedPIAltId={selectedPIAltId}
-            />
-          )}
-          {activeTab === 'exclusions' && (
-            <ExclusionsTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              piAlternatives={piAlternatives}
-              selectedPIAltId={selectedPIAltId}
-            />
-          )}
-          {activeTab === 'sanctions' && (
-            <SanctionsTab
-              quotation={q}
-              updateField={updateField}
-              setQ={setQ}
-              sanctionsVersions={sanctionsVersions}
-            />
-          )}
-          {activeTab === 'subjectivities' && (
-            <SubjectivitiesTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-            />
-          )}
-          {activeTab === 'premium' && (
-            <PremiumTab
-              quotation={q}
-              updateField={updateField}
-              setQ={setQ}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-              getEffectiveText={getEffectiveText}
-            />
-          )}
-          {activeTab === 'information' && (
-            <InformationTab
-              quotation={q}
-              updateField={updateField}
-              setQ={setQ}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-            />
-          )}
-          {activeTab === 'insuredValue' && (
-            <InsuredValueTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'voyage' && (
-            <VoyageTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'subjectMatter' && (
-            <SubjectMatterTab quotation={q} updateField={updateField} setQ={setQ} />
-          )}
-          {activeTab === 'cargoConditions' && (
-            <CargoClausesTab
-              quotation={q}
-              section="conditions"
-              updateField={updateField}
-              showSuccess={showSuccess}
-              showError={showError}
-            />
-          )}
-          {activeTab === 'cargoSpecial' && (
-            <CargoClausesTab
-              quotation={q}
-              section="special"
-              showSuccess={showSuccess}
-              showError={showError}
-            />
-          )}
-          {activeTab === 'cargoLaw' && (
-            <CargoClausesTab
-              quotation={q}
-              section="law"
-              showSuccess={showSuccess}
-              showError={showError}
-            />
-          )}
-          {activeTab === 'customSections' && (
-            <CustomSectionsTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-            />
-          )}
-          {activeTab === 'notes' && (
-            <NotesTab
-              quotation={q}
-              showSuccess={showSuccess}
-              showError={showError}
-              isLight={isLight}
-            />
-          )}
+          {/* Read-only: controls disabled, clickable rows blocked, text still readable and
+              copyable (notes stay usable) */}
+          <ReadOnlyContext.Provider value={!canEdit && activeTab !== 'notes'}>
+            <fieldset
+              disabled={!canEdit && activeTab !== 'notes'}
+              style={READONLY_FIELDSET}
+              onClickCapture={!canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined}
+              onDragStartCapture={
+                !canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined
+              }
+            >
+              {activeTab === 'insured' && (
+                <InsuredTab
+                  key={vesselVersion}
+                  quotation={q}
+                  vessels={vessels}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  updateField={updateField}
+                />
+              )}
+              {activeTab === 'vessel' && (
+                <VesselTab
+                  quotation={q}
+                  vessels={vessels}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                  onVesselsChanged={() => setVesselVersion((v) => v + 1)}
+                  setQ={setQ}
+                />
+              )}
+              {activeTab === 'agreedValue' && (
+                <AgreedValueTab
+                  quotation={q}
+                  updateField={updateField}
+                  setQ={setQ}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                />
+              )}
+              {activeTab === 'liability' && (
+                <LiabilityTab
+                  quotation={q}
+                  updateField={updateField}
+                  setQ={setQ}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  getEffectiveText={getEffectiveText}
+                />
+              )}
+              {activeTab === 'sumInsured' && (
+                <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'warConditions' && (
+                <WarConditionsTab quotation={q} showError={showError} />
+              )}
+              {activeTab === 'conditions' && (
+                <ConditionsTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  piAlternatives={piAlternatives}
+                  selectedPIAltId={selectedPIAltId}
+                />
+              )}
+              {activeTab === 'period' && (
+                <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'trading' && (
+                <TradingTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  updateField={updateField}
+                  setQ={setQ}
+                  getEffectiveText={getEffectiveText}
+                />
+              )}
+              {activeTab === 'warTrading' && (
+                <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'warranties' && (
+                <WarrantiesTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  updateField={updateField}
+                  setQ={setQ}
+                  getEffectiveText={getEffectiveText}
+                  piAlternatives={piAlternatives}
+                  selectedPIAltId={selectedPIAltId}
+                />
+              )}
+              {activeTab === 'surveyWarranties' && (
+                <SurveyWarrantiesTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  piAlternatives={piAlternatives}
+                  qVessels={qVessels}
+                />
+              )}
+              {activeTab === 'deductibles' && (
+                <DeductiblesTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                  updateField={updateField}
+                  setQ={setQ}
+                  getEffectiveText={getEffectiveText}
+                  piAlternatives={piAlternatives}
+                  selectedPIAltId={selectedPIAltId}
+                />
+              )}
+              {activeTab === 'exclusions' && (
+                <ExclusionsTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  piAlternatives={piAlternatives}
+                  selectedPIAltId={selectedPIAltId}
+                />
+              )}
+              {activeTab === 'sanctions' && (
+                <SanctionsTab
+                  quotation={q}
+                  updateField={updateField}
+                  setQ={setQ}
+                  sanctionsVersions={sanctionsVersions}
+                />
+              )}
+              {activeTab === 'subjectivities' && (
+                <SubjectivitiesTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                />
+              )}
+              {activeTab === 'premium' && (
+                <PremiumTab
+                  quotation={q}
+                  updateField={updateField}
+                  setQ={setQ}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                  getEffectiveText={getEffectiveText}
+                />
+              )}
+              {activeTab === 'information' && (
+                <InformationTab
+                  quotation={q}
+                  updateField={updateField}
+                  setQ={setQ}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                />
+              )}
+              {activeTab === 'insuredValue' && (
+                <InsuredValueTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'voyage' && (
+                <VoyageTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'subjectMatter' && (
+                <SubjectMatterTab quotation={q} updateField={updateField} setQ={setQ} />
+              )}
+              {activeTab === 'cargoConditions' && (
+                <CargoClausesTab
+                  quotation={q}
+                  section="conditions"
+                  updateField={updateField}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                />
+              )}
+              {activeTab === 'cargoSpecial' && (
+                <CargoClausesTab
+                  quotation={q}
+                  section="special"
+                  showSuccess={showSuccess}
+                  showError={showError}
+                />
+              )}
+              {activeTab === 'cargoLaw' && (
+                <CargoClausesTab
+                  quotation={q}
+                  section="law"
+                  showSuccess={showSuccess}
+                  showError={showError}
+                />
+              )}
+              {activeTab === 'customSections' && (
+                <CustomSectionsTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                />
+              )}
+              {activeTab === 'notes' && (
+                <NotesTab
+                  quotation={q}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  isLight={isLight}
+                />
+              )}
+            </fieldset>
+          </ReadOnlyContext.Provider>
         </div>
       )}
 
       {activeTab === 'hullConditions' && (
         <div key={settingsNonce} style={{ position: 'relative' }}>
-          {!canEdit && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'not-allowed' }} />
-          )}
-          <HullConditionsTab
-            quotation={q}
-            updateField={updateField}
-            showSuccess={showSuccess}
-            showError={showError}
-          />
+          <ReadOnlyContext.Provider value={!canEdit}>
+            <fieldset
+              disabled={!canEdit}
+              style={READONLY_FIELDSET}
+              onClickCapture={!canEdit ? blockReadOnlyClick : undefined}
+              onDragStartCapture={!canEdit ? blockReadOnlyClick : undefined}
+            >
+              <HullConditionsTab
+                quotation={q}
+                updateField={updateField}
+                showSuccess={showSuccess}
+                showError={showError}
+              />
+            </fieldset>
+          </ReadOnlyContext.Provider>
         </div>
       )}
 
