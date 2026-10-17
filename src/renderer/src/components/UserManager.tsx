@@ -135,6 +135,8 @@ export default function UserManager(): React.JSX.Element {
     []
   )
   const [resolvedPerms, setResolvedPerms] = useState<string[]>([])
+  // Each group's permissions, to show where an effective permission comes from
+  const [groupPermsById, setGroupPermsById] = useState<Record<string, string[]>>({})
   const [overrideSearch, setOverrideSearch] = useState('')
   const [showOverrideDropdown, setShowOverrideDropdown] = useState(false)
   const [collapsedOverrideCats, setCollapsedOverrideCats] = useState<Set<string>>(new Set())
@@ -286,6 +288,15 @@ export default function UserManager(): React.JSX.Element {
       ])
       setAllGroups(Array.isArray(groups) ? groups : [])
       setUserGroupIds(Array.isArray(gIds) ? gIds : [])
+      const gl = Array.isArray(groups) ? groups : []
+      const permLists = await Promise.all(
+        gl.map((g) => window.api.rbacGetGroupPermissions(g.id).catch(() => []))
+      )
+      setGroupPermsById(
+        Object.fromEntries(
+          gl.map((g, i) => [g.id, Array.isArray(permLists[i]) ? permLists[i] : []])
+        )
+      )
       setUserOverrides(Array.isArray(overrides) ? overrides : [])
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
     } catch (err) {
@@ -1477,26 +1488,84 @@ export default function UserManager(): React.JSX.Element {
               >
                 Effective Permissions ({resolvedPerms.length})
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {resolvedPerms.length === 0 && (
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>None</span>
-                )}
-                {resolvedPerms.map((key) => (
-                  <span
-                    key={key}
+              {resolvedPerms.length === 0 && (
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>None</span>
+              )}
+              {/* By area, each with where it comes from (hover): groups or a direct grant */}
+              {PERMISSION_CATEGORIES.map((cat) => {
+                const keys = cat.permissions
+                  .map((p) => p.key)
+                  .filter((k) => resolvedPerms.includes(k))
+                if (keys.length === 0) return null
+                return (
+                  <div
+                    key={cat.key}
                     style={{
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '0.72rem',
-                      background: 'var(--accent-tint)',
-                      color: 'var(--accent-primary)',
-                      border: '1px solid rgba(var(--accent-primary-rgb), 0.2)'
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'baseline',
+                      marginTop: '6px'
                     }}
                   >
-                    {getPermLabel(key)}
-                  </span>
-                ))}
-              </div>
+                    <span
+                      style={{
+                        width: '110px',
+                        flexShrink: 0,
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {cat.label}
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {keys.map((key) => {
+                        const fromGroups = allGroups
+                          .filter(
+                            (g) =>
+                              userGroupIds.includes(g.id) &&
+                              ((g.isSystem && g.name.toLowerCase() === 'administrator') ||
+                                (groupPermsById[g.id] || []).includes(key))
+                          )
+                          .map((g) => g.name)
+                        const direct = userOverrides.some(
+                          (o) => o.permissionKey === key && o.granted
+                        )
+                        const source = [
+                          ...fromGroups.map((n) => `group ${n}`),
+                          ...(direct ? ['granted directly'] : [])
+                        ]
+                        return (
+                          <span
+                            key={key}
+                            title={
+                              source.length ? `From ${source.join(', ')}` : 'From the admin role'
+                            }
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              background: direct ? 'transparent' : 'var(--accent-tint)',
+                              color: 'var(--accent-primary)',
+                              border: direct
+                                ? '1px dashed var(--accent-primary)'
+                                : '1px solid rgba(var(--accent-primary-rgb), 0.2)'
+                            }}
+                          >
+                            {getPermLabel(key)}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+              {resolvedPerms.length > 0 && (
+                <div
+                  style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '8px' }}
+                >
+                  Hover a permission to see where it comes from; dashed = granted directly.
+                </div>
+              )}
             </div>
           </div>
         </Modal>

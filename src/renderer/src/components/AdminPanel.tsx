@@ -1,4 +1,4 @@
-import { useState, useEffect, useEffectEvent, useRef, lazy, Suspense } from 'react'
+import { Fragment, useState, useEffect, useEffectEvent, useRef, lazy, Suspense } from 'react'
 import {
   Plus,
   Trash2,
@@ -275,6 +275,10 @@ export default function AdminPanel({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [groupPermissions, setGroupPermissions] = useState<string[]>([])
   const [collapsedPermCategories, setCollapsedPermCategories] = useState<Set<string>>(new Set())
+  // Group permission editor: search, undo of the last change, groups x permissions matrix
+  const [permSearch, setPermSearch] = useState('')
+  const [permUndo, setPermUndo] = useState<{ groupId: string; perms: string[] } | null>(null)
+  const [permMatrix, setPermMatrix] = useState<Record<string, string[]> | null>(null)
 
   // Activity Log Retention state
   const [logRetentionDays, setLogRetentionDays] = useState<number>(365)
@@ -705,7 +709,36 @@ export default function AdminPanel({
     }
   }
 
+  const undoPermChange = async (): Promise<void> => {
+    if (!permUndo) return
+    const { groupId, perms } = permUndo
+    setPermUndo(null)
+    try {
+      await window.api.rbacSetGroupPermissions(groupId, perms)
+      if (selectedGroupId === groupId) setGroupPermissions(perms)
+      showSuccess('Change undone')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to undo')
+    }
+  }
+
+  const openPermMatrix = async (): Promise<void> => {
+    try {
+      const lists = await Promise.all(
+        userGroups.map((g) => window.api.rbacGetGroupPermissions(g.id))
+      )
+      setPermMatrix(
+        Object.fromEntries(
+          userGroups.map((g, i) => [g.id, Array.isArray(lists[i]) ? lists[i] : []])
+        )
+      )
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to load permissions')
+    }
+  }
+
   const handleToggleGroupPermission = async (groupId: string, permKey: string): Promise<void> => {
+    setPermUndo({ groupId, perms: groupPermissions })
     const next = groupPermissions.includes(permKey)
       ? groupPermissions.filter((k) => k !== permKey)
       : [...groupPermissions, permKey]
@@ -725,6 +758,7 @@ export default function AdminPanel({
     categoryPerms: readonly { key: string; label: string }[]
   ): Promise<void> => {
     const keys = categoryPerms.map((p) => p.key)
+    setPermUndo({ groupId, perms: groupPermissions })
     const allSelected = keys.every((k) => groupPermissions.includes(k))
     const next = allSelected
       ? groupPermissions.filter((k) => !keys.includes(k))
@@ -5516,6 +5550,79 @@ export default function AdminPanel({
               >
                 Manage permission groups. Assign users to groups in the User Management page.
               </p>
+              {userGroups.length > 1 && (
+                <button
+                  className="btn-secondary btn-sm"
+                  style={{ marginBottom: '16px' }}
+                  onClick={() => void openPermMatrix()}
+                >
+                  Compare groups
+                </button>
+              )}
+              {permMatrix && (
+                <Modal
+                  title="Permissions by group"
+                  onClose={() => setPermMatrix(null)}
+                  width="min(1100px, 95vw)"
+                >
+                  <div className="table-wrap" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th style={{ position: 'sticky', left: 0 }}>Permission</th>
+                          {userGroups.map((g) => (
+                            <th key={g.id} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              {g.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {PERMISSION_CATEGORIES.map((cat) => (
+                          <Fragment key={cat.key}>
+                            <tr>
+                              <td
+                                colSpan={userGroups.length + 1}
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  background: 'var(--table-header-bg)'
+                                }}
+                              >
+                                {cat.label}
+                              </td>
+                            </tr>
+                            {cat.permissions.map((p) => (
+                              <tr key={p.key}>
+                                <td>{p.label}</td>
+                                {userGroups.map((g) => {
+                                  const has =
+                                    (g.isSystem && g.name.toLowerCase() === 'administrator') ||
+                                    (permMatrix[g.id] || []).includes(p.key)
+                                  return (
+                                    <td
+                                      key={g.id}
+                                      style={{
+                                        textAlign: 'center',
+                                        color: has ? 'var(--success)' : 'var(--text-secondary)'
+                                      }}
+                                      aria-label={has ? 'Granted' : 'Not granted'}
+                                    >
+                                      {has ? '✓' : '·'}
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Modal>
+              )}
 
               {/* Add Group Form */}
               <form
@@ -5725,9 +5832,50 @@ export default function AdminPanel({
                               ? 'System administrator group — all permissions are granted and cannot be changed.'
                               : 'Toggle permissions for this group. Changes are saved automatically.'}
                           </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              alignItems: 'center',
+                              marginBottom: '12px',
+                              flexWrap: 'wrap'
+                            }}
+                          >
+                            <input
+                              type="search"
+                              value={permSearch}
+                              onChange={(e) => setPermSearch(e.target.value)}
+                              placeholder="Find a permission..."
+                              aria-label="Find a permission"
+                              style={{ flex: '1 1 220px', maxWidth: '320px' }}
+                            />
+                            {permUndo && permUndo.groupId === group.id && !isAdminGroup && (
+                              <button
+                                className="btn-ghost btn-sm"
+                                onClick={() => void undoPermChange()}
+                                title="Put back the permissions as they were before the last change"
+                              >
+                                Undo last change
+                              </button>
+                            )}
+                          </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {PERMISSION_CATEGORIES.map((cat) => {
-                              const collapsed = collapsedPermCategories.has(cat.key)
+                            {PERMISSION_CATEGORIES.map((fullCat) => {
+                              // While searching: only matching permissions, categories open
+                              const q = permSearch.trim().toLowerCase()
+                              const cat = q
+                                ? {
+                                    ...fullCat,
+                                    permissions: fullCat.permissions.filter(
+                                      (p) =>
+                                        p.label.toLowerCase().includes(q) ||
+                                        p.key.toLowerCase().includes(q) ||
+                                        fullCat.label.toLowerCase().includes(q)
+                                    )
+                                  }
+                                : fullCat
+                              if (q && cat.permissions.length === 0) return null
+                              const collapsed = !q && collapsedPermCategories.has(cat.key)
                               const allChecked = cat.permissions.every(
                                 (p) => isAdminGroup || groupPermissions.includes(p.key)
                               )
