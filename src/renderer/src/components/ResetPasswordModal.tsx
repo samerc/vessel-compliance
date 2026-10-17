@@ -19,7 +19,8 @@ export default function ResetPasswordModal({
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [show, setShow] = useState(false)
-  const [mustChange, setMustChange] = useState(false)
+  // On by default: an admin-set password should be replaced by the user's own
+  const [mustChange, setMustChange] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 

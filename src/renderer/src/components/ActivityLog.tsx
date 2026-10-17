@@ -20,6 +20,7 @@ import { getReportSettings } from '../services/ReportSettingsService'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { PageHeader, EmptyState } from './ui'
+import { confirmDialog } from './DialogHost'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   CREATE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
@@ -66,6 +67,14 @@ function getModuleColor(module: string): string {
 }
 
 // Permission gate first, so the page's hooks always run in the same order
+// Log entity types that can be opened (app-open-record)
+const openableType = (t?: string | null): string | null =>
+  t === 'vessel' || t === 'entity' || t === 'quotation'
+    ? t
+    : t === 'policy' || t === 'policy_document'
+      ? 'policy'
+      : null
+
 export default function ActivityLog(): React.JSX.Element {
   const { hasPermission } = useAuth()
   if (!hasPermission('admin:activityLog')) {
@@ -112,6 +121,17 @@ function ActivityLogView(): React.JSX.Element {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
+  // What is typed; the search runs 300 ms after the last key (not one query per keystroke)
+  const [searchInput, setSearchInput] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
+  // Entry whose details are shown in full
+  const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
 
   // Filter options (loaded from DB)
   const [modules, setModules] = useState<string[]>([])
@@ -189,6 +209,7 @@ function ActivityLogView(): React.JSX.Element {
   }, [page, moduleFilter, actionFilter, userFilter, dateFrom, dateTo, search, reloadKey])
 
   const handleReset = (): void => {
+    setSearchInput('')
     setModuleFilter('')
     setActionFilter('')
     setUserFilter('')
@@ -198,7 +219,17 @@ function ActivityLogView(): React.JSX.Element {
     setPage(1)
   }
 
+  // Exports take at most 5,000 entries: say so before exporting a larger selection
+  const EXPORT_CAP = 5000
+  const confirmExportCap = async (): Promise<boolean> =>
+    total <= EXPORT_CAP ||
+    confirmDialog(
+      `Only the newest ${EXPORT_CAP.toLocaleString()} of ${total.toLocaleString()} entries will be exported. Narrow the dates or filters to export the rest.`,
+      { title: 'Large export', confirmLabel: 'Export anyway', isDangerous: false }
+    )
+
   const handleExportPDF = async (): Promise<void> => {
+    if (!(await confirmExportCap())) return
     try {
       // Fetch all entries matching current filters (up to 5000)
       const filters: ActivityLogFilters = { page: 1, limit: 5000 }
@@ -277,6 +308,7 @@ function ActivityLogView(): React.JSX.Element {
   }
 
   const handleExportExcel = async (): Promise<void> => {
+    if (!(await confirmExportCap())) return
     try {
       const allEntries = await window.api.activityGetLog({
         page: 1,
@@ -455,17 +487,14 @@ function ActivityLogView(): React.JSX.Element {
           />
           <input
             type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search entities, details, users..."
             style={{ ...inputStyle, width: '100%', paddingLeft: '28px' }}
           />
         </div>
 
-        {(moduleFilter || actionFilter || userFilter || dateFrom || dateTo || search) && (
+        {(moduleFilter || actionFilter || userFilter || dateFrom || dateTo || searchInput) && (
           <button onClick={handleReset} className="btn-ghost btn-sm">
             Clear
           </button>
@@ -589,7 +618,36 @@ function ActivityLogView(): React.JSX.Element {
                     )}
                     {actVisibleSet.has('entity') && (
                       <td>
-                        {entry.entityName ? (
+                        {entry.entityName && entry.entityId && openableType(entry.entityType) ? (
+                          <button
+                            type="button"
+                            className="link-button"
+                            title={`Open this ${openableType(entry.entityType)}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              window.dispatchEvent(
+                                new CustomEvent('app-open-record', {
+                                  detail: {
+                                    type: openableType(entry.entityType),
+                                    id: entry.entityId
+                                  }
+                                })
+                              )
+                            }}
+                            style={{
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              font: 'inherit'
+                            }}
+                          >
+                            {entry.entityName}
+                          </button>
+                        ) : entry.entityName ? (
                           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                             {entry.entityName}
                           </span>
@@ -612,9 +670,22 @@ function ActivityLogView(): React.JSX.Element {
                           maxWidth: '350px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: expandedEntry === entry.id ? 'pre-wrap' : 'nowrap',
+                          wordBreak: expandedEntry === entry.id ? 'break-word' : undefined,
+                          cursor: entry.details && entry.details.length > 60 ? 'pointer' : undefined
                         }}
-                        title={entry.details || ''}
+                        title={
+                          entry.details && entry.details.length > 60
+                            ? expandedEntry === entry.id
+                              ? 'Click to collapse'
+                              : 'Click to read all'
+                            : entry.details || ''
+                        }
+                        onClick={() =>
+                          entry.details &&
+                          entry.details.length > 60 &&
+                          setExpandedEntry(expandedEntry === entry.id ? null : entry.id)
+                        }
                       >
                         {entry.details || ''}
                       </td>

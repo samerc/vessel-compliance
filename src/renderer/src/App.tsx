@@ -58,7 +58,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
 import GlobalSearch from './components/GlobalSearch'
-import { PageHeader, SegmentedControl } from './components/ui'
+import { PageHeader, SegmentedControl, Field } from './components/ui'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './utils/accent'
 import { leaveThen } from './utils/useUnsavedGuard'
 import { useToast } from './contexts/ToastContext'
@@ -155,9 +155,9 @@ function App(): React.JSX.Element {
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set<string>(['recent', 'admin'])
-  )
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set<string>(['admin']))
+  // Recent: the last 6, or all of them (up to 20) when expanded
+  const [showAllRecent, setShowAllRecent] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
@@ -563,6 +563,12 @@ function App(): React.JSX.Element {
         setNavigateToVesselSection(undefined)
         setNavigateBackTab(activeTab !== 'vessels' ? activeTab : undefined)
         setActiveTab('vessels')
+      })
+    } else if (type === 'entity') {
+      leaveThen(() => {
+        setInitialEntityId(id)
+        setNavigateBackTab(activeTab !== 'directory' ? activeTab : undefined)
+        setActiveTab('directory')
       })
     } else if (type === 'quotation' || type === 'policy') {
       openRecentItem({
@@ -1220,7 +1226,7 @@ function App(): React.JSX.Element {
                 onToggle={toggleGroup}
                 sidebarCollapsed={sc}
               >
-                {recentItems.slice(0, 4).map((item) => {
+                {recentItems.slice(0, showAllRecent ? 20 : 6).map((item) => {
                   const iconMap: Record<string, React.ReactNode> = {
                     vessel: <Anchor size={14} />,
                     entity: <Building2 size={14} />,
@@ -1272,6 +1278,17 @@ function App(): React.JSX.Element {
                     </button>
                   )
                 })}
+                {!sc && recentItems.length > 6 && (
+                  <button
+                    onClick={() => setShowAllRecent((v) => !v)}
+                    className="btn-ghost btn-sm"
+                    style={{ margin: '2px 0 4px 34px', fontSize: '0.75rem' }}
+                  >
+                    {showAllRecent
+                      ? 'Show fewer'
+                      : `Show all (${Math.min(recentItems.length, 20)})`}
+                  </button>
+                )}
               </NavGroup>
             )}
 
@@ -1991,7 +2008,11 @@ function App(): React.JSX.Element {
           />
         )}
         {forcePasswordReset && (
+          // Not a Modal: this step cannot be closed (Escape / X), only completed or signed out of
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="force-pw-title"
             style={{
               position: 'fixed',
               inset: 0,
@@ -2005,98 +2026,91 @@ function App(): React.JSX.Element {
           >
             <div
               style={{
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '20px',
-                padding: '40px 44px',
+                background: 'var(--bg-primary)',
+                borderRadius: '16px',
+                padding: '36px 40px',
                 width: '460px',
+                maxWidth: 'calc(100vw - 32px)',
                 boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
-                border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`
+                border: 'var(--glass-border)'
               }}
             >
-              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <div
                   style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 16,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 14,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background:
-                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                    marginBottom: '16px'
+                    background: 'var(--accent-primary)',
+                    color: 'var(--accent-contrast, #fff)',
+                    marginBottom: '14px'
                   }}
                 >
-                  <KeyRound size={32} style={{ color: '#ffffff' }} />
+                  <KeyRound size={28} />
                 </div>
-                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>
-                  Change Your Password
+                <h2 id="force-pw-title" style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700 }}>
+                  Choose your password
                 </h2>
                 <p
                   style={{
                     color: 'var(--text-secondary)',
-                    fontSize: '0.9rem',
-                    marginTop: '10px',
+                    fontSize: '0.88rem',
+                    marginTop: '8px',
                     lineHeight: 1.5
                   }}
                 >
-                  For security purposes, please set a new password to continue using the
-                  application.
+                  Your administrator asked you to set your own password before continuing
+                  {user?.username ? ` as ${user.username}` : ''}.
                 </p>
               </div>
               {resetError && (
                 <div
+                  role="alert"
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    background: 'rgba(255,77,77,0.08)',
-                    border: '1px solid rgba(255,77,77,0.2)',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)',
                     color: 'var(--danger)',
                     fontSize: '0.85rem',
-                    marginBottom: '20px',
+                    marginBottom: '16px',
                     textAlign: 'center'
                   }}
                 >
                   {resetError}
                 </div>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '6px',
-                      fontWeight: 500
-                    }}
-                  >
-                    New Password
-                  </label>
+              <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <Field
+                  label="New password"
+                  htmlFor="force-pw-new"
+                  hint={
+                    resetPassword.length > 0 && resetPassword.length < 6
+                      ? 'At least 6 characters'
+                      : undefined
+                  }
+                >
                   <div style={{ position: 'relative' }}>
                     <input
+                      id="force-pw-new"
                       type={showResetPw ? 'text' : 'password'}
                       value={resetPassword}
                       onChange={(e) => setResetPassword(e.target.value)}
                       placeholder="At least 6 characters"
-                      style={{
-                        width: '100%',
-                        padding: '12px 44px 12px 16px',
-                        borderRadius: '10px',
-                        border: '1px solid var(--input-border)',
-                        background: 'var(--input-bg)',
-                        color: 'var(--input-text)',
-                        fontSize: '0.95rem',
-                        boxSizing: 'border-box'
-                      }}
+                      style={{ width: '100%', paddingRight: '40px' }}
+                      autoComplete="new-password"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={() => setShowResetPw(!showResetPw)}
+                      aria-label={showResetPw ? 'Hide password' : 'Show password'}
                       style={{
                         position: 'absolute',
-                        right: 8,
+                        right: 6,
                         top: '50%',
                         transform: 'translateY(-50%)',
                         background: 'none',
@@ -2104,103 +2118,64 @@ function App(): React.JSX.Element {
                         cursor: 'pointer',
                         color: 'var(--text-secondary)',
                         padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center'
+                        display: 'flex'
                       }}
                     >
-                      {showResetPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showResetPw ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
                   </div>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      display: 'block',
-                      marginBottom: '6px',
-                      fontWeight: 500
-                    }}
-                  >
-                    Confirm Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showResetPw ? 'text' : 'password'}
-                      value={resetConfirm}
-                      onChange={(e) => setResetConfirm(e.target.value)}
-                      placeholder="Re-enter your password"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleForceReset()
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '12px 44px 12px 16px',
-                        borderRadius: '10px',
-                        border: `1px solid ${resetConfirm && resetPassword && resetConfirm !== resetPassword ? 'var(--danger)' : 'var(--input-border)'}`,
-                        background: 'var(--input-bg)',
-                        color: 'var(--input-text)',
-                        fontSize: '0.95rem',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowResetPw(!showResetPw)}
-                      style={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text-secondary)',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      {showResetPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  {resetConfirm && resetPassword && resetConfirm !== resetPassword && (
-                    <span
-                      style={{
-                        fontSize: '0.78rem',
-                        color: 'var(--danger)',
-                        marginTop: '4px',
-                        display: 'block'
-                      }}
-                    >
-                      Passwords do not match
-                    </span>
-                  )}
-                </div>
-                {resetPassword.length > 0 && resetPassword.length < 6 && (
-                  <span style={{ fontSize: '0.78rem', color: 'var(--warning)', marginTop: '-8px' }}>
-                    Password must be at least 6 characters
-                  </span>
-                )}
-                <button
-                  onClick={handleForceReset}
-                  disabled={
-                    resetLoading ||
-                    !resetPassword ||
-                    !resetConfirm ||
-                    resetPassword.length < 6 ||
-                    resetPassword !== resetConfirm
+                </Field>
+                <Field
+                  label="Confirm password"
+                  htmlFor="force-pw-confirm"
+                  error={
+                    resetConfirm && resetPassword && resetConfirm !== resetPassword
+                      ? 'Passwords do not match'
+                      : undefined
                   }
-                  className="btn-primary"
-                  style={{
-                    padding: '14px',
-                    fontSize: '0.95rem',
-                    marginTop: '8px',
-                    borderRadius: '10px',
-                    fontWeight: 600
+                >
+                  <input
+                    id="force-pw-confirm"
+                    type={showResetPw ? 'text' : 'password'}
+                    value={resetConfirm}
+                    onChange={(e) => setResetConfirm(e.target.value)}
+                    placeholder="Type it again"
+                    autoComplete="new-password"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleForceReset()
+                    }}
+                  />
+                </Field>
+              </div>
+              <button
+                onClick={handleForceReset}
+                disabled={
+                  resetLoading ||
+                  !resetPassword ||
+                  !resetConfirm ||
+                  resetPassword.length < 6 ||
+                  resetPassword !== resetConfirm
+                }
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  marginTop: '20px',
+                  padding: '12px'
+                }}
+              >
+                {resetLoading ? 'Saving...' : 'Set password and continue'}
+              </button>
+              <div style={{ textAlign: 'center', marginTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setForcePasswordReset(false)
+                    logout()
                   }}
                 >
-                  {resetLoading ? 'Updating...' : 'Set New Password'}
+                  <LogOut size={14} /> Sign out
                 </button>
               </div>
             </div>

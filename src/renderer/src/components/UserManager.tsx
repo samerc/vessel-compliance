@@ -654,8 +654,23 @@ export default function UserManager(): React.JSX.Element {
               margin: '8px 0'
             }}
           >
-            {tempPassword}
+            <span className="mono">{tempPassword}</span>
           </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            Shown only now: copy it and give it to the user.
+          </div>
+          <button
+            className="btn-secondary btn-sm"
+            style={{ marginRight: '12px' }}
+            onClick={() => {
+              navigator.clipboard
+                .writeText(tempPassword)
+                .then(() => showSuccess('Password copied'))
+                .catch(() => showError('Could not copy - select the password instead'))
+            }}
+          >
+            Copy password
+          </button>
           <button
             onClick={() => {
               setTempPassword(null)

@@ -4,6 +4,7 @@ import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
 import type { ReportSettings } from '../../../shared/types'
+import { useToast } from '../contexts/ToastContext'
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function fmt(v: number): string {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-// Preview table uses plain USD formatting (settings only affect the PDF)
+// Preview table uses plain number formatting, labelled with the chosen currency
 
 // ── Excel parser ──────────────────────────────────────────────────────────────
 
@@ -500,6 +501,7 @@ export default function LossRecordReport(): React.JSX.Element {
 
   // Report-specific options (not shared with other reports)
   const [currency, setCurrency] = useState('USD')
+  const { showSuccess, showError } = useToast()
   const [showReserves, setShowReserves] = useState(true)
   const [showClaimSubtotals, setShowClaimSubtotals] = useState(true)
 
@@ -549,6 +551,9 @@ export default function LossRecordReport(): React.JSX.Element {
     try {
       const settings = await getReportSettings()
       await exportToPDF(data, settings, { currency, showReserves, showClaimSubtotals })
+      showSuccess('Loss record exported')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to export the loss record')
     } finally {
       setExporting(false)
     }
@@ -661,7 +666,7 @@ export default function LossRecordReport(): React.JSX.Element {
                 { label: 'Underwriting Years', value: stats.uwyCount },
                 { label: 'Vessels', value: stats.vesselCount },
                 { label: 'Claims', value: stats.claimCount },
-                { label: 'Total Incurred (USD)', value: fmt(stats.totalIncurred) }
+                { label: `Total Incurred (${currency})`, value: fmt(stats.totalIncurred) }
               ].map((s) => (
                 <div
                   key={s.label}
@@ -714,11 +719,11 @@ export default function LossRecordReport(): React.JSX.Element {
                     'Vessel',
                     'Policy',
                     'Claims',
-                    'Total Paid (USD)',
-                    'Reserves (USD)',
-                    'Total Incurred (USD)'
-                  ].map((h) => (
-                    <th key={h} className={h.includes('(USD)') ? 'num' : undefined}>
+                    `Total Paid (${currency})`,
+                    `Reserves (${currency})`,
+                    `Total Incurred (${currency})`
+                  ].map((h, i) => (
+                    <th key={h} className={i >= 4 ? 'num' : undefined}>
                       {h}
                     </th>
                   ))}

@@ -167,6 +167,8 @@ type AssuredRow = VesselAssured & { entityType?: string; entityName?: string; na
 interface DocAlert {
   id: string
   vesselId: string
+  /** Entity documents: the entity they belong to */
+  entityId?: string
   vessel: string
   document: string
   category: 'vessel' | 'entity' | 'endorsement'
@@ -214,6 +216,19 @@ export default function ComplianceCenter({
     'vessel'
   )
   const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
+  const toggleGroup = (key: string): void =>
+    setExpandedVessels((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  // Flat view: sort and pages
+  const [flatSort, setFlatSort] = useState<{
+    key: 'vessel' | 'document' | 'type' | 'date' | 'severity'
+    dir: 'asc' | 'desc'
+  }>({ key: 'severity', dir: 'desc' })
+  const [flatPage, setFlatPage] = useState(0)
   const [docSearch, setDocSearch] = useState('')
   // First load of the documents tab still running (never show "fully compliant" before it ends)
   const [docsLoading, setDocsLoading] = useState(true)
@@ -726,6 +741,7 @@ export default function ComplianceCenter({
           if (!hasFile) {
             alerts.push({
               id: `${v.id}-entity-${a.entityId}-${t.id}-missing`,
+              entityId: a.entityId,
               vesselId: v.id,
               vessel: v.name,
               document: `${t.name} (${a.entityName || a.name})`,
@@ -742,6 +758,7 @@ export default function ComplianceCenter({
             if (expiry < today) {
               alerts.push({
                 id: `${v.id}-entity-${a.entityId}-${t.id}-expired`,
+                entityId: a.entityId,
                 vesselId: v.id,
                 vessel: v.name,
                 document: `${t.name} (${a.entityName || a.name})`,
@@ -754,6 +771,7 @@ export default function ComplianceCenter({
             } else if (expiry < thirtyDaysFromNow) {
               alerts.push({
                 id: `${v.id}-entity-${a.entityId}-${t.id}-soon`,
+                entityId: a.entityId,
                 vesselId: v.id,
                 vessel: v.name,
                 document: `${t.name} (${a.entityName || a.name})`,
@@ -814,6 +832,37 @@ export default function ComplianceCenter({
     }
     return filtered
   }, [allAlerts, filter, docSearch])
+
+  // Flat view: sorted, 50 a page
+  const FLAT_PAGE_SIZE = 50
+  const SEVERITY_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1 }
+  const flatSorted = [...alerts].sort((a, b) => {
+    const k = flatSort.key
+    const av =
+      k === 'severity'
+        ? SEVERITY_RANK[a.severity] || 0
+        : k === 'date'
+          ? a.date === '-'
+            ? ''
+            : a.date
+          : String(a[k] ?? '').toLowerCase()
+    const bv =
+      k === 'severity'
+        ? SEVERITY_RANK[b.severity] || 0
+        : k === 'date'
+          ? b.date === '-'
+            ? ''
+            : b.date
+          : String(b[k] ?? '').toLowerCase()
+    const c = av < bv ? -1 : av > bv ? 1 : 0
+    return flatSort.dir === 'asc' ? c : -c
+  })
+  const flatPages = Math.max(1, Math.ceil(flatSorted.length / FLAT_PAGE_SIZE))
+  const flatPageSafe = Math.min(flatPage, flatPages - 1)
+  const flatPageAlerts = flatSorted.slice(
+    flatPageSafe * FLAT_PAGE_SIZE,
+    (flatPageSafe + 1) * FLAT_PAGE_SIZE
+  )
 
   // Group alerts by vessel
   const alertsByVessel = alerts.reduce<
@@ -1003,6 +1052,26 @@ export default function ComplianceCenter({
                 </button>
               ))}
             </div>
+            {(docViewMode === 'vessel' || docViewMode === 'document') && alerts.length > 0 && (
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() => {
+                  const keys =
+                    docViewMode === 'vessel'
+                      ? vesselGroups.map((g) => g.vesselId)
+                      : documentGroups.map((g) => g.document)
+                  const allOpen = keys.every((k) => expandedVessels.has(k))
+                  setExpandedVessels(allOpen ? new Set() : new Set(keys))
+                }}
+              >
+                {(docViewMode === 'vessel'
+                  ? vesselGroups.map((g) => g.vesselId)
+                  : documentGroups.map((g) => g.document)
+                ).every((k) => expandedVessels.has(k))
+                  ? 'Collapse all'
+                  : 'Expand all'}
+              </button>
+            )}
             <div style={{ position: 'relative', marginLeft: 'auto' }}>
               <Search
                 size={14}
@@ -1073,6 +1142,9 @@ export default function ComplianceCenter({
                     style={{ padding: '0', overflow: 'hidden' }}
                   >
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
                       style={{
                         padding: '12px 16px',
                         display: 'flex',
@@ -1082,14 +1154,13 @@ export default function ComplianceCenter({
                         background: 'var(--table-header-bg)',
                         cursor: 'pointer'
                       }}
-                      onClick={() =>
-                        setExpandedVessels((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(group.vesselId)) next.delete(group.vesselId)
-                          else next.add(group.vesselId)
-                          return next
-                        })
-                      }
+                      onClick={() => toggleGroup(group.vesselId)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleGroup(group.vesselId)
+                        }
+                      }}
                     >
                       <ChevronDownIcon
                         size={14}
@@ -1134,18 +1205,22 @@ export default function ComplianceCenter({
                               >
                                 <td>
                                   {alert.category === 'entity' && (
-                                    <span
+                                    <button
+                                      type="button"
+                                      title="Open this entity in the Directory"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (alert.entityId) onNavigateToEntity?.(alert.entityId)
+                                      }}
+                                      className="badge badge-violet"
                                       style={{
-                                        fontSize: '0.68rem',
-                                        padding: '1px 6px',
-                                        borderRadius: '4px',
-                                        background: 'rgba(139,92,246,0.1)',
-                                        color: 'var(--violet)',
-                                        marginRight: '6px'
+                                        marginRight: '6px',
+                                        border: 'none',
+                                        cursor: 'pointer'
                                       }}
                                     >
                                       Entity
-                                    </span>
+                                    </button>
                                   )}
                                   {alert.document}
                                 </td>
@@ -1197,6 +1272,9 @@ export default function ComplianceCenter({
                     style={{ padding: '0', overflow: 'hidden' }}
                   >
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
                       style={{
                         padding: '12px 16px',
                         display: 'flex',
@@ -1206,14 +1284,13 @@ export default function ComplianceCenter({
                         background: 'var(--table-header-bg)',
                         cursor: 'pointer'
                       }}
-                      onClick={() =>
-                        setExpandedVessels((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(group.document)) next.delete(group.document)
-                          else next.add(group.document)
-                          return next
-                        })
-                      }
+                      onClick={() => toggleGroup(group.document)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleGroup(group.document)
+                        }
+                      }}
                     >
                       <ChevronDownIcon
                         size={14}
@@ -1304,17 +1381,47 @@ export default function ComplianceCenter({
                 <caption className="sr-only">Document compliance alerts</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Vessel</th>
-                    <th scope="col">Document</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Date</th>
-                    <th scope="col" style={{ textAlign: 'right' }}>
-                      Severity
-                    </th>
+                    {(
+                      [
+                        ['vessel', 'Vessel'],
+                        ['document', 'Document'],
+                        ['type', 'Type'],
+                        ['date', 'Date'],
+                        ['severity', 'Severity']
+                      ] as const
+                    ).map(([key, label]) => (
+                      <th
+                        key={key}
+                        scope="col"
+                        className="sortable"
+                        aria-sort={
+                          flatSort.key === key
+                            ? flatSort.dir === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : undefined
+                        }
+                        style={{
+                          cursor: 'pointer',
+                          ...(key === 'severity' ? { textAlign: 'right' as const } : {})
+                        }}
+                        onClick={() => {
+                          setFlatSort((s) =>
+                            s.key === key
+                              ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+                              : { key, dir: key === 'date' || key === 'severity' ? 'desc' : 'asc' }
+                          )
+                          setFlatPage(0)
+                        }}
+                      >
+                        {label}
+                        {flatSort.key === key && (flatSort.dir === 'asc' ? ' ▲' : ' ▼')}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {alerts.map((alert) => {
+                  {flatPageAlerts.map((alert) => {
                     const rowBorder =
                       alert.type === 'expired' || alert.type === 'missing'
                         ? 'var(--danger)'
@@ -1329,18 +1436,18 @@ export default function ComplianceCenter({
                         <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
                         <td>
                           {alert.category === 'entity' && (
-                            <span
-                              style={{
-                                fontSize: '0.68rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background: 'rgba(139,92,246,0.1)',
-                                color: 'var(--violet)',
-                                marginRight: '6px'
+                            <button
+                              type="button"
+                              title="Open this entity in the Directory"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (alert.entityId) onNavigateToEntity?.(alert.entityId)
                               }}
+                              className="badge badge-violet"
+                              style={{ marginRight: '6px', border: 'none', cursor: 'pointer' }}
                             >
                               Entity
-                            </span>
+                            </button>
                           )}
                           {alert.document}
                         </td>
@@ -1396,6 +1503,46 @@ export default function ComplianceCenter({
                   })}
                 </tbody>
               </table>
+              {flatPages > 1 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 16px',
+                    borderTop: '1px solid var(--table-border)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <span>
+                    {flatPageSafe * FLAT_PAGE_SIZE + 1}-
+                    {Math.min((flatPageSafe + 1) * FLAT_PAGE_SIZE, flatSorted.length)} of{' '}
+                    {flatSorted.length}
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      className="btn-secondary btn-sm"
+                      disabled={flatPageSafe === 0}
+                      onClick={() => setFlatPage(flatPageSafe - 1)}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span>
+                      {flatPageSafe + 1} / {flatPages}
+                    </span>
+                    <button
+                      className="btn-secondary btn-sm"
+                      disabled={flatPageSafe >= flatPages - 1}
+                      onClick={() => setFlatPage(flatPageSafe + 1)}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

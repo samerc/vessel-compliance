@@ -10,12 +10,16 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean
   error: Error | null
+  /** React component stack, for the copied details */
+  componentStack?: string
+  copied?: boolean
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false, error: null }
+    this.copyDetails = this.copyDetails.bind(this)
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -24,6 +28,25 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error('ErrorBoundary caught:', error, errorInfo)
+    this.setState({ componentStack: errorInfo.componentStack || undefined })
+  }
+
+  // Everything support needs, as plain text for an email or chat
+  copyDetails(): void {
+    const e = this.state.error
+    const text = [
+      `Error: ${e?.message || 'unknown'}`,
+      `When: ${new Date().toISOString()}`,
+      `Page: ${document.title}`,
+      `App: ${navigator.userAgent}`,
+      '',
+      e?.stack || '',
+      this.state.componentStack ? `\nComponents:${this.state.componentStack}` : ''
+    ].join('\n')
+    navigator.clipboard
+      .writeText(text)
+      .then(() => this.setState({ copied: true }))
+      .catch(() => {})
   }
 
   render(): React.ReactNode {
@@ -79,21 +102,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               {this.state.error.message}
             </p>
           )}
-          <button
-            onClick={() => this.setState({ hasError: false, error: null })}
-            style={{
-              padding: '10px 24px',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'var(--accent-primary)',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: 500
-            }}
-          >
-            Try Again
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              className="btn-primary"
+              onClick={() => this.setState({ hasError: false, error: null, copied: false })}
+            >
+              Try Again
+            </button>
+            <button className="btn-secondary" onClick={() => window.location.reload()}>
+              Reload the app
+            </button>
+            <button className="btn-secondary" onClick={this.copyDetails}>
+              {this.state.copied ? 'Details copied' : 'Copy error details'}
+            </button>
+          </div>
         </div>
       )
     }

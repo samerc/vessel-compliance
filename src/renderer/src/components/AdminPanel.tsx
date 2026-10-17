@@ -287,6 +287,8 @@ export default function AdminPanel({
   // Backup & Restore state
   const [backupInProgress, setBackupInProgress] = useState(false)
   const [restoreInProgress, setRestoreInProgress] = useState(false)
+  // After a restore or clearing the update cache the app should restart: why, shown in a bar
+  const [restartReason, setRestartReason] = useState<string | null>(null)
   const [lastBackupDate, setLastBackupDate] = useState<string | null>(null)
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
 
@@ -618,7 +620,8 @@ export default function AdminPanel({
       if (result?.error) {
         showError(result.message || 'Restore failed')
       } else if (result?.success) {
-        showSuccess('Database restored successfully. Please reload the application.')
+        showSuccess('Database restored')
+        setRestartReason('The database was restored. Restart the app so every page reads it.')
       }
     } catch (err) {
       showError((err as { message?: string } | null)?.message || 'Restore failed')
@@ -1996,6 +1999,34 @@ export default function AdminPanel({
 
       {/* ── Content area ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+        {restartReason && (
+          <div
+            role="status"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '10px 16px',
+              marginBottom: '16px',
+              borderRadius: '8px',
+              background: 'color-mix(in srgb, var(--info) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)',
+              fontSize: '0.85rem'
+            }}
+          >
+            <RefreshCw size={16} color="var(--info)" />
+            <span style={{ flex: 1 }}>{restartReason}</span>
+            <button
+              className="btn-primary btn-sm"
+              onClick={() => void window.api.hotUpdateRestart()}
+            >
+              Restart now
+            </button>
+            <button className="btn-ghost btn-sm" onClick={() => setRestartReason(null)}>
+              Later
+            </button>
+          </div>
+        )}
         {(effectiveSection === 'quotationSettings' ||
           effectiveSection === 'policySettings' ||
           effectiveSection === 'users') && (
@@ -6649,8 +6680,20 @@ function FilePathSettingsSection({
                 return
               try {
                 await window.api.hotUpdateClearCache()
-                showSuccess('Cache cleared — app will use built-in version on restart')
+                showSuccess('Cache cleared')
                 setHotUpdateInfo(await window.api.hotUpdateGetInfo())
+                if (
+                  await confirmDialog(
+                    'Restart now to run the version that came with the installer?',
+                    {
+                      title: 'Restart',
+                      confirmLabel: 'Restart now',
+                      cancelLabel: 'Later',
+                      isDangerous: false
+                    }
+                  )
+                )
+                  void window.api.hotUpdateRestart()
               } catch (e) {
                 showError((e as { message?: string } | null)?.message || 'Failed')
               }

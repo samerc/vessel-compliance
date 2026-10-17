@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Bell,
   MessageCircle,
@@ -11,9 +11,11 @@ import {
   CheckCheck,
   Trash2,
   Filter,
-  Inbox
+  Inbox,
+  RefreshCw
 } from 'lucide-react'
-import { PageHeader, Badge, SegmentedControl, EmptyState } from './ui'
+import { PageHeader, Badge, SegmentedControl, EmptyState, Spinner } from './ui'
+import { useToast } from '../contexts/ToastContext'
 import type { Notification } from '../../../shared/types'
 
 interface NotificationsPageProps {
@@ -106,18 +108,26 @@ export default function NotificationsPage({
   const [unreadCount, setUnreadCount] = useState(0)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [loading, setLoading] = useState(true)
+  const { showError } = useToast()
+  const PAGE = 100
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let alive = true
     const run = async (): Promise<void> => {
+      setLoading(true)
       try {
-        const result = await window.api.notificationsGet({ limit: 100 })
+        const result = await window.api.notificationsGet({ limit: PAGE })
         if (alive && result && !('error' in result)) {
           setNotifications(result.data || [])
           setUnreadCount(result.unreadCount || 0)
+          setHasMore((result.data || []).length === PAGE)
         }
       } catch (err) {
-        console.error('Failed to load notifications:', err)
+        if (alive)
+          showError((err instanceof Error && err.message) || 'Failed to load notifications')
       } finally {
         if (alive) setLoading(false)
       }
@@ -126,7 +136,52 @@ export default function NotificationsPage({
     return () => {
       alive = false
     }
-  }, [])
+  }, [reloadKey, showError])
+
+  const loadMore = async (): Promise<void> => {
+    setLoadingMore(true)
+    try {
+      const result = await window.api.notificationsGet({
+        limit: PAGE,
+        offset: notifications.length
+      })
+      if (result && !('error' in result)) {
+        const more = result.data || []
+        setNotifications((prev) => [
+          ...prev,
+          ...more.filter((m) => !prev.some((p) => p.id === m.id))
+        ])
+        setHasMore(more.length === PAGE)
+      }
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to load more notifications')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Delete with undo: the notification leaves the list at once and is deleted 6 s later
+  // unless Undo is clicked (or right away when another one is deleted / the page closes)
+  const [pendingDelete, setPendingDelete] = useState<Notification | null>(null)
+  const pendingRef = useRef<{ notif: Notification; timer: ReturnType<typeof setTimeout> } | null>(
+    null
+  )
+  const commitDelete = (notif: Notification): void => {
+    window.api.notificationsDelete(notif.id).catch((err) => {
+      showError((err instanceof Error && err.message) || 'Failed to delete the notification')
+      setNotifications((prev) => [notif, ...prev])
+    })
+  }
+  useEffect(
+    () => () => {
+      // Leaving the page: the pending delete goes through
+      if (pendingRef.current) {
+        clearTimeout(pendingRef.current.timer)
+        void window.api.notificationsDelete(pendingRef.current.notif.id).catch(() => {})
+      }
+    },
+    []
+  )
 
   const handleMarkAllRead = async (): Promise<void> => {
     try {
@@ -134,7 +189,7 @@ export default function NotificationsPage({
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
       setUnreadCount(0)
     } catch (err) {
-      console.error('Failed to mark all read:', err)
+      showError((err instanceof Error && err.message) || 'Failed to mark all as read')
     }
   }
 
@@ -147,7 +202,7 @@ export default function NotificationsPage({
         )
         setUnreadCount((prev) => Math.max(0, prev - 1))
       } catch (err) {
-        console.error('Failed to mark read:', err)
+        showError((err instanceof Error && err.message) || 'Failed to mark as read')
       }
     }
     if (notif.linkType && notif.linkId && onNavigate) {
@@ -157,13 +212,31 @@ export default function NotificationsPage({
 
   const handleDelete = async (e: React.MouseEvent, notif: Notification): Promise<void> => {
     e.stopPropagation()
-    try {
-      await window.api.notificationsDelete(notif.id)
-      setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
-      if (!notif.isRead) setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (err) {
-      console.error('Failed to delete notification:', err)
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current.timer)
+      commitDelete(pendingRef.current.notif)
     }
+    setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
+    if (!notif.isRead) setUnreadCount((prev) => Math.max(0, prev - 1))
+    const timer = setTimeout(() => {
+      pendingRef.current = null
+      setPendingDelete(null)
+      commitDelete(notif)
+    }, 6000)
+    pendingRef.current = { notif, timer }
+    setPendingDelete(notif)
+  }
+
+  const undoDelete = (): void => {
+    const p = pendingRef.current
+    if (!p) return
+    clearTimeout(p.timer)
+    pendingRef.current = null
+    setPendingDelete(null)
+    setNotifications((prev) =>
+      [...prev, p.notif].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    )
+    if (!p.notif.isRead) setUnreadCount((n) => n + 1)
   }
 
   const filtered = notifications.filter((n) => {
@@ -182,13 +255,44 @@ export default function NotificationsPage({
           <>Notifications {unreadCount > 0 && <Badge tone="danger">{unreadCount} unread</Badge>}</>
         }
         actions={
-          unreadCount > 0 && (
-            <button onClick={handleMarkAllRead} className="btn-secondary">
-              <CheckCheck size={15} /> Mark All Read
+          <>
+            <button
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="btn-secondary"
+              disabled={loading}
+              title="Check for new notifications"
+            >
+              <RefreshCw size={15} /> Refresh
             </button>
-          )
+            {unreadCount > 0 && (
+              <button onClick={handleMarkAllRead} className="btn-secondary">
+                <CheckCheck size={15} /> Mark All Read
+              </button>
+            )}
+          </>
         }
       />
+      {pendingDelete && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 14px',
+            marginBottom: '12px',
+            borderRadius: '8px',
+            background: 'var(--bg-card)',
+            border: 'var(--glass-border)',
+            fontSize: '0.85rem'
+          }}
+        >
+          Notification deleted.
+          <button className="btn-ghost btn-sm" onClick={undoDelete}>
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div style={{ marginBottom: '16px' }}>
@@ -312,6 +416,17 @@ export default function NotificationsPage({
               </div>
             )
           })}
+          {hasMore && activeFilter === 'all' && (
+            <div style={{ textAlign: 'center', padding: '12px' }}>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+              >
+                {loadingMore ? <Spinner label="Loading..." /> : 'Load older notifications'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

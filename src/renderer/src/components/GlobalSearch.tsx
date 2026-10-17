@@ -127,8 +127,11 @@ export default function GlobalSearch({
     }
   }, [isOpen])
 
-  // Debounced search
+  // Debounced search; only the latest request may show its results (a slow earlier search
+  // must not overwrite the results of what is typed now)
+  const searchSeq = useRef(0)
   const doSearch = useCallback(async (q: string) => {
+    const seq = ++searchSeq.current
     if (q.trim().length < 2) {
       setResults(null)
       setLoading(false)
@@ -137,6 +140,7 @@ export default function GlobalSearch({
     setLoading(true)
     try {
       const res = await window.api.globalSearch(q.trim())
+      if (seq !== searchSeq.current) return
       if (res && !('error' in res && res.error)) {
         setResults(res)
         setHighlightIndex(0)
@@ -144,7 +148,7 @@ export default function GlobalSearch({
     } catch {
       // ignore
     } finally {
-      setLoading(false)
+      if (seq === searchSeq.current) setLoading(false)
     }
   }, [])
 
@@ -337,9 +341,10 @@ export default function GlobalSearch({
           />
           {query && (
             <button
-              title="Close"
-              aria-label="Close"
+              title="Clear search"
+              aria-label="Clear search"
               onClick={() => {
+                searchSeq.current++
                 setQuery('')
                 setResults(null)
                 inputRef.current?.focus()

@@ -3,7 +3,7 @@ import { Receipt, Vessel, VesselAssured, ReceiptInput } from '../../../shared/ty
 import { isIpcError } from '../utils/ipc'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, EmptyState, Modal, Field } from './ui'
+import { PageHeader, EmptyState, Modal, Field, Spinner } from './ui'
 import { ordinal, formatReceiptAmount } from '../services/receiptFormat'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
@@ -69,6 +69,14 @@ export default function ReceiptManager({
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Filters and sort of the list
+  const [currencyFilter, setCurrencyFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sort, setSort] = useState<{
+    key: 'receiptNumber' | 'receiptDate' | 'vesselName' | 'payerName' | 'amount'
+    dir: 'asc' | 'desc'
+  }>({ key: 'receiptDate', dir: 'desc' })
   const [showModal, setShowModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   // Deleting receipts / changing receipt settings needs Manage Policies (same gate as the server)
@@ -101,17 +109,63 @@ export default function ReceiptManager({
     }
   }, [vesselId, showError, reloadKey])
 
+  const currencies = useMemo(
+    () => [...new Set(receipts.map((r) => r.currency).filter(Boolean))].sort(),
+    [receipts]
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return receipts
-    return receipts.filter(
-      (r) =>
+    const list = receipts.filter((r) => {
+      if (currencyFilter !== 'all' && r.currency !== currencyFilter) return false
+      const d = String(r.receiptDate || '').slice(0, 10)
+      if (dateFrom && d < dateFrom) return false
+      if (dateTo && d > dateTo) return false
+      if (!q) return true
+      return (
         r.receiptNumber.toLowerCase().includes(q) ||
         (r.vesselName || '').toLowerCase().includes(q) ||
         (r.payerName || '').toLowerCase().includes(q) ||
-        (r.coversText || '').toLowerCase().includes(q)
-    )
-  }, [receipts, search])
+        (r.coversText || '').toLowerCase().includes(q) ||
+        (r.policies || []).some((p) => p.policyNumber.toLowerCase().includes(q))
+      )
+    })
+    const k = sort.key
+    return list.sort((a, b) => {
+      const c =
+        k === 'amount'
+          ? (a.amount || 0) - (b.amount || 0)
+          : k === 'receiptNumber'
+            ? a.receiptYear - b.receiptYear || a.receiptSerial - b.receiptSerial
+            : String(a[k] || '').localeCompare(String(b[k] || ''))
+      return sort.dir === 'asc' ? c : -c
+    })
+  }, [receipts, search, currencyFilter, dateFrom, dateTo, sort])
+
+  // Total of the listed receipts, per currency
+  const totals = useMemo(() => {
+    const t: Record<string, number> = {}
+    for (const r of filtered) t[r.currency] = (t[r.currency] || 0) + (Number(r.amount) || 0)
+    return t
+  }, [filtered])
+  const filtersOn = !!(search || currencyFilter !== 'all' || dateFrom || dateTo)
+  const sortHeader = (key: typeof sort.key, label: string, cls?: string): React.JSX.Element => (
+    <th
+      className={cls}
+      style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+      aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+      onClick={() =>
+        setSort((s) =>
+          s.key === key
+            ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+            : { key, dir: key === 'receiptDate' || key === 'amount' ? 'desc' : 'asc' }
+        )
+      }
+    >
+      {label}
+      {sort.key === key && (sort.dir === 'asc' ? ' ▲' : ' ▼')}
+    </th>
+  )
 
   const handleDelete = async (r: Receipt): Promise<void> => {
     const ok = await confirmDialog(`Delete receipt ${r.receiptNumber}? This cannot be undone.`)
@@ -194,31 +248,93 @@ export default function ReceiptManager({
         </div>
       )}
 
-      <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '16px' }}>
-        <Search
-          size={16}
-          style={{
-            position: 'absolute',
-            left: '10px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'var(--text-secondary)'
-          }}
-        />
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginBottom: '16px'
+        }}
+      >
+        <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '360px' }}>
+          <Search
+            size={16}
+            style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-secondary)'
+            }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search number, vessel, payer..."
+            style={{
+              width: '100%',
+              padding: '9px 12px 9px 34px',
+              borderRadius: '8px',
+              border: '1px solid var(--input-border)',
+              background: 'var(--input-bg)',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem'
+            }}
+          />
+        </div>
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search number, vessel, payer..."
-          style={{
-            width: '100%',
-            padding: '9px 12px 9px 34px',
-            borderRadius: '8px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--input-bg)',
-            color: 'var(--text-primary)',
-            fontSize: '0.85rem'
-          }}
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          aria-label="Received from"
+          title="Received from"
         />
+        <span className="muted">to</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          aria-label="Received until"
+          title="Received until"
+        />
+        {currencies.length > 1 && (
+          <select
+            value={currencyFilter}
+            onChange={(e) => setCurrencyFilter(e.target.value)}
+            aria-label="Currency"
+          >
+            <option value="all">All currencies</option>
+            {currencies.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
+        {filtersOn && (
+          <button
+            className="btn-ghost btn-sm"
+            onClick={() => {
+              setSearch('')
+              setCurrencyFilter('all')
+              setDateFrom('')
+              setDateTo('')
+            }}
+          >
+            Clear filters
+          </button>
+        )}
+        {filtered.length > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            {filtered.length} receipt{filtered.length === 1 ? '' : 's'} ·{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {Object.entries(totals)
+                .map(([cur, amt]) => formatReceiptAmount(amt, cur))
+                .join(' + ')}
+            </strong>
+          </span>
+        )}
       </div>
 
       <div className="table-wrap">
@@ -226,19 +342,21 @@ export default function ReceiptManager({
           <table className="data-table">
             <thead>
               <tr>
-                <th>Number</th>
-                <th>Date</th>
-                {!vesselId && <th>Vessel</th>}
-                <th>Received From</th>
+                {sortHeader('receiptNumber', 'Number')}
+                {sortHeader('receiptDate', 'Date')}
+                {!vesselId && sortHeader('vesselName', 'Vessel')}
+                {sortHeader('payerName', 'Received From')}
                 <th>Covers</th>
-                <th className="num">Amount</th>
+                {sortHeader('amount', 'Amount', 'num')}
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={vesselId ? 6 : 7}>Loading…</td>
+                  <td colSpan={vesselId ? 6 : 7} style={{ textAlign: 'center', padding: '32px' }}>
+                    <Spinner label="Loading receipts..." />
+                  </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
@@ -250,16 +368,24 @@ export default function ReceiptManager({
                     <EmptyState
                       compact
                       icon={<ReceiptIcon size={34} />}
-                      title={search ? 'No receipts match your search' : 'No receipts yet'}
+                      title={filtersOn ? 'No receipts match your filters' : 'No receipts yet'}
                       text={
-                        search
+                        filtersOn
                           ? undefined
                           : 'Issue a receipt when a premium payment comes in; it can be exported to Word.'
                       }
                       action={
-                        search ? (
-                          <button className="btn-secondary btn-sm" onClick={() => setSearch('')}>
-                            Clear search
+                        filtersOn ? (
+                          <button
+                            className="btn-secondary btn-sm"
+                            onClick={() => {
+                              setSearch('')
+                              setCurrencyFilter('all')
+                              setDateFrom('')
+                              setDateTo('')
+                            }}
+                          >
+                            Clear filters
                           </button>
                         ) : (
                           <button className="btn-primary btn-sm" onClick={openCreate}>
@@ -272,7 +398,12 @@ export default function ReceiptManager({
                 </tr>
               ) : (
                 filtered.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    className="clickable"
+                    onClick={() => openEdit(r)}
+                    title="Open the receipt"
+                  >
                     <td className="mono" style={{ fontWeight: 600 }}>
                       {r.receiptNumber}
                     </td>
@@ -287,7 +418,10 @@ export default function ReceiptManager({
                     <td className="num" style={{ fontWeight: 600 }}>
                       {formatReceiptAmount(r.amount, r.currency)}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td
+                      style={{ textAlign: 'right', whiteSpace: 'nowrap' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button title="Export DOCX" onClick={() => handleExport(r)} style={iconBtn}>
                         <FileDown size={16} />
                       </button>
