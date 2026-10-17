@@ -91,7 +91,7 @@ import {
   getDefaultSectionOrder,
   addMissingSections
 } from '../components/quotationSettingsConstants'
-import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
+import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
@@ -5253,41 +5253,30 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     (_inTypeKey && st(data, _inTypeKey as keyof PISectionTexts)) || st(data, 'importantNotice')
   if (_inText) {
     afterTable.push(emptyP())
-    const plainNotice = htmlToPlainText(_inText)
-    if (plainNotice.startsWith('IMPORTANT NOTICE')) {
-      afterTable.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 80 },
-          children: [
-            new TextRun({
-              text: 'IMPORTANT NOTICE',
-              bold: true,
-              size: 22,
-              font: 'Arial',
-              color: '000000'
-            })
-          ]
-        })
-      )
-      afterTable.push(
-        ...parseHtmlToParagraphs(_inText.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
-          size: 22,
-          font: 'Arial',
-          color: '000000',
-          alignment: AlignmentType.JUSTIFIED
-        })
-      )
-    } else {
-      afterTable.push(
-        ...parseHtmlToParagraphs(_inText, {
-          size: 22,
-          font: 'Arial',
-          color: '000000',
-          alignment: AlignmentType.JUSTIFIED
-        })
-      )
-    }
+    // The heading is printed always (as on the policy); the per-type texts are the body only
+    afterTable.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+        children: [
+          new TextRun({
+            text: 'IMPORTANT NOTICE',
+            bold: true,
+            size: 22,
+            font: 'Arial',
+            color: '000000'
+          })
+        ]
+      })
+    )
+    afterTable.push(
+      ...parseHtmlToParagraphs(_inText.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
+        size: 22,
+        font: 'Arial',
+        color: '000000',
+        alignment: AlignmentType.JUSTIFIED
+      })
+    )
   }
   for (const note of data.notes) {
     afterTable.push(emptyP())

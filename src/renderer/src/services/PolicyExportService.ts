@@ -4574,10 +4574,17 @@ export async function exportPolicyDocx(
   }
   children.push(polEmptyP())
 
-  // Important Notice — make type-aware by replacing P&I references for other types
+  // Important Notice: the policy's own text, else the type's notice from Quotation Settings
+  // (as the quotation prints it), else the general one with its P&I references made type-aware
+  const typeNoticeKey: Record<string, keyof PISectionTexts> = {
+    P: 'importantNoticePI',
+    H: 'importantNoticeHull',
+    W: 'importantNoticeWar',
+    F: 'importantNoticeFDD'
+  }
   let importantNotice =
     data.policy.importantNotice ||
-    (typeCode === 'F' ? polSt(data, 'importantNoticeFDD') : '') ||
+    (typeNoticeKey[typeCode] ? polSt(data, typeNoticeKey[typeCode]) : '') ||
     polSt(data, 'importantNotice')
   if (importantNotice) {
     // Replace type-specific references if not P&I
@@ -4595,30 +4602,16 @@ export async function exportPolicyDocx(
         'FD&D Terms and Conditions'
       )
     }
-    const plainNotice = htmlToPlainText(importantNotice)
-    if (plainNotice.startsWith('IMPORTANT NOTICE')) {
-      children.push(polCenteredP('IMPORTANT NOTICE', true))
-      children.push(
-        ...parseHtmlToParagraphs(
-          importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''),
-          {
-            size: POL_FONT_SIZE,
-            font: 'Arial',
-            color: '000000',
-            alignment: AlignmentType.JUSTIFIED
-          }
-        )
-      )
-    } else {
-      children.push(
-        ...parseHtmlToParagraphs(importantNotice, {
-          size: POL_FONT_SIZE,
-          font: 'Arial',
-          color: '000000',
-          alignment: AlignmentType.JUSTIFIED
-        })
-      )
-    }
+    // The heading is printed always; the per-type texts are the notice body only
+    children.push(polCenteredP('IMPORTANT NOTICE', true))
+    children.push(
+      ...parseHtmlToParagraphs(importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        alignment: AlignmentType.JUSTIFIED
+      })
+    )
     children.push(polEmptyP())
   }
 
