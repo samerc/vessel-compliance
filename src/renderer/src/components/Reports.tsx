@@ -28,18 +28,19 @@ type ReportTab =
   | 'condition-survey'
   | 'renewal-pipeline'
 
+// Ready-made reports first; the Report Builder (for anything else) last
 const TABS: { id: ReportTab; label: string; icon: LucideIcon }[] = [
-  { id: 'report-builder', label: 'Report Builder', icon: Database },
-  { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
-  { id: 'statement', label: 'Statement of Account', icon: Receipt },
   { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 },
+  { id: 'renewal-pipeline', label: 'Renewal Pipeline', icon: CalendarClock },
   { id: 'assured-report', label: 'Assured Report', icon: Users },
   { id: 'condition-survey', label: 'Condition Surveys', icon: ClipboardCheck },
-  { id: 'renewal-pipeline', label: 'Renewal Pipeline', icon: CalendarClock }
+  { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
+  { id: 'statement', label: 'Statement of Account', icon: Receipt },
+  { id: 'report-builder', label: 'Report Builder', icon: Database }
 ]
 
 export default function Reports({ subTab, subTabNonce }: SubTabProps = {}): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<ReportTab>('report-builder')
+  const [activeTab, setActiveTab] = useState<ReportTab>('customer-compliance')
   useRequestedSubTab(
     subTab,
     subTabNonce,

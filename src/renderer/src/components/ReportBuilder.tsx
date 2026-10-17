@@ -741,10 +741,34 @@ export default function ReportBuilder(): React.JSX.Element {
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(results.length / ROWS_PER_PAGE))
+  // Click a result column to sort the run's rows (no new query)
+  const [viewSort, setViewSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null)
+  const sortedResults = useMemo(() => {
+    if (!viewSort) return results
+    const { key, dir } = viewSort
+    return [...results].sort((a, b) => {
+      const x = a[key]
+      const y = b[key]
+      if (x == null && y == null) return 0
+      if (x == null) return 1
+      if (y == null) return -1
+      const nx = Number(x)
+      const ny = Number(y)
+      const c =
+        !isNaN(nx) && !isNaN(ny) && String(x).trim() !== '' && String(y).trim() !== ''
+          ? nx - ny
+          : String(x).localeCompare(String(y), undefined, { numeric: true })
+      return dir === 'asc' ? c : -c
+    })
+  }, [results, viewSort])
   const paginatedResults = useMemo(() => {
     const start = (currentPage - 1) * ROWS_PER_PAGE
-    return results.slice(start, start + ROWS_PER_PAGE)
-  }, [results, currentPage, ROWS_PER_PAGE])
+    return sortedResults.slice(start, start + ROWS_PER_PAGE)
+  }, [sortedResults, currentPage, ROWS_PER_PAGE])
+  const onSortColumn = (key: string): void =>
+    setViewSort((s) =>
+      s?.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
+    )
 
   // Reset page when results change (adjusted during render, React docs pattern)
   const [prevResults, setPrevResults] = useState(results)
@@ -824,7 +848,7 @@ export default function ReportBuilder(): React.JSX.Element {
       const XLSX = await import('xlsx-js-style')
       const cols = Array.from(selectedColumns)
       const headers = cols.map((c) => sourceDef.columns.find((d) => d.key === c)?.label || c)
-      const data = results.map((row) => cols.map((c) => formatCellValue(row[c], c)))
+      const data = sortedResults.map((row) => cols.map((c) => formatCellValue(row[c], c)))
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
 
       // Auto-width
@@ -857,7 +881,7 @@ export default function ReportBuilder(): React.JSX.Element {
       const doc = new jsPDF({ orientation: 'landscape' })
       const cols = Array.from(selectedColumns)
       const headers = cols.map((c) => sourceDef.columns.find((d) => d.key === c)?.label || c)
-      const body = results.map((row) => cols.map((c) => formatCellValue(row[c], c)))
+      const body = sortedResults.map((row) => cols.map((c) => formatCellValue(row[c], c)))
 
       // Header
       const primary = settings.primaryColor || [28, 52, 95]
@@ -956,34 +980,12 @@ export default function ReportBuilder(): React.JSX.Element {
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '20px',
+          justifyContent: 'flex-end',
+          marginBottom: '12px',
           flexWrap: 'wrap',
           gap: '12px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Database size={22} color="var(--accent-contrast)" />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '700', margin: 0 }}>Report Builder</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
-              Build custom reports with flexible data sources, columns, and filters
-            </p>
-          </div>
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
           {/* Saved Reports Dropdown */}
           <button
@@ -1132,6 +1134,29 @@ export default function ReportBuilder(): React.JSX.Element {
             paddingRight: '4px'
           }}
         >
+          {/* Run Button */}
+          <button
+            className="btn-primary"
+            onClick={runReport}
+            disabled={loading || selectedColumns.size === 0}
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 2,
+              marginBottom: '12px',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              fontSize: '0.9rem',
+              opacity: loading || selectedColumns.size === 0 ? 0.6 : 1
+            }}
+          >
+            <Play size={16} />
+            {loading ? 'Running...' : 'Run Report'}
+          </button>
           {/* Data Source */}
           <div style={cardStyle}>
             <div style={{ ...sectionHeaderStyle, marginBottom: '10px' }}>
@@ -1324,26 +1349,6 @@ export default function ReportBuilder(): React.JSX.Element {
               </div>
             )}
           </div>
-
-          {/* Run Button */}
-          <button
-            className="btn-primary"
-            onClick={runReport}
-            disabled={loading || selectedColumns.size === 0}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '10px',
-              fontSize: '0.9rem',
-              opacity: loading || selectedColumns.size === 0 ? 0.6 : 1
-            }}
-          >
-            <Play size={16} />
-            {loading ? 'Running...' : 'Run Report'}
-          </button>
         </div>
 
         {/* Results Panel */}
@@ -1561,6 +1566,8 @@ export default function ReportBuilder(): React.JSX.Element {
                 <ResultsTable
                   columns={sourceDef.columns.filter((c) => selectedColumns.has(c.key))}
                   rows={paginatedResults}
+                  sort={viewSort}
+                  onSort={onSortColumn}
                 />
                 {totalPages > 1 && (
                   <div
@@ -1719,10 +1726,14 @@ function statusTone(val: unknown): 'success' | 'warning' | 'danger' | 'accent' {
 
 function ResultsTable({
   columns,
-  rows
+  rows,
+  sort,
+  onSort
 }: {
   columns: ColumnDef[]
   rows: ReportResultRow[]
+  sort?: { key: string; dir: 'asc' | 'desc' } | null
+  onSort?: (key: string) => void
 }): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -1731,7 +1742,21 @@ function ResultsTable({
       <thead>
         <tr>
           {columns.map((col) => (
-            <th key={col.key}>{col.label}</th>
+            <th
+              key={col.key}
+              onClick={onSort ? () => onSort(col.key) : undefined}
+              style={onSort ? { cursor: 'pointer', whiteSpace: 'nowrap' } : undefined}
+              aria-sort={
+                sort?.key === col.key
+                  ? sort.dir === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : undefined
+              }
+            >
+              {col.label}
+              {sort?.key === col.key && (sort.dir === 'asc' ? ' ▲' : ' ▼')}
+            </th>
           ))}
         </tr>
       </thead>
