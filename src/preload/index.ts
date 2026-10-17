@@ -70,6 +70,13 @@ const api: Api = {
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
   getEntitiesPaginated: (params) => ipcRenderer.invoke('db:getEntitiesPaginated', params),
+  getEntityDirectoryStats: () => ipcRenderer.invoke('entities:getStats'),
+  deleteUnusedEntities: () => ipcRenderer.invoke('entities:deleteUnused'),
+  getEntityHistory: (entityId: string) => ipcRenderer.invoke('entities:getHistory', entityId),
+  getEntityNotes: (entityId: string) => ipcRenderer.invoke('entityNotes:get', entityId),
+  addEntityNote: (entityId: string, note: string) =>
+    ipcRenderer.invoke('entityNotes:add', entityId, note),
+  deleteEntityNote: (noteId: string) => ipcRenderer.invoke('entityNotes:delete', noteId),
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),

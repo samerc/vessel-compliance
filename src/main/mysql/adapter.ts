@@ -69,6 +69,9 @@ import {
   EntityDocument,
   EntityDocumentType,
   EntityQueryParams,
+  EntityGap,
+  EntityDirectoryStats,
+  EntityNote,
   EntityUBO,
   FlagState,
   FlagStatePort,
@@ -5714,6 +5717,20 @@ export class MySQLAdapter {
       } catch {
         /* idempotent migration: already applied or not applicable */
       }
+
+      // Migration: entity_notes (notes on a Directory entity, like vessel notes)
+      const [enTable] = await this.pool.query("SHOW TABLES LIKE 'entity_notes'")
+      if ((enTable as RowDataPacket[]).length === 0) {
+        await this.pool.query(`CREATE TABLE entity_notes (
+                    id VARCHAR(36) PRIMARY KEY,
+                    entity_id VARCHAR(36) NOT NULL,
+                    note TEXT NOT NULL,
+                    created_by_user_id VARCHAR(36),
+                    created_by_username VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_en_entity (entity_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -7158,10 +7175,14 @@ export class MySQLAdapter {
     const offset = (page - 1) * limit
 
     let query =
-      'SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities'
-    let countQuery = 'SELECT COUNT(*) as total FROM entities'
+      'SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, (SELECT COUNT(*) FROM entity_addresses ea WHERE ea.entity_id = e.id) as addressCount FROM entities e'
+    let countQuery = 'SELECT COUNT(*) as total FROM entities e'
     const conditions: string[] = []
     const values: SqlValue[] = []
+
+    if (params.gap && MySQLAdapter.ENTITY_GAP_SQL[params.gap]) {
+      conditions.push(MySQLAdapter.ENTITY_GAP_SQL[params.gap])
+    }
 
     if (search) {
       conditions.push('(name LIKE ? OR identifier LIKE ?)')
@@ -7209,15 +7230,142 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(query, values)
     const data = (rows as Row<Entity>[]).map((r) => ({
       ...r,
-      ofacMatchFound: Boolean(r.ofacMatchFound)
+      ofacMatchFound: Boolean(r.ofacMatchFound),
+      addressCount: Number(r.addressCount) || 0
     }))
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
+  // Directory "needs attention" conditions on `entities e` (filters and counts use the same SQL).
+  // Unused = no link to a vessel, UBO, policy, live quotation, policy document, blue card,
+  // receipt or commission override (the same records that block deleteEntity).
+  private static readonly ENTITY_UNUSED_SQL = `NOT EXISTS (SELECT 1 FROM vessel_assureds x WHERE x.entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM entity_ubos x WHERE x.assured_entity_id = e.id OR x.ubo_entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM vessel_dynamic_policies x WHERE x.customer_entity_id = e.id OR x.broker_entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM quotations x WHERE x.customer_entity_id = e.id AND x.deleted_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM quotation_assureds x WHERE x.entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM policy_doc_addresses x WHERE x.entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM policy_blue_cards x WHERE x.owner_entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM receipts x WHERE x.payer_entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM entity_commission_overrides x WHERE x.entity_id = e.id)`
+
+  private static readonly ENTITY_HAS_FILES_SQL = `EXISTS (SELECT 1 FROM entity_documents d WHERE d.entity_id = e.id AND d.file_path IS NOT NULL AND d.file_path <> '')`
+
+  static readonly ENTITY_GAP_SQL: Record<EntityGap, string> = {
+    missingDocs: `EXISTS (SELECT 1 FROM entity_document_types t
+        WHERE t.is_active = 1 AND t.is_required = 1 AND t.entity_scope IN ('both', e.type)
+          AND NOT EXISTS (SELECT 1 FROM entity_documents d WHERE d.entity_id = e.id
+            AND d.document_type_id = t.id AND d.file_path IS NOT NULL AND d.file_path <> ''))`,
+    noAddress: `(e.type = 'company' AND NOT EXISTS (SELECT 1 FROM entity_addresses a WHERE a.entity_id = e.id))`,
+    noUbo: `(e.type = 'company' AND EXISTS (SELECT 1 FROM vessel_assureds va WHERE va.entity_id = e.id)
+        AND NOT EXISTS (SELECT 1 FROM entity_ubos u WHERE u.assured_entity_id = e.id))`,
+    staleScreening: `(e.ofac_checked_at IS NULL OR e.ofac_checked_at < DATE_SUB(NOW(), INTERVAL 6 MONTH))`,
+    unused: `(${MySQLAdapter.ENTITY_UNUSED_SQL})`
+  }
+
+  async getEntityDirectoryStats(): Promise<EntityDirectoryStats> {
+    const empty: EntityDirectoryStats = {
+      total: 0,
+      companies: 0,
+      persons: 0,
+      missingDocs: 0,
+      noAddress: 0,
+      noUbo: 0,
+      staleScreening: 0,
+      unused: 0,
+      unusedDeletable: 0
+    }
+    if (!this.pool) return empty
+    const g = MySQLAdapter.ENTITY_GAP_SQL
+    const [rows] = await this.pool.query(
+      `SELECT COUNT(*) AS total,
+              SUM(e.type = 'company') AS companies,
+              SUM(e.type = 'person') AS persons,
+              SUM(${g.missingDocs}) AS missingDocs,
+              SUM(${g.noAddress}) AS noAddress,
+              SUM(${g.noUbo}) AS noUbo,
+              SUM(${g.staleScreening}) AS staleScreening,
+              SUM(${g.unused}) AS unused,
+              SUM(${g.unused} AND NOT ${MySQLAdapter.ENTITY_HAS_FILES_SQL}) AS unusedDeletable
+         FROM entities e`
+    )
+    const r = (rows as RowDataPacket[])[0] || {}
+    const out = { ...empty }
+    for (const k of Object.keys(empty) as (keyof EntityDirectoryStats)[]) out[k] = Number(r[k]) || 0
+    return out
+  }
+
+  /** Deletes every unused entity that has no documents on file; returns their names */
+  async deleteUnusedEntities(): Promise<string[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT e.id, e.name FROM entities e
+        WHERE ${MySQLAdapter.ENTITY_UNUSED_SQL} AND NOT ${MySQLAdapter.ENTITY_HAS_FILES_SQL}`
+    )
+    const names: string[] = []
+    for (const r of rows as RowDataPacket[]) {
+      await this.deleteEntity(r.id)
+      names.push(r.name)
+    }
+    return names
+  }
+
+  // --- Entity notes ---
+  async getEntityNotes(entityId: string): Promise<EntityNote[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      'SELECT id, entity_id as entityId, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM entity_notes WHERE entity_id = ? ORDER BY created_at DESC',
+      [entityId]
+    )
+    return rows as Row<EntityNote>[]
+  }
+
+  async addEntityNote(
+    entityId: string,
+    note: string,
+    userId: string,
+    username: string
+  ): Promise<EntityNote> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const id = uuidv4()
+    const now = new Date()
+    await this.pool.execute(
+      'INSERT INTO entity_notes (id, entity_id, note, created_by_user_id, created_by_username, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, entityId, note.trim(), userId, username, now]
+    )
+    return {
+      id,
+      entityId,
+      note: note.trim(),
+      createdByUserId: userId,
+      createdByUsername: username,
+      createdAt: now.toISOString()
+    }
+  }
+
+  async deleteEntityNote(noteId: string, userId: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute('DELETE FROM entity_notes WHERE id = ? AND created_by_user_id = ?', [
+      noteId,
+      userId
+    ])
+  }
+
+  /** Activity log entries recorded against this entity (newest first) */
+  async getEntityHistory(entityId: string, limit = 50): Promise<ActivityLogEntry[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      'SELECT id, user_id AS userId, username, action, module, entity_type AS entityType, entity_id AS entityId, entity_name AS entityName, details, created_at AS createdAt FROM activity_log WHERE entity_id = ? ORDER BY created_at DESC LIMIT ?',
+      [entityId, limit]
+    )
+    return rows as Row<ActivityLogEntry>[]
+  }
+
   async addEntity(entity: Omit<Entity, 'id'>): Promise<Entity> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
+    entity = { ...entity, name: MySQLAdapter.tidyName(entity.name) }
     await this.pool.execute(
       'INSERT INTO entities (id, name, type, identifier, email, phone, passport_file_path, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path, ofac_checked_at, ofac_match_found, ofac_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -7239,8 +7387,15 @@ export class MySQLAdapter {
     return { ...entity, id }
   }
 
+  /** Entity names are stored trimmed with single spaces ("Sea  Arrows " = "Sea Arrows") */
+  static tidyName(name: string): string {
+    return (name || '').trim().replace(/\s+/g, ' ')
+  }
+
   async updateEntity(id: string, updates: Partial<Entity>): Promise<void> {
     if (!this.pool) return
+    if (typeof updates.name === 'string')
+      updates = { ...updates, name: MySQLAdapter.tidyName(updates.name) }
 
     // Security: Validate file extensions for any file paths being updated
     if (updates.passportFilePath !== undefined && updates.passportFilePath) {
@@ -7366,7 +7521,8 @@ export class MySQLAdapter {
       ['entity_ubos', 'assured_entity_id'],
       ['entity_ubos', 'ubo_entity_id'],
       ['vessel_assureds', 'entity_id'],
-      ['compliance_check_results', 'entity_id']
+      ['compliance_check_results', 'entity_id'],
+      ['entity_notes', 'entity_id']
     ])
       await this.pool.execute(`DELETE FROM ${table} WHERE ${col} = ?`, [id])
     await this.pool.execute(

@@ -80,6 +80,39 @@ export interface Entity {
   ofacCheckedAt?: string
   ofacMatchFound?: boolean
   ofacStatus?: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH' | 'SANCTIONED'
+  /** Paginated directory rows only: number of addresses on file */
+  addressCount?: number
+}
+
+/** Directory "needs attention" filters (getEntitiesPaginated `gap`) */
+export type EntityGap =
+  | 'missingDocs' // a required document type in scope has no file
+  | 'noAddress' // company without an address
+  | 'noUbo' // company that is a vessel assured with no UBO listed
+  | 'staleScreening' // not screened for sanctions in the last 6 months
+  | 'unused' // not linked to any vessel, policy, quotation, receipt or UBO
+
+/** Counts behind the Directory "needs attention" cards */
+export interface EntityDirectoryStats {
+  total: number
+  companies: number
+  persons: number
+  missingDocs: number
+  noAddress: number
+  noUbo: number
+  staleScreening: number
+  unused: number
+  /** Unused entities with no documents on file (what "delete unused" removes) */
+  unusedDeletable: number
+}
+
+export interface EntityNote {
+  id: string
+  entityId: string
+  note: string
+  createdByUserId: string
+  createdByUsername: string
+  createdAt: string
 }
 
 export interface EntityDocumentType {
@@ -526,6 +559,7 @@ export interface EntityQueryParams {
   sortField?: 'name' | 'type'
   sortOrder?: 'asc' | 'desc'
   customersOnly?: boolean
+  gap?: EntityGap
 }
 
 export interface SurveyorQueryParams {

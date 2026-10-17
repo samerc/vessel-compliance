@@ -10,7 +10,8 @@ import {
   Building2,
   CheckCircle2,
   XCircle,
-  Mail
+  Mail,
+  AlertTriangle
 } from 'lucide-react'
 import { FlagState, FlagStatePort } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -83,14 +84,26 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
     }
   }
 
+  // A flag that ratifies the bunker or wreck convention needs its maritime authority on file:
+  // BBC / WRC blue cards are addressed to it
+  const needsAuthority = (fs: FlagState): boolean =>
+    !!(fs.ratifiedBunker || fs.ratifiedWreck) && !fs.authorityName?.trim()
+  const missingAuthorityCount = flagStates.filter(needsAuthority).length
+  const [onlyMissingAuthority, setOnlyMissingAuthority] = useState(false)
+
   // Filter
   const filtered = useMemo(() => {
-    if (!searchTerm.trim()) return flagStates
+    const base = onlyMissingAuthority
+      ? flagStates.filter(
+          (fs) => !!(fs.ratifiedBunker || fs.ratifiedWreck) && !fs.authorityName?.trim()
+        )
+      : flagStates
+    if (!searchTerm.trim()) return base
     const q = searchTerm.toLowerCase()
-    return flagStates.filter(
+    return base.filter(
       (fs) => fs.name.toLowerCase().includes(q) || fs.iso3Code.toLowerCase().includes(q)
     )
-  }, [flagStates, searchTerm])
+  }, [flagStates, searchTerm, onlyMissingAuthority])
 
   // Stats
   const bunkerCount = useMemo(
@@ -322,6 +335,37 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
           </p>
         </div>
       </header>
+
+      {/* Ratifying flags without an authority: their BBC / WRC blue cards have no addressee */}
+      {(missingAuthorityCount > 0 || onlyMissingAuthority) && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            borderRadius: '10px',
+            fontSize: '0.85rem',
+            background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)'
+          }}
+        >
+          <AlertTriangle size={16} color="var(--warning)" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            {missingAuthorityCount === 1
+              ? '1 flag state ratifies the bunker or wreck convention but has no maritime authority on file: its BBC / WRC blue cards cannot be addressed.'
+              : `${missingAuthorityCount} flag states ratify the bunker or wreck convention but have no maritime authority on file: their BBC / WRC blue cards cannot be addressed.`}
+          </span>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => setOnlyMissingAuthority((v) => !v)}
+          >
+            {onlyMissingAuthority ? 'Show all' : 'Show them'}
+          </button>
+        </div>
+      )}
 
       {/* Stats strip */}
       <div
@@ -600,6 +644,20 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                               }}
                             >
                               {fs.authorityName}
+                            </span>
+                          ) : needsAuthority(fs) ? (
+                            <span
+                              title="Needed to address BBC / WRC blue cards"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                color: 'var(--warning)'
+                              }}
+                            >
+                              <AlertTriangle size={12} /> Missing
                             </span>
                           ) : (
                             <span

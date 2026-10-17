@@ -227,9 +227,10 @@ Analytics dashboard for the fleet (`src/renderer/src/components/FleetAnalytics.t
 
 Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below):
 
-- **Stats Row**: Total entities, companies, persons counts (derived from `allEntities` — full unfiltered list)
-- **Table columns**: Name | Type | Sanctions (OfacBadge) | Documents (compliance score) | Vessels (count)
-- **Slide-in panel (400px)**: profile header (shows "UBO of: [Company]" with Link2 icon for persons), document status section, associated vessels as compact list rows
+- **Needs attention cards** (redesign 2026-10, replace the count cards): Missing documents, No UBOs (assured companies), No address (companies), Screening out of date (6 months), Not linked to anything, Possible duplicate pairs. Each card filters the list (`EntityQueryParams.gap`, SQL in `MySQLAdapter.ENTITY_GAP_SQL`, counts from IPC `entities:getStats`); the Unused filter offers "Delete N without documents" (IPC `entities:deleteUnused`: unused entities WITH documents are kept). Emails and phones are deliberately not counted (most entities come through brokers)
+- **Table columns** (prefs key `entities_v2`): Name | Type (hidden by default) | Profile (completeness `getProfile`: required documents, address for companies, UBOs for assured companies, screened in 6 months) | Sanctions | Screened | Documents | Vessels
+- **Slide-in panel (460px)**: header with "UBO of", profile meter + what is missing, quick facts; tabs Profile (shared `EntityEditPanel` with `hideBusiness`) | Business (vessels as assured / UBO + `EntityBusinessSection alwaysOpen`, renewals due within 90 days first) | Notes & history (`EntityNotesHistory`: `entity_notes` table, @username notifies, IPC `entityNotes:*`; history = activity_log rows with this `entity_id`, IPC `entities:getHistory`)
+- **Names** are stored trimmed with single spaces (`MySQLAdapter.tidyName` on add/update)
 - **`allEntities` state**: full unfiltered entity list loaded alongside paginated data; used for all lookups (`getAssociatedVessels`, `getParentCompanies`, counts). Using paginated `entities` for lookups caused "undefined (role)" in vessel cards when parent was on a different page.
 - **`getParentCompanies(entityId)`**: finds parent companies for UBO persons via `entityUBOs.filter(eu => eu.uboEntityId === entityId).map(eu => allEntities.find(...))`
 - **`getDocScore(entity)`**: returns `{ have, total }` for document compliance indicator column
@@ -237,7 +238,7 @@ Entity management page (`src/renderer/src/components/EntityDirectory.tsx`) — t
 - **Create Entity**: Modal with auto-sanctions check after creation (shows spinner)
 - **Delete**: With confirmation warning about linked vessels; clears customer references
 - **Vessel Navigation**: Clicking vessel names navigates to VesselDetail
-- **Find Duplicates**: Button scans all entities for similar names using Jaro-Winkler similarity with an adjustable threshold slider. Pairs can be merged directly from the results via `mergeEntities` adapter method.
+- **Find Duplicates**: compares entities of the SAME type by Jaro-Winkler on `dupKey(name)` (lower case, no accents / punctuation / company words like Shipping, Ltd, Co.), default 95%, adjustable slider; plain Jaro-Winkler on full names matched every "X Shipping Ltd." pair. Pairs can be merged directly via `mergeEntities`. The card count is worked out in small slices after load.
 
 ### Entity Documents (Configurable)
 

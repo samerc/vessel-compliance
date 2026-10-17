@@ -45,12 +45,15 @@ const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '0
  */
 export default function EntityBusinessSection({
   entityId,
-  sectionLabel
+  sectionLabel,
+  alwaysOpen = false
 }: {
   entityId: string
   sectionLabel: React.CSSProperties
+  /** Shown as its own tab: no collapsible header, renewals due first */
+  alwaysOpen?: boolean
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(alwaysOpen)
   const [data, setData] = useState<CustomerOverview | null>(null)
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
 
@@ -92,6 +95,24 @@ export default function EntityBusinessSection({
       data.receipts.length
     : 0
 
+  // Vessel policies ending within 90 days (or ended in the last 30, still to renew)
+  const renewals = (() => {
+    if (!data) return []
+    const today = new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+    const DAY = 86400000
+    return data.vesselPolicies
+      .filter((vp) => {
+        if (!vp.endDate) return false
+        const t = new Date(vp.endDate).getTime()
+        return t >= today - 30 * DAY && t <= today + 90 * DAY
+      })
+      .sort((a, b) => String(a.endDate).localeCompare(String(b.endDate)))
+  })()
+  const daysTo = (d: string): number =>
+    Math.round(
+      (new Date(d).getTime() - new Date(new Date().setHours(0, 0, 0, 0)).getTime()) / 86400000
+    )
+
   const subTitle = (label: string, count: number): React.JSX.Element => (
     <div style={{ ...sectionLabel, margin: '12px 0 6px' }}>
       {label} <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{count}</span>
@@ -99,32 +120,40 @@ export default function EntityBusinessSection({
   )
 
   return (
-    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--table-border)' }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: 0
-        }}
-      >
-        {open ? (
-          <ChevronDown size={13} color="var(--text-secondary)" />
-        ) : (
-          <ChevronRight size={13} color="var(--text-secondary)" />
-        )}
-        <span style={sectionLabel}>Business</span>
-        {!loading && total > 0 && (
-          <Badge tone="accent" style={{ marginLeft: '4px' }}>
-            {total}
-          </Badge>
-        )}
-      </button>
+    <div
+      style={
+        alwaysOpen
+          ? { padding: '4px 20px 16px' }
+          : { padding: '12px 20px', borderTop: '1px solid var(--table-border)' }
+      }
+    >
+      {!alwaysOpen && (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0
+          }}
+        >
+          {open ? (
+            <ChevronDown size={13} color="var(--text-secondary)" />
+          ) : (
+            <ChevronRight size={13} color="var(--text-secondary)" />
+          )}
+          <span style={sectionLabel}>Business</span>
+          {!loading && total > 0 && (
+            <Badge tone="accent" style={{ marginLeft: '4px' }}>
+              {total}
+            </Badge>
+          )}
+        </button>
+      )}
 
       {open && (
         <div style={{ marginTop: '6px' }}>
@@ -138,6 +167,54 @@ export default function EntityBusinessSection({
             />
           ) : (
             <>
+              {renewals.length > 0 && (
+                <>
+                  {subTitle('Renewals due', renewals.length)}
+                  <div className="table-wrap">
+                    <table className="data-table" style={{ tableLayout: 'fixed' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...head, width: '42%' }}>Vessel</th>
+                          <th style={{ ...head, width: '28%' }}>Cover</th>
+                          <th style={head}>Ends</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renewals.map((vp) => {
+                          const d = daysTo(vp.endDate!)
+                          return (
+                            <tr
+                              key={vp.id}
+                              className="clickable"
+                              onClick={() => openRecord('vessel', vp.vesselId)}
+                              title="Open vessel"
+                            >
+                              <td style={{ ...cell, fontWeight: 600 }}>{vp.vesselName}</td>
+                              <td style={cell}>{vp.policyTypeName}</td>
+                              <td style={cell}>
+                                {formatDate(vp.endDate)}{' '}
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    color:
+                                      d < 0
+                                        ? 'var(--danger)'
+                                        : d <= 30
+                                          ? 'var(--warning)'
+                                          : 'var(--text-secondary)'
+                                  }}
+                                >
+                                  {d < 0 ? `${-d}d ago` : d === 0 ? 'today' : `in ${d}d`}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
               {data.quotations.length > 0 && (
                 <>
                   {subTitle('Quotations', data.quotations.length)}

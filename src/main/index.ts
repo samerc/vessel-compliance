@@ -1699,6 +1699,66 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getEntitiesPaginated(params)
   })
+  safeHandle('entities:getStats', (event) => {
+    requireSession(event)
+    return db.getEntityDirectoryStats()
+  })
+  safeHandle('entities:deleteUnused', async (event) => {
+    const user = await requirePermission(event, 'entities:delete')
+    const names = await db.deleteUnusedEntities()
+    if (names.length > 0)
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'DELETE',
+        module: 'Entities',
+        entityType: 'entity',
+        details:
+          `Deleted ${names.length} unused entit${names.length === 1 ? 'y' : 'ies'}: ${names.join(', ')}`.slice(
+            0,
+            2000
+          )
+      }).catch(() => {})
+    return { deleted: names.length }
+  })
+  safeHandle('entities:getHistory', (event, entityId: string) => {
+    requireSession(event)
+    return db.getEntityHistory(entityId)
+  })
+
+  // Entity notes (Directory panel); @mentions notify like vessel notes
+  safeHandle('entityNotes:get', (event, entityId: string) => {
+    requireSession(event)
+    return db.getEntityNotes(entityId)
+  })
+  safeHandle('entityNotes:add', async (event, entityId: string, note: string) => {
+    const user = await requirePermission(event, 'entities:edit')
+    const result = await db.addEntityNote(entityId, note, user.id, user.username)
+    try {
+      const mentions = note.match(/@(\w+)/g)
+      if (mentions) {
+        const usernames = [...new Set(mentions.map((m) => m.slice(1)))]
+        for (const mu of await db.getUsersByUsername(usernames)) {
+          if (mu.id === user.id) continue
+          await db.notifyUser(
+            mu.id,
+            'note_mention',
+            `${user.username} mentioned you in a note on an entity`,
+            note,
+            'entity',
+            entityId
+          )
+        }
+      }
+    } catch (err) {
+      console.error('Entity note notification error:', err)
+    }
+    return result
+  })
+  safeHandle('entityNotes:delete', async (event, noteId: string) => {
+    const user = await requirePermission(event, 'entities:edit')
+    return db.deleteEntityNote(noteId, user.id)
+  })
   safeHandle('db:addEntity', async (event, entity: Omit<Entity, 'id'> & { id?: string }) => {
     const user = await requirePermission(event, 'entities:create')
     const result = await db.addEntity(entity)
@@ -1725,7 +1785,7 @@ app.whenReady().then(() => {
   safeHandle('db:updateEntity', async (event, id: string, updates: Partial<Entity>) => {
     const user = await requirePermission(event, 'entities:edit')
     const [eRows] = await db.pool!.query<RowDataPacket[]>(
-      'SELECT name, email, phone, type FROM entities WHERE id = ?',
+      'SELECT name, email, phone, type, identifier FROM entities WHERE id = ?',
       [id]
     )
     const old = eRows[0] || {}
@@ -1741,15 +1801,19 @@ app.whenReady().then(() => {
     const changes: string[] = []
     if (updates.name && updates.name !== old.name)
       changes.push(`name: ${old.name} → ${updates.name}`)
-    if (updates.email !== undefined && updates.email !== old.email) changes.push('email changed')
-    if (updates.phone !== undefined && updates.phone !== old.phone) changes.push('phone changed')
+    // Old -> new values, so the entity's history reads on its own
+    const shown = (v: unknown): string => (v == null || v === '' ? '(empty)' : String(v))
+    for (const f of ['email', 'phone', 'identifier'] as const) {
+      if (updates[f] !== undefined && (updates[f] || null) !== (old[f] || null))
+        changes.push(`${f}: ${shown(old[f])} → ${shown(updates[f])}`)
+    }
     if (updates.type && updates.type !== old.type)
       changes.push(`type: ${old.type} → ${updates.type}`)
     const nonDocFields = Object.keys(updates).filter(
       (k) =>
         updates[k] !== undefined &&
         !docFields.includes(k) &&
-        !['name', 'email', 'phone', 'type'].includes(k)
+        !['name', 'email', 'phone', 'type', 'identifier'].includes(k)
     )
     if (nonDocFields.length > 0) changes.push(...nonDocFields.map((k) => `${k} changed`))
     const summary =

@@ -56,6 +56,8 @@ interface EntityEditPanelProps {
    */
   editing?: boolean
   onEditingChange?: (v: boolean) => void
+  /** Leave out the Business section (the Directory shows it in its own tab) */
+  hideBusiness?: boolean
 }
 
 /**
@@ -73,7 +75,8 @@ export default function EntityEditPanel({
   onChanged,
   showCommissions = true,
   editing,
-  onEditingChange
+  onEditingChange,
+  hideBusiness = false
 }: EntityEditPanelProps): React.JSX.Element | null {
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
@@ -1266,7 +1269,7 @@ export default function EntityEditPanel({
       </div>
 
       {/* Quotations, policies, vessels and receipts where this entity is the customer */}
-      <EntityBusinessSection entityId={entity.id} sectionLabel={sectionLabel} />
+      {!hideBusiness && <EntityBusinessSection entityId={entity.id} sectionLabel={sectionLabel} />}
 
       {/* Commission overrides — collapsed by default, at the bottom */}
       {showCommissions && policyTypes.length > 0 && (

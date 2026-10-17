@@ -263,6 +263,13 @@ export interface Api {
 
   getEntities: () => Promise<Entity[]>
   getEntitiesPaginated: (params: EntityQueryParams) => Promise<PaginatedResult<Entity>>
+  getEntityDirectoryStats: () => Promise<import('../shared/types').EntityDirectoryStats>
+  /** Deletes every unused entity with no documents on file */
+  deleteUnusedEntities: () => Promise<{ deleted: number }>
+  getEntityHistory: (entityId: string) => Promise<import('../shared/types').ActivityLogEntry[]>
+  getEntityNotes: (entityId: string) => Promise<import('../shared/types').EntityNote[]>
+  addEntityNote: (entityId: string, note: string) => Promise<import('../shared/types').EntityNote>
+  deleteEntityNote: (noteId: string) => Promise<void>
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>

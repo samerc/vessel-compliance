@@ -24,12 +24,24 @@ import {
   CheckSquare,
   Square,
   Download,
-  FolderOpen
+  FolderOpen,
+  FileExclamationPoint,
+  MapPinOff,
+  UserX,
+  Clock,
+  Unlink,
+  Briefcase,
+  StickyNote,
+  IdCard
 } from 'lucide-react'
 import RemapFilePathsModal from './RemapFilePathsModal'
 import EntityEditPanel from './EntityEditPanel'
+import EntityBusinessSection from './EntityBusinessSection'
+import EntityNotesHistory from './EntityNotesHistory'
 import {
   Entity,
+  EntityGap,
+  EntityDirectoryStats,
   EntityQueryParams,
   Vessel,
   VesselAssured,
@@ -59,7 +71,45 @@ import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { decideSanctionsSubject } from '../utils/sanctionsDecision'
-import { SanctionsBadge, EmptyState, Modal, Field, SegmentedControl } from './ui'
+import { SanctionsBadge, EmptyState, Modal, Field, SegmentedControl, Tabs } from './ui'
+import { confirmDialog } from './DialogHost'
+
+/** Sanctions screening older than this counts as out of date */
+const SCREENING_MAX_AGE_MS = 182 * 86400000
+
+/** The Directory "needs attention" cards, in display order */
+const GAP_CARDS: { key: EntityGap; label: string; hint: string; icon: React.ReactNode }[] = [
+  {
+    key: 'missingDocs',
+    label: 'Missing documents',
+    hint: 'A required document type has no file',
+    icon: <FileExclamationPoint size={16} />
+  },
+  {
+    key: 'noUbo',
+    label: 'No UBOs',
+    hint: 'Companies that are vessel assureds with no beneficial owner listed',
+    icon: <UserX size={16} />
+  },
+  {
+    key: 'noAddress',
+    label: 'No address',
+    hint: 'Companies without an address on file',
+    icon: <MapPinOff size={16} />
+  },
+  {
+    key: 'staleScreening',
+    label: 'Screening out of date',
+    hint: 'Not screened for sanctions in the last 6 months',
+    icon: <Clock size={16} />
+  },
+  {
+    key: 'unused',
+    label: 'Not linked to anything',
+    hint: 'No vessel, policy, quotation, receipt or UBO link',
+    icon: <Unlink size={16} />
+  }
+]
 
 /** A vessel linked to an entity, directly (roles) or through an assured it is UBO of */
 type AssociatedVessel = Vessel & { roles: string[]; viaAssureds: string[] }
@@ -103,6 +153,30 @@ function jaroWinkler(s1: string, s2: string): number {
   return jaro + prefix * 0.1 * (1 - jaro)
 }
 
+// Words every second company name has: comparing without them stops "A.B. Shipping Ltd." from
+// looking like "Kayo Shipping Ltd." in the duplicate finder
+const NAME_NOISE = new Set(
+  'shipping ship ships management manager managers maritime marine navigation shipmanagement trading transport line lines company co corp corporation inc incorporated ltd limited llc sa sal sarl gmbh plc fzco fze fzc dmcc ou as holding holdings group international intl and the of'.split(
+    ' '
+  )
+)
+/** Name reduced for duplicate matching: lower case, no accents / punctuation / company words */
+function dupKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u0600-\u06ff\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t && !NAME_NOISE.has(t))
+    .join(' ')
+}
+/** Similarity of two entities for the duplicate finder (0 when the types differ) */
+function dupScore(a: { type: string; key: string }, b: { type: string; key: string }): number {
+  if (a.type !== b.type || !a.key || !b.key) return 0
+  return a.key === b.key ? 1 : jaroWinkler(a.key, b.key)
+}
+
 export default function EntityDirectory({
   initialEntityId,
   onInitialEntityConsumed,
@@ -142,22 +216,40 @@ export default function EntityDirectory({
   const [viewMode, setViewMode] = useState<'all' | 'customers'>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | 'company' | 'person'>('all')
   const [ofacStatusFilter, setOfacStatusFilter] = useState<string>('all')
+  // "Needs attention" filter (one at a time) and the counts behind the cards
+  const [gapFilter, setGapFilter] = useState<EntityGap | null>(null)
+  const [stats, setStats] = useState<EntityDirectoryStats | null>(null)
+  const [dupCount, setDupCount] = useState<number | null>(null)
+  const [deletingUnused, setDeletingUnused] = useState(false)
+  const [panelTab, setPanelTab] = useState<'profile' | 'business' | 'notes'>('profile')
+  const [noteCount, setNoteCount] = useState<number | null>(null)
 
   const debouncedSearch = useDebounceValue(searchTerm, 500)
 
   // Column preferences
   const ENTITY_COLUMNS: ColumnDef[] = [
     { id: 'name', label: 'Name', defaultVisible: true },
-    { id: 'type', label: 'Type', defaultVisible: true },
+    { id: 'type', label: 'Type', defaultVisible: false },
+    { id: 'profile', label: 'Profile', defaultVisible: true },
     { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
+    { id: 'screened', label: 'Screened', defaultVisible: true },
     { id: 'documents', label: 'Documents', defaultVisible: true },
     { id: 'vessels', label: 'Vessels', defaultVisible: true }
   ]
+  // v2: the Profile and Last screened columns were added (the old saved choice hid them)
   const { visibleColumns: entVisibleCols, setVisibleColumns: setEntVisibleCols } = useColumnPrefs(
-    'entities',
+    'entities_v2',
     ENTITY_COLUMNS
   )
   const entVisSet = new Set(entVisibleCols)
+  const COLUMN_WIDTHS: Record<string, string> = {
+    type: '100px',
+    profile: '110px',
+    sanctions: '132px',
+    screened: '104px',
+    documents: '95px',
+    vessels: '75px'
+  }
 
   const [checkingId, setCheckingId] = useState<string | null>(null)
 
@@ -206,7 +298,7 @@ export default function EntityDirectory({
   const [exportingCompliance, setExportingCompliance] = useState(false)
 
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false)
-  const [dupThreshold, setDupThreshold] = useState(85)
+  const [dupThreshold, setDupThreshold] = useState(95)
   // The merge was opened from the duplicate finder: go back to it afterwards
   const [mergeFromFinder, setMergeFromFinder] = useState(false)
   // Pairs marked "Not duplicates" (per computer), as "idA|idB" with the ids sorted
@@ -261,18 +353,57 @@ export default function EntityDirectory({
       .slice(0, 20)
   }, [mergeSearch, allEntitiesForMerge])
 
+  // Duplicate-matching keys, worked out once per load
+  const dupEntries = useMemo(
+    () => allEntities.map((e) => ({ entity: e, type: e.type, key: dupKey(e.name) })),
+    [allEntities]
+  )
+
   const duplicatePairs = useMemo(() => {
     if (!showDuplicatesModal) return []
     const threshold = dupThreshold / 100
     const pairs: { a: Entity; b: Entity; score: number }[] = []
-    for (let i = 0; i < allEntities.length; i++) {
-      for (let j = i + 1; j < allEntities.length; j++) {
-        const score = jaroWinkler(allEntities[i].name, allEntities[j].name)
-        if (score >= threshold) pairs.push({ a: allEntities[i], b: allEntities[j], score })
+    for (let i = 0; i < dupEntries.length; i++) {
+      for (let j = i + 1; j < dupEntries.length; j++) {
+        const score = dupScore(dupEntries[i], dupEntries[j])
+        if (score >= threshold)
+          pairs.push({ a: dupEntries[i].entity, b: dupEntries[j].entity, score })
       }
     }
     return pairs.sort((x, y) => y.score - x.score)
-  }, [allEntities, showDuplicatesModal, dupThreshold])
+  }, [dupEntries, showDuplicatesModal, dupThreshold])
+  // Possible duplicates for the Find Duplicates button, worked out in small slices after load so
+  // the page stays responsive (same rule as the finder at its current threshold)
+  useEffect(() => {
+    if (dupEntries.length === 0) return
+    let cancelled = false
+    const list = dupEntries
+    const threshold = dupThreshold / 100
+    let i = 0
+    let count = 0
+    let timer: ReturnType<typeof setTimeout>
+    const step = (): void => {
+      if (cancelled) return
+      const end = Math.min(i + 40, list.length)
+      for (; i < end; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          if (
+            dupScore(list[i], list[j]) >= threshold &&
+            !dismissedPairs.has(pairKey(list[i].entity.id, list[j].entity.id))
+          )
+            count++
+        }
+      }
+      if (i < list.length) timer = setTimeout(step, 0)
+      else setDupCount(count)
+    }
+    timer = setTimeout(step, 1200)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [dupEntries, dismissedPairs, dupThreshold])
+
   const shownPairs = duplicatePairs.filter(
     (p) => showDismissed || !dismissedPairs.has(pairKey(p.a.id, p.b.id))
   )
@@ -454,7 +585,8 @@ export default function EntityDirectory({
         search: debouncedSearch,
         type: typeFilter,
         ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
-        customersOnly: viewMode === 'customers' ? true : undefined
+        customersOnly: viewMode === 'customers' ? true : undefined,
+        gap: gapFilter ?? undefined
       })
     const applyPage = (result: PaginatedResult<Entity> | null | undefined): void => {
       setEntities(Array.isArray(result?.data) ? result.data : [])
@@ -508,10 +640,29 @@ export default function EntityDirectory({
     }
 
     void (full ? loadAll() : loadPage())
-  }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode, reloadKey])
+  }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode, gapFilter, reloadKey])
+
+  // "Needs attention" counts: on open and after every change
+  useEffect(() => {
+    let cancelled = false
+    window.api
+      .getEntityDirectoryStats()
+      .then((s) => !cancelled && setStats(s && typeof s.total === 'number' ? s : null))
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [reloadKey])
 
   // A new search / filter / page size starts again at page 1 (adjusting state during render)
-  const filterKey = JSON.stringify([debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
+  const filterKey = JSON.stringify([
+    debouncedSearch,
+    typeFilter,
+    ofacStatusFilter,
+    limit,
+    viewMode,
+    gapFilter
+  ])
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey)
@@ -701,15 +852,100 @@ export default function EntityDirectory({
     return { have, total: applicableTypes.length }
   }
 
-  // ── Stats ───────────────────────────────────────────────────────────────────
-  const companyCount = useMemo(
-    () => allEntities.filter((e) => e.type === 'company').length,
-    [allEntities]
-  )
-  const personCount = useMemo(
-    () => allEntities.filter((e) => e.type === 'person').length,
-    [allEntities]
-  )
+  // Profile completeness (emails and phones are left out: most entities come through brokers).
+  // Address is known only on directory rows (addressCount); elsewhere it is not counted.
+  const getProfile = (entity: Entity): { done: number; total: number; missing: string[] } => {
+    const missing: string[] = []
+    let total = 0
+    const docs = getDocScore(entity)
+    if (docs.total > 0) {
+      total++
+      const n = docs.total - docs.have
+      if (n > 0) missing.push(`${n} required document${n === 1 ? '' : 's'} missing`)
+    }
+    const row = entities.find((e) => e.id === entity.id) ?? entity
+    if (entity.type === 'company' && row.addressCount !== undefined) {
+      total++
+      if (!row.addressCount) missing.push('No address')
+    }
+    if (entity.type === 'company' && (assuredsByEntity.get(entity.id)?.length ?? 0) > 0) {
+      total++
+      if (!entityUBOs.some((u) => u.assuredEntityId === entity.id)) missing.push('No UBOs listed')
+    }
+    total++
+    const screened = entity.ofacCheckedAt ? new Date(entity.ofacCheckedAt).getTime() : NaN
+    if (isNaN(screened) || Date.now() - screened > SCREENING_MAX_AGE_MS)
+      missing.push(isNaN(screened) ? 'Never screened' : 'Screening out of date')
+    return { done: total - missing.length, total, missing }
+  }
+
+  const renderProfileMeter = (
+    p: { done: number; total: number; missing: string[] },
+    width = 48
+  ): React.JSX.Element => {
+    const pct = p.total ? (p.done / p.total) * 100 : 100
+    const color =
+      p.done === p.total ? 'var(--success)' : p.done === 0 ? 'var(--danger)' : 'var(--warning)'
+    return (
+      <span
+        title={p.missing.length ? p.missing.join('\n') : 'Profile complete'}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: `${width}px`,
+            height: '6px',
+            borderRadius: '3px',
+            background: 'var(--glass-border-color)',
+            overflow: 'hidden',
+            display: 'inline-block'
+          }}
+        >
+          <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: color }} />
+        </span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 600, color }}>
+          {p.done}/{p.total}
+        </span>
+      </span>
+    )
+  }
+
+  const screenedLabel = (entity: Entity): React.JSX.Element => {
+    if (!entity.ofacCheckedAt) return <span style={{ color: 'var(--danger)' }}>Never</span>
+    const d = new Date(entity.ofacCheckedAt)
+    if (isNaN(d.getTime())) return <span className="muted">-</span>
+    const stale = Date.now() - d.getTime() > SCREENING_MAX_AGE_MS
+    return (
+      <span style={{ color: stale ? 'var(--warning)' : 'var(--text-secondary)' }}>
+        {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+      </span>
+    )
+  }
+
+  const handleDeleteUnused = async (): Promise<void> => {
+    if (!stats) return
+    const keep = stats.unused - stats.unusedDeletable
+    const ok = await confirmDialog(
+      `Delete ${stats.unusedDeletable} entit${stats.unusedDeletable === 1 ? 'y' : 'ies'} that are not linked to anything and have no documents?` +
+        (keep > 0
+          ? `\n\n${keep} unused entit${keep === 1 ? 'y has' : 'ies have'} documents on file and will be kept: check and delete those one by one.`
+          : '') +
+        '\n\nThis cannot be undone.'
+    )
+    if (!ok) return
+    setDeletingUnused(true)
+    try {
+      const r = await window.api.deleteUnusedEntities()
+      showSuccess(`Deleted ${r.deleted} unused entit${r.deleted === 1 ? 'y' : 'ies'}`)
+      setSelectedEntity(null)
+      loadData()
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete unused entities')
+    } finally {
+      setDeletingUnused(false)
+    }
+  }
 
   // ── OFAC handlers ───────────────────────────────────────────────────────────
   const handleOfacRecheck = async (entity: Entity): Promise<void> => {
@@ -850,6 +1086,8 @@ export default function EntityDirectory({
   if (selectedEntityId !== prevSelectedEntityId) {
     setPrevSelectedEntityId(selectedEntityId)
     setEditingEntityCore(false)
+    setPanelTab('profile')
+    setNoteCount(null)
   }
 
   // Track recent item view when an entity is selected (addresses/commissions/docs are
@@ -901,24 +1139,13 @@ export default function EntityDirectory({
       >
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px' }}>Entities</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Assureds, UBOs, and beneficial owners across your fleet.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+            {stats
+              ? `${stats.total.toLocaleString()} owners, managers, brokers and UBOs: ${stats.companies.toLocaleString()} companies, ${stats.persons.toLocaleString()} persons`
+              : 'Owners, managers, brokers and UBOs across your fleet.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <button
-            className="btn-secondary"
-            onClick={() => setShowDuplicatesModal(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 16px',
-              fontSize: '0.9rem'
-            }}
-          >
-            <ScanSearch size={16} /> Find Duplicates
-          </button>
           {hasPermission('entities:create') && (
             <button
               className="btn-primary"
@@ -937,89 +1164,127 @@ export default function EntityDirectory({
         </div>
       </header>
 
-      {/* Stats row */}
+      {/* Needs attention: each card filters the list (click again to clear) */}
       <div
+        role="group"
+        aria-label="Needs attention"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '16px',
-          marginBottom: '24px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))',
+          gap: '10px',
+          marginBottom: '20px'
         }}
       >
-        <div
+        {GAP_CARDS.map((c) => {
+          const n = stats ? stats[c.key] : null
+          const active = gapFilter === c.key
+          return (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={active}
+              title={c.hint}
+              onClick={() => setGapFilter(active ? null : c.key)}
+              className="glass-card"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                color: 'var(--text-primary)',
+                border: active
+                  ? '1.5px solid var(--accent-primary)'
+                  : '1px solid var(--glass-border-color)',
+                background: active ? 'var(--accent-tint)' : undefined
+              }}
+            >
+              <span
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: n ? 'var(--warning)' : 'var(--success)',
+                  background: n
+                    ? 'color-mix(in srgb, var(--warning) 14%, transparent)'
+                    : 'color-mix(in srgb, var(--success) 14%, transparent)'
+                }}
+              >
+                {c.icon}
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{ display: 'block', fontSize: '1.2rem', fontWeight: 700, lineHeight: 1.1 }}
+                >
+                  {n === null ? '-' : n.toLocaleString()}
+                </span>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: '0.74rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {c.label}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          title="Entities with very similar names: review and merge them"
+          onClick={() => setShowDuplicatesModal(true)}
           className="glass-card"
-          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 14px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--glass-border-color)'
+          }}
         >
-          <div
+          <span
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              flexShrink: 0,
+              color: dupCount ? 'var(--warning)' : 'var(--success)',
+              background: dupCount
+                ? 'color-mix(in srgb, var(--warning) 14%, transparent)'
+                : 'color-mix(in srgb, var(--success) 14%, transparent)'
             }}
           >
-            <Shield size={20} color="white" />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
-              {allEntities.length}
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              Total Entities
-            </div>
-          </div>
-        </div>
-        <div
-          className="glass-card"
-          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
-        >
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: accentBg,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Building2 size={20} color={companyColor} />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
-              {companyCount}
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Companies</div>
-          </div>
-        </div>
-        <div
-          className="glass-card"
-          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
-        >
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <User size={20} color={personColor} />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
-              {personCount}
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Persons</div>
-          </div>
-        </div>
+            <ScanSearch size={16} />
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <span
+              style={{ display: 'block', fontSize: '1.2rem', fontWeight: 700, lineHeight: 1.1 }}
+            >
+              {dupCount === null ? '…' : dupCount.toLocaleString()}
+            </span>
+            <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              Possible duplicate pairs
+            </span>
+          </span>
+        </button>
       </div>
 
       {/* Filter bar */}
@@ -1045,16 +1310,15 @@ export default function EntityDirectory({
         <div style={{ flex: 1 }} />
 
         {/* Type filter */}
-        <select
+        <SegmentedControl
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as 'all' | 'company' | 'person')}
-          style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '120px' }}
-          aria-label="Filter by type"
-        >
-          <option value="all">All Types</option>
-          <option value="company">Companies</option>
-          <option value="person">Persons</option>
-        </select>
+          onChange={setTypeFilter}
+          items={[
+            { key: 'all', label: 'All types' },
+            { key: 'company', label: 'Companies', icon: <Building2 size={13} /> },
+            { key: 'person', label: 'Persons', icon: <User size={13} /> }
+          ]}
+        />
 
         {/* OFAC filter */}
         <select
@@ -1120,6 +1384,53 @@ export default function EntityDirectory({
           {selectMode ? 'Done' : 'Bulk select'}
         </button>
       </div>
+
+      {/* The "needs attention" filter in use */}
+      {gapFilter && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            padding: '8px 14px',
+            marginBottom: '12px',
+            borderRadius: '10px',
+            background: 'var(--accent-tint)',
+            border: '1px solid var(--accent-border)',
+            fontSize: '0.84rem'
+          }}
+        >
+          <span>
+            Showing <strong>{GAP_CARDS.find((c) => c.key === gapFilter)?.label}</strong>
+            {' · '}
+            {total.toLocaleString()} entit{total === 1 ? 'y' : 'ies'}
+            <span className="muted"> ({GAP_CARDS.find((c) => c.key === gapFilter)?.hint})</span>
+          </span>
+          <div style={{ flex: 1 }} />
+          {gapFilter === 'unused' &&
+            hasPermission('entities:delete') &&
+            stats &&
+            stats.unusedDeletable > 0 && (
+              <button
+                className="btn-secondary btn-sm"
+                style={{ color: 'var(--danger)' }}
+                disabled={deletingUnused}
+                onClick={() => void handleDeleteUnused()}
+                title="Deletes the unused entities that have no documents on file"
+              >
+                <Trash2 size={13} />{' '}
+                {deletingUnused
+                  ? 'Deleting...'
+                  : `Delete ${stats.unusedDeletable} without documents`}
+              </button>
+            )}
+          <button className="btn-secondary btn-sm" onClick={() => setGapFilter(null)}>
+            <X size={13} /> Clear filter
+          </button>
+        </div>
+      )}
 
       {/* Bulk Action Toolbar */}
       {selectMode && selectedEntityIds.size > 0 && (
@@ -1203,14 +1514,13 @@ export default function EntityDirectory({
               position: 'relative'
             }}
           >
-            <table className="data-table">
+            <table className="data-table" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 {selectMode && <col style={{ width: '40px' }} />}
-                <col style={{ width: 'auto' }} />
-                <col style={{ width: '110px' }} />
-                <col style={{ width: '150px' }} />
-                <col style={{ width: '90px' }} />
-                <col style={{ width: '80px' }} />
+                {ENTITY_COLUMNS.filter((c) => entVisSet.has(c.id)).map((c) => (
+                  <col key={c.id} style={{ width: COLUMN_WIDTHS[c.id] ?? 'auto' }} />
+                ))}
+                <col style={{ width: '36px' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -1236,17 +1546,9 @@ export default function EntityDirectory({
                       </div>
                     </th>
                   )}
-                  {[
-                    { id: 'name', label: 'Name' },
-                    { id: 'type', label: 'Type' },
-                    { id: 'sanctions', label: 'Sanctions' },
-                    { id: 'documents', label: 'Documents' },
-                    { id: 'vessels', label: 'Vessels' }
-                  ]
-                    .filter((col) => entVisSet.has(col.id))
-                    .map((col) => (
-                      <th key={col.id}>{col.label}</th>
-                    ))}
+                  {ENTITY_COLUMNS.filter((col) => entVisSet.has(col.id)).map((col) => (
+                    <th key={col.id}>{col.label}</th>
+                  ))}
                   <th style={{ width: '36px', padding: '10px 8px' }}>
                     <ColumnSelector
                       pageKey="entities"
@@ -1261,7 +1563,7 @@ export default function EntityDirectory({
                 {isLoading && entities.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={selectMode ? 6 : 5}
+                      colSpan={entVisibleCols.length + (selectMode ? 2 : 1)}
                       className="muted"
                       style={{ padding: '48px', textAlign: 'center' }}
                     >
@@ -1276,7 +1578,7 @@ export default function EntityDirectory({
                 ) : entities.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={selectMode ? 6 : 5}
+                      colSpan={entVisibleCols.length + (selectMode ? 2 : 1)}
                       style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <EmptyState
@@ -1431,9 +1733,19 @@ export default function EntityDirectory({
                             </span>
                           </td>
                         )}
+                        {/* Profile completeness */}
+                        {entVisSet.has('profile') && (
+                          <td>{renderProfileMeter(getProfile(entity))}</td>
+                        )}
                         {/* Sanctions */}
                         {entVisSet.has('sanctions') && (
                           <td>{renderOfacBadge({ entity }, () => handleOfacRecheck(entity))}</td>
+                        )}
+                        {/* Last screened */}
+                        {entVisSet.has('screened') && (
+                          <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                            {screenedLabel(entity)}
+                          </td>
                         )}
                         {/* Documents */}
                         {entVisSet.has('documents') && (
@@ -1554,7 +1866,7 @@ export default function EntityDirectory({
           <div
             className="glass-card fade-in"
             style={{
-              width: '400px',
+              width: '460px',
               flexShrink: 0,
               padding: 0,
               maxHeight: 'calc(100vh - 280px)',
@@ -1667,6 +1979,81 @@ export default function EntityDirectory({
                 </div>
               )}
 
+              {/* Profile completeness + quick facts */}
+              {(() => {
+                const p = getProfile(selectedEntity)
+                const custType = policyCustomers.get(selectedEntity.id)
+                return (
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      background: 'color-mix(in srgb, var(--text-primary) 3%, transparent)',
+                      border: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="muted" style={{ fontSize: '0.76rem', fontWeight: 600 }}>
+                        Profile
+                      </span>
+                      {renderProfileMeter(p, 90)}
+                      <span style={{ flex: 1 }} />
+                      <SanctionsBadge status={selectedEntity.ofacStatus} />
+                    </div>
+                    {p.missing.length > 0 && (
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}
+                      >
+                        {p.missing.map((m) => (
+                          <span
+                            key={m}
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '1px 8px',
+                              borderRadius: '10px',
+                              color: 'var(--warning)',
+                              background: 'color-mix(in srgb, var(--warning) 12%, transparent)'
+                            }}
+                          >
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div
+                      className="muted"
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '4px 14px',
+                        marginTop: '8px',
+                        fontSize: '0.76rem'
+                      }}
+                    >
+                      <span>
+                        <Ship size={11} style={{ verticalAlign: '-1px' }} /> Assured on{' '}
+                        {getVesselCount(selectedEntity.id)} vessel
+                        {getVesselCount(selectedEntity.id) === 1 ? '' : 's'}
+                      </span>
+                      {custType !== undefined && (
+                        <span>
+                          <Briefcase size={11} style={{ verticalAlign: '-1px' }} /> Customer
+                          {custType ? ` (${custType})` : ''}
+                        </span>
+                      )}
+                      <span>Screened {screenedLabel(selectedEntity)}</span>
+                      {selectedEntity.identifier && (
+                        <span>
+                          <IdCard size={11} style={{ verticalAlign: '-1px' }} />{' '}
+                          {selectedEntity.identifier}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Directory-level actions (edit / merge / delete / remap) */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
                 {hasPermission('entities:edit') && (
@@ -1732,217 +2119,262 @@ export default function EntityDirectory({
               </div>
             </div>
 
-            {/* Entity-level editing - shared with the vessel Assured tab */}
-            <EntityEditPanel
-              entityId={selectedEntity.id}
-              canManage={hasPermission('entities:edit')}
-              onChanged={loadData}
-              editing={editingEntityCore}
-              onEditingChange={setEditingEntityCore}
+            <Tabs
+              value={panelTab}
+              onChange={setPanelTab}
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                background: 'var(--bg-card)',
+                padding: '0 16px',
+                marginBottom: 0
+              }}
+              items={[
+                { key: 'profile', label: 'Profile' },
+                {
+                  key: 'business',
+                  label: 'Business',
+                  icon: <Briefcase size={14} />,
+                  count: getVesselCount(selectedEntity.id) || undefined
+                },
+                {
+                  key: 'notes',
+                  label: 'Notes & history',
+                  icon: <StickyNote size={14} />,
+                  count: noteCount || undefined
+                }
+              ]}
             />
 
-            {/* Vessels section */}
-            <div style={{ padding: '16px 20px', flex: 1 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px'
-                }}
-              >
-                <div
-                  style={{
+            {/* Entity-level editing - shared with the vessel Assured tab */}
+            {panelTab === 'profile' && (
+              <EntityEditPanel
+                entityId={selectedEntity.id}
+                canManage={hasPermission('entities:edit')}
+                onChanged={loadData}
+                editing={editingEntityCore}
+                onEditingChange={setEditingEntityCore}
+                hideBusiness
+              />
+            )}
+
+            {panelTab === 'notes' && (
+              <EntityNotesHistory
+                key={selectedEntity.id}
+                entityId={selectedEntity.id}
+                canAdd={hasPermission('entities:edit')}
+                onCountChange={setNoteCount}
+              />
+            )}
+
+            {/* Vessels, then the quotations / policies / receipts where it is the customer */}
+            {panelTab === 'business' && (
+              <>
+                <div style={{ padding: '16px 20px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.68rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.7px',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600
+                      }}
+                    >
+                      Vessels as assured / UBO
+                      {associatedVessels.length > 0 && (
+                        <span
+                          style={{
+                            marginLeft: '6px',
+                            padding: '1px 6px',
+                            borderRadius: '8px',
+                            background: accentBg,
+                            color: 'var(--accent-primary)',
+                            fontWeight: 700,
+                            fontSize: '0.65rem'
+                          }}
+                        >
+                          {associatedVessels.length}
+                        </span>
+                      )}
+                    </div>
+                    {policyCustomers.has(selectedEntity.id) && (
+                      <button
+                        onClick={async () => {
+                          setExportingCompliance(true)
+                          try {
+                            const { exportCustomerCompliancePDF } =
+                              await import('../services/CustomerComplianceExport')
+                            await exportCustomerCompliancePDF(
+                              selectedEntity.id,
+                              selectedEntity.name,
+                              policyCustomers.get(selectedEntity.id) ?? null
+                            )
+                          } finally {
+                            setExportingCompliance(false)
+                          }
+                        }}
+                        disabled={exportingCompliance}
+                        className="btn-secondary"
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '0.74rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="12" y1="18" x2="12" y2="12" />
+                          <line x1="9" y1="15" x2="15" y2="15" />
+                        </svg>
+                        {exportingCompliance ? 'Exporting...' : 'PDF'}
+                      </button>
+                    )}
+                  </div>
+
+                  {associatedVessels.length === 0 ? (
+                    <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                      Not an assured or UBO on any vessel.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {associatedVessels.map((vessel: AssociatedVessel, i: number) => (
+                        <div
+                          key={vessel.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            padding: '10px 0',
+                            borderBottom:
+                              i < associatedVessels.length - 1
+                                ? '1px solid var(--table-border)'
+                                : 'none'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '7px',
+                              background: accentBg,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              marginTop: '1px'
+                            }}
+                          >
+                            <Ship size={13} color={companyColor} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '0.85rem',
+                                cursor: 'pointer',
+                                color: 'var(--accent-primary)',
+                                textTransform: 'uppercase',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                              onClick={() => setViewingVessel(vessel)}
+                            >
+                              {vessel.name}
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginTop: '3px',
+                                flexWrap: 'wrap'
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  color: 'var(--text-secondary)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}
+                              >
+                                <Hash size={10} />
+                                {vessel.imoNumber}
+                              </span>
+                              {vessel.roles.map((r, ri) => (
+                                <span
+                                  key={ri}
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    background: accentBg,
+                                    color: companyColor,
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {r}
+                                </span>
+                              ))}
+                              {vessel.viaAssureds.map((r, ri) => (
+                                <span
+                                  key={ri}
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    background:
+                                      'color-mix(in srgb, var(--text-primary) 4%, transparent)',
+                                    color: 'var(--text-secondary)',
+                                    border: '1px solid var(--table-border)'
+                                  }}
+                                >
+                                  via {r}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {renderOfacBadge({ vessel }, () => handleVesselOfacRecheck(vessel))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <EntityBusinessSection
+                  key={selectedEntity.id}
+                  entityId={selectedEntity.id}
+                  sectionLabel={{
                     fontSize: '0.68rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.7px',
                     color: 'var(--text-secondary)',
                     fontWeight: 600
                   }}
-                >
-                  Vessels
-                  {associatedVessels.length > 0 && (
-                    <span
-                      style={{
-                        marginLeft: '6px',
-                        padding: '1px 6px',
-                        borderRadius: '8px',
-                        background: accentBg,
-                        color: 'var(--accent-primary)',
-                        fontWeight: 700,
-                        fontSize: '0.65rem'
-                      }}
-                    >
-                      {associatedVessels.length}
-                    </span>
-                  )}
-                </div>
-                {policyCustomers.has(selectedEntity.id) && (
-                  <button
-                    onClick={async () => {
-                      setExportingCompliance(true)
-                      try {
-                        const { exportCustomerCompliancePDF } =
-                          await import('../services/CustomerComplianceExport')
-                        await exportCustomerCompliancePDF(
-                          selectedEntity.id,
-                          selectedEntity.name,
-                          policyCustomers.get(selectedEntity.id) ?? null
-                        )
-                      } finally {
-                        setExportingCompliance(false)
-                      }
-                    }}
-                    disabled={exportingCompliance}
-                    className="btn-secondary"
-                    style={{
-                      padding: '3px 10px',
-                      fontSize: '0.74rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="12" y1="18" x2="12" y2="12" />
-                      <line x1="9" y1="15" x2="15" y2="15" />
-                    </svg>
-                    {exportingCompliance ? 'Exporting...' : 'PDF'}
-                  </button>
-                )}
-              </div>
-
-              {associatedVessels.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '24px 0',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  <Ship
-                    size={28}
-                    style={{ opacity: 0.2, display: 'block', margin: '0 auto 8px' }}
-                  />
-                  No vessels linked
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {associatedVessels.map((vessel: AssociatedVessel, i: number) => (
-                    <div
-                      key={vessel.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '10px',
-                        padding: '10px 0',
-                        borderBottom:
-                          i < associatedVessels.length - 1
-                            ? '1px solid var(--table-border)'
-                            : 'none'
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '7px',
-                          background: accentBg,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          marginTop: '1px'
-                        }}
-                      >
-                        <Ship size={13} color={companyColor} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            color: 'var(--accent-primary)',
-                            textTransform: 'uppercase',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                          onClick={() => setViewingVessel(vessel)}
-                        >
-                          {vessel.name}
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            marginTop: '3px',
-                            flexWrap: 'wrap'
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              color: 'var(--text-secondary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '2px'
-                            }}
-                          >
-                            <Hash size={10} />
-                            {vessel.imoNumber}
-                          </span>
-                          {vessel.roles.map((r, ri) => (
-                            <span
-                              key={ri}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background: accentBg,
-                                color: companyColor,
-                                fontWeight: 500
-                              }}
-                            >
-                              {r}
-                            </span>
-                          ))}
-                          {vessel.viaAssureds.map((r, ri) => (
-                            <span
-                              key={ri}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background:
-                                  'color-mix(in srgb, var(--text-primary) 4%, transparent)',
-                                color: 'var(--text-secondary)',
-                                border: '1px solid var(--table-border)'
-                              }}
-                            >
-                              via {r}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      {renderOfacBadge({ vessel }, () => handleVesselOfacRecheck(vessel))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  alwaysOpen
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -2336,7 +2768,8 @@ export default function EntityDirectory({
           }
         >
           <p style={{ margin: '0 0 14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            Entities with similar names based on Jaro-Winkler similarity
+            Companies or persons whose names match closely, ignoring punctuation and common words
+            such as Shipping, Maritime, Co. or Ltd.
           </p>
 
           {/* Threshold control */}
