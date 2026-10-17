@@ -36,7 +36,7 @@ interface ColumnDef {
 interface FilterDef {
   key: string
   label: string
-  type: 'select' | 'text' | 'date'
+  type: 'select' | 'text' | 'date' | 'number'
   options?: { value: string; label: string }[]
   loadOptions?: () => Promise<{ value: string; label: string }[]>
   placeholder?: string
@@ -98,7 +98,33 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         type: 'select',
         loadOptions: loadClassificationOptions
       },
+      {
+        key: 'vesselType',
+        label: 'Vessel Type',
+        type: 'select',
+        loadOptions: loadVesselTypeOptions
+      },
+      {
+        key: 'policyTypeId',
+        label: 'Active Policy',
+        type: 'select',
+        loadOptions: loadPolicyTypeOptions
+      },
       { key: 'customerId', label: 'Customer', type: 'select', loadOptions: loadEntityOptions },
+      {
+        key: 'customerType',
+        label: 'Customer Type',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'All' },
+          { value: 'broker', label: 'Broker' },
+          { value: 'direct', label: 'Direct' }
+        ]
+      },
+      { key: 'builtFrom', label: 'Built From', type: 'number', placeholder: 'Year' },
+      { key: 'builtTo', label: 'Built To', type: 'number', placeholder: 'Year' },
+      { key: 'gtFrom', label: 'GT From', type: 'number' },
+      { key: 'gtTo', label: 'GT To', type: 'number' },
       { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel name, IMO...' }
     ],
     groupBy: [
@@ -455,6 +481,11 @@ async function loadClassificationOptions(): Promise<{ value: string; label: stri
 async function loadEntityOptions(): Promise<{ value: string; label: string }[]> {
   const entities = await window.api.getEntities()
   return [{ value: 'all', label: 'All' }, ...entities.map((e) => ({ value: e.id, label: e.name }))]
+}
+
+async function loadVesselTypeOptions(): Promise<{ value: string; label: string }[]> {
+  const types = await window.api.getVesselTypes()
+  return [{ value: 'all', label: 'All' }, ...types.map((t) => ({ value: t.id, label: t.name }))]
 }
 
 async function loadPolicyTypeOptions(): Promise<{ value: string; label: string }[]> {
@@ -1277,6 +1308,15 @@ export default function ReportBuilder(): React.JSX.Element {
                         type="date"
                         value={filters[f.key] || ''}
                         onChange={(e) => updateFilter(f.key, e.target.value)}
+                      />
+                    )}
+                    {f.type === 'number' && (
+                      <input
+                        type="number"
+                        min={0}
+                        value={filters[f.key] || ''}
+                        onChange={(e) => updateFilter(f.key, e.target.value)}
+                        placeholder={f.placeholder}
                       />
                     )}
                   </Field>

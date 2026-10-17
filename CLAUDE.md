@@ -450,12 +450,14 @@ Query builder for finding entity contacts across the fleet (`src/renderer/src/co
 
 The one-time legacy Excel importer (`vesselExcelImport.ts`, IPCs `vessels:importInsurancePoliciesFromExcel` / `vessels:reimportVesselDetails`) was removed; its UI had already been dropped. Data it imported stays (`vessels:getInsurancePolicies` still reads it). The startup migration in `initSchema()` that normalizes non-ISO dates in `vessel_policy_values` is kept.
 
-### Vessel Filter
+### Vessel Filter ("More filters" on the Vessels page)
 
-Advanced vessel search page (`src/renderer/src/components/VesselFilter.tsx`):
+No longer a page of its own (2026-10-17, it overlapped the Report Builder): `VesselFilter.tsx` is the "More filters" panel of the Vessels page. VesselManager shows it instead of the plain list (`showFilters`; stays on when coming back from a vessel it opened); `navigateTo({ tab: 'vessels', sub: 'filter' })` opens it (feature `vessel-filter`). Printable / shareable output belongs in the Report Builder, whose Vessels source has the same criteria.
 
-- **Filters**: Multiple criteria for filtering the vessel list
-- **Navigation**: View button navigates to vessel detail
+- **Criteria**: policy types (+ active / expired), vessel type, flag (incl. unassigned), class, year built, GT, customer + broker/direct, vessel status; AND / OR
+- **Customer**: from the vessel's ACTIVE policies (`getAllVesselDynamicPolicies`, loaded once), never the legacy `vessels.customer_id`
+- **Saved views**: per computer (localStorage `vessel_filter_views`); Excel export; tick two results to Compare
+- **Navigation**: clicking a result opens the vessel; "Vessel list" goes back to the plain list
 - **Searchable MultiSelect**: `MultiSelectDropdown` component auto-shows an inline search input when `options.length > 6` (e.g. flag states list). Auto-focuses on open via `useEffect([open, showSearch])`. Filters by both `label` and `sublabel`. Clears search on close.
 - **Portal dropdowns**: Dropdowns rendered via `createPortal` to avoid clipping inside scrollable containers; positioned with `getBoundingClientRect` + flip-upward logic.
 
@@ -936,6 +938,7 @@ Unified template system (merged email + document):
 Customizable reports with 9 data sources:
 
 - **Data Sources**: Vessels, Policies, Entities, Renewals, Quotations, Policy Documents, Documents, Surveys, Survey Warranties
+- **Vessels source**: customer / customer type come from the vessel's active policies (all of them, comma-separated); filters for vessel type, active policy type, customer, customer type, built from/to, GT from/to (filter `type: 'number'`)
 - **Config**: Column checkboxes, dynamic filters per source, group-by, sort
 - **Chart View**: Horizontal bar charts with metrics (Count, Sum Premium, Avg Premium)
 - **Save/Share**: Named report configs saved to DB, shareable with team
@@ -954,9 +957,9 @@ Customizable reports with 9 data sources:
 
 - **Registry**: `src/renderer/src/features.ts` (`FEATURES`) lists every page, sub-tab and notable action with title, description, area, keywords, permission and a `NavTarget` (`{ tab, sub?, action? }`). It feeds the command palette, the **Features** page (`FeaturesPage.tsx`, bottom of the sidebar) and What's New "Try it" links. **Add an entry when you add a page, a sub-tab or a notable action.**
 - **`navigateTo(target)`** in App.tsx is the one way to go anywhere: sets the tab, a requested sub-tab (`pageRequest`), or runs an `AppAction` (new vessel/quotation/entity, what's new, release history, profile, check updates, theme, density)
-- **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
+- **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Vessels (list/filter), Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
 - **What's New "Try it"**: `featureId` on a `WHATS_NEW` item, or `[try:feature-id]` at the end of a release-note line
-- **Sidebar menu** (redesign 2026-10, App.tsx): Home, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Vessel Filter, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
+- **Sidebar menu** (redesign 2026-10, App.tsx): Home, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
 - **Settings hub** (AdminPanel = the Settings page): one place for every setting. The left list is grouped (`SETTINGS_GROUPS`: Quotations & policies, Vessels & documents, Compliance, Users & access, Files, System) with a search box (section names + `SECTION_KEYWORDS`). Quotation Settings, Policy Settings & Banks and User Management open INSIDE it (`HUB_PAGES`, outside the read-only fieldset, each with its own permission); a dot marks sections shared with regular users. The sidebar shows Settings when the user has admin:settings, fileManager:view, quotations:settings or admin:users. `navigateTo({ tab: 'users' })` redirects to `{ tab: 'admin', sub: 'users' }`; the Quotations and Policies pages keep their own Settings toggle too. Banks are managed only in Policy Settings
 - **First-run tip**: one-time Home banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
 
@@ -1041,8 +1044,8 @@ Per-quotation P&I alternatives (similar to hull):
 
 ### Vessel Comparison
 
-- **Location**: VesselFilter results page
-- **Select**: Checkboxes on 2 vessels → "Compare" button
+- **Component**: `VesselCompareModal.tsx` (loads everything itself from two vessel ids)
+- **Where**: Vessels page Bulk select with exactly 2 vessels ticked -> "Compare"; or tick 2 results in More filters
 - **Modal**: Side-by-side: General info, Policies, Documents, Sanctions
 
 ### Rebuilt Year

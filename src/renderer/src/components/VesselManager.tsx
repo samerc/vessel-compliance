@@ -16,7 +16,9 @@ import {
   X,
   CheckSquare,
   Square,
-  Download
+  Download,
+  GitCompareArrows,
+  SlidersHorizontal
 } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -33,6 +35,11 @@ import { vesselDocCounts, type VesselDocCounts } from '../utils/vesselDocComplia
 
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
+import { useRequestedSubTab, type SubTabProps } from '../utils/useRequestedSubTab'
+import VesselCompareModal from './VesselCompareModal'
+
+// "More filters" panel (the former Vessel Filter page), loaded when first opened
+const VesselFilter = lazy(() => import('./VesselFilter'))
 
 // Loaded on first open: VesselDetail pulls in the Excel/PDF export libraries, which kept them
 // in the startup bundle
@@ -56,12 +63,11 @@ export default function VesselManager({
   onNavigateBack,
   navigateBackLabel,
   onNavigateToQuotation,
-  onOpenAdvancedFilter,
   openCreate,
-  onCreateConsumed
-}: {
-  /** Opens the Vessel Filter page (more criteria than this list) */
-  onOpenAdvancedFilter?: () => void
+  onCreateConsumed,
+  subTab,
+  subTabNonce
+}: SubTabProps & {
   initialVesselId?: string | null
   initialVesselSection?:
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'
@@ -80,6 +86,13 @@ export default function VesselManager({
   const [openInEditMode, setOpenInEditMode] = useState(false)
   const { showError, showSuccess } = useToast()
   const { hasPermission } = useAuth()
+  // "More filters" panel instead of the plain list (stays on when coming back from a vessel)
+  const [showFilters, setShowFilters] = useState(false)
+  useRequestedSubTab(subTab, subTabNonce, ['list', 'filter'] as const, (k) => {
+    setSelectedVessel(null)
+    setShowFilters(k === 'filter')
+  })
+  const [showCompare, setShowCompare] = useState(false)
 
   // Pagination State
   const [page, setPage] = useState(1)
@@ -614,6 +627,48 @@ export default function VesselManager({
     )
   }
 
+  // Opens a vessel picked in the "More filters" results
+  const openVesselById = async (vesselId: string): Promise<void> => {
+    try {
+      const all = await window.api.getVessels()
+      const vessel = Array.isArray(all) ? all.find((v: Vessel) => v.id === vesselId) : undefined
+      if (!vessel) {
+        showError('Vessel not found')
+        return
+      }
+      setAppliedSection(undefined)
+      setNavigatedExternally(false)
+      setOpenInEditMode(false)
+      setSelectedVessel(vessel)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to open the vessel')
+    }
+  }
+
+  if (showFilters) {
+    return (
+      <div className="fade-in page">
+        <PageHeader
+          icon={<Ship size={26} />}
+          title="Vessels"
+          subtitle="More filters: policies, flag, class, type, age, tonnage and customer."
+        />
+        <Suspense
+          fallback={
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Loading...
+            </div>
+          }
+        >
+          <VesselFilter
+            onNavigateToVessel={(id) => void openVesselById(id)}
+            onClose={() => setShowFilters(false)}
+          />
+        </Suspense>
+      </div>
+    )
+  }
+
   return (
     <div className="fade-in page">
       <PageHeader
@@ -1014,16 +1069,14 @@ export default function VesselManager({
             {key !== 'all' && docCounts && <span className="chip-count">{docChipCounts[key]}</span>}
           </button>
         ))}
-        {onOpenAdvancedFilter && (
-          <button
-            className="btn-ghost btn-sm"
-            style={{ marginLeft: 'auto' }}
-            onClick={onOpenAdvancedFilter}
-            title="Flag, type, age, tonnage, class, policies and more"
-          >
-            <Filter size={14} /> Advanced filter
-          </button>
-        )}
+        <button
+          className="btn-ghost btn-sm"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => setShowFilters(true)}
+          title="Policies, flag, class, type, age, tonnage and customer, with AND / OR, saved views and compare"
+        >
+          <SlidersHorizontal size={14} /> More filters
+        </button>
       </div>
 
       {/* Bulk Action Toolbar */}
@@ -1198,6 +1251,25 @@ export default function VesselManager({
             }}
           >
             <Download size={13} /> Export Selected
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowCompare(true)}
+            disabled={selectedVesselIds.size !== 2}
+            title={
+              selectedVesselIds.size === 2
+                ? 'Compare these two vessels side by side'
+                : 'Select exactly two vessels to compare them'
+            }
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <GitCompareArrows size={13} /> Compare
           </button>
           <div style={{ flex: 1 }} />
           <button
@@ -1811,6 +1883,13 @@ export default function VesselManager({
           onClose={() => setSanctionsModal({ show: false, searchedName: '', matches: [] })}
           onMarkClean={handleMarkClean}
           onConfirmMatch={handleConfirmMatch}
+        />
+      )}
+
+      {showCompare && selectedVesselIds.size === 2 && (
+        <VesselCompareModal
+          vesselIds={[...selectedVesselIds] as [string, string]}
+          onClose={() => setShowCompare(false)}
         />
       )}
     </div>

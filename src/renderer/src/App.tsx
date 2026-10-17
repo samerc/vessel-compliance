@@ -25,7 +25,6 @@ import {
   KeyRound,
   ClipboardList,
   FileText,
-  SlidersHorizontal,
   Calendar,
   RefreshCw,
   Layers,
@@ -72,7 +71,6 @@ const FleetManager = lazy(() => import('./components/FleetManager'))
 const Directory = lazy(() => import('./components/Directory'))
 const ComplianceCenter = lazy(() => import('./components/ComplianceCenter'))
 const UserManager = lazy(() => import('./components/UserManager'))
-const VesselFilter = lazy(() => import('./components/VesselFilter'))
 const Calculators = lazy(() => import('./components/Calculators'))
 const ReceiptManager = lazy(() => import('./components/ReceiptManager'))
 const QuotationManager = lazy(() => import('./components/QuotationManager'))
@@ -671,7 +669,6 @@ function App(): React.JSX.Element {
     'survey-followup': 'Survey Follow-Up',
     calculators: 'Calculators',
     quotations: 'Quotations',
-    'vessel-filter': 'Vessel Filter',
     renewals: 'Renewals',
     reports: 'Reports',
     analytics: 'Fleet Analytics',
@@ -1319,8 +1316,6 @@ function App(): React.JSX.Element {
               sidebarCollapsed={sc}
             >
               {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
-              {hasPermission('vessels:view') &&
-                navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
               {hasPermission('fleets:view') && navItem('fleets', <Layers size={18} />, 'Fleets')}
               {hasPermission('surveys:view') &&
                 navItem('surveys', <ClipboardList size={18} />, 'Surveys')}
@@ -1626,6 +1621,7 @@ function App(): React.JSX.Element {
             )}
             {activeTab === 'vessels' && (
               <VesselManager
+                {...sub('vessels')}
                 initialVesselId={navigateToVesselId}
                 initialVesselSection={navigateToVesselSection}
                 initialSurveyId={navigateToSurveyId}
@@ -1650,7 +1646,6 @@ function App(): React.JSX.Element {
                           surveys: 'Back to Surveys',
                           compliance: 'Back to Compliance',
                           directory: 'Back to Directory',
-                          'vessel-filter': 'Back to Vessel Filter',
                           renewals: 'Back to Renewals',
                           admin: 'Back to System Setup',
                           'survey-followup': 'Back to Survey Follow-Up',
@@ -1663,21 +1658,11 @@ function App(): React.JSX.Element {
                   setInitialQuotationId(qId)
                   setActiveTab('quotations')
                 }}
-                onOpenAdvancedFilter={() => navigateTo({ tab: 'vessel-filter' })}
                 openCreate={createIntent === 'vessel'}
                 onCreateConsumed={() => setCreateIntent(null)}
               />
             )}
             <Suspense fallback={<LoadingFallback />}>
-              {activeTab === 'vessel-filter' && (
-                <VesselFilter
-                  onNavigateToVessel={(vesselId) => {
-                    setNavigateToVesselId(vesselId)
-                    setNavigateBackTab('vessel-filter')
-                    setActiveTab('vessels')
-                  }}
-                />
-              )}
               {activeTab === 'fleets' && <FleetManager {...sub('fleets')} />}
               {activeTab === 'admin' && (
                 <AdminPanel

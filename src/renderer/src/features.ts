@@ -17,7 +17,6 @@ export type AppTab =
   | 'survey-followup'
   | 'calculators'
   | 'quotations'
-  | 'vessel-filter'
   | 'renewals'
   | 'reports'
   | 'analytics'
@@ -114,14 +113,25 @@ export const FEATURES: Feature[] = [
   },
   {
     id: 'vessel-filter',
-    title: 'Vessel Filter',
+    title: 'More vessel filters',
     area: 'Fleet',
-    kind: 'page',
+    kind: 'view',
     permission: 'vessels:view',
-    target: { tab: 'vessel-filter' },
+    target: { tab: 'vessels', sub: 'filter' },
     description:
-      'Find vessels by policy type, flag, class, age, tonnage or customer, and compare two vessels side by side.',
-    keywords: 'query search compare criteria'
+      'Find vessels by policy type, flag, class, type, age, tonnage or customer with AND / OR, save the criteria as a view and export the result.',
+    keywords: 'vessel filter advanced query search criteria saved views'
+  },
+  {
+    id: 'vessel-compare',
+    title: 'Compare two vessels',
+    area: 'Fleet',
+    kind: 'view',
+    permission: 'vessels:view',
+    target: { tab: 'vessels' },
+    description:
+      'On the Vessels page, Bulk select two vessels (or tick two in More filters) and press Compare: particulars, policies, documents and sanctions side by side.',
+    keywords: 'compare side by side difference'
   },
   {
     id: 'fleets',

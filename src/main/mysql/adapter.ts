@@ -23306,6 +23306,13 @@ export class MySQLAdapter {
     // and/or the vessel_classifications junction (dual/multi-class). Resolve every linked
     // society id to its name, dedup, and concat so both filter and display catch all classes.
     const vesselClassExpr = `COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.name ORDER BY cs2.name SEPARATOR ', ') FROM classification_societies cs2 WHERE cs2.id = v.classification_society OR cs2.id IN (SELECT vc2.classification_society_id FROM vessel_classifications vc2 WHERE vc2.vessel_id = v.id)), v.classification_society)`
+    // The customer is kept on the policy: every customer (and its kind) with an active policy
+    const vesselCustomerExpr = `(SELECT GROUP_CONCAT(DISTINCT ce2.name ORDER BY ce2.name SEPARATOR ', ') FROM vessel_dynamic_policies vdp2 JOIN entities ce2 ON ce2.id = vdp2.customer_entity_id WHERE vdp2.vessel_id = v.id AND vdp2.status = 'active')`
+    const vesselCustomerTypeExpr = `(SELECT GROUP_CONCAT(DISTINCT vdp3.customer_type ORDER BY vdp3.customer_type SEPARATOR ', ') FROM vessel_dynamic_policies vdp3 WHERE vdp3.vessel_id = v.id AND vdp3.status = 'active' AND vdp3.customer_entity_id IS NOT NULL)`
+    const intOrNull = (val: string): number | null => {
+      const n = parseInt(val, 10)
+      return Number.isFinite(n) ? n : null
+    }
 
     // Define allowed columns per data source to prevent SQL injection
     const DATA_SOURCE_DEFS: Record<
@@ -23321,7 +23328,6 @@ export class MySQLAdapter {
         baseQuery: `FROM vessels v
                     LEFT JOIN fleets f ON v.fleet_id = f.id
                     LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
-                    LEFT JOIN entities cust ON v.customer_id = cust.id
                     LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id`,
         columnMap: {
           name: 'v.name AS name',
@@ -23332,12 +23338,12 @@ export class MySQLAdapter {
           rebuiltYear: 'v.rebuilt_year AS rebuiltYear',
           grossTonnage: 'v.gross_tonnage AS grossTonnage',
           classification: `${vesselClassExpr} AS classification`,
-          customer: 'cust.name AS customer',
+          customer: `${vesselCustomerExpr} AS customer`,
           fleet: 'f.name AS fleet',
           isActive: 'v.is_active AS isActive',
           createdAt: 'v.created_at AS createdAt',
           callSign: 'v.call_sign AS callSign',
-          customerType: 'v.customer_type AS customerType'
+          customerType: `${vesselCustomerTypeExpr} AS customerType`
         },
         filterMap: {
           status: (params, val) => {
@@ -23361,11 +23367,44 @@ export class MySQLAdapter {
           },
           customerId: (params, val) => {
             params.push(val)
-            return 'v.customer_id = ?'
+            return "EXISTS (SELECT 1 FROM vessel_dynamic_policies vdc WHERE vdc.vessel_id = v.id AND vdc.status = 'active' AND vdc.customer_entity_id = ?)"
+          },
+          customerType: (params, val) => {
+            if (val !== 'broker' && val !== 'direct') return ''
+            params.push(val)
+            return "EXISTS (SELECT 1 FROM vessel_dynamic_policies vdt WHERE vdt.vessel_id = v.id AND vdt.status = 'active' AND vdt.customer_entity_id IS NOT NULL AND vdt.customer_type = ?)"
           },
           vesselType: (params, val) => {
             params.push(val)
             return 'v.vessel_type_id = ?'
+          },
+          policyTypeId: (params, val) => {
+            params.push(val)
+            return "EXISTS (SELECT 1 FROM vessel_dynamic_policies vdy WHERE vdy.vessel_id = v.id AND vdy.status = 'active' AND vdy.policy_type_id = ?)"
+          },
+          builtFrom: (params, val) => {
+            const n = intOrNull(val)
+            if (n === null) return ''
+            params.push(n)
+            return 'v.built_year >= ?'
+          },
+          builtTo: (params, val) => {
+            const n = intOrNull(val)
+            if (n === null) return ''
+            params.push(n)
+            return 'v.built_year <= ?'
+          },
+          gtFrom: (params, val) => {
+            const n = intOrNull(val)
+            if (n === null) return ''
+            params.push(n)
+            return 'v.gross_tonnage >= ?'
+          },
+          gtTo: (params, val) => {
+            const n = intOrNull(val)
+            if (n === null) return ''
+            params.push(n)
+            return 'v.gross_tonnage <= ?'
           },
           classificationId: (params, val) => {
             params.push(val, val)
@@ -23378,7 +23417,7 @@ export class MySQLAdapter {
           }
         },
         groupMap: {
-          customer: 'cust.name',
+          customer: vesselCustomerExpr,
           fleet: 'f.name',
           vesselType: 'COALESCE(rvt.name, v.vessel_type)',
           flagState: 'fs.name',
