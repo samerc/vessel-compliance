@@ -37,5 +37,25 @@ export default defineConfig(
       '@typescript-eslint/explicit-function-return-type': 'off'
     }
   },
+  {
+    // Main process: never import() a package. The hot-update cache has no node_modules; the
+    // bootstrap puts the installer's on NODE_PATH, which require honours but import() does not
+    // (the jszip break of 2026-10-14). Relative import('./x') of our own modules is fine.
+    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/shared/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression[source.type="Literal"]:not([source.value=/^[.]/])',
+          message:
+            'Use a static import: a dynamic import() of a package fails on PCs running a hot-update.'
+        },
+        {
+          selector: 'ImportExpression:not([source.type="Literal"])',
+          message: 'import() needs a literal relative path in the main process (hot-update safety).'
+        }
+      ]
+    }
+  },
   eslintConfigPrettier
 )

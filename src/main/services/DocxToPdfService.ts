@@ -4,6 +4,10 @@ import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import { createHash } from 'crypto'
+// Static imports only: a dynamic import() of a package fails on PCs running a hot-update
+// (no node_modules there; NODE_PATH is honoured by require, not by import())
+import JSZip from 'jszip'
+import { PDFDocument } from 'pdf-lib'
 
 // execFile (no shell): file paths travel as argv, never as code. A vessel name in a
 // file name (e.g. containing $(...) or quotes) must not be able to run commands.
@@ -129,7 +133,6 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
  * Count the number of pages in a PDF using pdf-lib.
  */
 export async function countPdfPages(pdfPath: string): Promise<number> {
-  const { PDFDocument } = await import('pdf-lib')
   const data = fs.readFileSync(pdfPath)
   const pdf = await PDFDocument.load(data)
   return pdf.getPageCount()
@@ -139,7 +142,6 @@ export async function countPdfPages(pdfPath: string): Promise<number> {
  * Merge multiple PDF files into one output file using pdf-lib.
  */
 export async function mergePdfs(pdfPaths: string[], outputPath: string): Promise<void> {
-  const { PDFDocument } = await import('pdf-lib')
   const merged = await PDFDocument.create()
 
   for (const p of pdfPaths) {
@@ -168,7 +170,6 @@ export async function setDocxPageStart(
   policyTypeTitle?: string,
   totalPages?: number
 ): Promise<Buffer> {
-  const { default: JSZip } = await import('jszip')
   const zip = await JSZip.loadAsync(docxBuffer)
 
   const docXmlFile = zip.file('word/document.xml')
@@ -501,7 +502,6 @@ function setSectionPageStart(docXml: string, start: number): string {
  * page-number footer gets the generated one ("{Type} Cover {number}" + "Page X of Y").
  */
 export async function prepareTcDocx(docxBuffer: Buffer, fill: TcFill): Promise<Buffer> {
-  const { default: JSZip } = await import('jszip')
   const zip = await JSZip.loadAsync(docxBuffer)
   const parts = Object.keys(zip.files).filter((n) => /^word\/(header|footer)\d*\.xml$/.test(n))
   const xmls = new Map<string, string>()
