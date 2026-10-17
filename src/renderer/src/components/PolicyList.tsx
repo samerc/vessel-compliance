@@ -94,16 +94,40 @@ function SortIcon({
   )
 }
 
+// The list's search, filters, sort and page, kept while a policy is open (the list unmounts) so
+// Back returns to the same view; for this app session only
+interface PolicyListView {
+  search: string
+  statusFilter: string
+  typeFilter: string
+  registryOnly: boolean
+  sortField: SortField
+  sortDir: SortDir
+  page: number
+}
+let savedView: PolicyListView = {
+  search: '',
+  statusFilter: 'all',
+  typeFilter: 'all',
+  registryOnly: false,
+  sortField: 'expiryDate',
+  sortDir: 'desc',
+  page: 0
+}
+
 export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.JSX.Element {
   const [policies, setPolicies] = useState<PolicyListItem[]>([])
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string }[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [registryOnly, setRegistryOnly] = useState(false)
-  const [sortField, setSortField] = useState<SortField>('expiryDate')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [page, setPage] = useState(0)
+  const [search, setSearch] = useState(savedView.search)
+  const [statusFilter, setStatusFilter] = useState<string>(savedView.statusFilter)
+  const [typeFilter, setTypeFilter] = useState<string>(savedView.typeFilter)
+  const [registryOnly, setRegistryOnly] = useState(savedView.registryOnly)
+  const [sortField, setSortField] = useState<SortField>(savedView.sortField)
+  const [sortDir, setSortDir] = useState<SortDir>(savedView.sortDir)
+  const [page, setPage] = useState(savedView.page)
+  useEffect(() => {
+    savedView = { search, statusFilter, typeFilter, registryOnly, sortField, sortDir, page }
+  }, [search, statusFilter, typeFilter, registryOnly, sortField, sortDir, page])
   const [loading, setLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean
@@ -223,6 +247,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.J
 
   // Paginate
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  // A remembered page past the end (policies deleted meanwhile) shows the last page
+  if (!loading && policies.length > 0 && page > totalPages - 1) setPage(totalPages - 1)
   const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const formatCurrency = (amount?: number, currency?: string): string => {

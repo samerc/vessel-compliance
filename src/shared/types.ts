@@ -1854,6 +1854,14 @@ export interface ReceiptInput {
   policies?: ReceiptPolicy[]
 }
 
+/** Receipts that name a policy (by policy document id or number), summed per currency */
+export interface ReceiptPolicySummary {
+  /** The policy document id or policy number that was asked for */
+  key: string
+  receipts: { receiptNumber: string; receiptDate: string; amount: number; currency: string }[]
+  totals: Record<string, number>
+}
+
 export interface ReceiptSettings {
   nextSerial: number
   city: string

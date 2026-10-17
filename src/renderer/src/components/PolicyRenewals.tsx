@@ -189,6 +189,23 @@ export default function PolicyRenewals({
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1) // 1-based
   const [renewals, setRenewals] = useState<RenewalRow[]>([])
+  // Receipts naming each renewal's policy number: total received per currency
+  const [paidByPolicy, setPaidByPolicy] = useState<Record<string, Record<string, number>>>({})
+  useEffect(() => {
+    const numbers = [...new Set(renewals.map((r) => r.policyNumber).filter(Boolean))] as string[]
+    if (numbers.length === 0) return
+    let alive = true
+    window.api
+      .receiptSummaries(numbers)
+      .then((list) => {
+        if (alive && Array.isArray(list))
+          setPaidByPolicy(Object.fromEntries(list.map((s) => [s.key, s.totals])))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [renewals])
   const [loading, setLoading] = useState(false)
   const [sortField, setSortFieldRaw] = useState<SortField>(
     () => (localStorage.getItem('renewals_sortField') as SortField) || 'endDate'
@@ -1004,6 +1021,18 @@ export default function PolicyRenewals({
           }}
         >
           {formatPremium(r.premium, r.currency)}
+          {r.policyNumber && paidByPolicy[r.policyNumber] && (
+            <div
+              className="muted"
+              style={{ fontSize: '0.72rem', fontWeight: 400 }}
+              title="Received on receipts naming this policy number"
+            >
+              Paid{' '}
+              {Object.entries(paidByPolicy[r.policyNumber])
+                .map(([cur, amt]) => formatPremium(amt, cur))
+                .join(' + ')}
+            </div>
+          )}
         </td>
       )}
       {rnVisSet.has('days') && (

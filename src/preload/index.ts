@@ -1217,6 +1217,7 @@ const api: Api = {
   // Receipts
   receiptList: () => ipcRenderer.invoke('receipt:list'),
   receiptListByVessel: (vesselId: string) => ipcRenderer.invoke('receipt:listByVessel', vesselId),
+  receiptSummaries: (keys: string[]) => ipcRenderer.invoke('receipt:summaries', keys),
   receiptGet: (id: string) => ipcRenderer.invoke('receipt:get', id),
   receiptNextNumber: (year?: number) => ipcRenderer.invoke('receipt:nextNumber', year),
   receiptCreate: (data) => ipcRenderer.invoke('receipt:create', data),

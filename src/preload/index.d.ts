@@ -1776,6 +1776,8 @@ export interface Api {
   sanctionsReportList: () => Promise<import('../shared/types').SanctionsReportCheck[]>
   receiptList: () => Promise<import('../shared/types').Receipt[]>
   receiptListByVessel: (vesselId: string) => Promise<import('../shared/types').Receipt[]>
+  /** Receipts naming each policy (policy document id or policy number) */
+  receiptSummaries: (keys: string[]) => Promise<import('../shared/types').ReceiptPolicySummary[]>
   receiptGet: (id: string) => Promise<import('../shared/types').Receipt | null>
   receiptNextNumber: (year?: number) => Promise<{ serial: number; year: number; number: string }>
   receiptCreate: (

@@ -148,6 +148,7 @@ import {
   QuotationWarCondition,
   QuotationWorkflowLog,
   Receipt,
+  ReceiptPolicySummary,
   ReceiptInput,
   ReceiptPolicy,
   RecentItem,
@@ -17156,6 +17157,48 @@ export class MySQLAdapter {
              ORDER BY r.receipt_year DESC, r.receipt_serial DESC`
     )
     return (rows as RowDataPacket[]).map((r) => this.mapReceiptRow(r))
+  }
+
+  /**
+   * Receipts naming each policy (a policy document id or a policy number). A receipt covering
+   * several policies is listed under each of them with its full amount.
+   */
+  async getReceiptSummaries(keys: string[]): Promise<ReceiptPolicySummary[]> {
+    if (!this.pool) return []
+    const list = [...new Set(keys.filter((k) => typeof k === 'string' && k.trim()))].slice(0, 2000)
+    if (list.length === 0) return []
+    const ph = list.map(() => '?').join(',')
+    const [rows] = await this.pool.query(
+      `SELECT rp.policy_doc_id AS policyDocId, rp.policy_number AS policyNumber,
+              r.receipt_number AS receiptNumber, r.receipt_date AS receiptDate,
+              r.amount, r.currency
+         FROM receipt_policies rp JOIN receipts r ON r.id = rp.receipt_id
+        WHERE rp.policy_doc_id IN (${ph}) OR rp.policy_number IN (${ph})
+        ORDER BY r.receipt_date`,
+      [...list, ...list]
+    )
+    const byKey = new Map<string, ReceiptPolicySummary>()
+    const seen = new Set<string>()
+    for (const r of rows as RowDataPacket[]) {
+      for (const key of [r.policyDocId, r.policyNumber]) {
+        if (!key || !list.includes(key) || seen.has(`${key}:${r.receiptNumber}`)) continue
+        seen.add(`${key}:${r.receiptNumber}`)
+        const s: ReceiptPolicySummary = byKey.get(key) || { key, receipts: [], totals: {} }
+        const amount = Number(r.amount) || 0
+        s.receipts.push({
+          receiptNumber: r.receiptNumber,
+          receiptDate:
+            r.receiptDate instanceof Date
+              ? r.receiptDate.toISOString().slice(0, 10)
+              : String(r.receiptDate),
+          amount,
+          currency: r.currency
+        })
+        s.totals[r.currency] = (s.totals[r.currency] || 0) + amount
+        byKey.set(key, s)
+      }
+    }
+    return [...byKey.values()]
   }
 
   async getReceiptsByVessel(vesselId: string): Promise<Receipt[]> {

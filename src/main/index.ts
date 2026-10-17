@@ -2703,6 +2703,10 @@ app.whenReady().then(() => {
     await requirePermission(event, 'policies:view')
     return db.getReceipts()
   })
+  safeHandle('receipt:summaries', async (event, keys: string[]) => {
+    await requirePermission(event, 'policies:view')
+    return db.getReceiptSummaries(Array.isArray(keys) ? keys : [])
+  })
   safeHandle('receipt:listByVessel', async (event, vesselId: string) => {
     await requirePermission(event, 'policies:view')
     return db.getReceiptsByVessel(vesselId)

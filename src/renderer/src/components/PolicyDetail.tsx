@@ -56,7 +56,8 @@ import type {
   QuotationHullAdditionalCondition,
   QuotationHullCondition,
   VesselAssured,
-  EntityAddress
+  EntityAddress,
+  ReceiptPolicySummary
 } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
 import { ok, asArray } from '../utils/ipc'
@@ -203,6 +204,32 @@ export default function PolicyDetail({
   onNavigateToPolicy
 }: PolicyDetailProps): React.JSX.Element | null {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
+  // Receipts naming this policy (by id or number)
+  const [receiptSummary, setReceiptSummary] = useState<ReceiptPolicySummary | null>(null)
+  useEffect(() => {
+    if (!policy) return
+    let alive = true
+    window.api
+      .receiptSummaries([policy.id, policy.policyNumber].filter(Boolean) as string[])
+      .then((list) => {
+        if (!alive || !Array.isArray(list)) return
+        // One receipt can be found by both the id and the number: merge without double counting
+        const seen = new Set<string>()
+        const merged: ReceiptPolicySummary = { key: policy.id, receipts: [], totals: {} }
+        for (const s of list)
+          for (const r of s.receipts) {
+            if (seen.has(r.receiptNumber)) continue
+            seen.add(r.receiptNumber)
+            merged.receipts.push(r)
+            merged.totals[r.currency] = (merged.totals[r.currency] || 0) + r.amount
+          }
+        setReceiptSummary(merged)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [policy])
   const [instalments, setInstalments] = useState<Instalment[]>([])
   const [addresses, setAddresses] = useState<PolicyAddress[]>([])
   const [blueCards, setBlueCards] = useState<BlueCard[]>([])
@@ -3677,6 +3704,40 @@ export default function PolicyDetail({
                       }}
                     >
                       {formatAmount(netPremium, policy.premiumCurrency)}
+                    </div>
+                  </div>
+                )}
+                {receiptSummary && (
+                  <div>
+                    <div style={labelStyle}>Received</div>
+                    <div style={valueStyle}>
+                      {receiptSummary.receipts.length === 0 ? (
+                        <span className="muted">No receipts yet</span>
+                      ) : (
+                        <span
+                          title={receiptSummary.receipts
+                            .map(
+                              (r) =>
+                                `${r.receiptNumber} · ${formatDateShort(r.receiptDate)} · ${formatAmount(r.amount, r.currency)}`
+                            )
+                            .join('\n')}
+                        >
+                          <strong>
+                            {Object.entries(receiptSummary.totals)
+                              .map(([cur, amt]) => formatAmount(amt, cur))
+                              .join(' + ')}
+                          </strong>{' '}
+                          <span className="muted">
+                            ({receiptSummary.receipts.length} receipt
+                            {receiptSummary.receipts.length === 1 ? '' : 's'}, last{' '}
+                            {formatDateShort(
+                              receiptSummary.receipts[receiptSummary.receipts.length - 1]
+                                .receiptDate
+                            )}
+                            )
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
