@@ -16,7 +16,8 @@ import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 
 interface Props {
-  onNavigateToVessel: (vesselId: string) => void
+  /** Opens the vessel's Surveys tab, on the given survey */
+  onNavigateToVessel: (vesselId: string, surveyId?: string) => void
 }
 
 interface SurveyWithCounts extends ConditionSurvey {
@@ -750,7 +751,12 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
                 const hasOpenDefects = survey.openDefects > 0
 
                 return (
-                  <tr key={survey.id}>
+                  <tr
+                    key={survey.id}
+                    className="clickable"
+                    onClick={() => onNavigateToVessel(survey.vesselId, survey.id)}
+                    title="Open this survey"
+                  >
                     {svVisSet.has('vessel') && (
                       <td>
                         <div style={{ fontWeight: '600', textTransform: 'uppercase' }}>
@@ -821,8 +827,11 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
                     <td style={{ textAlign: 'center' }}>
                       {svVisSet.has('actions') && (
                         <button
-                          onClick={() => onNavigateToVessel(survey.vesselId)}
-                          title="View vessel surveys"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onNavigateToVessel(survey.vesselId, survey.id)
+                          }}
+                          title="Open this survey"
                           className="btn-secondary btn-sm"
                         >
                           <Eye size={14} />

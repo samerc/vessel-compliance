@@ -52,6 +52,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
 export default function VesselManager({
   initialVesselId,
   initialVesselSection,
+  initialSurveyId,
   onClearInitialVessel,
   onNavigateBack,
   navigateBackLabel,
@@ -65,6 +66,8 @@ export default function VesselManager({
   initialVesselId?: string | null
   initialVesselSection?:
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'
+  /** With initialVesselSection 'surveys': the survey to open */
+  initialSurveyId?: string | null
   onClearInitialVessel?: () => void
   onNavigateBack?: () => void
   navigateBackLabel?: string
@@ -127,11 +130,14 @@ export default function VesselManager({
   const onCreateConsumedRef = useRef(onCreateConsumed)
   const onClearInitialVesselRef = useRef(onClearInitialVessel)
   const initialVesselSectionRef = useRef(initialVesselSection)
+  const initialSurveyIdRef = useRef(initialSurveyId)
   useEffect(() => {
     onCreateConsumedRef.current = onCreateConsumed
     onClearInitialVesselRef.current = onClearInitialVessel
     initialVesselSectionRef.current = initialVesselSection
+    initialSurveyIdRef.current = initialSurveyId
   })
+  const [appliedSurveyId, setAppliedSurveyId] = useState<string | null>(null)
   useEffect(() => {
     if (openCreate) onCreateConsumedRef.current?.()
   }, [openCreate])
@@ -198,6 +204,7 @@ export default function VesselManager({
     let alive = true
     // Capture section NOW (synchronously) before the async gap clears it
     const sectionToApply = initialVesselSectionRef.current
+    const surveyToApply = initialSurveyIdRef.current ?? null
     ;(async () => {
       const allVessels = await window.api.getVessels()
       // A newer pick (e.g. a second Recent click) wins over this slower load
@@ -207,6 +214,7 @@ export default function VesselManager({
         : undefined
       if (vessel) {
         setAppliedSection(sectionToApply)
+        setAppliedSurveyId(surveyToApply)
         setNavigatedExternally(true)
         setOpenInEditMode(false)
         setSelectedVessel(vessel)
@@ -601,6 +609,7 @@ export default function VesselManager({
           backLabel={backLabel}
           onBack={handleBack}
           initialSection={appliedSection}
+          initialSurveyId={appliedSurveyId}
           initialEditing={openInEditMode}
           onNavigateToQuotation={onNavigateToQuotation}
         />

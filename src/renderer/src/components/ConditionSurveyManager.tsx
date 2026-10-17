@@ -32,6 +32,8 @@ import { formatDate } from '../utils/dateUtils'
 
 interface ConditionSurveyManagerProps {
   vessel: Vessel
+  /** Survey shown first (e.g. opened from the survey list) */
+  initialSurveyId?: string | null
 }
 
 type DefectCounts = Record<string, { open: number; closed: number; overdue: number }>
@@ -90,7 +92,8 @@ async function loadSurveyData(
 }
 
 export default function ConditionSurveyManager({
-  vessel
+  vessel,
+  initialSurveyId
 }: ConditionSurveyManagerProps): React.JSX.Element {
   const { user, hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
@@ -99,7 +102,7 @@ export default function ConditionSurveyManager({
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
   const [surveyTypes, setSurveyTypes] = useState<ConditionSurveyType[]>([])
   const [attachments, setAttachments] = useState<SurveyAttachment[]>([])
-  const [expandedSurveyId, setExpandedSurveyId] = useState<string | null>(null)
+  const [expandedSurveyId, setExpandedSurveyId] = useState<string | null>(initialSurveyId ?? null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [dragOverSurveyId, setDragOverSurveyId] = useState<string | null>(null)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)

@@ -18,6 +18,7 @@ import {
   Hash,
   Plus,
   Merge,
+  ArrowUpDown,
   Link2,
   ScanSearch,
   CheckSquare,
@@ -206,6 +207,31 @@ export default function EntityDirectory({
 
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false)
   const [dupThreshold, setDupThreshold] = useState(85)
+  // The merge was opened from the duplicate finder: go back to it afterwards
+  const [mergeFromFinder, setMergeFromFinder] = useState(false)
+  // Pairs marked "Not duplicates" (per computer), as "idA|idB" with the ids sorted
+  const [dismissedPairs, setDismissedPairs] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('dup_dismissed_pairs') || '[]'))
+    } catch {
+      return new Set()
+    }
+  })
+  const [showDismissed, setShowDismissed] = useState(false)
+  const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`)
+  const setDismissed = (key: string, dismissed: boolean): void => {
+    setDismissedPairs((prev) => {
+      const next = new Set(prev)
+      if (dismissed) next.add(key)
+      else next.delete(key)
+      try {
+        localStorage.setItem('dup_dismissed_pairs', JSON.stringify([...next]))
+      } catch {
+        /* per-computer convenience only */
+      }
+      return next
+    })
+  }
 
   // Bulk selection state
   const [selectMode, setSelectMode] = useState(false)
@@ -213,9 +239,14 @@ export default function EntityDirectory({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [showEntityRemapModal, setShowEntityRemapModal] = useState(false)
 
-  const openMergeModal = async (entity: Entity): Promise<void> => {
+  const openMergeModal = async (
+    entity: Entity,
+    target: Entity | null = null,
+    fromFinder = false
+  ): Promise<void> => {
     setMergeSource(entity)
-    setMergeTarget(null)
+    setMergeTarget(target)
+    setMergeFromFinder(fromFinder)
     setMergeSearch('')
     setMergeKeepName('target')
     const all = await window.api.getEntities()
@@ -242,6 +273,10 @@ export default function EntityDirectory({
     }
     return pairs.sort((x, y) => y.score - x.score)
   }, [allEntities, showDuplicatesModal, dupThreshold])
+  const shownPairs = duplicatePairs.filter(
+    (p) => showDismissed || !dismissedPairs.has(pairKey(p.a.id, p.b.id))
+  )
+  const dismissedInRange = duplicatePairs.length - shownPairs.length
 
   const handleMerge = async (): Promise<void> => {
     if (!mergeSource || !mergeTarget) return
@@ -257,6 +292,7 @@ export default function EntityDirectory({
       setMergeTarget(null)
       setSelectedEntity(null)
       loadData()
+      if (mergeFromFinder) setShowDuplicatesModal(true)
     } catch (error) {
       showError((error instanceof Error && error.message) || 'Failed to merge entities')
     } finally {
@@ -620,6 +656,38 @@ export default function EntityDirectory({
     return (uboParentIds.get(entityId) || [])
       .map((pid) => allEntities.find((e) => e.id === pid))
       .filter((e): e is Entity => !!e)
+  }
+
+  // What a merge moves: vessel links, UBO links, documents and the sanctions status
+  const renderMergeFacts = (e: Entity): React.JSX.Element => {
+    const uboLinks = entityUBOs.filter(
+      (u) => u.assuredEntityId === e.id || u.uboEntityId === e.id
+    ).length
+    const docs = getDocScore(e)
+    return (
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          marginTop: '6px',
+          fontSize: '0.74rem',
+          color: 'var(--text-secondary)'
+        }}
+      >
+        <span>
+          {getVesselCount(e.id)} vessel link{getVesselCount(e.id) === 1 ? '' : 's'}
+        </span>
+        <span>
+          {uboLinks} UBO link{uboLinks === 1 ? '' : 's'}
+        </span>
+        <span>
+          Documents {docs.have}/{docs.total}
+        </span>
+        <SanctionsBadge status={e.ofacStatus} />
+      </div>
+    )
   }
 
   const getDocScore = (entity: Entity): { have: number; total: number } => {
@@ -2041,13 +2109,22 @@ export default function EntityDirectory({
         <Modal
           title="Merge Entities"
           icon={<Merge size={18} />}
-          onClose={() => setShowMergeModal(false)}
+          onClose={() => {
+            setShowMergeModal(false)
+            if (mergeFromFinder) setShowDuplicatesModal(true)
+          }}
           width={560}
           closeOnOverlay={false}
           footer={
             <>
-              <button onClick={() => setShowMergeModal(false)} className="btn-secondary">
-                Cancel
+              <button
+                onClick={() => {
+                  setShowMergeModal(false)
+                  if (mergeFromFinder) setShowDuplicatesModal(true)
+                }}
+                className="btn-secondary"
+              >
+                {mergeFromFinder ? 'Back to duplicates' : 'Cancel'}
               </button>
               <button
                 onClick={handleMerge}
@@ -2065,8 +2142,8 @@ export default function EntityDirectory({
               marginBottom: '20px',
               padding: '14px',
               borderRadius: '10px',
-              background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
-              border: isLight ? '1px solid rgba(200,120,0,0.2)' : '1px solid rgba(255,193,7,0.15)',
+              background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)',
               fontSize: '0.82rem',
               color: 'var(--warning)'
             }}
@@ -2081,10 +2158,8 @@ export default function EntityDirectory({
                 style={{
                   padding: '12px',
                   borderRadius: '8px',
-                  background: isLight ? 'rgba(200,0,0,0.05)' : 'rgba(255,77,77,0.05)',
-                  border: isLight
-                    ? '1px solid rgba(200,0,0,0.15)'
-                    : '1px solid rgba(255,77,77,0.1)',
+                  background: 'color-mix(in srgb, var(--danger) 6%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px'
@@ -2095,13 +2170,28 @@ export default function EntityDirectory({
                 ) : (
                   <User size={18} color={personColor} />
                 )}
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '600' }}>{mergeSource.name}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                     {mergeSource.type}
                     {mergeSource.identifier ? ` - ${mergeSource.identifier}` : ''}
                   </div>
+                  {renderMergeFacts(mergeSource)}
                 </div>
+                {mergeTarget && (
+                  <button
+                    onClick={() => {
+                      setMergeSource(mergeTarget)
+                      setMergeTarget(mergeSource)
+                      setMergeKeepName((k) => (k === 'target' ? 'source' : 'target'))
+                    }}
+                    className="btn-secondary"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                    title="Keep this one instead and delete the other"
+                  >
+                    <ArrowUpDown size={13} /> Swap
+                  </button>
+                )}
               </div>
             </Field>
             <Field label="Target (will be kept)" span="all">
@@ -2110,10 +2200,8 @@ export default function EntityDirectory({
                   style={{
                     padding: '12px',
                     borderRadius: '8px',
-                    background: isLight ? 'rgba(0,140,70,0.05)' : 'rgba(0,255,136,0.05)',
-                    border: isLight
-                      ? '1px solid rgba(0,140,70,0.15)'
-                      : '1px solid rgba(0,255,136,0.1)',
+                    background: 'color-mix(in srgb, var(--success) 6%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px'
@@ -2124,12 +2212,13 @@ export default function EntityDirectory({
                   ) : (
                     <User size={18} color={personColor} />
                   )}
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '600' }}>{mergeTarget.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       {mergeTarget.type}
                       {mergeTarget.identifier ? ` - ${mergeTarget.identifier}` : ''}
                     </div>
+                    {renderMergeFacts(mergeTarget)}
                   </div>
                   <button
                     onClick={() => {
@@ -2317,12 +2406,31 @@ export default function EntityDirectory({
                 whiteSpace: 'nowrap'
               }}
             >
-              — {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found
+              — {shownPairs.length} pair{shownPairs.length !== 1 ? 's' : ''} found
             </span>
           </div>
+          {(dismissedInRange > 0 || showDismissed) && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                margin: '-8px 0 12px'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showDismissed}
+                onChange={(e) => setShowDismissed(e.target.checked)}
+              />
+              Show pairs marked not duplicates ({dismissedInRange})
+            </label>
+          )}
 
           {/* Results */}
-          {duplicatePairs.length === 0 ? (
+          {shownPairs.length === 0 ? (
             <EmptyState
               compact
               icon={<CheckCircle2 size={34} />}
@@ -2337,12 +2445,12 @@ export default function EntityDirectory({
                     <th>Entity A</th>
                     <th>Entity B</th>
                     <th style={{ textAlign: 'center', width: '80px' }}>Score</th>
-                    <th style={{ width: '80px' }}></th>
+                    <th style={{ width: '170px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {duplicatePairs.map((pair, idx) => (
-                    <tr key={idx}>
+                  {shownPairs.map((pair) => (
+                    <tr key={pairKey(pair.a.id, pair.b.id)}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {pair.a.type === 'company' ? (
@@ -2411,12 +2519,33 @@ export default function EntityDirectory({
                           }}
                           onClick={() => {
                             setShowDuplicatesModal(false)
-                            openMergeModal(pair.a)
+                            // The one with more links is kept by default
+                            const aLinks = getVesselCount(pair.a.id)
+                            const bLinks = getVesselCount(pair.b.id)
+                            if (aLinks >= bLinks) void openMergeModal(pair.b, pair.a, true)
+                            else void openMergeModal(pair.a, pair.b, true)
                           }}
-                          title="Open merge dialog for this pair"
+                          title="Merge this pair (both sides filled in, swap if needed)"
                         >
                           <Merge size={13} /> Merge
                         </button>
+                        {dismissedPairs.has(pairKey(pair.a.id, pair.b.id)) ? (
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={() => setDismissed(pairKey(pair.a.id, pair.b.id), false)}
+                            title="Show this pair again"
+                          >
+                            Undo
+                          </button>
+                        ) : (
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={() => setDismissed(pairKey(pair.a.id, pair.b.id), true)}
+                            title="These are different parties: hide the pair"
+                          >
+                            Not duplicates
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -111,6 +111,8 @@ function App(): React.JSX.Element {
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | undefined
   >(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<AppTab | undefined>(undefined)
+  // A survey to open on the vessel's Surveys tab (from the survey list)
+  const [navigateToSurveyId, setNavigateToSurveyId] = useState<string | null>(null)
   const [complianceSubTab, setComplianceSubTab] = useState<
     'documents' | 'policies' | 'sanctions' | 'dataQuality'
   >('documents')
@@ -1609,9 +1611,11 @@ function App(): React.JSX.Element {
               <VesselManager
                 initialVesselId={navigateToVesselId}
                 initialVesselSection={navigateToVesselSection}
+                initialSurveyId={navigateToSurveyId}
                 onClearInitialVessel={() => {
                   setNavigateToVesselId(null)
                   setNavigateToVesselSection(undefined)
+                  setNavigateToSurveyId(null)
                 }}
                 onNavigateBack={
                   navigateBackTab
@@ -1727,8 +1731,9 @@ function App(): React.JSX.Element {
               (hasPermission('surveys:view') ? (
                 <Suspense fallback={<LoadingFallback />}>
                   <ConditionSurveyList
-                    onNavigateToVessel={(vesselId) => {
+                    onNavigateToVessel={(vesselId, surveyId) => {
                       setNavigateToVesselId(vesselId)
+                      setNavigateToSurveyId(surveyId ?? null)
                       setNavigateToVesselSection('surveys')
                       setNavigateBackTab('surveys')
                       setActiveTab('vessels')

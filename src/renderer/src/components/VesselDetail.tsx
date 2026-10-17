@@ -88,6 +88,8 @@ interface VesselDetailProps {
   initialSection?:
     'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
   initialEditing?: boolean
+  /** Survey to open first on the Surveys tab */
+  initialSurveyId?: string | null
   onNavigateToQuotation?: (quotationId: string) => void
 }
 
@@ -97,6 +99,7 @@ export default function VesselDetail({
   backLabel = 'Back to Vessels',
   initialSection,
   initialEditing = false,
+  initialSurveyId,
   onNavigateToQuotation
 }: VesselDetailProps): React.JSX.Element {
   // Local copy: saves update it instead of mutating the parent's vessel object
@@ -3656,7 +3659,9 @@ export default function VesselDetail({
 
           {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
 
-          {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
+          {detailView === 'surveys' && (
+            <ConditionSurveyManager vessel={vessel} initialSurveyId={initialSurveyId} />
+          )}
 
           {detailView === 'policies' && (
             <>
