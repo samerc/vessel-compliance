@@ -1155,6 +1155,8 @@ export interface Quotation {
   fullPremiumLossEnabled?: boolean
   fullPremiumLossText?: string | null
   subjectivityDays?: number
+  /** The subjectivities tab filled its defaults (or the user added one): never auto-fill again */
+  subjectivitiesFilled?: boolean
   createdAt?: string
   updatedAt?: string
   createdBy?: string

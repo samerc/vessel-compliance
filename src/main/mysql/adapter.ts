@@ -308,7 +308,8 @@ const QUOTATION_CONTENT_COLS = [
   'annual_premium_amount',
   'pro_rata_months',
   'previous_premium_amount',
-  'subjectivity_days'
+  'subjectivity_days',
+  'subjectivities_filled'
 ]
 
 export class MySQLAdapter {
@@ -5423,6 +5424,24 @@ export class MySQLAdapter {
         }
       } catch {
         /* idempotent migration: already applied or not applicable */
+      }
+      // Migration: quotations remember that their subjectivities were filled once, so the
+      // defaults never come back after the user deleted them all
+      try {
+        const [sfCol] = await this.pool.query(
+          "SHOW COLUMNS FROM quotations LIKE 'subjectivities_filled'"
+        )
+        if ((sfCol as RowDataPacket[]).length === 0) {
+          await this.pool.query(
+            'ALTER TABLE quotations ADD COLUMN subjectivities_filled TINYINT(1) DEFAULT 0'
+          )
+          await this.pool.query(
+            `UPDATE quotations SET subjectivities_filled = 1, updated_at = updated_at
+              WHERE id IN (SELECT DISTINCT quotation_id FROM quotation_subjectivities)`
+          )
+        }
+      } catch (e) {
+        console.error('Migration warning (subjectivities_filled):', e)
       }
       // Migration: editable UPCC section name (quotation + policy override) and the survey
       // warranty wording edited in the converter (JSON [{id, text}], NULL = from the quotation)
@@ -12613,6 +12632,7 @@ export class MySQLAdapter {
                 q.outstanding_premium_bold as outstandingPremiumBold,
                 q.outstanding_premium_underline as outstandingPremiumUnderline,
                 q.subjectivity_days as subjectivityDays,
+                q.subjectivities_filled as subjectivitiesFilled,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
@@ -12722,7 +12742,8 @@ export class MySQLAdapter {
         r.outstandingPremiumBold != null ? Boolean(r.outstandingPremiumBold) : true,
       outstandingPremiumUnderline:
         r.outstandingPremiumUnderline != null ? Boolean(r.outstandingPremiumUnderline) : true,
-      subjectivityDays: r.subjectivityDays != null ? Number(r.subjectivityDays) : 0
+      subjectivityDays: r.subjectivityDays != null ? Number(r.subjectivityDays) : 0,
+      subjectivitiesFilled: !!r.subjectivitiesFilled
     } as Quotation
   }
 
@@ -15969,6 +15990,11 @@ export class MySQLAdapter {
         data.order || 0,
         data.vesselScope ? JSON.stringify(data.vesselScope) : null
       ]
+    )
+    // From now on the tab never fills the defaults in again (see subjectivities_filled)
+    await this.pool.execute(
+      'UPDATE quotations SET subjectivities_filled = 1, updated_at = updated_at WHERE id = ? AND NOT subjectivities_filled',
+      [data.quotationId]
     )
     return { id, ...data }
   }

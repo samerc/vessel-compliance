@@ -44,7 +44,8 @@ async function loadSubjectivities(
   quotationId: string,
   quotationTypeCode: string | undefined,
   sink: SubjectivitySink,
-  autoPopulateRan: { current: boolean }
+  autoPopulateRan: { current: boolean },
+  alreadyFilled: boolean
 ): Promise<void> {
   const [subjs, masters, dts, qv] = await Promise.all([
     window.api.getQuotationSubjectivities(quotationId),
@@ -64,15 +65,23 @@ async function loadSubjectivities(
   sink.setDocTypes(safeDts)
   sink.setQVessels(Array.isArray(qv) ? qv : [])
 
-  // Auto-populate on first load if no subjectivities yet (skip for War and Cargo — subjectivities not included by default)
+  // Auto-populate only the very first time the quotation has none (skip for War and Cargo -
+  // subjectivities not included by default). Once it had any, an empty list is the user's
+  // choice: deleting the last one must not bring the defaults back
+  const firstLoad = !autoPopulateRan.current
+  autoPopulateRan.current = true
   if (
-    !autoPopulateRan.current &&
+    firstLoad &&
+    !alreadyFilled &&
     safeSubjs.length === 0 &&
     filteredMasters.length > 0 &&
     quotationTypeCode !== 'W' &&
     quotationTypeCode !== 'C'
   ) {
-    autoPopulateRan.current = true
+    // The editor's quotation can be older than this tab (the tab remounts on every switch):
+    // read the mark fresh before filling
+    const fresh = await window.api.getQuotation(quotationId)
+    if (fresh && !('error' in fresh) && fresh.subjectivitiesFilled) return
     await autoPopulate(quotationId, filteredMasters, safeDts, sink)
   }
 }
@@ -363,15 +372,24 @@ export default function SubjectivitiesTab({
   // The settings lists come from the editor-session cache, so a reload re-reads only this
   // quotation's rows
   const loadData = (): Promise<void> =>
-    loadSubjectivities(quotation.id, quotation.quotationTypeCode, sink, autoPopulateRan)
+    loadSubjectivities(
+      quotation.id,
+      quotation.quotationTypeCode,
+      sink,
+      autoPopulateRan,
+      !!quotation.subjectivitiesFilled
+    )
 
   useEffect(() => {
     void loadSubjectivities(
       quotation.id,
       quotation.quotationTypeCode,
       { setItems, setMasterList, setDocTypes, setQVessels, setScopeAutoDetected },
-      autoPopulateRan
+      autoPopulateRan,
+      !!quotation.subjectivitiesFilled
     )
+    // subjectivitiesFilled is read once per quotation: the first load decides
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotation.id, quotation.quotationTypeCode])
 
   const handleAddCustom = async (): Promise<void> => {
