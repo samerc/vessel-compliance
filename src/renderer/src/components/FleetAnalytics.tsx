@@ -582,8 +582,11 @@ export default function FleetAnalytics(): React.JSX.Element {
   // ── Result state ────────────────────────────────────────────────────────────
   const [vessels, setVessels] = useState<AnalyticsVesselRow[]>([])
   const [policyCoverage, setPolicyCoverage] = useState<{ name: string; vesselCount: number }[]>([])
-  const [loading, setLoading] = useState(false)
-  const [hasQueried, setHasQueried] = useState(false)
+  // Runs once on open with the default filters (the page is never empty)
+  const [loading, setLoading] = useState(true)
+  const [hasQueried, setHasQueried] = useState(true)
+  // Vessels behind a clicked row (type, flag, customer)
+  const [drill, setDrill] = useState<{ title: string; vessels: AnalyticsVesselRow[] } | null>(null)
 
   // ── Export modal ────────────────────────────────────────────────────────────
   const [exportModalOpen, setExportModalOpen] = useState(false)
@@ -627,6 +630,17 @@ export default function FleetAnalytics(): React.JSX.Element {
       }
     }
     load()
+    // First analysis with the default filters
+    window.api
+      .analyticsGetData({ ...DEFAULT_FILTERS })
+      .then((result) => {
+        if (result && !isIpcError(result)) {
+          setVessels(Array.isArray(result.vessels) ? result.vessels : [])
+          setPolicyCoverage(Array.isArray(result.policyCoverage) ? result.policyCoverage : [])
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   // ── Derived: customers (entities that are customers of at least one vessel) ─
@@ -734,7 +748,8 @@ export default function FleetAnalytics(): React.JSX.Element {
           count: items.length,
           pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0,
           avgAge,
-          avgTonnage
+          avgTonnage,
+          vessels: items
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -750,7 +765,8 @@ export default function FleetAnalytics(): React.JSX.Element {
           name: fs?.name ?? '(Unassigned)',
           iso3: fs?.iso3Code ?? '',
           count: vessels.length,
-          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
+          vessels
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -796,7 +812,8 @@ export default function FleetAnalytics(): React.JSX.Element {
           name: entity?.name ?? '(Unknown)',
           count: vessels.length,
           pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
-          types
+          types,
+          vessels
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -1746,6 +1763,52 @@ export default function FleetAnalytics(): React.JSX.Element {
           }
         />
 
+        {drill && (
+          <Modal title={drill.title} onClose={() => setDrill(null)} width={560}>
+            <div
+              style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '8px' }}
+            >
+              {drill.vessels.length} vessel{drill.vessels.length === 1 ? '' : 's'} · click one to
+              open it
+            </div>
+            <div className="table-wrap" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Vessel</th>
+                    <th>IMO</th>
+                    <th>Type</th>
+                    <th className="num">Built</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...drill.vessels]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((v) => (
+                      <tr
+                        key={v.id}
+                        className="clickable"
+                        onClick={() => {
+                          setDrill(null)
+                          window.dispatchEvent(
+                            new CustomEvent('app-open-record', {
+                              detail: { type: 'vessel', id: v.id }
+                            })
+                          )
+                        }}
+                      >
+                        <td style={{ fontWeight: 600 }}>{v.name}</td>
+                        <td className="mono">{v.imoNumber}</td>
+                        <td>{v.vesselType || '—'}</td>
+                        <td className="num">{v.builtYear || '—'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </Modal>
+        )}
+
         {/* ── Content ── */}
         {!hasQueried ? (
           <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center' }}>
@@ -1880,7 +1943,14 @@ export default function FleetAnalytics(): React.JSX.Element {
                     </thead>
                     <tbody>
                       {vesselTypeBreakdown.map((row) => (
-                        <tr key={row.name}>
+                        <tr
+                          key={row.name}
+                          className="clickable"
+                          title="Show these vessels"
+                          onClick={() =>
+                            setDrill({ title: `Type: ${row.name}`, vessels: row.vessels })
+                          }
+                        >
                           <td style={{ fontWeight: 600 }}>{row.name}</td>
                           <td className="num" style={{ fontWeight: 700 }}>
                             {row.count}
@@ -1939,7 +2009,14 @@ export default function FleetAnalytics(): React.JSX.Element {
                       {flagDistribution.rows.map((row) => {
                         const flagCls = row.iso3 ? getFlagClass(row.iso3) : ''
                         return (
-                          <tr key={row.name}>
+                          <tr
+                            key={row.name}
+                            className="clickable"
+                            title="Show these vessels"
+                            onClick={() =>
+                              setDrill({ title: `Flag: ${row.name}`, vessels: row.vessels })
+                            }
+                          >
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {flagCls ? (
@@ -2218,7 +2295,14 @@ export default function FleetAnalytics(): React.JSX.Element {
                     </thead>
                     <tbody>
                       {customerConcentration.map((row) => (
-                        <tr key={row.name}>
+                        <tr
+                          key={row.name}
+                          className="clickable"
+                          title="Show these vessels"
+                          onClick={() =>
+                            setDrill({ title: `Customer: ${row.name}`, vessels: row.vessels })
+                          }
+                        >
                           <td style={{ fontWeight: 600 }}>{row.name}</td>
                           <td className="num" style={{ fontWeight: 700 }}>
                             {row.count}
