@@ -168,6 +168,43 @@ const allTabs: TabDef[] = [
   { key: 'notes', label: 'Notes', icon: StickyNote }
 ]
 
+// Section groups of the editor's left list
+const TAB_GROUPS = ['Risk', 'Cover', 'Terms', 'Other'] as const
+const tabGroupOf = (k: EditorTab): (typeof TAB_GROUPS)[number] =>
+  (
+    ({
+      vessel: 'Risk',
+      insured: 'Risk',
+      agreedValue: 'Risk',
+      sumInsured: 'Risk',
+      insuredValue: 'Risk',
+      liability: 'Risk',
+      subjectMatter: 'Risk',
+      voyage: 'Risk',
+      period: 'Risk',
+      subjectivities: 'Terms',
+      premium: 'Terms',
+      information: 'Terms',
+      customSections: 'Other',
+      notes: 'Other'
+    }) as Partial<Record<EditorTab, (typeof TAB_GROUPS)[number]>>
+  )[k] || 'Cover'
+
+// Export checks shown as dots on the sections they concern
+const warningTab = (w: string): EditorTab | null => {
+  if (w.startsWith('Sanctions: assured')) return 'insured'
+  if (w.startsWith('Sanctions: vessel')) return 'vessel'
+  if (w.startsWith('Premium')) return 'premium'
+  if (w.startsWith('Limit of Liability')) return 'liability'
+  if (w.startsWith('Agreed Insured Value')) return 'agreedValue'
+  if (w.startsWith('Sum Insured')) return 'sumInsured'
+  if (w.startsWith('Insured Value')) return 'insuredValue'
+  return null
+}
+
+// The section last open per quotation (this app session)
+const lastTabByQuotation = new Map<string, EditorTab>()
+
 function getTabsForType(typeCode?: string): TabDef[] {
   const code = typeCode || 'P'
   return allTabs.filter((t) => !t.types || t.types.includes(code))
@@ -208,7 +245,18 @@ export default function QuotationEditor({
   policyContext,
   onReturnToPolicy
 }: QuotationEditorProps): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
+  const [activeTab, setActiveTab] = useState<EditorTab>(() => {
+    const last = lastTabByQuotation.get(quotation.id)
+    return last && getTabsForType(quotation.quotationTypeCode).some((t) => t.key === last)
+      ? last
+      : 'vessel'
+  })
+  const switchTab = (k: EditorTab): void => {
+    setActiveTab(k)
+    lastTabByQuotation.set(quotation.id, k)
+  }
+  // Export checks per section (warning dots), refreshed when the section changes
+  const [tabWarnings, setTabWarnings] = useState<Partial<Record<EditorTab, string[]>>>({})
   const [q, setQ] = useState<Quotation>(quotation)
   // policyTypes removed — type shown as badge, not editable
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -759,6 +807,27 @@ export default function QuotationEditor({
     return out
   }
 
+  // Warning dots: the export checks, re-run shortly after the section or the key amounts change
+  useEffect(() => {
+    let alive = true
+    const t = setTimeout(async () => {
+      const ws = await validateBeforeExport(q)
+      if (!alive) return
+      const byTab: Partial<Record<EditorTab, string[]>> = {}
+      for (const w of ws) {
+        const k = warningTab(w)
+        if (k) (byTab[k] ||= []).push(w)
+      }
+      setTabWarnings(byTab)
+    }, 500)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+    // validateBeforeExport reads q; these are the fields it checks
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, q.premiumAmount, q.limitOfLiabilityAmount, q.agreedValue, q.insuredValueAmount])
+
   const doExport = async (
     quotation: Quotation,
     _format: 'pdf' | 'word',
@@ -1188,6 +1257,19 @@ export default function QuotationEditor({
           />
           {/* Every save of the editor and its tabs: Saving... / Saved / Last change not saved */}
           {canEdit && !isLocked && <SaveStatus />}
+          {/* Premium at a glance (quotation level; alternatives / vessels are on the Premium tab) */}
+          {q.premiumAmount ? (
+            <button
+              type="button"
+              className="badge badge-neutral"
+              style={{ border: 'none', cursor: 'pointer' }}
+              onClick={() => switchTab('premium')}
+              title="Open the Premium section"
+            >
+              Premium {q.premiumCurrency || ''}{' '}
+              {Number(q.premiumAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </button>
+          ) : null}
           {/* DRAFT badge */}
           {(q.referenceNumber || '').startsWith('DRAFT-') && (
             <span
@@ -1367,9 +1449,10 @@ export default function QuotationEditor({
                   alignItems: 'center',
                   gap: '3px'
                 }}
-                title="Workflow history"
+                title="Workflow history: who moved this quotation between steps, and when"
+                className="btn-ghost btn-sm"
               >
-                <History size={13} /> {workflowLog.length}
+                <History size={13} /> History ({workflowLog.length})
               </button>
               {showWorkflowLog && (
                 <div
@@ -2078,402 +2161,457 @@ export default function QuotationEditor({
           </Modal>
         ))}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        {getTabsForType(q.quotationTypeCode).map((t) => {
-          const Icon = t.icon
-          const active = activeTab === t.key
-          return (
-            <button
-              key={t.key}
-              onClick={() => {
-                setActiveTab(t.key)
-                void refreshIfSettingsChanged()
-              }}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '8px 8px 0 0',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.78rem',
-                fontWeight: active ? '600' : '400',
-                background: active ? 'var(--bg-card)' : 'transparent',
-                color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.15s'
-              }}
-            >
-              <Icon size={14} /> {t.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* P&I Alternatives Bar */}
-      {showPIAltBar && (
-        <div
+      {/* Sections: a grouped list on the left (like the policy wizard), content on the right */}
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <nav
+          aria-label="Quotation sections"
           style={{
+            width: '196px',
+            flexShrink: 0,
+            position: 'sticky',
+            top: '12px',
             display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            marginBottom: '8px',
-            borderRadius: '10px',
-            background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)',
-            border: '1px solid var(--glass-border-color)',
-            flexWrap: 'wrap'
+            flexDirection: 'column',
+            gap: '2px'
           }}
         >
-          {piAlternatives.length === 0 ? (
-            <>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                No alternatives configured
-              </span>
-              {!isLocked && (
-                <button
-                  onClick={handleAddPIAlternatives}
-                  className="btn-secondary"
+          {TAB_GROUPS.map((group) => {
+            const items = getTabsForType(q.quotationTypeCode).filter(
+              (t) => tabGroupOf(t.key) === group
+            )
+            if (items.length === 0) return null
+            return (
+              <div key={group} style={{ marginBottom: '10px' }}>
+                <div
                   style={{
-                    fontSize: '0.78rem',
-                    padding: '5px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-secondary)',
+                    padding: '4px 10px'
                   }}
                 >
-                  <Plus size={13} /> Add Alternatives
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              {piAlternatives.map((alt, idx) => {
-                const color = piAltColors[idx % piAltColors.length]
-                const active = selectedPIAltId === alt.id
-                return (
-                  <button
-                    key={alt.id}
-                    onClick={() => setSelectedPIAltId(alt.id)}
-                    style={{
-                      padding: '5px 14px',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
-                      background: active ? `${color}18` : 'transparent',
-                      color: active ? color : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: color,
-                        flexShrink: 0
+                  {group}
+                </div>
+                {items.map((t) => {
+                  const Icon = t.icon
+                  const active = activeTab === t.key
+                  const warn = tabWarnings[t.key]
+                  return (
+                    <button
+                      key={t.key}
+                      aria-current={active ? 'page' : undefined}
+                      title={warn ? warn.join('\n') : undefined}
+                      onClick={() => {
+                        switchTab(t.key)
+                        void refreshIfSettingsChanged()
                       }}
-                    />
-                    {alt.label || `Alt ${idx + 1}`}
-                  </button>
-                )
-              })}
-              {!isLocked && (
-                <>
-                  <button
-                    onClick={handleAddPIAlternative}
-                    className="btn-secondary"
-                    style={{ padding: '5px 8px', fontSize: '0.78rem' }}
-                    title="Add alternative"
-                  >
-                    <Plus size={14} />
-                  </button>
-                  <button
-                    onClick={handleRemoveLastPIAlternative}
-                    className="btn-secondary"
-                    style={{ padding: '5px 8px', fontSize: '0.78rem', color: 'var(--danger)' }}
-                    title="Remove last alternative"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Tab Content */}
-      {activeTab !== 'hullConditions' && (
-        <div
-          key={settingsNonce}
-          className="glass-card"
-          style={{ padding: '24px', minHeight: '300px', position: 'relative' }}
-        >
-          {qVessels.length >= 2 && (
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem',
+                        fontWeight: active ? 600 : 400,
+                        background: active ? 'var(--accent-tint)' : 'transparent',
+                        color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textAlign: 'left'
+                      }}
+                      className={active ? undefined : 'hover-effect'}
+                    >
+                      <Icon size={15} style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} />
+                      <span style={{ flex: 1, minWidth: 0 }}>{t.label}</span>
+                      {warn && (
+                        <span
+                          aria-label={`${warn.length} item${warn.length === 1 ? '' : 's'} to check`}
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: 'var(--warning)',
+                            flexShrink: 0
+                          }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </nav>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* P&I Alternatives Bar */}
+          {showPIAltBar && (
             <div
               style={{
                 display: 'flex',
-                flexWrap: 'wrap',
-                gap: '6px 12px',
-                padding: '8px 14px',
-                marginBottom: '2px',
-                fontSize: '0.72rem',
-                color: 'var(--text-secondary)'
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                marginBottom: '8px',
+                borderRadius: '10px',
+                background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)',
+                border: '1px solid var(--glass-border-color)',
+                flexWrap: 'wrap'
               }}
             >
-              {qVessels.map((v) => (
-                <span key={v.id}>
-                  <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
-                    {v.vesselLabel}
-                  </span>{' '}
-                  {(v.name || v.vesselLabel).toUpperCase()}
-                </span>
-              ))}
+              {piAlternatives.length === 0 ? (
+                <>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    No alternatives configured
+                  </span>
+                  {!isLocked && (
+                    <button
+                      onClick={handleAddPIAlternatives}
+                      className="btn-secondary"
+                      style={{
+                        fontSize: '0.78rem',
+                        padding: '5px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Plus size={13} /> Add Alternatives
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {piAlternatives.map((alt, idx) => {
+                    const color = piAltColors[idx % piAltColors.length]
+                    const active = selectedPIAltId === alt.id
+                    return (
+                      <button
+                        key={alt.id}
+                        onClick={() => setSelectedPIAltId(alt.id)}
+                        style={{
+                          padding: '5px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
+                          background: active ? `${color}18` : 'transparent',
+                          color: active ? color : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: color,
+                            flexShrink: 0
+                          }}
+                        />
+                        {alt.label || `Alt ${idx + 1}`}
+                      </button>
+                    )
+                  })}
+                  {!isLocked && (
+                    <>
+                      <button
+                        onClick={handleAddPIAlternative}
+                        className="btn-secondary"
+                        style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                        title="Add alternative"
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <button
+                        onClick={handleRemoveLastPIAlternative}
+                        className="btn-secondary"
+                        style={{ padding: '5px 8px', fontSize: '0.78rem', color: 'var(--danger)' }}
+                        title="Remove last alternative"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           )}
-          {/* Read-only: controls disabled, clickable rows blocked, text still readable and
-              copyable (notes stay usable) */}
-          <ReadOnlyContext.Provider value={!canEdit && activeTab !== 'notes'}>
-            <fieldset
-              disabled={!canEdit && activeTab !== 'notes'}
-              style={READONLY_FIELDSET}
-              onClickCapture={!canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined}
-              onDragStartCapture={
-                !canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined
-              }
-            >
-              {activeTab === 'insured' && (
-                <InsuredTab
-                  key={vesselVersion}
-                  quotation={q}
-                  vessels={vessels}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  updateField={updateField}
-                />
-              )}
-              {activeTab === 'vessel' && (
-                <VesselTab
-                  quotation={q}
-                  vessels={vessels}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                  onVesselsChanged={() => setVesselVersion((v) => v + 1)}
-                  setQ={setQ}
-                />
-              )}
-              {activeTab === 'agreedValue' && (
-                <AgreedValueTab
-                  quotation={q}
-                  updateField={updateField}
-                  setQ={setQ}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                />
-              )}
-              {activeTab === 'liability' && (
-                <LiabilityTab
-                  quotation={q}
-                  updateField={updateField}
-                  setQ={setQ}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  getEffectiveText={getEffectiveText}
-                />
-              )}
-              {activeTab === 'sumInsured' && (
-                <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'warConditions' && (
-                <WarConditionsTab quotation={q} showError={showError} />
-              )}
-              {activeTab === 'conditions' && (
-                <ConditionsTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  piAlternatives={piAlternatives}
-                  selectedPIAltId={selectedPIAltId}
-                />
-              )}
-              {activeTab === 'period' && (
-                <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'trading' && (
-                <TradingTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  updateField={updateField}
-                  setQ={setQ}
-                  getEffectiveText={getEffectiveText}
-                />
-              )}
-              {activeTab === 'warTrading' && (
-                <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'warranties' && (
-                <WarrantiesTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  updateField={updateField}
-                  setQ={setQ}
-                  getEffectiveText={getEffectiveText}
-                  piAlternatives={piAlternatives}
-                  selectedPIAltId={selectedPIAltId}
-                />
-              )}
-              {activeTab === 'surveyWarranties' && (
-                <SurveyWarrantiesTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  piAlternatives={piAlternatives}
-                  qVessels={qVessels}
-                />
-              )}
-              {activeTab === 'deductibles' && (
-                <DeductiblesTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                  updateField={updateField}
-                  setQ={setQ}
-                  getEffectiveText={getEffectiveText}
-                  piAlternatives={piAlternatives}
-                  selectedPIAltId={selectedPIAltId}
-                />
-              )}
-              {activeTab === 'exclusions' && (
-                <ExclusionsTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  piAlternatives={piAlternatives}
-                  selectedPIAltId={selectedPIAltId}
-                />
-              )}
-              {activeTab === 'sanctions' && (
-                <SanctionsTab
-                  quotation={q}
-                  updateField={updateField}
-                  setQ={setQ}
-                  sanctionsVersions={sanctionsVersions}
-                />
-              )}
-              {activeTab === 'subjectivities' && (
-                <SubjectivitiesTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                />
-              )}
-              {activeTab === 'premium' && (
-                <PremiumTab
-                  quotation={q}
-                  updateField={updateField}
-                  setQ={setQ}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                  getEffectiveText={getEffectiveText}
-                />
-              )}
-              {activeTab === 'information' && (
-                <InformationTab
-                  quotation={q}
-                  updateField={updateField}
-                  setQ={setQ}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                />
-              )}
-              {activeTab === 'insuredValue' && (
-                <InsuredValueTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'voyage' && (
-                <VoyageTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'subjectMatter' && (
-                <SubjectMatterTab quotation={q} updateField={updateField} setQ={setQ} />
-              )}
-              {activeTab === 'cargoConditions' && (
-                <CargoClausesTab
-                  quotation={q}
-                  section="conditions"
-                  updateField={updateField}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                />
-              )}
-              {activeTab === 'cargoSpecial' && (
-                <CargoClausesTab
-                  quotation={q}
-                  section="special"
-                  showSuccess={showSuccess}
-                  showError={showError}
-                />
-              )}
-              {activeTab === 'cargoLaw' && (
-                <CargoClausesTab
-                  quotation={q}
-                  section="law"
-                  showSuccess={showSuccess}
-                  showError={showError}
-                />
-              )}
-              {activeTab === 'customSections' && (
-                <CustomSectionsTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                />
-              )}
-              {activeTab === 'notes' && (
-                <NotesTab
-                  quotation={q}
-                  showSuccess={showSuccess}
-                  showError={showError}
-                  isLight={isLight}
-                />
-              )}
-            </fieldset>
-          </ReadOnlyContext.Provider>
-        </div>
-      )}
 
-      {activeTab === 'hullConditions' && (
-        <div key={settingsNonce} style={{ position: 'relative' }}>
-          <ReadOnlyContext.Provider value={!canEdit}>
-            <fieldset
-              disabled={!canEdit}
-              style={READONLY_FIELDSET}
-              onClickCapture={!canEdit ? blockReadOnlyClick : undefined}
-              onDragStartCapture={!canEdit ? blockReadOnlyClick : undefined}
+          {/* Tab Content */}
+          {activeTab !== 'hullConditions' && (
+            <div
+              key={settingsNonce}
+              className="glass-card"
+              style={{ padding: '24px', minHeight: '300px', position: 'relative' }}
             >
-              <HullConditionsTab
-                quotation={q}
-                updateField={updateField}
-                showSuccess={showSuccess}
-                showError={showError}
-              />
-            </fieldset>
-          </ReadOnlyContext.Provider>
+              {qVessels.length >= 2 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px 12px',
+                    padding: '8px 14px',
+                    marginBottom: '2px',
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  {qVessels.map((v) => (
+                    <span key={v.id}>
+                      <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
+                        {v.vesselLabel}
+                      </span>{' '}
+                      {(v.name || v.vesselLabel).toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* Read-only: controls disabled, clickable rows blocked, text still readable and
+              copyable (notes stay usable) */}
+              <ReadOnlyContext.Provider value={!canEdit && activeTab !== 'notes'}>
+                <fieldset
+                  disabled={!canEdit && activeTab !== 'notes'}
+                  style={READONLY_FIELDSET}
+                  onClickCapture={
+                    !canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined
+                  }
+                  onDragStartCapture={
+                    !canEdit && activeTab !== 'notes' ? blockReadOnlyClick : undefined
+                  }
+                >
+                  {activeTab === 'insured' && (
+                    <InsuredTab
+                      key={vesselVersion}
+                      quotation={q}
+                      vessels={vessels}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      updateField={updateField}
+                    />
+                  )}
+                  {activeTab === 'vessel' && (
+                    <VesselTab
+                      quotation={q}
+                      vessels={vessels}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                      onVesselsChanged={() => setVesselVersion((v) => v + 1)}
+                      setQ={setQ}
+                    />
+                  )}
+                  {activeTab === 'agreedValue' && (
+                    <AgreedValueTab
+                      quotation={q}
+                      updateField={updateField}
+                      setQ={setQ}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                    />
+                  )}
+                  {activeTab === 'liability' && (
+                    <LiabilityTab
+                      quotation={q}
+                      updateField={updateField}
+                      setQ={setQ}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      getEffectiveText={getEffectiveText}
+                    />
+                  )}
+                  {activeTab === 'sumInsured' && (
+                    <SumInsuredTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'warConditions' && (
+                    <WarConditionsTab quotation={q} showError={showError} />
+                  )}
+                  {activeTab === 'conditions' && (
+                    <ConditionsTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      piAlternatives={piAlternatives}
+                      selectedPIAltId={selectedPIAltId}
+                    />
+                  )}
+                  {activeTab === 'period' && (
+                    <PeriodTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'trading' && (
+                    <TradingTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      updateField={updateField}
+                      setQ={setQ}
+                      getEffectiveText={getEffectiveText}
+                    />
+                  )}
+                  {activeTab === 'warTrading' && (
+                    <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'warranties' && (
+                    <WarrantiesTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      updateField={updateField}
+                      setQ={setQ}
+                      getEffectiveText={getEffectiveText}
+                      piAlternatives={piAlternatives}
+                      selectedPIAltId={selectedPIAltId}
+                    />
+                  )}
+                  {activeTab === 'surveyWarranties' && (
+                    <SurveyWarrantiesTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      piAlternatives={piAlternatives}
+                      qVessels={qVessels}
+                    />
+                  )}
+                  {activeTab === 'deductibles' && (
+                    <DeductiblesTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                      updateField={updateField}
+                      setQ={setQ}
+                      getEffectiveText={getEffectiveText}
+                      piAlternatives={piAlternatives}
+                      selectedPIAltId={selectedPIAltId}
+                    />
+                  )}
+                  {activeTab === 'exclusions' && (
+                    <ExclusionsTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      piAlternatives={piAlternatives}
+                      selectedPIAltId={selectedPIAltId}
+                    />
+                  )}
+                  {activeTab === 'sanctions' && (
+                    <SanctionsTab
+                      quotation={q}
+                      updateField={updateField}
+                      setQ={setQ}
+                      sanctionsVersions={sanctionsVersions}
+                    />
+                  )}
+                  {activeTab === 'subjectivities' && (
+                    <SubjectivitiesTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                    />
+                  )}
+                  {activeTab === 'premium' && (
+                    <PremiumTab
+                      quotation={q}
+                      updateField={updateField}
+                      setQ={setQ}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                      getEffectiveText={getEffectiveText}
+                    />
+                  )}
+                  {activeTab === 'information' && (
+                    <InformationTab
+                      quotation={q}
+                      updateField={updateField}
+                      setQ={setQ}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                    />
+                  )}
+                  {activeTab === 'insuredValue' && (
+                    <InsuredValueTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'voyage' && (
+                    <VoyageTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'subjectMatter' && (
+                    <SubjectMatterTab quotation={q} updateField={updateField} setQ={setQ} />
+                  )}
+                  {activeTab === 'cargoConditions' && (
+                    <CargoClausesTab
+                      quotation={q}
+                      section="conditions"
+                      updateField={updateField}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                    />
+                  )}
+                  {activeTab === 'cargoSpecial' && (
+                    <CargoClausesTab
+                      quotation={q}
+                      section="special"
+                      showSuccess={showSuccess}
+                      showError={showError}
+                    />
+                  )}
+                  {activeTab === 'cargoLaw' && (
+                    <CargoClausesTab
+                      quotation={q}
+                      section="law"
+                      showSuccess={showSuccess}
+                      showError={showError}
+                    />
+                  )}
+                  {activeTab === 'customSections' && (
+                    <CustomSectionsTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                    />
+                  )}
+                  {activeTab === 'notes' && (
+                    <NotesTab
+                      quotation={q}
+                      showSuccess={showSuccess}
+                      showError={showError}
+                      isLight={isLight}
+                    />
+                  )}
+                </fieldset>
+              </ReadOnlyContext.Provider>
+            </div>
+          )}
+
+          {activeTab === 'hullConditions' && (
+            <div key={settingsNonce} style={{ position: 'relative' }}>
+              <ReadOnlyContext.Provider value={!canEdit}>
+                <fieldset
+                  disabled={!canEdit}
+                  style={READONLY_FIELDSET}
+                  onClickCapture={!canEdit ? blockReadOnlyClick : undefined}
+                  onDragStartCapture={!canEdit ? blockReadOnlyClick : undefined}
+                >
+                  <HullConditionsTab
+                    quotation={q}
+                    updateField={updateField}
+                    showSuccess={showSuccess}
+                    showError={showError}
+                  />
+                </fieldset>
+              </ReadOnlyContext.Provider>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {showSectionOrder && (
         <SectionOrderModal
