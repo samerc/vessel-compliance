@@ -64,7 +64,7 @@ import { ok, asArray } from '../utils/ipc'
 import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
-import { Modal, Field } from './ui'
+import { Modal, Field, Tabs } from './ui'
 import { confirmDialog } from './DialogHost'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
@@ -204,6 +204,32 @@ export default function PolicyDetail({
   onNavigateToPolicy
 }: PolicyDetailProps): React.JSX.Element | null {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
+  // Read view tabs, their counts, and "Add Endorsement" from the header (remounts the manager in
+  // add mode)
+  const [readTab, setReadTab] = useState<'overview' | 'blueCards' | 'endorsements' | 'revisions'>(
+    'overview'
+  )
+  const [endorsementCount, setEndorsementCount] = useState<number | null>(null)
+  const [revisionCount, setRevisionCount] = useState<number | null>(null)
+  const [addEndorsementNonce, setAddEndorsementNonce] = useState(0)
+  useEffect(() => {
+    if (!policy) return
+    let alive = true
+    Promise.all([
+      window.api.endorsementList(policy.id),
+      policy.policyNumber ? window.api.policyGetRevisions(policy.policyNumber) : Promise.resolve([])
+    ])
+      .then(([ends, revs]) => {
+        if (!alive) return
+        setEndorsementCount(Array.isArray(ends) ? ends.length : null)
+        setRevisionCount(Array.isArray(revs) ? revs.length : null)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [policy])
+
   // Receipts naming this policy (by id or number)
   const [receiptSummary, setReceiptSummary] = useState<ReceiptPolicySummary | null>(null)
   useEffect(() => {
@@ -1536,8 +1562,16 @@ export default function PolicyDetail({
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+      {/* Header: the title keeps its line; the actions wrap below it when space runs out */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginBottom: '24px',
+          flexWrap: 'wrap'
+        }}
+      >
         <button
           onClick={onBack}
           className="btn-secondary"
@@ -1546,7 +1580,7 @@ export default function PolicyDetail({
         >
           <ArrowLeft size={18} />
         </button>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: '1 1 360px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1
               style={{
@@ -1554,7 +1588,8 @@ export default function PolicyDetail({
                 margin: 0,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                whiteSpace: 'nowrap'
               }}
             >
               <FileCheck size={26} />
@@ -1634,6 +1669,20 @@ export default function PolicyDetail({
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Add Endorsement: opens the Endorsements tab with a new endorsement */}
+          {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && (
+            <button
+              className="btn-secondary"
+              style={{ ...headerBtnStyle }}
+              onClick={() => {
+                setReadTab('endorsements')
+                setAddEndorsementNonce((n) => n + 1)
+              }}
+              title="Add an endorsement to this policy"
+            >
+              <FileCheck size={16} /> Add Endorsement
+            </button>
+          )}
           {/* Edit Policy — primary action (only before first export) */}
           {!isEditing &&
             hasPermission('policies:manage') &&
@@ -3500,455 +3549,494 @@ export default function PolicyDetail({
       {/* ─── READ-ONLY VIEW ─── */}
       {!isEditing && (
         <>
-          {/* Two-column layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {/* Overview Card */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <Ship size={18} style={{ color: 'var(--accent-primary)' }} />
-                <span style={cardTitleStyle}>Overview</span>
-              </div>
-
-              {/* Vessel */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={labelStyle}>Vessel</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={valueStyle}>{policy.vesselName || '-'}</span>
-                  {policy.imoNumber && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      IMO {policy.imoNumber}
-                    </span>
-                  )}
-                  {onNavigateToVessel && policy.vesselId && (
-                    <button
-                      onClick={() => onNavigateToVessel(policy.vesselId)}
-                      className="btn-secondary"
-                      style={{
-                        padding: '3px 6px',
-                        fontSize: '0.72rem',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}
-                      title="View vessel"
-                    >
-                      <ExternalLink size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Vessel details grid */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  marginBottom: '16px'
-                }}
-              >
-                {policy.vesselType && (
-                  <div>
-                    <div style={labelStyle}>Type</div>
-                    <div style={valueStyle}>{policy.vesselType}</div>
+          <Tabs
+            style={{ marginBottom: '16px' }}
+            value={readTab}
+            onChange={setReadTab}
+            items={[
+              { key: 'overview', label: 'Overview', icon: <Ship size={15} /> },
+              {
+                key: 'blueCards',
+                label: 'Blue Cards',
+                icon: <CreditCard size={15} />,
+                count: blueCards.length,
+                hidden: !isPIType
+              },
+              {
+                key: 'endorsements',
+                label: 'Endorsements',
+                icon: <FileCheck size={15} />,
+                count: endorsementCount ?? undefined
+              },
+              {
+                key: 'revisions',
+                label: 'Revisions',
+                icon: <Clock size={15} />,
+                count: revisionCount ?? undefined
+              }
+            ]}
+          />
+          {readTab === 'overview' && (
+            <>
+              {/* Two-column layout */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Overview Card */}
+                <div style={cardStyle}>
+                  <div style={cardHeaderStyle}>
+                    <Ship size={18} style={{ color: 'var(--accent-primary)' }} />
+                    <span style={cardTitleStyle}>Overview</span>
                   </div>
-                )}
-                {policy.flagStateName && (
-                  <div>
-                    <div style={labelStyle}>Flag</div>
-                    <div style={valueStyle}>{policy.flagStateName}</div>
-                  </div>
-                )}
-                {policy.builtYear && (
-                  <div>
-                    <div style={labelStyle}>Built</div>
-                    <div style={valueStyle}>
-                      {policy.rebuiltYear
-                        ? `${policy.builtYear} / Rebuilt ${policy.rebuiltYear}`
-                        : policy.builtYear}
-                    </div>
-                  </div>
-                )}
-                {policy.grossTonnage && (
-                  <div>
-                    <div style={labelStyle}>Gross tonnage</div>
-                    <div style={valueStyle}>{Number(policy.grossTonnage).toLocaleString()}</div>
-                  </div>
-                )}
-              </div>
 
-              {/* Customer */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={labelStyle}>Customer</div>
-                <div style={valueStyle}>
-                  {policy.customerName || (
-                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>-</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Period */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  marginBottom: '12px'
-                }}
-              >
-                <div>
-                  <div style={labelStyle}>Inception</div>
-                  <div style={valueStyle}>
-                    {formatPeriod(policy.inceptionDate, policy.inceptionTime)}
-                  </div>
-                </div>
-                <div>
-                  <div style={labelStyle}>Expiry</div>
-                  <div style={valueStyle}>{formatPeriod(policy.expiryDate, policy.expiryTime)}</div>
-                </div>
-              </div>
-
-              {policy.timezone && (
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={labelStyle}>Timezone</div>
-                  <div style={valueStyle}>{policy.timezone}</div>
-                </div>
-              )}
-
-              {/* Source quotation */}
-              {policy.quotationId && (
-                <div>
-                  <div style={labelStyle}>Source quotation</div>
-                  <div style={valueStyle}>
-                    {onNavigateToQuotation ? (
-                      <span
-                        onClick={() =>
-                          onNavigateToQuotation(policy.quotationId, {
-                            policyId: policy.id,
-                            policyNumber: policy.policyNumber
-                          })
-                        }
-                        style={{
-                          color: 'var(--accent)',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {policy.quotationReference ||
-                          quotationData?.referenceNumber ||
-                          policy.quotationId}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.85rem' }}>
-                        {policy.quotationReference ||
-                          quotationData?.referenceNumber ||
-                          policy.quotationId}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Financial Card */}
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <DollarSign size={18} style={{ color: '#00c864' }} />
-                <span style={cardTitleStyle}>Financial Details</span>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  marginBottom: '16px'
-                }}
-              >
-                <div>
-                  <div style={labelStyle}>Premium</div>
-                  <div style={{ ...valueStyle, fontWeight: 600 }}>
-                    {formatAmount(policy.premiumAmount, policy.premiumCurrency)}
-                  </div>
-                </div>
-                {policy.perAnnumPremium != null && (
-                  <div>
-                    <div style={labelStyle}>Per annum premium</div>
-                    <div style={{ ...valueStyle, fontWeight: 600 }}>
-                      {formatAmount(policy.perAnnumPremium, policy.premiumCurrency)}
-                    </div>
-                  </div>
-                )}
-                {policy.commissionPercent != null && policy.commissionPercent > 0 && (
-                  <div>
-                    <div style={labelStyle}>Commission</div>
-                    <div style={valueStyle}>
-                      {policy.commissionPercent}%
-                      {commissionAmount != null && (
-                        <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
-                          ({formatAmount(commissionAmount, policy.premiumCurrency)})
+                  {/* Vessel */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={labelStyle}>Vessel</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={valueStyle}>{policy.vesselName || '-'}</span>
+                      {policy.imoNumber && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          IMO {policy.imoNumber}
                         </span>
                       )}
-                    </div>
-                  </div>
-                )}
-                {netPremium != null && (
-                  <div>
-                    <div style={labelStyle}>Net premium</div>
-                    <div
-                      style={{
-                        ...valueStyle,
-                        fontWeight: 600,
-                        color: 'var(--success)'
-                      }}
-                    >
-                      {formatAmount(netPremium, policy.premiumCurrency)}
-                    </div>
-                  </div>
-                )}
-                {receiptSummary && (
-                  <div>
-                    <div style={labelStyle}>Received</div>
-                    <div style={valueStyle}>
-                      {receiptSummary.receipts.length === 0 ? (
-                        <span className="muted">No receipts yet</span>
-                      ) : (
-                        <span
-                          title={receiptSummary.receipts
-                            .map(
-                              (r) =>
-                                `${r.receiptNumber} · ${formatDateShort(r.receiptDate)} · ${formatAmount(r.amount, r.currency)}`
-                            )
-                            .join('\n')}
+                      {onNavigateToVessel && policy.vesselId && (
+                        <button
+                          onClick={() => onNavigateToVessel(policy.vesselId)}
+                          className="btn-secondary"
+                          style={{
+                            padding: '3px 6px',
+                            fontSize: '0.72rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                          title="View vessel"
                         >
-                          <strong>
-                            {Object.entries(receiptSummary.totals)
-                              .map(([cur, amt]) => formatAmount(amt, cur))
-                              .join(' + ')}
-                          </strong>{' '}
-                          <span className="muted">
-                            ({receiptSummary.receipts.length} receipt
-                            {receiptSummary.receipts.length === 1 ? '' : 's'}, last{' '}
-                            {formatDateShort(
-                              receiptSummary.receipts[receiptSummary.receipts.length - 1]
-                                .receiptDate
-                            )}
-                            )
-                          </span>
-                        </span>
+                          <ExternalLink size={12} />
+                        </button>
                       )}
                     </div>
                   </div>
-                )}
-                {policy.bankName && (
-                  <div>
-                    <div style={labelStyle}>Bank</div>
-                    <div style={valueStyle}>{policy.bankName}</div>
-                  </div>
-                )}
-                {policy.proRata && (
-                  <div>
-                    <div style={labelStyle}>Pro rata</div>
-                    <div style={valueStyle}>Yes</div>
-                  </div>
-                )}
-                {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
-                  <div>
-                    <div style={labelStyle}>Exchange rate</div>
-                    <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
-                  </div>
-                )}
-              </div>
 
-              {/* Instalment table */}
-              {instalments.length > 0 && (
-                <div style={{ marginTop: '8px' }}>
-                  <div className="field-label" style={{ marginBottom: '8px' }}>
-                    Instalments
-                  </div>
-                  {(() => {
-                    // Compact: currency once in the headings, one line per cell, and the
-                    // commission / net columns only when there is a commission
-                    const cur = policy.premiumCurrency || 'USD'
-                    const num = (n?: number | null): string =>
-                      n == null
-                        ? '-'
-                        : Number(n).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })
-                    const hasComm = instalments.some((i) => (i.commissionAmount || 0) !== 0)
-                    const th: React.CSSProperties = { padding: '8px 10px' }
-                    const td: React.CSSProperties = {
-                      padding: '8px 10px',
-                      whiteSpace: 'nowrap',
-                      fontVariantNumeric: 'tabular-nums'
-                    }
-                    return (
-                      <div className="table-wrap">
-                        <table className="data-table">
-                          <thead>
-                            <tr>
-                              <th style={{ ...th, width: '1%' }}>#</th>
-                              <th style={th}>Due Date</th>
-                              <th style={{ ...th, textAlign: 'right' }}>Premium ({cur})</th>
-                              {hasComm && <th style={{ ...th, textAlign: 'right' }}>Commission</th>}
-                              {hasComm && <th style={{ ...th, textAlign: 'right' }}>Net</th>}
-                              <th style={{ ...th, textAlign: 'center', width: '1%' }}>NR</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {instalments.map((inst) => (
-                              <tr key={inst.instalmentNumber}>
-                                <td style={td}>{inst.instalmentNumber}</td>
-                                <td style={td}>
-                                  {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
-                                </td>
-                                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
-                                  {num(inst.premiumAmount)}
-                                </td>
-                                {hasComm && (
-                                  <td style={{ ...td, textAlign: 'right' }}>
-                                    {num(inst.commissionAmount)}
-                                  </td>
-                                )}
-                                {hasComm && (
-                                  <td
-                                    style={{
-                                      ...td,
-                                      textAlign: 'right',
-                                      color: 'var(--success)'
-                                    }}
-                                  >
-                                    {num((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
-                                  </td>
-                                )}
-                                <td style={{ ...td, textAlign: 'center' }}>
-                                  {inst.isNonRefundable ? (
-                                    <span
-                                      style={{
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 600,
-                                        background: 'rgba(255, 176, 32, 0.15)',
-                                        color: '#ffb020'
-                                      }}
-                                      title="Non-refundable"
-                                    >
-                                      NR
-                                    </span>
-                                  ) : (
-                                    <span style={{ color: 'var(--text-secondary)' }}>-</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-
-              {policy.premiumAmount == null && instalments.length === 0 && (
-                <div
-                  style={{
-                    padding: '24px',
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  No financial data recorded
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Addresses Card */}
-          {addresses.length > 0 && (
-            <div style={cardStyle}>
-              <div style={cardHeaderStyle}>
-                <Users size={18} style={{ color: '#6464ff' }} />
-                <span style={cardTitleStyle}>Addresses</span>
-                <span
-                  style={{
-                    marginLeft: 'auto',
-                    padding: '2px 10px',
-                    borderRadius: '10px',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    background: 'rgba(100, 100, 255, 0.12)',
-                    color: isLight ? '#4a4adf' : '#6464ff'
-                  }}
-                >
-                  {addresses.length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {addresses.map((addr, idx) => (
+                  {/* Vessel details grid */}
                   <div
-                    key={`${addr.entityId}-${idx}`}
                     style={{
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      background: 'var(--table-header-bg)',
-                      border: '1px solid var(--glass-border-color)'
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '12px',
+                      marginBottom: '16px'
                     }}
                   >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '6px'
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                        {addr.entityName}
-                      </span>
-                      {addr.role && (
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                            color: 'var(--text-secondary)'
-                          }}
-                        >
-                          {addr.role}
-                        </span>
-                      )}
-                    </div>
-                    {addr.addressText && (
-                      <div
-                        style={{
-                          fontSize: '0.82rem',
-                          color: 'var(--text-secondary)',
-                          whiteSpace: 'pre-wrap',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '6px'
-                        }}
-                      >
-                        <MapPin size={13} style={{ marginTop: '2px', flexShrink: 0 }} />
-                        {addr.addressText}
+                    {policy.vesselType && (
+                      <div>
+                        <div style={labelStyle}>Type</div>
+                        <div style={valueStyle}>{policy.vesselType}</div>
+                      </div>
+                    )}
+                    {policy.flagStateName && (
+                      <div>
+                        <div style={labelStyle}>Flag</div>
+                        <div style={valueStyle}>{policy.flagStateName}</div>
+                      </div>
+                    )}
+                    {policy.builtYear && (
+                      <div>
+                        <div style={labelStyle}>Built</div>
+                        <div style={valueStyle}>
+                          {policy.rebuiltYear
+                            ? `${policy.builtYear} / Rebuilt ${policy.rebuiltYear}`
+                            : policy.builtYear}
+                        </div>
+                      </div>
+                    )}
+                    {policy.grossTonnage && (
+                      <div>
+                        <div style={labelStyle}>Gross tonnage</div>
+                        <div style={valueStyle}>{Number(policy.grossTonnage).toLocaleString()}</div>
                       </div>
                     )}
                   </div>
-                ))}
+
+                  {/* Customer */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={labelStyle}>Customer</div>
+                    <div style={valueStyle}>
+                      {policy.customerName || (
+                        <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          -
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Period */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '12px',
+                      marginBottom: '12px'
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>Inception</div>
+                      <div style={valueStyle}>
+                        {formatPeriod(policy.inceptionDate, policy.inceptionTime)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Expiry</div>
+                      <div style={valueStyle}>
+                        {formatPeriod(policy.expiryDate, policy.expiryTime)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {policy.timezone && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={labelStyle}>Timezone</div>
+                      <div style={valueStyle}>{policy.timezone}</div>
+                    </div>
+                  )}
+
+                  {/* Source quotation */}
+                  {policy.quotationId && (
+                    <div>
+                      <div style={labelStyle}>Source quotation</div>
+                      <div style={valueStyle}>
+                        {onNavigateToQuotation ? (
+                          <span
+                            onClick={() =>
+                              onNavigateToQuotation(policy.quotationId, {
+                                policyId: policy.id,
+                                policyNumber: policy.policyNumber
+                              })
+                            }
+                            style={{
+                              color: 'var(--accent)',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {policy.quotationReference ||
+                              quotationData?.referenceNumber ||
+                              policy.quotationId}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.85rem' }}>
+                            {policy.quotationReference ||
+                              quotationData?.referenceNumber ||
+                              policy.quotationId}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Financial Card */}
+                <div style={cardStyle}>
+                  <div style={cardHeaderStyle}>
+                    <DollarSign size={18} style={{ color: '#00c864' }} />
+                    <span style={cardTitleStyle}>Financial Details</span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '12px',
+                      marginBottom: '16px'
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>Premium</div>
+                      <div style={{ ...valueStyle, fontWeight: 600 }}>
+                        {formatAmount(policy.premiumAmount, policy.premiumCurrency)}
+                      </div>
+                    </div>
+                    {policy.perAnnumPremium != null && (
+                      <div>
+                        <div style={labelStyle}>Per annum premium</div>
+                        <div style={{ ...valueStyle, fontWeight: 600 }}>
+                          {formatAmount(policy.perAnnumPremium, policy.premiumCurrency)}
+                        </div>
+                      </div>
+                    )}
+                    {policy.commissionPercent != null && policy.commissionPercent > 0 && (
+                      <div>
+                        <div style={labelStyle}>Commission</div>
+                        <div style={valueStyle}>
+                          {policy.commissionPercent}%
+                          {commissionAmount != null && (
+                            <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
+                              ({formatAmount(commissionAmount, policy.premiumCurrency)})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {netPremium != null && (
+                      <div>
+                        <div style={labelStyle}>Net premium</div>
+                        <div
+                          style={{
+                            ...valueStyle,
+                            fontWeight: 600,
+                            color: 'var(--success)'
+                          }}
+                        >
+                          {formatAmount(netPremium, policy.premiumCurrency)}
+                        </div>
+                      </div>
+                    )}
+                    {receiptSummary && (
+                      <div>
+                        <div style={labelStyle}>Received</div>
+                        <div style={valueStyle}>
+                          {receiptSummary.receipts.length === 0 ? (
+                            <span className="muted">No receipts yet</span>
+                          ) : (
+                            <span
+                              title={receiptSummary.receipts
+                                .map(
+                                  (r) =>
+                                    `${r.receiptNumber} · ${formatDateShort(r.receiptDate)} · ${formatAmount(r.amount, r.currency)}`
+                                )
+                                .join('\n')}
+                            >
+                              <strong>
+                                {Object.entries(receiptSummary.totals)
+                                  .map(([cur, amt]) => formatAmount(amt, cur))
+                                  .join(' + ')}
+                              </strong>{' '}
+                              <span className="muted">
+                                ({receiptSummary.receipts.length} receipt
+                                {receiptSummary.receipts.length === 1 ? '' : 's'}, last{' '}
+                                {formatDateShort(
+                                  receiptSummary.receipts[receiptSummary.receipts.length - 1]
+                                    .receiptDate
+                                )}
+                                )
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {policy.bankName && (
+                      <div>
+                        <div style={labelStyle}>Bank</div>
+                        <div style={valueStyle}>{policy.bankName}</div>
+                      </div>
+                    )}
+                    {policy.proRata && (
+                      <div>
+                        <div style={labelStyle}>Pro rata</div>
+                        <div style={valueStyle}>Yes</div>
+                      </div>
+                    )}
+                    {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
+                      <div>
+                        <div style={labelStyle}>Exchange rate</div>
+                        <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Instalment table */}
+                  {instalments.length > 0 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <div className="field-label" style={{ marginBottom: '8px' }}>
+                        Instalments
+                      </div>
+                      {(() => {
+                        // Compact: currency once in the headings, one line per cell, and the
+                        // commission / net columns only when there is a commission
+                        const cur = policy.premiumCurrency || 'USD'
+                        const num = (n?: number | null): string =>
+                          n == null
+                            ? '-'
+                            : Number(n).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })
+                        const hasComm = instalments.some((i) => (i.commissionAmount || 0) !== 0)
+                        const th: React.CSSProperties = { padding: '8px 10px' }
+                        const td: React.CSSProperties = {
+                          padding: '8px 10px',
+                          whiteSpace: 'nowrap',
+                          fontVariantNumeric: 'tabular-nums'
+                        }
+                        return (
+                          <div className="table-wrap">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th style={{ ...th, width: '1%' }}>#</th>
+                                  <th style={th}>Due Date</th>
+                                  <th style={{ ...th, textAlign: 'right' }}>Premium ({cur})</th>
+                                  {hasComm && (
+                                    <th style={{ ...th, textAlign: 'right' }}>Commission</th>
+                                  )}
+                                  {hasComm && <th style={{ ...th, textAlign: 'right' }}>Net</th>}
+                                  <th style={{ ...th, textAlign: 'center', width: '1%' }}>NR</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {instalments.map((inst) => (
+                                  <tr key={inst.instalmentNumber}>
+                                    <td style={td}>{inst.instalmentNumber}</td>
+                                    <td style={td}>
+                                      {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
+                                    </td>
+                                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+                                      {num(inst.premiumAmount)}
+                                    </td>
+                                    {hasComm && (
+                                      <td style={{ ...td, textAlign: 'right' }}>
+                                        {num(inst.commissionAmount)}
+                                      </td>
+                                    )}
+                                    {hasComm && (
+                                      <td
+                                        style={{
+                                          ...td,
+                                          textAlign: 'right',
+                                          color: 'var(--success)'
+                                        }}
+                                      >
+                                        {num(
+                                          (inst.premiumAmount || 0) - (inst.commissionAmount || 0)
+                                        )}
+                                      </td>
+                                    )}
+                                    <td style={{ ...td, textAlign: 'center' }}>
+                                      {inst.isNonRefundable ? (
+                                        <span
+                                          style={{
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.68rem',
+                                            fontWeight: 600,
+                                            background: 'rgba(255, 176, 32, 0.15)',
+                                            color: '#ffb020'
+                                          }}
+                                          title="Non-refundable"
+                                        >
+                                          NR
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {policy.premiumAmount == null && instalments.length === 0 && (
+                    <div
+                      style={{
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      No financial data recorded
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+
+              {/* Addresses Card */}
+              {addresses.length > 0 && (
+                <div style={cardStyle}>
+                  <div style={cardHeaderStyle}>
+                    <Users size={18} style={{ color: '#6464ff' }} />
+                    <span style={cardTitleStyle}>Addresses</span>
+                    <span
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '2px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        background: 'rgba(100, 100, 255, 0.12)',
+                        color: isLight ? '#4a4adf' : '#6464ff'
+                      }}
+                    >
+                      {addresses.length}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {addresses.map((addr, idx) => (
+                      <div
+                        key={`${addr.entityId}-${idx}`}
+                        style={{
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          background: 'var(--table-header-bg)',
+                          border: '1px solid var(--glass-border-color)'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '6px'
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                            {addr.entityName}
+                          </span>
+                          {addr.role && (
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.68rem',
+                                fontWeight: 600,
+                                textTransform: 'uppercase',
+                                background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                                color: 'var(--text-secondary)'
+                              }}
+                            >
+                              {addr.role}
+                            </span>
+                          )}
+                        </div>
+                        {addr.addressText && (
+                          <div
+                            style={{
+                              fontSize: '0.82rem',
+                              color: 'var(--text-secondary)',
+                              whiteSpace: 'pre-wrap',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '6px'
+                            }}
+                          >
+                            <MapPin size={13} style={{ marginTop: '2px', flexShrink: 0 }} />
+                            {addr.addressText}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Blue Cards Section */}
-          {isPIType && (
+          {readTab === 'blueCards' && isPIType && (
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <CreditCard size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -4713,30 +4801,37 @@ export default function PolicyDetail({
           )}
 
           {/* Endorsements Card */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <FileCheck size={18} style={{ color: 'var(--text-secondary)' }} />
-              <span style={cardTitleStyle}>Endorsements</span>
+          {readTab === 'endorsements' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <FileCheck size={18} style={{ color: 'var(--text-secondary)' }} />
+                <span style={cardTitleStyle}>Endorsements</span>
+              </div>
+              <EndorsementManager
+                key={addEndorsementNonce}
+                policyDocId={policyId}
+                policyNumber={policy.policyNumber}
+                premiumCurrency={policy.premiumCurrency || 'USD'}
+                initialAddMode={addEndorsementNonce > 0}
+                onCount={setEndorsementCount}
+              />
             </div>
-            <EndorsementManager
-              policyDocId={policyId}
-              policyNumber={policy.policyNumber}
-              premiumCurrency={policy.premiumCurrency || 'USD'}
-            />
-          </div>
+          )}
 
           {/* Revision History Card */}
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <Clock size={18} style={{ color: 'var(--text-secondary)' }} />
-              <span style={cardTitleStyle}>Revision History</span>
+          {readTab === 'revisions' && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Clock size={18} style={{ color: 'var(--text-secondary)' }} />
+                <span style={cardTitleStyle}>Revision History</span>
+              </div>
+              <RevisionHistorySection
+                policyNumber={policy.policyNumber}
+                currentPolicyId={policyId}
+                onViewRevision={onNavigateToPolicy}
+              />
             </div>
-            <RevisionHistorySection
-              policyNumber={policy.policyNumber}
-              currentPolicyId={policyId}
-              onViewRevision={onNavigateToPolicy}
-            />
-          </div>
+          )}
         </>
       )}
 

@@ -41,6 +41,8 @@ interface EndorsementManagerProps {
   premiumCurrency?: string
   initialAddMode?: boolean
   initialContent?: string
+  /** Told how many endorsements the policy has (tab counts) */
+  onCount?: (n: number) => void
 }
 
 interface EditState {
@@ -140,7 +142,8 @@ export default function EndorsementManager({
   policyDocId,
   premiumCurrency,
   initialAddMode,
-  initialContent
+  initialContent,
+  onCount
 }: EndorsementManagerProps): React.JSX.Element {
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
@@ -169,8 +172,13 @@ export default function EndorsementManager({
     { show: false, id: '', number: 0 }
   )
 
+  const onCountRef = useRef(onCount)
+  useEffect(() => {
+    onCountRef.current = onCount
+  })
   const applyData = useCallback((d: EndorsementPageData): void => {
     setEndorsements(d.endorsements)
+    onCountRef.current?.(d.endorsements.length)
     setTemplates(d.templates)
     if (d.policyData) setPolicyData(d.policyData)
     setPolicyInstalments(d.policyInstalments)
