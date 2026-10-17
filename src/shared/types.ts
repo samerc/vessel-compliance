@@ -2416,6 +2416,9 @@ export interface PolicyDocument {
   nonRefundablePercent: number | null
   qrEnabled: boolean | null
   hideBroker: boolean
+  /** Printed for signing: the policy's pages and the total (policy + T&C) shown in its footer */
+  signingPages?: number | null
+  signingTotal?: number | null
   exchangeRate: number
   createdBy: string | null
   createdAt: string

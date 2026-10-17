@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   ArrowLeft,
   FileCheck,
+  Printer,
+  Paperclip,
   Ship,
   DollarSign,
   Clock,
@@ -266,6 +268,8 @@ export default function PolicyDetail({
   const [, setExportingBC] = useState(false)
   const [exportingQB, setExportingQB] = useState(false)
   const [exportingPdfTC, setExportingPdfTC] = useState(false)
+  // "For signing" PDF or signed scan + T&C being built: the message of the waiting overlay
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null)
   const [exportingBundle, setExportingBundle] = useState(false)
   const [showDeclarationModal, setShowDeclarationModal] = useState(false)
   const [declarationFields, setDeclarationFields] = useState<DeclarationFields | null>(null)
@@ -1521,6 +1525,47 @@ export default function PolicyDetail({
     }
   }
 
+  // Wet-ink signing: print this PDF (its footer counts the T&C pages), sign, scan, then add the
+  // T&C to the scan below
+  const handleExportForSigning = async (): Promise<void> => {
+    if (!(await confirmFirstExport())) return
+    setPdfBusy('Preparing the policy for signing. Please wait...')
+    try {
+      const { exportPolicyForSigning } = await import('../services/PolicyExportService')
+      const r = await exportPolicyForSigning(policyId)
+      showSuccess(
+        `Policy for signing exported: ${r.policyPages} page${r.policyPages === 1 ? '' : 's'}, numbered to ${r.total} with the T&C`
+      )
+      await loadData()
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export the policy for signing'))
+    } finally {
+      setPdfBusy(null)
+    }
+  }
+
+  const handleAppendTcToScan = async (): Promise<void> => {
+    setPdfBusy('Adding the T&C to the signed policy. Please wait...')
+    try {
+      const { appendTcToSignedScan } = await import('../services/PolicyExportService')
+      const r = await appendTcToSignedScan(policyId, (msg) =>
+        confirmDialog(msg, {
+          title: 'Signed policy',
+          confirmLabel: 'Add the T&C',
+          isDangerous: false
+        })
+      )
+      if (r)
+        showSuccess(
+          `Signed policy saved with the T&C: ${r.scanPages} signed + ${r.tcPages} T&C pages = ${r.total}`
+        )
+    } catch (err) {
+      showError(errMessage(err, 'Failed to add the T&C to the signed policy'))
+    } finally {
+      setPdfBusy(null)
+    }
+  }
+
   const handleExportDA = async (): Promise<void> => {
     setExportingDA(true)
     try {
@@ -1929,6 +1974,30 @@ export default function PolicyDetail({
                         >
                           <FileCheck size={15} />{' '}
                           {exportingPdfTC ? 'Converting...' : 'Export Policy (PDF + T&C)'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false)
+                            void handleExportForSigning()
+                          }}
+                          disabled={!!pdfBusy}
+                          style={actionItemStyle}
+                          className="hover-effect"
+                          title="A PDF of the policy to print and sign; its page numbers already count the T&C"
+                        >
+                          <Printer size={15} /> Export for Signing (PDF)
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false)
+                            void handleAppendTcToScan()
+                          }}
+                          disabled={!!pdfBusy}
+                          style={actionItemStyle}
+                          className="hover-effect"
+                          title="Choose the scanned signed policy: the T&C is added after it, numbered on"
+                        >
+                          <Paperclip size={15} /> Add T&C to Signed Scan...
                         </button>
                         <button
                           onClick={() => {
@@ -5269,7 +5338,7 @@ export default function PolicyDetail({
         })()}
 
       {/* Export overlay: blocks the page until the PDF + T&C is built (cannot be closed) */}
-      {exportingPdfTC && (
+      {(exportingPdfTC || pdfBusy) && (
         <div
           role="status"
           aria-live="polite"
@@ -5312,7 +5381,7 @@ export default function PolicyDetail({
               Exporting Policy
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Converting to PDF and merging with T&C. Please wait...
+              {pdfBusy || 'Converting to PDF and merging with T&C. Please wait...'}
             </div>
           </div>
         </div>

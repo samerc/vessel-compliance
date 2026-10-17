@@ -2321,7 +2321,9 @@ export interface Api {
   convertDocxBufferToPdf: (data: {
     docxData: number[]
     fileName?: string
-  }) => Promise<{ data: number[]; fileName: string } | { error: true; message: string }>
+  }) => Promise<
+    { data: number[]; fileName: string; pageCount: number } | { error: true; message: string }
+  >
 
   // File Manager
   fileManagerGetRoot: () => Promise<string | null>
@@ -2355,7 +2357,32 @@ export interface Api {
     filePrefix: string
     policyNumber?: string
     policyTypeTitle?: string
-  }) => Promise<{ data: number[]; fileName: string; totalPages: number }>
+    /** Only count the pages (policy + T&C), no merged PDF */
+    countOnly?: boolean
+    /** Total to print in the T&C footer */
+    totalPages?: number
+  }) => Promise<{
+    data: number[]
+    fileName: string
+    totalPages: number
+    policyPages: number
+    tcPages: number
+  }>
+  /** Pick the signed, scanned policy PDF (remembered by the main process for tcScanAppend) */
+  tcScanPick: () => Promise<
+    | { canceled: true }
+    | { canceled: false; fileName: string; pages: number }
+    | { error: true; message: string }
+  >
+  /** The picked scan followed by the type's T&C, numbered from the page after the scan */
+  tcScanAppend: (data: {
+    tcTypeCode: string
+    filePrefix: string
+    policyNumber?: string
+    policyTypeTitle?: string
+  }) => Promise<
+    { data: number[]; scanPages: number; tcPages: number } | { error: true; message: string }
+  >
 }
 
 declare global {

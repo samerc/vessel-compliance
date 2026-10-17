@@ -1572,7 +1572,16 @@ const api: Api = {
     filePrefix: string
     policyNumber?: string
     policyTypeTitle?: string
-  }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data)
+    countOnly?: boolean
+    totalPages?: number
+  }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data),
+  tcScanPick: () => ipcRenderer.invoke('tcScan:pick'),
+  tcScanAppend: (data: {
+    tcTypeCode: string
+    filePrefix: string
+    policyNumber?: string
+    policyTypeTitle?: string
+  }) => ipcRenderer.invoke('tcScan:append', data)
 }
 
 // Expose curated API to renderer via context bridge

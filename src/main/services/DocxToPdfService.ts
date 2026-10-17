@@ -3,6 +3,7 @@ import { promisify } from 'util'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import { createHash } from 'crypto'
 
 // execFile (no shell): file paths travel as argv, never as code. A vessel name in a
 // file name (e.g. containing $(...) or quotes) must not be able to run commands.
@@ -262,16 +263,10 @@ export async function setDocxPageStart(
 }
 
 /**
- * Full pipeline: generate a combined policy + T&C PDF.
- *
- * Steps:
- * 1. Save policy DOCX blob to temp file
- * 2. Convert to PDF via Word COM
- * 3. Count pages in policy PDF
- * 4. Modify T&C DOCX to start page numbering after the policy
- * 5. Convert T&C DOCX to PDF
- * 6. Merge both PDFs
- * 7. Return the merged PDF path (caller is responsible for cleanup)
+ * Policy + T&C as one PDF. The policy pages are counted, the T&C is numbered from the next page.
+ * - countOnly: only count (policy pages + T&C pages), no merge; the caller re-generates the policy
+ *   with that total in its footer and calls again with totalPages
+ * - totalPages: the total to print in the T&C footer (the policy DOCX already carries it)
  */
 export async function buildPolicyWithTC(
   policyDocxBuffer: Buffer,
@@ -279,70 +274,351 @@ export async function buildPolicyWithTC(
   outputDir: string,
   filePrefix: string,
   policyNumber?: string,
-  policyTypeTitle?: string
-): Promise<{ pdfPath: string; tempFiles: string[]; totalPages: number }> {
+  policyTypeTitle?: string,
+  opts: { countOnly?: boolean; totalPages?: number } = {}
+): Promise<{
+  pdfPath: string
+  tempFiles: string[]
+  totalPages: number
+  policyPages: number
+  tcPages: number
+}> {
   const tempFiles: string[] = []
-
   try {
-    // 1. Save policy DOCX to temp
-    const policyDocxPath = path.join(outputDir, `${filePrefix}_policy.docx`)
-    fs.writeFileSync(policyDocxPath, policyDocxBuffer)
-    tempFiles.push(policyDocxPath)
-
-    // 2. Convert policy DOCX to PDF
-    const policyPdfPath = await convertDocxToPdf(policyDocxPath)
-    tempFiles.push(policyPdfPath)
-
-    // 3. Count pages in policy PDF
-    const policyPageCount = await countPdfPages(policyPdfPath)
-
-    // 4. First pass T&C: get page count (no hardcoded total yet, use NUMPAGES field)
-    const tcPass1Buffer = await setDocxPageStart(
-      tcDocxBuffer,
-      policyPageCount + 1,
-      policyNumber,
-      policyTypeTitle
+    const policyPdfPath = await convertBuffer(
+      policyDocxBuffer,
+      outputDir,
+      `${filePrefix}_policy`,
+      tempFiles
     )
-    const tcPass1Path = path.join(outputDir, `${filePrefix}_tc_pass1.docx`)
-    fs.writeFileSync(tcPass1Path, tcPass1Buffer)
-    tempFiles.push(tcPass1Path)
+    const policyPages = await countPdfPages(policyPdfPath)
+    const fill: TcFill = { startPage: policyPages + 1, policyNumber, typeTitle: policyTypeTitle }
 
-    const tcPass1PdfPath = await convertDocxToPdf(tcPass1Path)
-    tempFiles.push(tcPass1PdfPath)
-
-    const tcPageCount = await countPdfPages(tcPass1PdfPath)
-    const totalPages = policyPageCount + tcPageCount
-
-    // 5. Second pass T&C: inject hardcoded combined total
-    const tcFinalBuffer = await setDocxPageStart(
-      tcDocxBuffer,
-      policyPageCount + 1,
-      policyNumber,
-      policyTypeTitle,
-      totalPages
+    if (opts.countOnly || !opts.totalPages) {
+      const tcPages = await countTcPages(
+        tcDocxBuffer,
+        fill,
+        outputDir,
+        `${filePrefix}_tc_count`,
+        tempFiles
+      )
+      if (opts.countOnly)
+        return {
+          pdfPath: '',
+          tempFiles,
+          totalPages: policyPages + tcPages,
+          policyPages,
+          tcPages
+        }
+      opts = { totalPages: policyPages + tcPages }
+    }
+    const totalPages = opts.totalPages!
+    const tcPdfPath = await convertBuffer(
+      await prepareTcDocx(tcDocxBuffer, { ...fill, totalPages }),
+      outputDir,
+      `${filePrefix}_tc`,
+      tempFiles
     )
-    const tcDocxPath = path.join(outputDir, `${filePrefix}_tc.docx`)
-    fs.writeFileSync(tcDocxPath, tcFinalBuffer)
-    tempFiles.push(tcDocxPath)
-
-    const tcPdfPath = await convertDocxToPdf(tcDocxPath)
-    tempFiles.push(tcPdfPath)
-
-    // 6. Merge both PDFs
+    const tcPages = await countPdfPages(tcPdfPath)
     const mergedPdfPath = path.join(outputDir, `${filePrefix}.pdf`)
     await mergePdfs([policyPdfPath, tcPdfPath], mergedPdfPath)
     tempFiles.push(mergedPdfPath)
-
-    return { pdfPath: mergedPdfPath, tempFiles, totalPages }
+    return { pdfPath: mergedPdfPath, tempFiles, totalPages, policyPages, tcPages }
   } catch (error) {
-    // Clean up temp files on error
-    for (const f of tempFiles) {
-      try {
-        fs.unlinkSync(f)
-      } catch {
-        /* ignore */
-      }
+    removeTempFiles(tempFiles)
+    throw error
+  }
+}
+
+// ==================== T&C templates written in Word ====================
+// The insurer's T&C files carry their own headers / footers (logo, watermark, "P&I Certificate
+// P26210074", "Page 4 of 30", title line). The certificate number and the page total are typed in
+// by hand there. They are filled per policy here, keeping everything else of the footer:
+//  - placeholders {policy_number} / {number}, {total_pages} / {total}, {type} wherever they are
+//  - otherwise: the number after "Certificate" / "Cover", the number after "Page N of", and a
+//    leftover "x" typed in front of "Page" (a cut "H2520x" placeholder)
+// Word splits such text over several runs ("P", "262", "100", "74"), so the text of a paragraph is
+// rebuilt across its runs.
+
+export interface TcFill {
+  /** Number of the first T&C page (pages before it: the policy or the signed scan) */
+  startPage: number
+  /** Total pages of the whole document; left as typed when unknown */
+  totalPages?: number
+  policyNumber?: string
+  /** "P&I", "Hull"... for {type} and for the generated footer of a template without one */
+  typeTitle?: string
+}
+
+const xmlUnescape = (s: string): string =>
+  s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+const xmlEscape = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const PLACEHOLDER_RE = /\{(policy_number|number|total_pages|total|type)\}/i
+
+/** One edit of a paragraph's text: [start, end) replaced by text */
+interface TextEdit {
+  start: number
+  end: number
+  text: string
+}
+
+/** Edits for one paragraph of a header / footer */
+function tcParagraphEdits(text: string, fill: TcFill, usePlaceholders: boolean): TextEdit[] {
+  const edits: TextEdit[] = []
+  const add = (start: number, end: number, t: string | undefined): void => {
+    if (t == null) return
+    if (edits.some((e) => start < e.end && end > e.start)) return
+    edits.push({ start, end, text: t })
+  }
+  const total = fill.totalPages ? String(fill.totalPages) : undefined
+  if (usePlaceholders) {
+    for (const m of text.matchAll(new RegExp(PLACEHOLDER_RE.source, 'gi'))) {
+      const k = m[1].toLowerCase()
+      const v =
+        k === 'policy_number' || k === 'number'
+          ? fill.policyNumber
+          : k === 'type'
+            ? fill.typeTitle
+            : total
+      add(m.index!, m.index! + m[0].length, v)
     }
+    return edits
+  }
+  // Certificate / cover number: the rest of the paragraph after the word
+  const num = /\b(?:Certificate|Cover)\s+([A-Z]{1,3}\s?\d[\w\-/ ]*?)\s*$/.exec(text)
+  if (num && fill.policyNumber) {
+    const s = num.index + num[0].lastIndexOf(num[1])
+    add(s, s + num[1].length, fill.policyNumber)
+  }
+  // "Page 4 of 30": the typed total
+  const tot = /Page\s*\d*\s*of\s*(\d+)/i.exec(text)
+  if (tot && total) {
+    const s = tot.index + tot[0].length - tot[1].length
+    add(s, s + tot[1].length, total)
+  }
+  // A cut placeholder left in front of "Page" ("x", "xx")
+  const stray = /^\s*([xX]+)(?=\s*Page\b)/.exec(text)
+  if (stray) {
+    const s = stray.index + stray[0].length - stray[1].length
+    add(s, s + stray[1].length, '')
+  }
+  return edits
+}
+
+/** Apply the fill to every paragraph of a header / footer part */
+function fillTcPart(xml: string, fill: TcFill, usePlaceholders: boolean): string {
+  const runRe = /<w:t(\s[^>]*)?>([^<]*)<\/w:t>/g
+  const runs: { start: number; end: number; attrs: string; text: string; para: number }[] = []
+  let para = 0
+  let last = 0
+  for (const m of xml.matchAll(runRe)) {
+    // A paragraph end between two text runs starts a new paragraph
+    const between = xml.slice(last, m.index)
+    para += between.split('</w:p>').length - 1
+    runs.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      attrs: m[1] || '',
+      text: xmlUnescape(m[2]),
+      para
+    })
+    last = m.index! + m[0].length
+  }
+  const newTexts = runs.map((r) => r.text)
+  const byPara = new Map<number, number[]>()
+  runs.forEach((r, i) => byPara.set(r.para, [...(byPara.get(r.para) || []), i]))
+  for (const idx of byPara.values()) {
+    const offsets: number[] = []
+    let full = ''
+    for (const i of idx) {
+      offsets.push(full.length)
+      full += runs[i].text
+    }
+    const edits = tcParagraphEdits(full, fill, usePlaceholders).sort((a, b) => a.start - b.start)
+    if (edits.length === 0) continue
+    // Rebuild each run: kept characters stay in their run, a replacement goes into the run where
+    // the replaced text started
+    idx.forEach((i, k) => {
+      const rs = offsets[k]
+      const re = rs + runs[i].text.length
+      let out = ''
+      let pos = rs
+      for (const e of edits) {
+        if (e.end <= rs || e.start >= re) continue
+        if (e.start > pos) out += full.slice(pos, e.start)
+        if (e.start >= rs) out += e.text
+        pos = Math.max(pos, Math.min(e.end, re))
+      }
+      if (pos < re) out += full.slice(pos, re)
+      newTexts[i] = out
+    })
+  }
+  let result = ''
+  let cur = 0
+  runs.forEach((r, i) => {
+    result += xml.slice(cur, r.start)
+    const t = newTexts[i]
+    const attrs =
+      t !== t.trim() && !/xml:space/.test(r.attrs) ? `${r.attrs} xml:space="preserve"` : r.attrs
+    result += `<w:t${attrs}>${xmlEscape(t)}</w:t>`
+    cur = r.end
+  })
+  return result + xml.slice(cur)
+}
+
+/** Sets the first section's page numbering to start at `start`; later sections continue */
+function setSectionPageStart(docXml: string, start: number): string {
+  let first = true
+  return docXml.replace(/<w:sectPr\b[^>]*>[\s\S]*?<\/w:sectPr>/g, (sect) => {
+    if (!first) return sect.replace(/(<w:pgNumType\b[^>]*?)\s+w:start="\d+"/, '$1')
+    first = false
+    // "Continuous" means nothing for the first section in Word, but LibreOffice then ignores its
+    // page number start (the P&I T&C printed "Page 1" instead of 4)
+    sect = sect.replace(/<w:type w:val="continuous"\/>/, '')
+    if (/<w:pgNumType\b/.test(sect))
+      return sect.replace(/<w:pgNumType\b([^>]*?)(\/?)>/, (_m, attrs: string, close: string) => {
+        const kept = attrs.replace(/\s+w:start="\d+"/, '')
+        return `<w:pgNumType${kept} w:start="${start}"${close}>`
+      })
+    // Keep the schema order: pgNumType comes before cols / docGrid
+    const tag = `<w:pgNumType w:start="${start}"/>`
+    if (/<w:cols\b/.test(sect)) return sect.replace(/<w:cols\b/, `${tag}<w:cols`)
+    if (/<w:docGrid\b/.test(sect)) return sect.replace(/<w:docGrid\b/, `${tag}<w:docGrid`)
+    return sect.replace(/<\/w:sectPr>$/, `${tag}</w:sectPr>`)
+  })
+}
+
+/**
+ * Prepares a Word T&C template for one policy: page numbers start after the policy (or the signed
+ * scan), and the footer's certificate number and page total are filled in. A template without a
+ * page-number footer gets the generated one ("{Type} Cover {number}" + "Page X of Y").
+ */
+export async function prepareTcDocx(docxBuffer: Buffer, fill: TcFill): Promise<Buffer> {
+  const { default: JSZip } = await import('jszip')
+  const zip = await JSZip.loadAsync(docxBuffer)
+  const parts = Object.keys(zip.files).filter((n) => /^word\/(header|footer)\d*\.xml$/.test(n))
+  const xmls = new Map<string, string>()
+  for (const n of parts) xmls.set(n, await zip.file(n)!.async('string'))
+  const hasPageField = [...xmls.entries()].some(
+    ([n, x]) => n.includes('footer') && /\bPAGE\b/.test(x)
+  )
+  if (!hasPageField)
+    return setDocxPageStart(
+      docxBuffer,
+      fill.startPage,
+      fill.policyNumber,
+      fill.typeTitle,
+      fill.totalPages
+    )
+  // Placeholders anywhere in the headers / footers switch off the automatic detection
+  const usePlaceholders = [...xmls.values()].some((x) =>
+    PLACEHOLDER_RE.test(
+      xmlUnescape([...x.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(''))
+    )
+  )
+  for (const [n, x] of xmls) zip.file(n, fillTcPart(x, fill, usePlaceholders))
+  const docFile = zip.file('word/document.xml')
+  if (!docFile) throw new Error('Invalid DOCX: missing word/document.xml')
+  zip.file('word/document.xml', setSectionPageStart(await docFile.async('string'), fill.startPage))
+  return Buffer.from(await zip.generateAsync({ type: 'nodebuffer' }))
+}
+
+/** Converts a DOCX buffer in a temp file and returns the PDF path (both paths go to tempFiles) */
+async function convertBuffer(
+  buf: Buffer,
+  outputDir: string,
+  name: string,
+  tempFiles: string[]
+): Promise<string> {
+  const docxPath = path.join(outputDir, `${name}.docx`)
+  fs.writeFileSync(docxPath, buf)
+  tempFiles.push(docxPath)
+  const pdfPath = await convertDocxToPdf(docxPath)
+  tempFiles.push(pdfPath)
+  return pdfPath
+}
+
+// T&C page counts per template file (its layout does not depend on the numbers filled into the
+// footer): a conversion takes 10-40 s, so the count is worked out once per template per session
+const tcPageCounts = new Map<string, number>()
+
+async function countTcPages(
+  tcDocxBuffer: Buffer,
+  fill: TcFill,
+  outputDir: string,
+  name: string,
+  tempFiles: string[]
+): Promise<number> {
+  const key = createHash('sha1').update(tcDocxBuffer).digest('hex')
+  const known = tcPageCounts.get(key)
+  if (known) return known
+  const pdf = await convertBuffer(
+    await prepareTcDocx(tcDocxBuffer, fill),
+    outputDir,
+    name,
+    tempFiles
+  )
+  const n = await countPdfPages(pdf)
+  tcPageCounts.set(key, n)
+  return n
+}
+
+/** Removes temp files, ignoring the ones already gone */
+export function removeTempFiles(files: string[]): void {
+  for (const f of files) {
+    try {
+      fs.unlinkSync(f)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Signed scan + T&C: the scanned signed policy (printed with "Page X of {total}") followed by the
+ * T&C numbered from the page after the scan, with the same total.
+ */
+export async function appendTcToPdf(
+  scanPdf: Buffer,
+  tcDocxBuffer: Buffer,
+  outputDir: string,
+  filePrefix: string,
+  policyNumber?: string,
+  typeTitle?: string
+): Promise<{ pdfPath: string; tempFiles: string[]; scanPages: number; tcPages: number }> {
+  const tempFiles: string[] = []
+  try {
+    const scanPath = path.join(outputDir, `${filePrefix}_scan.pdf`)
+    fs.writeFileSync(scanPath, scanPdf)
+    tempFiles.push(scanPath)
+    const scanPages = await countPdfPages(scanPath)
+    const fill: TcFill = { startPage: scanPages + 1, policyNumber, typeTitle }
+    const tcPages = await countTcPages(
+      tcDocxBuffer,
+      fill,
+      outputDir,
+      `${filePrefix}_tc_count`,
+      tempFiles
+    )
+    const tcPdf = await convertBuffer(
+      await prepareTcDocx(tcDocxBuffer, { ...fill, totalPages: scanPages + tcPages }),
+      outputDir,
+      `${filePrefix}_tc`,
+      tempFiles
+    )
+    const merged = path.join(outputDir, `${filePrefix}.pdf`)
+    await mergePdfs([scanPath, tcPdf], merged)
+    tempFiles.push(merged)
+    return { pdfPath: merged, tempFiles, scanPages, tcPages }
+  } catch (error) {
+    removeTempFiles(tempFiles)
     throw error
   }
 }

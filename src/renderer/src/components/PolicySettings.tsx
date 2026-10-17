@@ -2145,6 +2145,14 @@ function TcTemplatesTab({
           {busy ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Upload DOCX
         </button>
       </div>
+      <p className="muted" style={{ fontSize: '0.8rem', margin: '10px 0 0', maxWidth: '640px' }}>
+        An uploaded Word file keeps its own headers and footers. On each policy its pages are
+        numbered after the policy, and its footer is filled in: the number after
+        &quot;Certificate&quot; or &quot;Cover&quot; becomes the policy number and the number after
+        &quot;Page N of&quot; the total pages. You can also type {'{policy_number}'} and{' '}
+        {'{total_pages}'} in the footer instead. The T&C Footer below is used only by rich-text
+        templates and by a Word file without page numbers.
+      </p>
 
       {/* T&C footer config */}
       <div

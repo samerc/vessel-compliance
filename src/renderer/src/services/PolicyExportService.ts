@@ -5219,42 +5219,24 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     return
   }
 
-  // Legacy DOCX T&C: merge policy PDF + T&C PDF via the two-pass page-number pipeline.
-  // Resolve policy type title for T&C footer
-  const typeTitleMap: Record<string, string> = {
-    P: 'P&I',
-    H: 'Hull',
-    W: 'War Risk',
-    F: 'FD&D',
-    L: 'Loss of Hire',
-    C: 'Cargo'
-  }
-  const policyTypeTitle = typeTitleMap[typeCode] || data.quotation.quotationTypeName || 'Insurance'
+  // Word T&C: count the pages (policy + T&C), then the policy with that total in its footer and
+  // the T&C numbered after it, merged into one PDF
+  const policyTypeTitle = tcTypeTitle(typeCode, data.quotation.quotationTypeName)
   const policyNumber = data.policy.policyNumber
-
-  // Pass 1: generate policy DOCX with auto page count, convert to get combined total
-  const { buffer: buf1, fileName } = await generatePolicyDocxBuffer(policyId)
-  const pass1Result = await window.api.convertBuildPolicyWithTC({
-    policyDocxData: Array.from(new Uint8Array(buf1)),
-    tcTypeCode: typeCode,
-    filePrefix: fileName,
+  const { total, fileName } = await countPolicyWithWordTc(
+    policyId,
+    typeCode,
     policyNumber,
     policyTypeTitle
-  })
-
-  if (!pass1Result || isIpcError(pass1Result)) {
-    throw new Error((isIpcError(pass1Result) && pass1Result.message) || 'PDF conversion failed')
-  }
-
-  // Pass 2: re-generate with hardcoded combined total
-  const combinedTotal = pass1Result.totalPages || 0
-  const { buffer: buf2 } = await generatePolicyDocxBuffer(policyId, combinedTotal)
+  )
+  const { buffer: buf2 } = await generatePolicyDocxBuffer(policyId, total)
   const result = await window.api.convertBuildPolicyWithTC({
     policyDocxData: Array.from(new Uint8Array(buf2)),
     tcTypeCode: typeCode,
     filePrefix: fileName,
     policyNumber,
-    policyTypeTitle
+    policyTypeTitle,
+    totalPages: total
   })
 
   if (!result || isIpcError(result)) {
@@ -5276,6 +5258,169 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   } catch {
     /* non-critical */
   }
+}
+
+/** Type name for a T&C footer that has none of its own */
+function tcTypeTitle(typeCode: string, typeName?: string | null): string {
+  const map: Record<string, string> = {
+    P: 'P&I',
+    H: 'Hull',
+    W: 'War Risk',
+    F: 'FD&D',
+    L: 'Loss of Hire',
+    C: 'Cargo'
+  }
+  return map[typeCode] || typeName || 'Insurance'
+}
+
+/** Pages of the policy and of its Word T&C, as the PDF converter lays them out */
+async function countPolicyWithWordTc(
+  policyId: string,
+  typeCode: string,
+  policyNumber: string,
+  policyTypeTitle: string
+): Promise<{ total: number; policyPages: number; fileName: string }> {
+  const { buffer, fileName } = await generatePolicyDocxBuffer(policyId)
+  const res = await window.api.convertBuildPolicyWithTC({
+    policyDocxData: Array.from(new Uint8Array(buffer)),
+    tcTypeCode: typeCode,
+    filePrefix: fileName,
+    policyNumber,
+    policyTypeTitle,
+    countOnly: true
+  })
+  if (!res || isIpcError(res))
+    throw new Error((isIpcError(res) && res.message) || 'PDF conversion failed')
+  return { total: res.totalPages, policyPages: res.policyPages, fileName }
+}
+
+/** PDF bytes of a DOCX, with its page count */
+async function docxToPdf(
+  buffer: ArrayBuffer,
+  fileName: string
+): Promise<{ blob: Blob; pageCount: number }> {
+  const res = await window.api.convertDocxBufferToPdf({
+    docxData: Array.from(new Uint8Array(buffer)),
+    fileName
+  })
+  if (!res || isIpcError(res))
+    throw new Error((isIpcError(res) && res.message) || 'PDF conversion failed')
+  return {
+    blob: new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
+    pageCount: res.pageCount
+  }
+}
+
+/**
+ * The policy to print, sign and scan: a PDF of the policy alone whose footer already counts the
+ * T&C pages ("Page 1 of 24"). The T&C is added to the scan afterwards
+ * (appendTcToSignedScan). The policy remembers its pages and the total, to check the scan.
+ */
+export async function exportPolicyForSigning(
+  policyId: string
+): Promise<{ policyPages: number; total: number }> {
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const tcTemplate = await window.api.tcGetTemplate(typeCode)
+  if (!tcTemplate || isIpcError(tcTemplate))
+    throw new Error(
+      'No T&C template set for this policy type. Add one in Policy Settings, T&C Templates.'
+    )
+  const policyNumber = data.policy.policyNumber
+  let total: number
+  let expectedPages: number | null = null
+  let fileName: string
+  if (tcTemplate.kind === 'html' && tcTemplate.contentHtml) {
+    // Rich-text T&C: the policy + T&C document gives the total
+    const combined = await generatePolicyDocxBuffer(policyId, undefined, true)
+    total = (await docxToPdf(combined.buffer, combined.fileName)).pageCount
+    fileName = combined.fileName
+  } else {
+    const counted = await countPolicyWithWordTc(
+      policyId,
+      typeCode,
+      policyNumber,
+      tcTypeTitle(typeCode, data.quotation.quotationTypeName)
+    )
+    total = counted.total
+    expectedPages = counted.policyPages
+    fileName = counted.fileName
+  }
+  const { buffer } = await generatePolicyDocxBuffer(policyId, total)
+  const pdf = await docxToPdf(buffer, fileName)
+  if (expectedPages != null && pdf.pageCount !== expectedPages)
+    throw new Error(
+      `The policy came out on ${pdf.pageCount} pages instead of ${expectedPages}. Please try again.`
+    )
+  await polDownloadBlob(pdf.blob, `${fileName} (for signing).pdf`)
+  // Remembered to check the scan later; a user without policies:manage still gets the PDF
+  try {
+    const live = await window.api.policyGetById(policyId)
+    ok(
+      await window.api.policyUpdate(policyId, {
+        signingPages: pdf.pageCount,
+        signingTotal: total,
+        ...(live && !isIpcError(live) && live.exportedAt
+          ? {}
+          : { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })
+      })
+    )
+  } catch {
+    /* non-critical */
+  }
+  return { policyPages: pdf.pageCount, total }
+}
+
+/**
+ * The signed, scanned policy followed by the T&C (numbered from the page after the scan, same
+ * total). `confirm` is asked when the scan does not look like the copy printed for signing.
+ */
+export async function appendTcToSignedScan(
+  policyId: string,
+  confirm: (message: string) => Promise<boolean>
+): Promise<{ scanPages: number; tcPages: number; total: number } | null> {
+  const data = await loadFrozenExportData(policyId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const picked = await window.api.tcScanPick()
+  if (isIpcError(picked)) throw new Error(picked.message || 'Could not open the file')
+  if (picked.canceled) return null
+  // From the live record: the export data may be the content frozen at the first export
+  const live = await window.api.policyGetById(policyId)
+  const signingPages = live && !isIpcError(live) ? (live.signingPages ?? null) : null
+  const signingTotal = live && !isIpcError(live) ? (live.signingTotal ?? null) : null
+  if (signingPages == null) {
+    if (
+      !(await confirm(
+        'This policy was not printed with "Export for signing", so the signed pages may not show the right page total. Add the T&C anyway?'
+      ))
+    )
+      return null
+  } else if (picked.pages !== signingPages) {
+    if (
+      !(await confirm(
+        `The scan has ${picked.pages} page${picked.pages === 1 ? '' : 's'}, but the policy printed for signing had ${signingPages}. ` +
+          `The T&C would start at page ${picked.pages + 1}, and the signed pages say "of ${signingTotal}". Add the T&C anyway?`
+      ))
+    )
+      return null
+  }
+  const vName = data.vesselInfo?.name || ''
+  const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
+  const baseName = `${data.policy.policyNumber} - ${vName}${revSuffix}`
+  const res = await window.api.tcScanAppend({
+    tcTypeCode: typeCode,
+    filePrefix: data.policy.policyNumber,
+    policyNumber: data.policy.policyNumber,
+    policyTypeTitle: tcTypeTitle(typeCode, data.quotation.quotationTypeName)
+  })
+  if (!res || isIpcError(res))
+    throw new Error((isIpcError(res) && res.message) || 'Could not add the T&C')
+  await polDownloadBlob(
+    new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
+    `${baseName} (signed with T&C).pdf`
+  )
+  return { scanPages: res.scanPages, tcPages: res.tcPages, total: res.scanPages + res.tcPages }
 }
 
 // ==================== Shared DA/CA Helpers ====================

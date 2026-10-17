@@ -879,11 +879,11 @@ P&I insurance certificates:
 
 ### Terms & Conditions Automation
 
-- **T&C Templates** (`policy_tc_templates`): One DOCX per policy type, uploaded in Policy Settings
-- **DOCX→PDF**: Via Microsoft Word COM (PowerShell) or LibreOffice (headless fallback)
-- **Dynamic Page Numbering**: Counts policy PDF pages, injects `w:pgNumType` into T&C DOCX
-- **PDF Merging**: `pdf-lib` combines policy + T&C into single document
-- **Export**: "Export Policy (PDF + T&C)" button in PolicyDetail
+- **T&C Templates** (`policy_tc_templates`): several per policy type, one default; rich text (written in the app) or an uploaded Word file (Policy Settings, T&C Templates)
+- **DOCX→PDF**: Via Microsoft Word COM (PowerShell) or LibreOffice (headless fallback). Slow (10-40 s per document), so the T&C page count is cached per template file per session (`countTcPages`, sha1 of the file)
+- **Word T&C keep their own headers / footers** (`prepareTcDocx` in `DocxToPdfService.ts`): the first section's `w:pgNumType w:start` = page after the policy / scan (later sections continue; a "continuous" type on the first section is dropped, LibreOffice ignored the start with it), and in every header/footer part the text is filled across Word's split runs: placeholders `{policy_number}`/`{number}`, `{total_pages}`/`{total}`, `{type}`; without placeholders the number after "Certificate"/"Cover", the total after "Page N of", and a stray "x" before "Page" (cut placeholder in the Hull file). A Word file with no PAGE field in any footer gets the generated footer (old `setDocxPageStart`)
+- **Export Policy (PDF + T&C)**: count (policy + T&C, `countOnly`), then the policy with that total + the T&C numbered after it, merged with `pdf-lib`
+- **Wet-ink signing** (PolicyDetail actions): "Export for Signing (PDF)" = the policy alone whose footer already counts the T&C pages; it stores `policy_documents.signing_pages` / `signing_total`. "Add T&C to Signed Scan..." = pick the scanned PDF (`tcScan:pick`, the main process remembers the path) -> `tcScan:append` (`appendTcToPdf`): scan + T&C numbered from the page after it with total scan + T&C. Asks first when the scan's page count differs from `signing_pages` or the policy was never exported for signing. Needs the default T&C to be a Word file (rich-text T&C: error message)
 
 ### QR Verification
 

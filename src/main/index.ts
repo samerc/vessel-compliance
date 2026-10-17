@@ -7970,8 +7970,13 @@ app.whenReady().then(() => {
       let pdfPath = ''
       try {
         pdfPath = await convertDocxToPdf(docxPath)
+        const { countPdfPages } = await import('./services/DocxToPdfService')
         const pdfData = readFileSync(pdfPath)
-        return { data: Array.from(pdfData), fileName: `${base}.pdf` }
+        return {
+          data: Array.from(pdfData),
+          fileName: `${base}.pdf`,
+          pageCount: await countPdfPages(pdfPath)
+        }
       } finally {
         try {
           unlinkSync(docxPath)
@@ -8040,6 +8045,10 @@ app.whenReady().then(() => {
         filePrefix: string
         policyNumber?: string
         policyTypeTitle?: string
+        /** Only count the pages (policy + T&C), no merged PDF */
+        countOnly?: boolean
+        /** Total to print in the T&C footer (the policy DOCX already carries it) */
+        totalPages?: number
       }
     ) => {
       requireSession(event)
@@ -8054,17 +8063,18 @@ app.whenReady().then(() => {
       }
 
       const outputDir = tmpdir()
-      const { pdfPath, tempFiles, totalPages } = await buildPolicyWithTC(
+      const { pdfPath, tempFiles, totalPages, policyPages, tcPages } = await buildPolicyWithTC(
         policyBuf,
         tcBuf as Buffer,
         outputDir,
         data.filePrefix,
         data.policyNumber,
-        data.policyTypeTitle
+        data.policyTypeTitle,
+        { countOnly: data.countOnly, totalPages: data.totalPages }
       )
 
       // Read the merged PDF and return as array
-      const pdfData = readFileSync(pdfPath)
+      const pdfData = pdfPath ? readFileSync(pdfPath) : Buffer.alloc(0)
 
       // Clean up temp files
       for (const f of tempFiles) {
@@ -8075,7 +8085,78 @@ app.whenReady().then(() => {
         }
       }
 
-      return { data: Array.from(pdfData), fileName: `${data.filePrefix}.pdf`, totalPages }
+      return {
+        data: Array.from(pdfData),
+        fileName: `${data.filePrefix}.pdf`,
+        totalPages,
+        policyPages,
+        tcPages
+      }
+    }
+  )
+
+  // --- Signed scan + T&C ---
+  // The policy is printed "for signing" (its footer already counts the T&C pages), signed and
+  // scanned; the T&C is then added to the scan, numbered from the page after it. The picked file
+  // is remembered here, so the append step reads only a file the user chose in this dialog.
+  let pickedScanPath = ''
+  safeHandle('tcScan:pick', async (event) => {
+    requireSession(event)
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const opts = {
+      title: 'Choose the signed, scanned policy',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['openFile' as const]
+    }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled || !res.filePaths[0]) return { canceled: true }
+    pickedScanPath = res.filePaths[0]
+    const { countPdfPages } = await import('./services/DocxToPdfService')
+    return {
+      canceled: false,
+      fileName: basename(pickedScanPath),
+      pages: await countPdfPages(pickedScanPath)
+    }
+  })
+  safeHandle(
+    'tcScan:append',
+    async (
+      event,
+      data: {
+        tcTypeCode: string
+        filePrefix: string
+        policyNumber?: string
+        policyTypeTitle?: string
+      }
+    ) => {
+      requireSession(event)
+      if (!pickedScanPath) throw new Error('Choose the scanned policy first')
+      const tpl = await db.getDefaultTcTemplate(data.tcTypeCode)
+      if (!tpl)
+        throw new Error(
+          'No T&C template set for this policy type. Add one in Policy Settings, T&C Templates.'
+        )
+      const tcBuf = tpl.hasFile ? await db.getTcTemplateFileById(tpl.id) : null
+      if (!tcBuf)
+        throw new Error(
+          'The T&C for this policy type is written in the app (rich text). Adding it to a scan needs the Word file: upload it in Policy Settings, T&C Templates, and make it the default.'
+        )
+      const { appendTcToPdf, removeTempFiles } = await import('./services/DocxToPdfService')
+      const prefix = (data.filePrefix || 'policy').replace(/[^a-zA-Z0-9._-]/g, '_')
+      const { pdfPath, tempFiles, scanPages, tcPages } = await appendTcToPdf(
+        readFileSync(pickedScanPath),
+        tcBuf as Buffer,
+        tmpdir(),
+        `${prefix}_${Date.now()}`,
+        data.policyNumber,
+        data.policyTypeTitle
+      )
+      try {
+        return { data: Array.from(readFileSync(pdfPath)), scanPages, tcPages }
+      } finally {
+        removeTempFiles(tempFiles)
+        pickedScanPath = ''
+      }
     }
   )
 

@@ -5534,6 +5534,21 @@ export class MySQLAdapter {
         /* idempotent migration: already applied or not applicable */
       }
 
+      // Printed for signing: the policy's own pages and the whole total (policy + T&C) its footer
+      // showed, so adding the T&C to the signed scan can check the scan has those pages
+      try {
+        const [spCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM policy_documents LIKE 'signing_pages'"
+        )) as QueryRows
+        if ((spCol as RowDataPacket[]).length === 0) {
+          await this.pool.query(
+            'ALTER TABLE policy_documents ADD COLUMN signing_pages INT NULL, ADD COLUMN signing_total INT NULL'
+          )
+        }
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
+
       // Hide-broker toggle on policy_documents — suppress the "c/o broker" line on policy + DA/CA
       try {
         const [hbCol] = (await this.pool.query(
@@ -17677,6 +17692,8 @@ export class MySQLAdapter {
         r.non_refundable_percent == null ? null : Number(r.non_refundable_percent),
       qrEnabled: r.qr_enabled == null ? null : Boolean(r.qr_enabled),
       hideBroker: Boolean(r.hide_broker),
+      signingPages: r.signing_pages == null ? null : Number(r.signing_pages),
+      signingTotal: r.signing_total == null ? null : Number(r.signing_total),
       proRata: Boolean(r.pro_rata),
       // 0% is a real commission, not "none"
       commissionPercent: r.commission_percent != null ? Number(r.commission_percent) : null,
@@ -17976,7 +17993,9 @@ export class MySQLAdapter {
       selectedSubjectivityIds: 'selected_subjectivity_ids',
       subjectivityDays: 'subjectivity_days',
       upccTitle: 'upcc_title',
-      surveyWarrantyTexts: 'survey_warranty_texts'
+      surveyWarrantyTexts: 'survey_warranty_texts',
+      signingPages: 'signing_pages',
+      signingTotal: 'signing_total'
     }
     const sets: string[] = []
     const vals: SqlValue[] = []
