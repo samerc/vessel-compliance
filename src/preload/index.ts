@@ -67,6 +67,9 @@ const api: Api = {
   duplicateVesselDocument: (docId, uploadedBy) =>
     ipcRenderer.invoke('db:duplicateVesselDocument', docId, uploadedBy),
   deleteVesselDocumentById: (docId) => ipcRenderer.invoke('db:deleteVesselDocumentById', docId),
+  docHistoryList: (ownerType, ownerIds) =>
+    ipcRenderer.invoke('docHistory:list', ownerType, ownerIds),
+  docHistoryRestore: (historyId) => ipcRenderer.invoke('docHistory:restore', historyId),
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
   getEntitiesPaginated: (params) => ipcRenderer.invoke('db:getEntitiesPaginated', params),

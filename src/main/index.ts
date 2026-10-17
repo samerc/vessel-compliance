@@ -1612,7 +1612,7 @@ app.whenReady().then(() => {
     'db:upsertVesselDocument',
     async (event, doc: VesselDocument & { docTypeId?: string }) => {
       const user = await requirePermission(event, 'documents:upload')
-      await db.upsertVesselDocument(doc)
+      const replaced = await db.upsertVesselDocument(doc, user.username)
       const [vDocRows] = await db.pool!.query<RowDataPacket[]>(
         'SELECT name FROM vessels WHERE id = ?',
         [doc.vesselId]
@@ -1633,6 +1633,15 @@ app.whenReady().then(() => {
         entityName: vDocName,
         details: `Uploaded ${docTypeName} for vessel ${vDocName}`
       }).catch(() => {})
+      // The earlier file stays in the document's history; the Activity tab shows the change
+      if (replaced)
+        db.addVesselAuditEntry(
+          doc.vesselId,
+          `${docTypeName} file`,
+          basename(replaced),
+          doc.filePath ? basename(doc.filePath) : 'unlinked',
+          user.username
+        ).catch(() => {})
     }
   )
   safeHandle(
@@ -1686,8 +1695,35 @@ app.whenReady().then(() => {
     return db.duplicateVesselDocument(docId, uploadedBy)
   })
   safeHandle('db:deleteVesselDocumentById', async (event, docId: string) => {
-    await requirePermission(event, 'documents:delete')
-    return db.deleteVesselDocumentById(docId)
+    const user = await requirePermission(event, 'documents:delete')
+    return db.deleteVesselDocumentById(docId, user.username)
+  })
+
+  // Document history: earlier files of a vessel / entity document (links only)
+  safeHandle('docHistory:list', (event, ownerType: 'vessel' | 'entity', ownerIds: string[]) => {
+    requireSession(event)
+    if (ownerType !== 'vessel' && ownerType !== 'entity') return []
+    return db.getDocumentHistory(ownerType, Array.isArray(ownerIds) ? ownerIds : [])
+  })
+  safeHandle('docHistory:restore', async (event, historyId: string) => {
+    const [hRows] = await db.pool!.query<RowDataPacket[]>(
+      'SELECT owner_type FROM document_history WHERE id = ?',
+      [historyId]
+    )
+    const user = await requirePermission(
+      event,
+      hRows[0]?.owner_type === 'entity' ? 'entities:edit' : 'documents:upload'
+    )
+    const restored = await db.restoreDocumentVersion(historyId, user.username)
+    if (restored.ownerType === 'vessel')
+      db.addVesselAuditEntry(
+        restored.ownerId,
+        'Document file restored',
+        null,
+        basename(restored.filePath),
+        user.username
+      ).catch(() => {})
+    return restored
   })
 
   // Entity IPC Handlers
@@ -1906,8 +1942,8 @@ app.whenReady().then(() => {
   safeHandle(
     'entityDocs:upsert',
     async (event, doc: Parameters<typeof db.upsertEntityDocument>[0]) => {
-      await requirePermission(event, 'entities:edit')
-      return db.upsertEntityDocument(doc)
+      const user = await requirePermission(event, 'entities:edit')
+      return db.upsertEntityDocument(doc, user.username)
     }
   )
   safeHandle(
@@ -1918,8 +1954,8 @@ app.whenReady().then(() => {
     }
   )
   safeHandle('entityDocs:delete', async (event, entityId: string, documentTypeId: string) => {
-    await requirePermission(event, 'entities:edit')
-    return db.deleteEntityDocument(entityId, documentTypeId)
+    const user = await requirePermission(event, 'entities:edit')
+    return db.deleteEntityDocument(entityId, documentTypeId, user.username)
   })
 
   safeHandle('db:getAssuredRoles', (event) => {

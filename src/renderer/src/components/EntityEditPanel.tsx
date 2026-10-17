@@ -17,7 +17,8 @@ import {
   Phone,
   Hash,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  History
 } from 'lucide-react'
 import {
   Entity,
@@ -25,7 +26,8 @@ import {
   SanctionsMatch,
   EntityAddress,
   EntityDocumentType,
-  EntityDocument
+  EntityDocument,
+  DocumentHistoryEntry
 } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -35,6 +37,7 @@ import SanctionsModal from './SanctionsModal'
 import EntityBusinessSection from './EntityBusinessSection'
 import { CaseToggleBtn } from './CaseToggle'
 import MissingFilePath from './MissingFilePath'
+import DocumentHistoryModal from './DocumentHistoryModal'
 import { confirmDialog } from './DialogHost'
 import { SanctionsBadge, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
@@ -92,6 +95,13 @@ export default function EntityEditPanel({
   const [docs, setDocs] = useState<EntityDocument[]>([])
   // Physical file-existence per entity_document id (false = path stored but file missing on disk)
   const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
+  // Earlier files of this entity's and its UBOs' documents
+  const [docHistory, setDocHistory] = useState<DocumentHistoryEntry[]>([])
+  const [docHistoryFor, setDocHistoryFor] = useState<{
+    entityId: string
+    typeId: string
+    name: string
+  } | null>(null)
   const [addresses, setAddresses] = useState<EntityAddress[]>([])
   const [ubos, setUbos] = useState<EntityUBO[]>([])
   const [commissions, setCommissions] = useState<
@@ -187,6 +197,12 @@ export default function EntityEditPanel({
         /* unknown = shown as present */
       }
       setFileStatus(fstatus)
+      try {
+        const hist = await window.api.docHistoryList('entity', [...relevantEntityIds])
+        setDocHistory(Array.isArray(hist) ? hist : [])
+      } catch {
+        setDocHistory([])
+      }
     } catch {
       /* ignore */
     }
@@ -607,6 +623,23 @@ export default function EntityEditPanel({
           const fileExists = doc ? fileStatus[doc.id] !== false : true
           const onFile = hasFile && fileExists
           const fileMissing = hasFile && !fileExists
+          const historyCount = docHistory.filter(
+            (h) => h.ownerId === ent.id && h.documentTypeId === dt.id
+          ).length
+          const historyBtn =
+            historyCount > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDocHistoryFor({ entityId: ent.id, typeId: dt.id, name: dt.name })
+                }}
+                className="btn-secondary"
+                style={{ padding: '3px 6px', fontSize: '0.68rem' }}
+                title={`Earlier files (${historyCount})`}
+              >
+                <History size={10} />
+              </button>
+            ) : null
           return (
             <div
               key={dt.id}
@@ -660,6 +693,7 @@ export default function EntityEditPanel({
               </span>
               {hasFile ? (
                 <div style={{ display: 'flex', gap: '4px' }}>
+                  {historyBtn}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -699,21 +733,24 @@ export default function EntityEditPanel({
                   )}
                 </div>
               ) : (
-                canUploadDocs && (
-                  <button
-                    onClick={() => handleClickUploadDoc(ent.id, dt.id, dt.name)}
-                    className="btn-secondary"
-                    style={{
-                      padding: '3px 8px',
-                      fontSize: '0.7rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px'
-                    }}
-                  >
-                    <Upload size={10} /> Upload
-                  </button>
-                )
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {historyBtn}
+                  {canUploadDocs && (
+                    <button
+                      onClick={() => handleClickUploadDoc(ent.id, dt.id, dt.name)}
+                      className="btn-secondary"
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '0.7rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}
+                    >
+                      <Upload size={10} /> Upload
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )
@@ -1423,6 +1460,17 @@ export default function EntityEditPanel({
         </div>
       )}
 
+      {docHistoryFor && (
+        <DocumentHistoryModal
+          documentName={docHistoryFor.name}
+          entries={docHistory.filter(
+            (h) => h.ownerId === docHistoryFor.entityId && h.documentTypeId === docHistoryFor.typeId
+          )}
+          canRestore={canUploadDocs}
+          onClose={() => setDocHistoryFor(null)}
+          onRestored={refresh}
+        />
+      )}
       {sanctionsModal.show && (
         <SanctionsModal
           searchedName={sanctionsModal.searchedName}

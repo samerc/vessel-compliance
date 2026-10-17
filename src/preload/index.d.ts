@@ -1,5 +1,6 @@
 import {
   DocumentType,
+  DocumentHistoryEntry,
   Fleet,
   Vessel,
   VesselDocument,
@@ -260,6 +261,17 @@ export interface Api {
   ) => Promise<void>
   duplicateVesselDocument: (docId: string, uploadedBy: string) => Promise<void>
   deleteVesselDocumentById: (docId: string) => Promise<void>
+  // Document history: earlier files of vessel / entity documents (links only)
+  docHistoryList: (
+    ownerType: 'vessel' | 'entity',
+    ownerIds: string[]
+  ) => Promise<DocumentHistoryEntry[]>
+  docHistoryRestore: (historyId: string) => Promise<{
+    ownerType: 'vessel' | 'entity'
+    ownerId: string
+    documentTypeId: string
+    filePath: string
+  }>
 
   getEntities: () => Promise<Entity[]>
   getEntitiesPaginated: (params: EntityQueryParams) => Promise<PaginatedResult<Entity>>

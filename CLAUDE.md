@@ -701,6 +701,17 @@ Unified activity view inside `VesselDetail.tsx` (rendered when `detailView === '
 - **Layout**: Vertical timeline with month+year headers, colored icons per type
 - **Assured changes**: Assured Added/Removed/Role changes logged in vessel_audit_log with purple icon, clean titles without "changed" suffix
 
+### Document History (earlier files)
+
+Vessel and entity documents keep their earlier files as LINKS (never copies; a file saved over on disk is gone):
+- **Table**: `document_history` (owner_type 'vessel' | 'entity', owner_id, document_type_id, file_path, expiry/received dates, uploaded_at/by, action 'replaced' | 'removed', replaced_at DATETIME(3), replaced_by)
+- **Archived in the adapter**: `upsertVesselDocument` / `upsertEntityDocument` when the path changes (a new file or '' = unlink), `deleteVesselDocumentById`, `deleteEntityDocument` (`archiveDocument`). Same-path upserts (required toggle) archive nothing
+- **Restore** (`restoreDocumentVersion`): the earlier file + its dates become current, the current file goes into the history; vessel = `documents:upload`, entity = `entities:edit`
+- **UI**: `DocumentHistoryModal` from "History (N)" on the vessel document cards, the clock button in the table view (VesselDetail) and the entity document rows (EntityEditPanel); open / show in folder / make current
+- **Activity**: a vessel file change is audited as `{doc type} file` old name -> new name ('unlinked')
+- Merging entities moves the source's history to the target (and keeps the source's file there when the target has its own); `remapAllFilePaths` remaps history paths (and `entity_documents`, which it missed before)
+- IPC `docHistory:list(ownerType, ownerIds[])`, `docHistory:restore(historyId)`
+
 ### Vessel Document Expiry (`VesselDocumentsView`)
 
 - **Expiry clear button**: explicit `×` (`X` icon, 18px circle) button renders next to the expiry date input when a date is set; calls `updateVesselDocumentExpiry(..., null)` directly. Chromium date input native clear is unreliable for controlled React inputs.

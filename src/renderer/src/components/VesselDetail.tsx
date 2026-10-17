@@ -33,7 +33,8 @@ import {
   GitCommit,
   Edit3,
   Loader2,
-  Receipt
+  Receipt,
+  History
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
@@ -42,6 +43,7 @@ import {
   Vessel,
   DocumentType,
   VesselDocument,
+  DocumentHistoryEntry,
   VesselNameHistory,
   FlagState,
   VesselCustomDocType,
@@ -65,6 +67,7 @@ import 'flag-icons/css/flag-icons.min.css'
 
 import VesselDocumentsView from './VesselDocumentsView'
 import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
+import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
@@ -113,6 +116,21 @@ export default function VesselDetail({
   }
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
+  // Earlier files per document type (table view; the card view loads its own)
+  const [docHistory, setDocHistory] = useState<DocumentHistoryEntry[]>([])
+  const [docHistoryFor, setDocHistoryFor] = useState<{ id: string; name: string } | null>(null)
+  useEffect(() => {
+    let live = true
+    window.api
+      .docHistoryList('vessel', [vessel.id])
+      .then((rows) => {
+        if (live) setDocHistory(Array.isArray(rows) ? rows : [])
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [vessel.id, vesselDocs])
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
   const [vesselActive, setVesselActive] = useState(vessel.isActive)
@@ -2753,6 +2771,15 @@ export default function VesselDetail({
               onSaved={loadDocuments}
             />
           )}
+          {docHistoryFor && (
+            <DocumentHistoryModal
+              documentName={docHistoryFor.name}
+              entries={docHistory.filter((h) => h.documentTypeId === docHistoryFor.id)}
+              canRestore={hasPermission('documents:upload')}
+              onClose={() => setDocHistoryFor(null)}
+              onRestored={loadDocuments}
+            />
+          )}
           {detailView === 'documents' && useCardDocs && (
             <VesselDocumentsView
               vessel={vessel}
@@ -3295,6 +3322,20 @@ export default function VesselDetail({
                               <div
                                 style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                               >
+                                {!isExtra &&
+                                  docHistory.some((h) => h.documentTypeId === rowType.id) && (
+                                    <button
+                                      onClick={() =>
+                                        setDocHistoryFor({ id: rowType.id, name: rowType.name })
+                                      }
+                                      className="btn-secondary"
+                                      style={{ padding: '6px' }}
+                                      title="Earlier files of this document"
+                                      aria-label="Earlier files"
+                                    >
+                                      <History size={18} />
+                                    </button>
+                                  )}
                                 {rowHasFile && (
                                   <>
                                     <button
@@ -3640,6 +3681,19 @@ export default function VesselDetail({
                             <div
                               style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                             >
+                              {docHistory.some((h) => h.documentTypeId === customType.id) && (
+                                <button
+                                  onClick={() =>
+                                    setDocHistoryFor({ id: customType.id, name: customType.name })
+                                  }
+                                  className="btn-secondary"
+                                  style={{ padding: '6px' }}
+                                  title="Earlier files of this document"
+                                  aria-label="Earlier files"
+                                >
+                                  <History size={18} />
+                                </button>
+                              )}
                               {rowHasFile && (
                                 <>
                                   <button

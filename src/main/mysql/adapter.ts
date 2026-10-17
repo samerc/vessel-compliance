@@ -68,6 +68,7 @@ import {
   EntityAddress,
   EntityDocument,
   EntityDocumentType,
+  DocumentHistoryEntry,
   EntityQueryParams,
   EntityGap,
   EntityDirectoryStats,
@@ -5746,6 +5747,26 @@ export class MySQLAdapter {
                     INDEX idx_en_entity (entity_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
       }
+
+      // Migration: document_history (earlier files of vessel / entity documents, links only)
+      const [dhTable] = await this.pool.query("SHOW TABLES LIKE 'document_history'")
+      if ((dhTable as RowDataPacket[]).length === 0) {
+        await this.pool.query(`CREATE TABLE document_history (
+                    id VARCHAR(36) PRIMARY KEY,
+                    owner_type VARCHAR(10) NOT NULL,
+                    owner_id VARCHAR(36) NOT NULL,
+                    document_type_id VARCHAR(36) NOT NULL,
+                    file_path TEXT NOT NULL,
+                    expiry_date DATE NULL,
+                    received_date DATE NULL,
+                    uploaded_at DATETIME NULL,
+                    uploaded_by VARCHAR(255) NULL,
+                    action VARCHAR(10) NOT NULL DEFAULT 'replaced',
+                    replaced_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    replaced_by VARCHAR(255) NULL,
+                    INDEX idx_dh_owner (owner_type, owner_id, document_type_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -6818,8 +6839,9 @@ export class MySQLAdapter {
     }))
   }
 
-  async upsertVesselDocument(doc: VesselDocument): Promise<void> {
-    if (!this.pool) return
+  /** Returns the earlier file's path when a different file (or none) replaced it */
+  async upsertVesselDocument(doc: VesselDocument, by?: string): Promise<string | null> {
+    if (!this.pool) return null
 
     // Security: Validate file extension
     if (doc.filePath) {
@@ -6830,11 +6852,20 @@ export class MySQLAdapter {
     }
 
     const [existing] = await this.pool.query<RowDataPacket[]>(
-      'SELECT id FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
+      'SELECT id, file_path, expiry_date, received_date, uploaded_date, uploaded_by FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
       [doc.vesselId, doc.documentTypeId]
     )
 
+    let replaced: string | null = null
     if (existing.length > 0) {
+      const old = existing[0]
+      if (old.file_path && old.file_path !== (doc.filePath || '')) {
+        replaced = old.file_path
+        await this.archiveDocument('vessel', doc.vesselId, doc.documentTypeId, old, {
+          action: doc.filePath ? 'replaced' : 'removed',
+          by: by || doc.uploadedBy
+        })
+      }
       await this.pool.execute(
         `UPDATE vessel_documents SET 
             file_path = ?, sent = ?, required = ?, expiry_date = ?, received_date = ?, 
@@ -6870,6 +6901,146 @@ export class MySQLAdapter {
         ]
       )
     }
+    return replaced
+  }
+
+  // --- Document history (earlier files of a vessel / entity document; links only, never copies) ---
+
+  /** Keeps the current file of a document row before it is replaced or removed */
+  private async archiveDocument(
+    ownerType: 'vessel' | 'entity',
+    ownerId: string,
+    documentTypeId: string,
+    row: RowDataPacket,
+    opts: { action: 'replaced' | 'removed'; by?: string }
+  ): Promise<void> {
+    if (!this.pool || !row.file_path) return
+    await this.pool.execute(
+      `INSERT INTO document_history
+          (id, owner_type, owner_id, document_type_id, file_path, expiry_date, received_date, uploaded_at, uploaded_by, action, replaced_at, replaced_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), ?)`,
+      [
+        uuidv4(),
+        ownerType,
+        ownerId,
+        documentTypeId,
+        row.file_path,
+        row.expiry_date || null,
+        row.received_date || null,
+        row.uploaded_date || row.uploaded_at || null,
+        row.uploaded_by || null,
+        opts.action,
+        opts.by || null
+      ]
+    )
+  }
+
+  async getDocumentHistory(
+    ownerType: 'vessel' | 'entity',
+    ownerIds: string[]
+  ): Promise<DocumentHistoryEntry[]> {
+    if (!this.pool || ownerIds.length === 0) return []
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT id, owner_type AS ownerType, owner_id AS ownerId, document_type_id AS documentTypeId,
+              file_path AS filePath, DATE_FORMAT(expiry_date, '%Y-%m-%d') AS expiryDate,
+              DATE_FORMAT(received_date, '%Y-%m-%d') AS receivedDate, uploaded_at AS uploadedAt,
+              uploaded_by AS uploadedBy, action, replaced_at AS replacedAt, replaced_by AS replacedBy
+         FROM document_history WHERE owner_type = ? AND owner_id IN (?)
+        ORDER BY replaced_at DESC`,
+      [ownerType, ownerIds]
+    )
+    return rows as DocumentHistoryEntry[]
+  }
+
+  /**
+   * Makes an earlier file the current one again (with its dates). The file it replaces goes
+   * into the history in its place. Returns what was restored, for the activity log.
+   */
+  async restoreDocumentVersion(
+    historyId: string,
+    by: string
+  ): Promise<{
+    ownerType: 'vessel' | 'entity'
+    ownerId: string
+    documentTypeId: string
+    filePath: string
+  }> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const [hRows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT * FROM document_history WHERE id = ?',
+      [historyId]
+    )
+    const h = hRows[0]
+    if (!h) throw new Error('This earlier version no longer exists')
+    const ownerType = h.owner_type as 'vessel' | 'entity'
+    if (ownerType === 'vessel') {
+      const [cur] = await this.pool.query<RowDataPacket[]>(
+        'SELECT id, file_path, expiry_date, received_date, uploaded_date, uploaded_by FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ? LIMIT 1',
+        [h.owner_id, h.document_type_id]
+      )
+      if (cur[0]) {
+        await this.archiveDocument('vessel', h.owner_id, h.document_type_id, cur[0], {
+          action: 'replaced',
+          by
+        })
+        await this.pool.execute(
+          'UPDATE vessel_documents SET file_path = ?, expiry_date = ?, received_date = ?, uploaded_date = COALESCE(?, uploaded_date), uploaded_by = COALESCE(?, uploaded_by) WHERE id = ?',
+          [h.file_path, h.expiry_date, h.received_date, h.uploaded_at, h.uploaded_by, cur[0].id]
+        )
+      } else {
+        const [dt] = await this.pool.query<RowDataPacket[]>(
+          'SELECT required FROM document_types WHERE id = ?',
+          [h.document_type_id]
+        )
+        await this.pool.execute(
+          `INSERT INTO vessel_documents
+              (id, vessel_id, document_type_id, file_path, sent, required, expiry_date, received_date, uploaded_date, uploaded_by)
+              VALUES (?, ?, ?, ?, 0, ?, ?, ?, COALESCE(?, NOW()), ?)`,
+          [
+            uuidv4(),
+            h.owner_id,
+            h.document_type_id,
+            h.file_path,
+            dt.length > 0 ? Boolean(dt[0].required) : true,
+            h.expiry_date,
+            h.received_date,
+            h.uploaded_at,
+            h.uploaded_by || by
+          ]
+        )
+      }
+    } else {
+      const [cur] = await this.pool.query<RowDataPacket[]>(
+        'SELECT id, file_path, expiry_date, received_date, uploaded_at FROM entity_documents WHERE entity_id = ? AND document_type_id = ?',
+        [h.owner_id, h.document_type_id]
+      )
+      if (cur[0])
+        await this.archiveDocument('entity', h.owner_id, h.document_type_id, cur[0], {
+          action: 'replaced',
+          by
+        })
+      await this.pool.execute(
+        `INSERT INTO entity_documents (id, entity_id, document_type_id, file_path, expiry_date, received_date, uploaded_at)
+             VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+             ON DUPLICATE KEY UPDATE file_path = VALUES(file_path), expiry_date = VALUES(expiry_date), received_date = VALUES(received_date), uploaded_at = VALUES(uploaded_at)`,
+        [
+          uuidv4(),
+          h.owner_id,
+          h.document_type_id,
+          h.file_path,
+          h.expiry_date,
+          h.received_date,
+          h.uploaded_at
+        ]
+      )
+    }
+    await this.pool.execute('DELETE FROM document_history WHERE id = ?', [historyId])
+    return {
+      ownerType,
+      ownerId: h.owner_id,
+      documentTypeId: h.document_type_id,
+      filePath: h.file_path
+    }
   }
 
   async duplicateVesselDocument(docId: string, uploadedBy: string): Promise<void> {
@@ -6898,8 +7069,17 @@ export class MySQLAdapter {
     )
   }
 
-  async deleteVesselDocumentById(docId: string): Promise<void> {
+  async deleteVesselDocumentById(docId: string, by?: string): Promise<void> {
     if (!this.pool) return
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT vessel_id, document_type_id, file_path, expiry_date, received_date, uploaded_date, uploaded_by FROM vessel_documents WHERE id = ?',
+      [docId]
+    )
+    if (rows[0]?.file_path)
+      await this.archiveDocument('vessel', rows[0].vessel_id, rows[0].document_type_id, rows[0], {
+        action: 'removed',
+        by
+      })
     await this.pool.execute('DELETE FROM vessel_documents WHERE id = ?', [docId])
   }
 
@@ -7726,8 +7906,27 @@ export class MySQLAdapter {
                 sd.received_date
               ]
             )
+          } else if (sd.file_path) {
+            // The target keeps its own file: the source's goes into the target's history
+            await conn.execute(
+              `INSERT INTO document_history
+                  (id, owner_type, owner_id, document_type_id, file_path, expiry_date, received_date, action, replaced_at)
+                  VALUES (?, 'entity', ?, ?, ?, ?, ?, 'replaced', NOW(3))`,
+              [
+                uuidv4(),
+                targetId,
+                sd.document_type_id,
+                sd.file_path,
+                sd.expiry_date,
+                sd.received_date
+              ]
+            )
           }
         }
+        await conn.execute(
+          "UPDATE document_history SET owner_id = ? WHERE owner_type = 'entity' AND owner_id = ?",
+          [targetId, sourceId]
+        )
       } catch {
         /* entity_documents table may not exist yet: nothing to copy */
       }
@@ -7831,18 +8030,30 @@ export class MySQLAdapter {
     return rows as EntityDocument[]
   }
 
-  async upsertEntityDocument(doc: {
-    entityId: string
-    documentTypeId: string
-    filePath: string
-    expiryDate?: string
-    receivedDate?: string
-  }): Promise<EntityDocument> {
+  async upsertEntityDocument(
+    doc: {
+      entityId: string
+      documentTypeId: string
+      filePath: string
+      expiryDate?: string
+      receivedDate?: string
+    },
+    by?: string
+  ): Promise<EntityDocument> {
     if (!this.pool) throw new Error('DB Not connected')
     if (doc.filePath) {
       const validation = await this.validateFileExtension(doc.filePath)
       if (!validation.valid) throw new Error(`File validation failed: ${validation.reason}`)
     }
+    const [existing] = await this.pool.query<RowDataPacket[]>(
+      'SELECT file_path, expiry_date, received_date, uploaded_at FROM entity_documents WHERE entity_id = ? AND document_type_id = ?',
+      [doc.entityId, doc.documentTypeId]
+    )
+    if (existing[0]?.file_path && existing[0].file_path !== (doc.filePath || ''))
+      await this.archiveDocument('entity', doc.entityId, doc.documentTypeId, existing[0], {
+        action: doc.filePath ? 'replaced' : 'removed',
+        by
+      })
     const id = uuidv4()
     await this.pool.execute(
       `INSERT INTO entity_documents (id, entity_id, document_type_id, file_path, expiry_date, received_date)
@@ -7877,8 +8088,17 @@ export class MySQLAdapter {
     )
   }
 
-  async deleteEntityDocument(entityId: string, documentTypeId: string): Promise<void> {
+  async deleteEntityDocument(entityId: string, documentTypeId: string, by?: string): Promise<void> {
     if (!this.pool) return
+    const [existing] = await this.pool.query<RowDataPacket[]>(
+      'SELECT file_path, expiry_date, received_date, uploaded_at FROM entity_documents WHERE entity_id = ? AND document_type_id = ?',
+      [entityId, documentTypeId]
+    )
+    if (existing[0]?.file_path)
+      await this.archiveDocument('entity', entityId, documentTypeId, existing[0], {
+        action: 'removed',
+        by
+      })
     await this.pool.execute(
       'DELETE FROM entity_documents WHERE entity_id = ? AND document_type_id = ?',
       [entityId, documentTypeId]
@@ -24397,6 +24617,8 @@ export class MySQLAdapter {
 
     const tables: { table: string; column: string }[] = [
       { table: 'vessel_documents', column: 'file_path' },
+      { table: 'entity_documents', column: 'file_path' },
+      { table: 'document_history', column: 'file_path' },
       { table: 'survey_attachments', column: 'file_path' },
       { table: 'entities', column: 'passport_file_path' },
       { table: 'entities', column: 'certificate_of_incorporation_path' },

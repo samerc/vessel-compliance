@@ -135,6 +135,23 @@ export interface EntityDocument {
   uploadedAt?: string
 }
 
+/** An earlier file of a vessel / entity document, kept when it was replaced or removed */
+export interface DocumentHistoryEntry {
+  id: string
+  ownerType: 'vessel' | 'entity'
+  ownerId: string
+  documentTypeId: string
+  filePath: string
+  expiryDate?: string | null
+  receivedDate?: string | null
+  uploadedAt?: string | null
+  uploadedBy?: string | null
+  /** 'replaced' = a newer file was linked, 'removed' = the file was unlinked / deleted */
+  action: 'replaced' | 'removed'
+  replacedAt: string
+  replacedBy?: string | null
+}
+
 export interface AssuredRole {
   id: string
   name: string

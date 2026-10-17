@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import {
   CheckCircle,
   AlertCircle,
@@ -12,7 +12,8 @@ import {
   Pencil,
   Loader2,
   Info,
-  FolderOpen
+  FolderOpen,
+  History
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -22,13 +23,15 @@ import type {
   DocumentType,
   VesselDocument,
   VesselCustomDocType,
-  VesselDynamicPolicy
+  VesselDynamicPolicy,
+  DocumentHistoryEntry
 } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
 import MissingFilePath from './MissingFilePath'
 import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
+import DocumentHistoryModal from './DocumentHistoryModal'
 import { getDocStatus as sharedDocStatus, type DocStatus } from '../utils/docStatus'
 
 interface Props {
@@ -101,6 +104,22 @@ export default function VesselDocumentsView({
   >('all')
   // Asked after a file is linked or replaced: its received and expiry dates
   const [datesRequest, setDatesRequest] = useState<DocumentDatesRequest | null>(null)
+  // Earlier files per document type (kept when a file is replaced or unlinked)
+  const [history, setHistory] = useState<DocumentHistoryEntry[]>([])
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null)
+  useEffect(() => {
+    let live = true
+    window.api
+      .docHistoryList('vessel', [vessel.id])
+      .then((rows) => {
+        if (live) setHistory(Array.isArray(rows) ? rows : [])
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+    // Reloaded with the documents: a replace or unlink adds an entry
+  }, [vessel.id, vesselDocs])
 
   // Inline date edits: saved with a confirmation, failures reported
   const saveExpiry = async (docTypeId: string, name: string, val: string | null): Promise<void> => {
@@ -910,6 +929,25 @@ export default function VesselDocumentsView({
               </button>
             </>
           )}
+          {(() => {
+            const n = history.filter((h) => h.documentTypeId === id).length
+            return n > 0 ? (
+              <button
+                onClick={() => setHistoryFor({ id, name })}
+                className="btn-secondary"
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Earlier files of this document"
+              >
+                <History size={13} /> History ({n})
+              </button>
+            ) : null
+          })()}
           {!isCustom && (
             <button
               onClick={() => handleToggleRequired(id)}
@@ -1010,6 +1048,15 @@ export default function VesselDocumentsView({
           request={datesRequest}
           onClose={() => setDatesRequest(null)}
           onSaved={loadData}
+        />
+      )}
+      {historyFor && (
+        <DocumentHistoryModal
+          documentName={historyFor.name}
+          entries={history.filter((h) => h.documentTypeId === historyFor.id)}
+          canRestore={hasPermission('documents:upload')}
+          onClose={() => setHistoryFor(null)}
+          onRestored={loadData}
         />
       )}
 

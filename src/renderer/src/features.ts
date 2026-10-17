@@ -134,6 +134,17 @@ export const FEATURES: Feature[] = [
     keywords: 'compare side by side difference'
   },
   {
+    id: 'document-history',
+    title: 'Earlier files of a document',
+    area: 'Fleet',
+    kind: 'view',
+    permission: 'vessels:view',
+    target: { tab: 'vessels' },
+    description:
+      'Replacing or unlinking a vessel or entity document keeps the earlier file: History on the document opens, shows its folder or makes it current again.',
+    keywords: 'history previous old version replaced file COR certificate restore'
+  },
+  {
     id: 'fleets',
     title: 'Fleets',
     area: 'Fleet',
