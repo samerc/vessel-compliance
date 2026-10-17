@@ -1295,7 +1295,7 @@ Excel registry file for quotation numbering and logging:
 - **Year sheets**: Auto-created when year changes
 - **Fallback**: DB counter used if no registry path configured
 - **File locked**: Approval fails with error if Excel is open
-- **Write method**: Uses Excel COM via PowerShell to preserve tables/formulas/formatting. Falls back to `xlsx-js-style` if Excel is not installed. Reads still use `xlsx-js-style`.
+- **Write method**: Uses Excel COM via PowerShell to preserve tables/formulas/formatting. Falls back to `xlsx-js-style` if Excel is not installed. Reads still use `xlsx-js-style`. Everything is async (Excel COM takes seconds and the file is on a share; a sync call froze the app), reads parse only the current year's sheet, and the CANCELLED mark takes the same named lock as approvals (`vc_quotation_registry`)
 - **IPC**: `quotationRegistry:getPath`, `quotationRegistry:setPath`, `quotationRegistry:browse`
 - **Service**: `src/main/services/QuotationRegistryService.ts`
 

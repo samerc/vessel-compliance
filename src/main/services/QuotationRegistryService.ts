@@ -1,8 +1,14 @@
 import XLSX from 'xlsx-js-style'
-import { existsSync, writeFileSync, unlinkSync } from 'fs'
+import { existsSync } from 'fs'
+import { readFile, writeFile, unlink } from 'fs/promises'
 import { tmpdir } from 'os'
-import { execSync, execFileSync } from 'child_process'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { join } from 'path'
+
+// Everything here is async: the Excel COM calls take seconds (up to 30 s) and the registry is
+// usually on a network share, so a synchronous call froze the whole app for every user action
+const execFileAsync = promisify(execFile)
 
 const BRANCH_MAP: Record<string, string> = {
   P: 'P:P&I',
@@ -31,29 +37,41 @@ const HEADERS = [
 
 // ── Excel COM availability check ──────────────────────────────────────────────
 
-let excelComAvailable: boolean | null = null
+let excelComAvailable: Promise<boolean> | null = null
 
-function checkExcelCom(): boolean {
-  if (excelComAvailable !== null) return excelComAvailable
-  try {
-    execSync(
-      'powershell -NoProfile -Command "New-Object -ComObject Excel.Application | ForEach-Object { $_.Quit() }"',
-      { stdio: 'pipe', timeout: 10000 }
+function checkExcelCom(): Promise<boolean> {
+  if (!excelComAvailable) {
+    excelComAvailable = execFileAsync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        'New-Object -ComObject Excel.Application | ForEach-Object { $_.Quit() }'
+      ],
+      { timeout: 10000, windowsHide: true }
+    ).then(
+      () => true,
+      () => false
     )
-    excelComAvailable = true
-  } catch {
-    excelComAvailable = false
   }
   return excelComAvailable
 }
 
 // ── Read helpers (xlsx-js-style, non-destructive) ─────────────────────────────
 
-function getYearSheetReadOnly(filePath: string): { ws: XLSX.WorkSheet; sheetName: string } {
+/** Workbook from the file, read without blocking (network share); `sheets` limits parsing */
+async function readWorkbook(filePath: string, opts: XLSX.ParsingOptions): Promise<XLSX.WorkBook> {
+  return XLSX.read(await readFile(filePath), { ...opts, type: 'buffer' })
+}
+
+async function getYearSheetReadOnly(
+  filePath: string
+): Promise<{ ws: XLSX.WorkSheet; sheetName: string }> {
   const year = String(new Date().getFullYear())
   if (!existsSync(filePath)) throw new Error('Registry file not found')
 
-  const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
+  // Only values are read here (serial, reference): parse just this year's sheet
+  const wb = await readWorkbook(filePath, { sheets: [year] })
   const ws = wb.Sheets[year]
   if (!ws) throw new Error(`No sheet found for year ${year}`)
 
@@ -75,7 +93,7 @@ function getLastSerial(ws: XLSX.WorkSheet): number {
 // it is written to a UTF-8 JSON file and read by the script as $d. Interpolating it into
 // '...' strings is unsafe — PowerShell also treats the curly quotes ‘ ’ ‚ ‛ as string
 // delimiters, so a name like O’BRIEN could break out of the string.
-function runPowerShellScript(body: string, data: Record<string, unknown>): string {
+async function runPowerShellScript(body: string, data: Record<string, unknown>): Promise<string> {
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const tempFile = join(tmpdir(), `vc-registry-${stamp}.ps1`)
   const dataFile = join(tmpdir(), `vc-registry-${stamp}.json`)
@@ -86,31 +104,24 @@ function runPowerShellScript(body: string, data: Record<string, unknown>): strin
   ].join('\n')
   try {
     // BOM so Windows PowerShell 5.1 reads the script as UTF-8, not the ANSI code page
-    writeFileSync(tempFile, '\ufeff' + script, 'utf-8')
-    writeFileSync(dataFile, JSON.stringify(data), 'utf-8')
-    return execFileSync(
+    await writeFile(tempFile, '﻿' + script, 'utf-8')
+    await writeFile(dataFile, JSON.stringify(data), 'utf-8')
+    const { stdout } = await execFileAsync(
       'powershell',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tempFile, '-DataPath', dataFile],
       { encoding: 'utf-8', timeout: 30000, windowsHide: true }
-    ).trim()
+    )
+    return stdout.trim()
   } catch (err) {
     const e = err as { stderr?: string; message?: string }
     throw new Error(`Excel COM failed: ${e.stderr || e.message}`, { cause: err })
   } finally {
-    try {
-      unlinkSync(tempFile)
-    } catch {
-      /* ignore */
-    }
-    try {
-      unlinkSync(dataFile)
-    } catch {
-      /* ignore */
-    }
+    await unlink(tempFile).catch(() => {})
+    await unlink(dataFile).catch(() => {})
   }
 }
 
-function appendRowViaCom(
+async function appendRowViaCom(
   filePath: string,
   sheetName: string,
   values: {
@@ -124,7 +135,7 @@ function appendRowViaCom(
     vesselType: string
     broker: string
   }
-): void {
+): Promise<void> {
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
@@ -155,7 +166,7 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runPowerShellScript(ps, { filePath, sheetName, ...values })
+  const result = await runPowerShellScript(ps, { filePath, sheetName, ...values })
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }
@@ -164,13 +175,13 @@ try {
   }
 }
 
-function setCellViaCom(
+async function setCellViaCom(
   filePath: string,
   sheetName: string,
   row: number,
   col: number,
   value: string
-): void {
+): Promise<void> {
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
@@ -189,7 +200,7 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runPowerShellScript(ps, { filePath, sheetName, row, col, value })
+  const result = await runPowerShellScript(ps, { filePath, sheetName, row, col, value })
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }
@@ -197,7 +208,7 @@ try {
 
 // ── Write via xlsx-js-style (fallback when Excel not installed) ───────────────
 
-function appendRowViaXlsx(
+async function appendRowViaXlsx(
   filePath: string,
   sheetName: string,
   values: {
@@ -211,8 +222,9 @@ function appendRowViaXlsx(
     vesselType: string
     broker: string
   }
-): void {
-  const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
+): Promise<void> {
+  // The whole workbook is rewritten: keep formulas and styles of every sheet
+  const wb = await readWorkbook(filePath, { cellFormula: true, cellStyles: true })
   const ws = wb.Sheets[sheetName]
   if (!ws) throw new Error(`Sheet ${sheetName} not found`)
 
@@ -239,26 +251,33 @@ function appendRowViaXlsx(
     s: { r: 0, c: 0 },
     e: { r: newRow, c: HEADERS.length - 1 }
   })
-  XLSX.writeFile(wb, filePath)
+  await writeWorkbook(wb, filePath)
 }
 
-function setCellViaXlsx(
+async function setCellViaXlsx(
   filePath: string,
   sheetName: string,
   row0based: number,
   col0based: number,
   value: string
-): void {
-  const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
+): Promise<void> {
+  const wb = await readWorkbook(filePath, { cellFormula: true, cellStyles: true })
   const ws = wb.Sheets[sheetName]
   if (!ws) return
   ws[XLSX.utils.encode_cell({ r: row0based, c: col0based })] = { v: value, t: 's' }
-  XLSX.writeFile(wb, filePath)
+  await writeWorkbook(wb, filePath)
+}
+
+/** Same output as XLSX.writeFile, but the (network) file write does not block */
+async function writeWorkbook(wb: XLSX.WorkBook, filePath: string): Promise<void> {
+  const ext = filePath.toLowerCase().endsWith('.xls') ? 'xls' : 'xlsx'
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: ext }) as Buffer
+  await writeFile(filePath, buf)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function assignRegistryNumber(
+export async function assignRegistryNumber(
   filePath: string,
   data: {
     isRenewal: boolean
@@ -269,8 +288,8 @@ export function assignRegistryNumber(
     vesselType: string
     broker: string
   }
-): { reference: string; serial: number } {
-  const { ws, sheetName } = getYearSheetReadOnly(filePath)
+): Promise<{ reference: string; serial: number }> {
+  const { ws, sheetName } = await getYearSheetReadOnly(filePath)
   const lastSerial = getLastSerial(ws)
   const nextSerial = lastSerial + 1
 
@@ -292,35 +311,35 @@ export function assignRegistryNumber(
     broker: data.broker || ''
   }
 
-  if (checkExcelCom()) {
-    appendRowViaCom(filePath, sheetName, values)
+  if (await checkExcelCom()) {
+    await appendRowViaCom(filePath, sheetName, values)
   } else {
-    appendRowViaXlsx(filePath, sheetName, values)
+    await appendRowViaXlsx(filePath, sheetName, values)
   }
 
   return { reference, serial: nextSerial }
 }
 
 /** Read the last serial number without writing (for preview) */
-export function getLastRegistrySerial(filePath: string): number {
+export async function getLastRegistrySerial(filePath: string): Promise<number> {
   if (!existsSync(filePath)) return 0
-  const { ws } = getYearSheetReadOnly(filePath)
+  const { ws } = await getYearSheetReadOnly(filePath)
   return getLastSerial(ws)
 }
 
 /** Mark a registry entry as cancelled */
-export function markRegistryCancelled(filePath: string, reference: string): void {
+export async function markRegistryCancelled(filePath: string, reference: string): Promise<void> {
   if (!existsSync(filePath)) return
-  const { ws, sheetName } = getYearSheetReadOnly(filePath)
+  const { ws, sheetName } = await getYearSheetReadOnly(filePath)
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
 
   for (let r = 2; r <= range.e.r; r++) {
     const refCell = ws[XLSX.utils.encode_cell({ r, c: 4 })]
     if (refCell && refCell.v === reference) {
-      if (checkExcelCom()) {
-        setCellViaCom(filePath, sheetName, r + 1, 11, 'CANCELLED') // 1-based row, col K=11
+      if (await checkExcelCom()) {
+        await setCellViaCom(filePath, sheetName, r + 1, 11, 'CANCELLED') // 1-based row, col K=11
       } else {
-        setCellViaXlsx(filePath, sheetName, r, 10, 'CANCELLED') // 0-based row, col K=10
+        await setCellViaXlsx(filePath, sheetName, r, 10, 'CANCELLED') // 0-based row, col K=10
       }
       return
     }

@@ -199,7 +199,7 @@ async function assignRegistryNumberLocked(
   }
 
   try {
-    const result = assignRegistryNumber(resolvedPath, {
+    const result = await assignRegistryNumber(resolvedPath, {
       isRenewal: q.isRenewal || false,
       typeCode: q.quotationTypeCode || 'P',
       managers,
@@ -6937,7 +6937,10 @@ app.whenReady().then(() => {
             const registryPath = await db.getSetting('quotationRegistryPath')
             if (registryPath) {
               try {
-                markRegistryCancelled(resolveFilePath(registryPath), releasedRef)
+                // Same lock as approvals: two Excel writes to the file at once would fail
+                await db.withNamedLock('vc_quotation_registry', () =>
+                  markRegistryCancelled(resolveFilePath(registryPath), releasedRef)
+                )
               } catch {
                 /* registry file locked or missing: the DB release already happened */
               }
