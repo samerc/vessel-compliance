@@ -343,6 +343,12 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
           setSelectedFleetDetail(null)
           loadData()
         }}
+        onManageVessels={() => {
+          // Back to the list with this fleet's panel open (the one place to add / remove)
+          setPanelFleet(selectedFleetDetail)
+          setSelectedFleetDetail(null)
+          loadData()
+        }}
       />
     )
   }

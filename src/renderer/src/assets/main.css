@@ -1294,3 +1294,22 @@ body.density-spacious .glass-card {
     margin-bottom: 10px;
   }
 }
+
+/* A select-like control shown as plain text until hovered or focused (e.g. the fleet of a
+   vessel row): the value reads like data, the box appears when it is about to be changed */
+.inline-combo {
+  background: transparent;
+  border: 1px solid transparent;
+}
+.inline-combo svg {
+  opacity: 0;
+}
+.inline-combo:hover,
+.inline-combo:focus-visible {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+}
+.inline-combo:hover svg,
+.inline-combo:focus-visible svg {
+  opacity: 0.5;
+}

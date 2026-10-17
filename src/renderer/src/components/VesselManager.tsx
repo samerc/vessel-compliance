@@ -1504,14 +1504,14 @@ export default function VesselManager({
                               setFleetComboCreating(false)
                               setFleetComboNewName('')
                             }}
+                            className="inline-combo"
+                            title="Change fleet"
                             style={{
                               width: '100%',
                               padding: '4px 8px',
                               borderRadius: '6px',
                               fontSize: '0.85rem',
-                              background: 'var(--input-bg)',
-                              border: '1px solid var(--input-border)',
-                              color: 'var(--text-primary)',
+                              color: v.fleetId ? 'var(--text-primary)' : 'var(--text-secondary)',
                               fontFamily: 'inherit',
                               textAlign: 'left',
                               cursor: 'pointer',
@@ -1525,7 +1525,7 @@ export default function VesselManager({
                                 ? fleets.find((f) => f.id === v.fleetId)?.name || 'Unknown'
                                 : 'Standalone'}
                             </span>
-                            <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                            <ChevronDown size={14} />
                           </button>
                           {fleetComboOpen === v.id && (
                             <>

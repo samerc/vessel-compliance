@@ -26,9 +26,15 @@ import { Modal } from './ui'
 interface FleetDetailProps {
   fleet: Fleet
   onBack: () => void
+  /** The fleet's vessels are changed in one place: the Fleets list panel (this opens it) */
+  onManageVessels?: () => void
 }
 
-export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.JSX.Element {
+export default function FleetDetail({
+  fleet,
+  onBack,
+  onManageVessels
+}: FleetDetailProps): React.JSX.Element {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [allVessels, setAllVessels] = useState<Vessel[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -318,7 +324,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.
                         >
                           Details <ExternalLink size={14} />
                         </button>
-                        {showRemove && canManageFleets && (
+                        {showRemove && canManageFleets && !onManageVessels && (
                           <button
                             onClick={() => handleRemoveVessel(v)}
                             style={{
@@ -374,15 +380,25 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          {canManageFleets && (
-            <button
-              onClick={() => setShowQuickAdd(!showQuickAdd)}
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Plus size={18} /> Add Vessel
-            </button>
-          )}
+          {canManageFleets &&
+            (onManageVessels ? (
+              <button
+                onClick={onManageVessels}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                title="Add or remove this fleet's vessels in the Fleets list"
+              >
+                <Plus size={18} /> Manage vessels
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowQuickAdd(!showQuickAdd)}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Plus size={18} /> Add Vessel
+              </button>
+            ))}
           <button
             onClick={() => handleOpenExportModal('excel')}
             className="btn-secondary"
@@ -528,7 +544,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.
               style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
             >
               <Ship size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-              <p>No vessels in this fleet yet. Use &quot;Add Vessel&quot; to assign vessels.</p>
+              <p>
+                No vessels in this fleet yet. Use &quot;
+                {onManageVessels ? 'Manage vessels' : 'Add Vessel'}&quot; to assign vessels.
+              </p>
             </div>
           )}
         </>
