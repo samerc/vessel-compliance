@@ -41,6 +41,11 @@ export default function SanctionsCheckReport(): React.JSX.Element {
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<SanctionsReportListResult[] | null>(null)
   const [decision, setDecision] = useState<Decision>(null)
+  // The decision already stored for this run (audit record + linked entity's status)
+  const [savedDecision, setSavedDecision] = useState<Decision>(null)
+  const [savingDecision, setSavingDecision] = useState(false)
+  // The list entries above the threshold, shown so the decision can be made on the facts
+  const [matches, setMatches] = useState<SanctionsMatch[]>([])
   const [checkedAt, setCheckedAt] = useState<Date | null>(null)
   const [exporting, setExporting] = useState(false)
 
@@ -64,6 +69,8 @@ export default function SanctionsCheckReport(): React.JSX.Element {
   const resetResults = (): void => {
     setResults(null)
     setDecision(null)
+    setSavedDecision(null)
+    setMatches([])
     setCheckedAt(null)
   }
 
@@ -91,11 +98,12 @@ export default function SanctionsCheckReport(): React.JSX.Element {
       )
       // Lists not loaded: nothing was screened, so no list may read as clear
       if (resp?.status === 'ERROR') throw new Error(resp.error || 'The sanctions check failed')
-      const matches: SanctionsMatch[] = (resp?.matches || []).filter(
-        (m: SanctionsMatch) => Math.round((m.score || 0) * 100) >= threshold
-      )
+      const found: SanctionsMatch[] = (resp?.matches || [])
+        .filter((m: SanctionsMatch) => Math.round((m.score || 0) * 100) >= threshold)
+        .sort((a: SanctionsMatch, b: SanctionsMatch) => (b.score || 0) - (a.score || 0))
+      setMatches(found)
       const perList: SanctionsReportListResult[] = SOURCES.map((s) => {
-        const cnt = matches.filter((m) => (m.source || '').toUpperCase() === s.code).length
+        const cnt = found.filter((m) => (m.source || '').toUpperCase() === s.code).length
         return { source: s.code, status: cnt > 0 ? 'POTENTIAL_MATCH' : 'CLEAR', matchCount: cnt }
       })
       setResults(perList)
@@ -111,37 +119,57 @@ export default function SanctionsCheckReport(): React.JSX.Element {
     }
   }
 
+  // Stores a decision as soon as it is made: the screening record for the audit history and,
+  // when a stored entity was screened, its sanctions status. Errors are reported, not hidden
+  const recordDecision = async (d: 'CLEARED' | 'SANCTIONED'): Promise<boolean> => {
+    if (!results || !checkedAt) return false
+    setSavingDecision(true)
+    try {
+      await window.api.sanctionsReportSave({
+        subjectName: subjectName.trim(),
+        entityId: selectedEntity?.id || null,
+        entityType: selectedEntity ? 'entity' : null,
+        threshold,
+        decision: d,
+        results,
+        checkedBy: user?.fullName || user?.username || null
+      })
+      if (selectedEntity) {
+        await window.api.updateEntity(selectedEntity.id, {
+          ofacStatus: d === 'SANCTIONED' ? 'MATCH' : 'CLEARED',
+          ofacCheckedAt: checkedAt.toISOString(),
+          ofacMatchFound: d === 'SANCTIONED'
+        })
+      }
+      setDecision(d)
+      setSavedDecision(d)
+      showSuccess(
+        selectedEntity
+          ? `${selectedEntity.name} marked ${d === 'SANCTIONED' ? 'sanctioned' : 'cleared'}`
+          : `Decision saved: ${d === 'SANCTIONED' ? 'sanctioned' : 'cleared'}`
+      )
+      return true
+    } catch (err) {
+      showError(
+        `The decision was not saved: ${(err instanceof Error && err.message) || 'unknown error'}`
+      )
+      return false
+    } finally {
+      setSavingDecision(false)
+    }
+  }
+
   const handleExport = async (): Promise<void> => {
     if (!results || !checkedAt) return
     if (!decision) {
       showError('Clear or sanction the subject before exporting')
       return
     }
+    // A clean run decides itself: it is stored with the export
+    if (savedDecision !== decision && !(await recordDecision(decision))) return
     setExporting(true)
     try {
       const checkedBy = user?.fullName || user?.username || null
-      // Save the screening record for audit history
-      await window.api
-        .sanctionsReportSave({
-          subjectName: subjectName.trim(),
-          entityId: selectedEntity?.id || null,
-          entityType: selectedEntity ? 'entity' : null,
-          threshold,
-          decision,
-          results,
-          checkedBy
-        })
-        .catch(() => {})
-      // If a stored entity was screened, update its sanctions status to match the decision
-      if (selectedEntity) {
-        await window.api
-          .updateEntity(selectedEntity.id, {
-            ofacStatus: decision === 'SANCTIONED' ? 'MATCH' : 'CLEARED',
-            ofacCheckedAt: checkedAt.toISOString(),
-            ofacMatchFound: decision === 'SANCTIONED'
-          })
-          .catch(() => {})
-      }
       await exportPdf({
         subjectName: subjectName.trim(),
         entity: selectedEntity,
@@ -367,6 +395,64 @@ export default function SanctionsCheckReport(): React.JSX.Element {
             </table>
           </div>
 
+          {/* The list entries behind the potential matches */}
+          {matches.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ fontSize: '0.84rem', fontWeight: 600, marginBottom: '8px' }}>
+                Matched list entries ({matches.length})
+              </div>
+              <div className="table-wrap" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name on the list</th>
+                      <th>List</th>
+                      <th style={{ textAlign: 'right' }}>Score</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matches.map((m) => (
+                      <tr key={`${m.source}:${m.id}`}>
+                        <td style={{ fontWeight: 500 }}>
+                          {m.names?.[0] || '-'}
+                          {m.names && m.names.length > 1 && (
+                            <div className="muted" style={{ fontSize: '0.75rem', fontWeight: 400 }}>
+                              Also: {m.names.slice(1, 4).join('; ')}
+                              {m.names.length > 4 ? ` +${m.names.length - 4}` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {m.source}
+                          {m.source_id && (
+                            <div className="muted" style={{ fontSize: '0.75rem' }}>
+                              {m.source_id}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                          {Math.round((m.score || 0) * 100)}%
+                        </td>
+                        <td className="muted" style={{ fontSize: '0.78rem', maxWidth: '320px' }}>
+                          {[
+                            m.target_type,
+                            m.imo_number && `IMO ${m.imo_number}`,
+                            m.listed_on && `Listed ${formatDate(m.listed_on)}`,
+                            m.remarks &&
+                              (m.remarks.length > 160 ? m.remarks.slice(0, 160) + '...' : m.remarks)
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Decision */}
           <div
             style={{
@@ -390,9 +476,10 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                   <AlertTriangle size={16} /> Potential matches found — clear or sanction the
                   subject before exporting.
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button
-                    onClick={() => setDecision('CLEARED')}
+                    onClick={() => void recordDecision('CLEARED')}
+                    disabled={savingDecision || savedDecision === 'CLEARED'}
                     className="btn-secondary"
                     style={{
                       borderColor: decision === 'CLEARED' ? 'var(--success)' : undefined,
@@ -403,7 +490,8 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                     <ShieldCheck size={16} /> Clear Subject
                   </button>
                   <button
-                    onClick={() => setDecision('SANCTIONED')}
+                    onClick={() => void recordDecision('SANCTIONED')}
+                    disabled={savingDecision || savedDecision === 'SANCTIONED'}
                     className="btn-secondary"
                     style={{
                       borderColor: decision === 'SANCTIONED' ? 'var(--danger)' : undefined,
@@ -413,6 +501,12 @@ export default function SanctionsCheckReport(): React.JSX.Element {
                   >
                     <ShieldAlert size={16} /> Sanction Subject
                   </button>
+                  {savingDecision && <Loader2 size={16} className="spin" />}
+                  {savedDecision && !savingDecision && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      Saved{selectedEntity ? ` on ${selectedEntity.name}` : ''}
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (

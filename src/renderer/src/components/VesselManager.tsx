@@ -31,6 +31,7 @@ import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { PageHeader, SanctionsBadge, EmptyState, Field } from './ui'
 
 import { ok } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 
 // Loaded on first open: VesselDetail pulls in the Excel/PDF export libraries, which kept them
 // in the startup bundle
@@ -423,6 +424,22 @@ export default function VesselManager({
   }
 
   const handleBulkChangeStatus = async (isActive: boolean): Promise<void> => {
+    const n = selectedVesselIds.size
+    if (n === 0) return
+    const what = `${n} vessel${n === 1 ? '' : 's'}`
+    if (
+      !(await confirmDialog(
+        isActive
+          ? `Set ${what} active?`
+          : `Set ${what} inactive? Their active policies become inactive too, and they leave renewals, survey lists and compliance alerts.`,
+        {
+          title: isActive ? 'Set active' : 'Set inactive',
+          confirmLabel: isActive ? 'Set active' : 'Set inactive',
+          isDangerous: !isActive
+        }
+      ))
+    )
+      return
     try {
       await window.api.bulkSetVesselStatus([...selectedVesselIds], isActive)
       showSuccess(

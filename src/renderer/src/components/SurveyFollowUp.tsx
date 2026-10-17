@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateOrDash } from '../utils/dateUtils'
 import { ok, isIpcError } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 
 // Endorsement rows; snake_case fallbacks are read defensively for older rows
 type EndorsementRow = EndorsementDueRow & {
@@ -249,29 +250,48 @@ export default function SurveyFollowUp({
   }, [reloadKey, showError])
   const loadData = (): void => setReloadKey((k) => k + 1)
 
-  const handleBulkMarkDone = async (): Promise<void> => {
-    for (const id of selectedIds) {
-      const w = warranties.find((ww) => ww.id === id)
-      if (w && w.status === 'pending') {
-        ok(await window.api.surveyWarrantyUpdate(id, { status: 'survey_done' }))
+  // Bulk status change of the selected warranties: asks first (with how many qualify),
+  // reports how many changed and keeps going past a failed one
+  const bulkSetStatus = async (
+    from: string[],
+    to: 'survey_done' | 'completed',
+    label: string
+  ): Promise<void> => {
+    const targets = warranties.filter((w) => selectedIds.has(w.id) && from.includes(w.status))
+    if (targets.length === 0) {
+      showError(`None of the selected warranties can be ${label.toLowerCase()}`)
+      return
+    }
+    const skipped = selectedIds.size - targets.length
+    if (
+      !(await confirmDialog(
+        `${label}: ${targets.length} warrant${targets.length === 1 ? 'y' : 'ies'}?` +
+          (skipped > 0 ? ` ${skipped} selected already past this step are left as they are.` : ''),
+        { title: label, confirmLabel: label, isDangerous: false }
+      ))
+    )
+      return
+    let done = 0
+    for (const w of targets) {
+      try {
+        ok(await window.api.surveyWarrantyUpdate(w.id, { status: to }))
+        done++
+      } catch {
+        /* counted below */
       }
     }
+    if (done === targets.length) showSuccess(`${label}: ${done} warrant${done === 1 ? 'y' : 'ies'}`)
+    else showError(`${label}: ${done} of ${targets.length} updated, the others failed`)
     setSelectedIds(new Set())
     setSelectMode(false)
     loadData()
   }
 
-  const handleBulkComplete = async (): Promise<void> => {
-    for (const id of selectedIds) {
-      const w = warranties.find((ww) => ww.id === id)
-      if (w && (w.status === 'pending' || w.status === 'survey_done')) {
-        ok(await window.api.surveyWarrantyUpdate(id, { status: 'completed' }))
-      }
-    }
-    setSelectedIds(new Set())
-    setSelectMode(false)
-    loadData()
-  }
+  const handleBulkMarkDone = (): Promise<void> =>
+    bulkSetStatus(['pending'], 'survey_done', 'Mark survey done')
+
+  const handleBulkComplete = (): Promise<void> =>
+    bulkSetStatus(['pending', 'survey_done'], 'completed', 'Complete')
 
   const handleMarkEndorsementIssued = async (surveyId: string): Promise<void> => {
     try {

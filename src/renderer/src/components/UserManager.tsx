@@ -199,15 +199,26 @@ export default function UserManager(): React.JSX.Element {
   }
 
   const handleDelete = async (id: string): Promise<void> => {
+    if (id === currentUser?.id) {
+      showError('You cannot delete your own account')
+      return
+    }
+    const target = users.find((u) => u.id === id)
+    const who = target ? target.fullName || target.username : 'this user'
     setConfirmation({
       show: true,
       title: 'Delete User?',
-      message: 'Are you sure you want to delete this user? This action cannot be undone.',
+      message: `Delete ${who}${target?.fullName ? ` (${target.username})` : ''}? They can no longer sign in. This cannot be undone.`,
       isDangerous: true,
       onConfirm: async () => {
-        await window.api.deleteUser(id)
-        loadUsers()
         setConfirmation((prev) => ({ ...prev, show: false }))
+        try {
+          await window.api.deleteUser(id)
+          showSuccess(`${who} deleted`)
+        } catch (err) {
+          showError((err instanceof Error && err.message) || 'Failed to delete the user')
+        }
+        loadUsers()
       }
     })
   }

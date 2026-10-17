@@ -82,6 +82,8 @@ export default function SanctionsSearch({
   // Search state
   const [query, setQuery] = useState('')
   const [threshold, setThreshold] = useState(user?.sanctionsThreshold || 60)
+  // The user's saved default; moving the slider only changes this search until saved
+  const [savedThreshold, setSavedThreshold] = useState(user?.sanctionsThreshold || 60)
   const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu', 'uk', 'isf', 'sic'])
   const [results, setResults] = useState<SanctionsMatch[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -111,6 +113,7 @@ export default function SanctionsSearch({
     setThresholdUser(user)
     if (user?.sanctionsThreshold !== undefined) {
       setThreshold(user.sanctionsThreshold)
+      setSavedThreshold(user.sanctionsThreshold)
     }
   }
 
@@ -191,10 +194,14 @@ export default function SanctionsSearch({
     }
   }
 
-  const handleThresholdChange = (newThreshold: number): void => {
-    setThreshold(newThreshold)
-    if (user) {
-      window.api.updateSanctionsThreshold(newThreshold)
+  const saveThresholdAsDefault = async (): Promise<void> => {
+    if (!user) return
+    try {
+      await window.api.updateSanctionsThreshold(threshold)
+      setSavedThreshold(threshold)
+      showSuccess(`${threshold}% is now your default match threshold`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save the threshold')
     }
   }
 
@@ -578,10 +585,38 @@ export default function SanctionsSearch({
                     max="95"
                     step="5"
                     value={threshold}
-                    onChange={(e) => handleThresholdChange(parseInt(e.target.value))}
+                    onChange={(e) => setThreshold(parseInt(e.target.value))}
                     style={{ width: '100%', height: '6px', cursor: 'pointer' }}
                     aria-label="Minimum match threshold"
                   />
+                  {threshold !== savedThreshold && user && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '10px',
+                        alignItems: 'center',
+                        marginTop: '6px',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      <span>For this search only (your default is {savedThreshold}%)</span>
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={() => void saveThresholdAsDefault()}
+                      >
+                        Save as my default
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={() => setThreshold(savedThreshold)}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  )}
                   <div
                     style={{
                       display: 'flex',

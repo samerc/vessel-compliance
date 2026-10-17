@@ -47,7 +47,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog, promptDialog } from './DialogHost'
-import { PageHeader, Tabs, Badge, Field } from './ui'
+import { PageHeader, Tabs, Badge, Field, EmptyState, Spinner } from './ui'
 import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
 import AlertsByCustomer from './AlertsByCustomer'
 
@@ -214,6 +214,8 @@ export default function ComplianceCenter({
   )
   const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
   const [docSearch, setDocSearch] = useState('')
+  // First load of the documents tab still running (never show "fully compliant" before it ends)
+  const [docsLoading, setDocsLoading] = useState(true)
   const [endorsementsDue, setEndorsementsDue] = useState<EndorsementDueRow[]>([])
   const [activeTab, setActiveTabRaw] = useState<
     'documents' | 'policies' | 'sanctions' | 'dataQuality'
@@ -230,6 +232,7 @@ export default function ComplianceCenter({
 
   // Sanctions compliance state
   const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
+  const [sanctionsLoading, setSanctionsLoading] = useState(true)
   const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
   const [policyAlerts, setPolicyAlerts] = useState<PolicyExpiryRow[]>([])
   const [policyExpiringSoon, setPolicyExpiringSoon] = useState<PolicyExpiryRow[]>([])
@@ -298,6 +301,8 @@ export default function ComplianceCenter({
       setVessels([])
       setDocs([])
       setDocTypes([])
+    } finally {
+      setDocsLoading(false)
     }
   }, [])
 
@@ -322,6 +327,8 @@ export default function ComplianceCenter({
       setResultsTotal(0)
       setResultsTotalPages(0)
       setCheckLogs([])
+    } finally {
+      setSanctionsLoading(false)
     }
   }, [resultsPage, resultsLimit])
 
@@ -566,7 +573,7 @@ export default function ComplianceCenter({
 
   // Every document/entity alert across the fleet — recomputed only when its inputs change
   // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
-  const alerts = useMemo((): DocAlert[] => {
+  const allAlerts = useMemo((): DocAlert[] => {
     // Midnight, like the vessel page: a document expiring today is not expired yet
     const today = new Date(new Date().setHours(0, 0, 0, 0))
     const thirtyDaysFromNow = new Date()
@@ -719,14 +726,7 @@ export default function ComplianceCenter({
       })
     }
 
-    let filtered = alerts.filter((a) => filter === 'all' || a.type === filter)
-    if (docSearch.trim()) {
-      const q = docSearch.toLowerCase()
-      filtered = filtered.filter(
-        (a) => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q)
-      )
-    }
-    return filtered
+    return alerts
   }, [
     vessels,
     docs,
@@ -734,11 +734,28 @@ export default function ComplianceCenter({
     entityDocTypes,
     entityDocs,
     allAssureds,
-    filter,
-    docSearch,
     endorsementsDue,
     policyExpiries
   ])
+
+  // Counts per type are of the whole fleet: they do not change with the filter or search
+  const alertCounts = useMemo(() => {
+    const c = { missing: 0, expired: 0, soon: 0 }
+    for (const a of allAlerts) if (a.type in c) c[a.type as keyof typeof c]++
+    return c
+  }, [allAlerts])
+
+  // The alerts shown: type filter + search
+  const alerts = useMemo(() => {
+    let filtered = allAlerts.filter((a) => filter === 'all' || a.type === filter)
+    if (docSearch.trim()) {
+      const q = docSearch.toLowerCase()
+      filtered = filtered.filter(
+        (a) => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }, [allAlerts, filter, docSearch])
 
   // Group alerts by vessel
   const alertsByVessel = alerts.reduce<
@@ -798,7 +815,8 @@ export default function ComplianceCenter({
             icon: <AlertCircle size={16} />,
             label: (
               <>
-                Document Alerts {alerts.length > 0 && <Badge tone="danger">{alerts.length}</Badge>}
+                Document Alerts{' '}
+                {allAlerts.length > 0 && <Badge tone="danger">{allAlerts.length}</Badge>}
               </>
             )
           },
@@ -853,25 +871,28 @@ export default function ComplianceCenter({
                 active={filter === 'all'}
                 onClick={() => setFilter('all')}
                 label="All"
-                count={alerts.length}
+                count={allAlerts.length}
               />
               <FilterButton
                 active={filter === 'missing'}
                 onClick={() => setFilter('missing')}
                 label="Missing"
                 color="var(--danger)"
+                count={alertCounts.missing}
               />
               <FilterButton
                 active={filter === 'expired'}
                 onClick={() => setFilter('expired')}
                 label="Expired"
                 color="var(--danger)"
+                count={alertCounts.expired}
               />
               <FilterButton
                 active={filter === 'soon'}
                 onClick={() => setFilter('soon')}
                 label="Expiring Soon"
                 color="var(--warning)"
+                count={alertCounts.soon}
               />
             </div>
             <div
@@ -945,7 +966,38 @@ export default function ComplianceCenter({
             </div>
           </div>
 
-          {docViewMode === 'customer' ? (
+          {docsLoading ? (
+            <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
+              <Spinner size={20} label="Checking the fleet's documents..." />
+            </div>
+          ) : allAlerts.length === 0 ? (
+            <div className="glass-card">
+              <EmptyState
+                icon={<CheckCircle size={40} color="var(--success)" />}
+                title="Fleet is fully compliant"
+                text="No missing, expired or expiring documents."
+              />
+            </div>
+          ) : alerts.length === 0 ? (
+            <div className="glass-card">
+              <EmptyState
+                icon={<Search size={40} />}
+                title="No alerts match your filter"
+                text={`${allAlerts.length} alert${allAlerts.length === 1 ? '' : 's'} in total.`}
+                action={
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      setFilter('all')
+                      setDocSearch('')
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
+            </div>
+          ) : docViewMode === 'customer' ? (
             /* Grouped by customer / broker (vessels' active policies) */
             <AlertsByCustomer
               alerts={alerts}
@@ -1074,19 +1126,6 @@ export default function ComplianceCenter({
                   </div>
                 )
               })}
-              {vesselGroups.length === 0 && (
-                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-                  <CheckCircle
-                    size={48}
-                    color="var(--success)"
-                    style={{ marginBottom: '16px', opacity: 0.5 }}
-                  />
-                  <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-                    Fleet is fully compliant
-                  </div>
-                  <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                </div>
-              )}
             </div>
           ) : docViewMode === 'document' ? (
             /* Grouped by document type view */
@@ -1199,19 +1238,6 @@ export default function ComplianceCenter({
                   </div>
                 )
               })}
-              {documentGroups.length === 0 && (
-                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-                  <CheckCircle
-                    size={48}
-                    color="var(--success)"
-                    style={{ marginBottom: '16px', opacity: 0.5 }}
-                  />
-                  <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-                    Fleet is fully compliant
-                  </div>
-                  <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                </div>
-              )}
             </div>
           ) : (
             /* Flat list view */
@@ -1310,21 +1336,6 @@ export default function ComplianceCenter({
                       </tr>
                     )
                   })}
-                  {alerts.length === 0 && (
-                    <tr>
-                      <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
-                        <CheckCircle
-                          size={48}
-                          color="var(--success)"
-                          style={{ marginBottom: '16px', opacity: 0.5 }}
-                        />
-                        <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-                          Fleet is fully compliant
-                        </div>
-                        <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -2611,7 +2622,17 @@ export default function ComplianceCenter({
                         )}
                       </>
                     ))}
-                    {pendingResults.length === 0 && (
+                    {pendingResults.length === 0 && sanctionsLoading && (
+                      <tr>
+                        <td
+                          colSpan={canReview ? 6 : 5}
+                          style={{ padding: '48px', textAlign: 'center' }}
+                        >
+                          <Spinner size={20} label="Loading reviews..." />
+                        </td>
+                      </tr>
+                    )}
+                    {pendingResults.length === 0 && !sanctionsLoading && (
                       <tr>
                         <td
                           colSpan={canReview ? 6 : 5}
