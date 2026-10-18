@@ -34,6 +34,7 @@ import {
   addMonthsISO,
   round2,
   vesselTechnical,
+  upccPercentText,
   PremiumContext,
   PremiumLolOption
 } from '../../../shared/premium'
@@ -1680,7 +1681,7 @@ function StepVesselAlternative({
                     fontWeight: 600
                   }}
                 >
-                  UPCC {quotation.upccDiscountPercent}%
+                  UPCC {upccPercentText(quotation, qVessels)}
                 </span>
               )}
             </div>

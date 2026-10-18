@@ -100,7 +100,7 @@ import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 import { fillTextDeductibles } from '../../../shared/deductibleValues'
-import { hullClausesPerVesselOnly } from '../../../shared/premium'
+import { hullClausesPerVesselOnly, upccPercentFor, upccPercentText } from '../../../shared/premium'
 
 // ==================== Export Snapshot ====================
 
@@ -4250,11 +4250,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           ? wNcbFixedAmt
           : (tech * wNcbPct) / 100
       const afterNcb = tech - ncbDed
+      // A vessel can have its own UPCC rate
       const upccDed = vessel?.upccExcluded
         ? 0
         : wUpccType === 'amount'
           ? wUpccFixedAmt
-          : (afterNcb * wUpccPct) / 100
+          : (afterNcb * (wq.upccEnabled ? upccPercentFor(wq, vessel) : 0)) / 100
       return wApplyExtra(afterNcb - upccDed)
     }
     const wIsMultiVessel = data.quotationVessels.length >= 2
@@ -5183,7 +5184,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         (wNcbType === 'amount' ? wNcbFixedAmt : ((wq.premiumAmount || 0) * wNcbPct) / 100)
       const wUpccAmt = wUpccType === 'amount' ? wUpccFixedAmt : (wAfterNcbPrem * wUpccPct) / 100
       const wUpccAmtStr = formatCurrency(wUpccAmt, wq.premiumCurrency)
-      const wUpccPctStr = `${wUpccPct}%`
+      // Vessels with their own rate are named: "17.5% (12.5% for SAND WEAVER)"
+      const wUpccPctStr = upccPercentText(wq, data.quotationVessels)
       const wUpccDisplay = wUpccType === 'amount' ? wUpccAmtStr : wUpccPctStr
       if (wq.upccText) {
         const resolved = wq.upccText

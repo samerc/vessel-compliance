@@ -1279,6 +1279,8 @@ export interface QuotationVessel {
   previousSection2Premium?: number | null
   ncbExcluded?: boolean
   upccExcluded?: boolean
+  /** This vessel's own UPCC rate (null = the quotation's rate) */
+  upccPercent?: number | null
 }
 
 export interface QuotationSubLimit {

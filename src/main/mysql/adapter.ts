@@ -5790,6 +5790,15 @@ export class MySQLAdapter {
           'ALTER TABLE quotations ADD COLUMN lol_show_premium TINYINT(1) NOT NULL DEFAULT 0'
         )
 
+      // Migration: quotation_vessels.upcc_percent (a vessel's own UPCC rate; NULL = quotation's)
+      const [qvUpCol] = await this.pool.query(
+        "SHOW COLUMNS FROM quotation_vessels LIKE 'upcc_percent'"
+      )
+      if ((qvUpCol as RowDataPacket[]).length === 0)
+        await this.pool.query(
+          'ALTER TABLE quotation_vessels ADD COLUMN upcc_percent DECIMAL(6,3) NULL DEFAULT NULL'
+        )
+
       // Migration: quotations.show_addresses (print the insureds' and broker's addresses)
       const [qsaCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'show_addresses'")
       if ((qsaCol as RowDataPacket[]).length === 0)
@@ -11934,7 +11943,8 @@ export class MySQLAdapter {
                     qv.agreed_value as agreedValue, qv.iv_value as ivValue, qv.agreed_value_currency as agreedValueCurrency,
                     qv.war_excess_amount as warExcessAmount, qv.war_section1_premium as warSection1Premium, qv.war_section2_premium as warSection2Premium,
                     qv.previous_premium as previousPremium, qv.previous_section1_premium as previousSection1Premium, qv.previous_section2_premium as previousSection2Premium,
-                    qv.ncb_excluded as ncbExcluded, qv.upcc_excluded as upccExcluded
+                    qv.ncb_excluded as ncbExcluded, qv.upcc_excluded as upccExcluded,
+                    qv.upcc_percent as upccPercent
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
@@ -11961,7 +11971,8 @@ export class MySQLAdapter {
       ncbExcluded:
         r.ncbExcluded !== 0 && r.ncbExcluded !== false && r.ncbExcluded != null ? true : false,
       upccExcluded:
-        r.upccExcluded !== 0 && r.upccExcluded !== false && r.upccExcluded != null ? true : false
+        r.upccExcluded !== 0 && r.upccExcluded !== false && r.upccExcluded != null ? true : false,
+      upccPercent: r.upccPercent != null ? Number(r.upccPercent) : null
     }))
   }
 
@@ -12048,6 +12059,7 @@ export class MySQLAdapter {
       agreedValueCurrency: string | null
       ncbExcluded: boolean
       upccExcluded: boolean
+      upccPercent: number | null
     }>
   ): Promise<void> {
     if (!this.pool) return
@@ -12077,7 +12089,8 @@ export class MySQLAdapter {
       previousSection1Premium: 'previous_section1_premium',
       previousSection2Premium: 'previous_section2_premium',
       ncbExcluded: 'ncb_excluded',
-      upccExcluded: 'upcc_excluded'
+      upccExcluded: 'upcc_excluded',
+      upccPercent: 'upcc_percent'
     }
     for (const [key, col] of Object.entries(colMap)) {
       if (key in data) {
@@ -13735,7 +13748,7 @@ export class MySQLAdapter {
           )
           for (const r of rows as RowDataPacket[]) {
             await this.pool.execute(
-              'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, ncb_excluded, upcc_excluded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, ncb_excluded, upcc_excluded, upcc_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [
                 uuidv4(),
                 targetQuotationId,
@@ -13752,7 +13765,8 @@ export class MySQLAdapter {
                 r.classification,
                 r.call_sign,
                 r.ncb_excluded || 0,
-                r.upcc_excluded || 0
+                r.upcc_excluded || 0,
+                r.upcc_percent ?? null
               ]
             )
           }
@@ -14240,8 +14254,8 @@ export class MySQLAdapter {
       const newVId = uuidv4()
       vesselIdMap[v.id] = newVId
       await this.pool.execute(
-        `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value, agreed_value_currency, war_excess_amount, war_section1_premium, war_section2_premium, previous_premium, previous_section1_premium, previous_section2_premium, ncb_excluded, upcc_excluded)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value, agreed_value_currency, war_excess_amount, war_section1_premium, war_section2_premium, previous_premium, previous_section1_premium, previous_section2_premium, ncb_excluded, upcc_excluded, upcc_percent)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newVId,
           newId,
@@ -14268,7 +14282,8 @@ export class MySQLAdapter {
           v.previous_section1_premium,
           v.previous_section2_premium,
           v.ncb_excluded || 0,
-          v.upcc_excluded || 0
+          v.upcc_excluded || 0,
+          v.upcc_percent ?? null
         ]
       )
     }

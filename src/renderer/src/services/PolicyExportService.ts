@@ -4426,15 +4426,16 @@ export async function exportPolicyDocx(
     const upccContent: (Paragraph | Table)[] = []
     let upccText = data.quotation.upccText
     const upccIsAmount = data.quotation.upccDiscountType === 'amount'
-    if (data.quotation.upccDiscountPercent != null)
-      upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
+    // This vessel's own UPCC rate when it has one
+    const upccPct = data.vessel?.upccPercent ?? data.quotation.upccDiscountPercent
+    if (upccPct != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(upccPct))
     if (upccIsAmount && data.quotation.upccDiscountAmount != null)
       upccText = upccText.replace(
         /\{upcc_amount\}/g,
         polFormatCurrency(data.quotation.upccDiscountAmount, polCur)
       )
-    else if (!upccIsAmount && data.quotation.upccDiscountPercent != null)
-      upccText = upccText.replace(/\{upcc_amount\}/g, `${data.quotation.upccDiscountPercent}%`)
+    else if (!upccIsAmount && upccPct != null)
+      upccText = upccText.replace(/\{upcc_amount\}/g, `${upccPct}%`)
     upccText = upccText.replace(/\{currency\}/g, polCur)
     upccContent.push(...polMp(upccText))
     addRow(

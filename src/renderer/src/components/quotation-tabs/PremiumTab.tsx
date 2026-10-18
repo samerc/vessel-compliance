@@ -381,12 +381,15 @@ export default function PremiumTab({
       ? qVessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
       : quotation.premiumAmount || 0
 
+  // A vessel can have its own UPCC rate (empty = the quotation's)
+  const vUpccPct = (v: (typeof qVessels)[0]): number =>
+    quotation.upccEnabled ? (v.upccPercent ?? upccPct) : 0
   // Per-vessel payable respecting NCB/UPCC exclusion flags
   const vesselPayable = (v: (typeof qVessels)[0]): number => {
     const tech = v.premiumAmount || 0
     const nd = v.ncbExcluded ? 0 : ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
     const an = tech - nd
-    const ud = v.upccExcluded ? 0 : upccType === 'amount' ? upccFixedAmt : (an * upccPct) / 100
+    const ud = v.upccExcluded ? 0 : upccType === 'amount' ? upccFixedAmt : (an * vUpccPct(v)) / 100
     return applyExtraDiscounts(an - ud)
   }
 
@@ -454,7 +457,7 @@ export default function PremiumTab({
   const payableFor = (tech: number, v: (typeof qVessels)[0]): number => {
     const nd = v.ncbExcluded ? 0 : ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
     const an = tech - nd
-    const ud = v.upccExcluded ? 0 : upccType === 'amount' ? upccFixedAmt : (an * upccPct) / 100
+    const ud = v.upccExcluded ? 0 : upccType === 'amount' ? upccFixedAmt : (an * vUpccPct(v)) / 100
     return applyExtraDiscounts(an - ud)
   }
   // Instalment amount (editor only): payable (or premium when no discount) ÷ number of instalments
@@ -1961,6 +1964,49 @@ export default function PremiumTab({
                                   UPCC
                                 </label>
                               )}
+                              {quotation.upccEnabled &&
+                                upccType === 'percentage' &&
+                                !v.upccExcluded && (
+                                  // This vessel's own UPCC rate; empty = the quotation's rate
+                                  <input
+                                    key={`${v.id}:${v.upccPercent ?? ''}`}
+                                    type="number"
+                                    step="any"
+                                    defaultValue={v.upccPercent ?? ''}
+                                    placeholder={`${quotation.upccDiscountPercent ?? 0}`}
+                                    title="UPCC rate for this vessel (%). Leave empty to use the quotation's rate"
+                                    onBlur={async (e) => {
+                                      const raw = e.target.value.trim()
+                                      const val = raw === '' ? null : parseFloat(raw)
+                                      if (val != null && (isNaN(val) || val < 0 || val > 100))
+                                        return
+                                      if (val === (v.upccPercent ?? null)) return
+                                      setQVessels((prev) =>
+                                        prev.map((pv) =>
+                                          pv.id === v.id ? { ...pv, upccPercent: val } : pv
+                                        )
+                                      )
+                                      await window.api.updateQuotationVessel(v.id, {
+                                        upccPercent: val
+                                      })
+                                    }}
+                                    style={{
+                                      width: '52px',
+                                      padding: '2px 4px',
+                                      fontSize: '0.72rem',
+                                      textAlign: 'right'
+                                    }}
+                                  />
+                                )}
+                              {quotation.upccEnabled &&
+                                upccType === 'percentage' &&
+                                !v.upccExcluded && (
+                                  <span
+                                    style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}
+                                  >
+                                    %
+                                  </span>
+                                )}
                             </div>
                             {numInst > 1 && vPrem > 0 && (
                               <div

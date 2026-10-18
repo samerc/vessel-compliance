@@ -38,6 +38,36 @@ export function deductedDiscounts<T extends ExtraDiscount>(extra: T[] = []): T[]
 export interface VesselDiscountFlags {
   ncbExcluded?: boolean | null
   upccExcluded?: boolean | null
+  /** This vessel's own UPCC rate (null = the quotation's rate) */
+  upccPercent?: number | null
+}
+
+/** The UPCC rate that applies to a vessel: its own rate, else the quotation's. */
+export function upccPercentFor(
+  q: PremiumDiscountSource,
+  vessel?: VesselDiscountFlags | null
+): number {
+  return Number(vessel?.upccPercent ?? q.upccDiscountPercent) || 0
+}
+
+const pctStr = (n: number): string => `${Number(n.toFixed(3))}%`
+
+/** {upcc_percent} as printed: the quotation's rate, then any vessel with its own rate, e.g.
+ *  "17.5% (12.5% for SAND WEAVER)". Vessels excluded from UPCC are left out. */
+export function upccPercentText(
+  q: PremiumDiscountSource,
+  vessels: (VesselDiscountFlags & { name?: string; vesselLabel?: string })[] = []
+): string {
+  const base = Number(q.upccDiscountPercent) || 0
+  const byRate = new Map<number, string[]>()
+  for (const v of vessels) {
+    if (v.upccExcluded || v.upccPercent == null || Number(v.upccPercent) === base) continue
+    const r = Number(v.upccPercent)
+    byRate.set(r, [...(byRate.get(r) || []), (v.name || v.vesselLabel || '').toUpperCase()])
+  }
+  if (byRate.size === 0) return pctStr(base)
+  const parts = [...byRate].map(([r, names]) => `${pctStr(r)} for ${names.join(' and ')}`)
+  return `${pctStr(base)} (${parts.join(', ')})`
 }
 
 export const round2 = (n: number): number => Math.round((n || 0) * 100) / 100
@@ -67,7 +97,7 @@ export function computePayablePremium(
     ? 0
     : q.upccDiscountType === 'amount'
       ? Number(q.upccDiscountAmount) || 0
-      : (afterNcb * (Number(q.upccDiscountPercent) || 0)) / 100
+      : (afterNcb * upccPercentFor(q, vessel)) / 100
   let r = afterNcb - upccDed
   for (const d of deductedDiscounts(extra)) {
     if (d.discountType === 'amount') r -= Number(d.amount) || 0
