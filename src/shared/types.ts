@@ -1314,6 +1314,8 @@ export interface PITextDeductible {
   order: number
   /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
   typeScope?: string
+  /** Default values of the wording's placeholders ({percent}, {currency}, {minimum}...) */
+  defaultValues?: Record<string, string | number | null> | null
 }
 
 export interface QuotationTextDeductible {
@@ -1325,6 +1327,8 @@ export interface QuotationTextDeductible {
   order: number
   vesselScope?: string[] | null
   alternativeId?: string | null
+  /** This quotation's values of the wording's placeholders (filled in by the exports) */
+  fieldValues?: Record<string, string | number | null> | null
 }
 
 export interface QuotationExcludedCountry {

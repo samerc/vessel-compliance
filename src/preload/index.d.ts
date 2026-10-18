@@ -1015,10 +1015,16 @@ export interface Api {
     title?: string
     text: string
     defaultIncluded?: boolean
+    defaultValues?: Record<string, string | number | null> | null
   }) => Promise<PITextDeductible>
   piUpdateTextDeductible: (
     id: string,
-    updates: { title?: string; text?: string; defaultIncluded?: boolean }
+    updates: {
+      title?: string
+      text?: string
+      defaultIncluded?: boolean
+      defaultValues?: Record<string, string | number | null> | null
+    }
   ) => Promise<void>
   piDeleteTextDeductible: (id: string) => Promise<void>
   piReorderTextDeductibles: (orderedIds: string[]) => Promise<void>
@@ -1558,10 +1564,16 @@ export interface Api {
     text: string
     order?: number
     vesselScope?: string[]
+    fieldValues?: Record<string, string | number | null> | null
   }) => Promise<QuotationTextDeductible>
   updateQuotationTextDeductible: (
     id: string,
-    updates: { title?: string; text?: string; vesselScope?: string[] | null }
+    updates: {
+      title?: string
+      text?: string
+      vesselScope?: string[] | null
+      fieldValues?: Record<string, string | number | null> | null
+    }
   ) => Promise<void>
   deleteQuotationTextDeductible: (id: string) => Promise<void>
   reorderQuotationTextDeductibles: (orderedIds: string[]) => Promise<void>

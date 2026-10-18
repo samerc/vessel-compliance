@@ -5749,6 +5749,38 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
       }
 
+      // Migration: values in text deductibles (FD&D: {percent}% ... {currency} {minimum} ...)
+      const [tdvCol] = await this.pool.query(
+        "SHOW COLUMNS FROM pi_text_deductibles LIKE 'default_values'"
+      )
+      if ((tdvCol as RowDataPacket[]).length === 0)
+        await this.pool.query('ALTER TABLE pi_text_deductibles ADD COLUMN default_values TEXT NULL')
+      const [qtdvCol] = await this.pool.query(
+        "SHOW COLUMNS FROM quotation_text_deductibles LIKE 'field_values'"
+      )
+      if ((qtdvCol as RowDataPacket[]).length === 0)
+        await this.pool.query(
+          'ALTER TABLE quotation_text_deductibles ADD COLUMN field_values TEXT NULL'
+        )
+      {
+        // The FD&D deductible as first seeded (values typed in the text) gets value fields; the
+        // printed wording stays the same. Rows whose text was edited are left as they are.
+        const seeded =
+          '25% of all costs, fees and expenses, each dispute, subject to,\nUSD 10,000 Minimum Deductible\nUSD 30,000 Maximum Deductible'
+        const withFields =
+          '{percent}% of all costs, fees and expenses, each dispute, subject to,\n{currency} {minimum} Minimum Deductible\n{currency} {maximum} Maximum Deductible'
+        // {currency} is filled from the quotation, it has no stored value
+        const vals = JSON.stringify({ percent: 25, minimum: 10000, maximum: 30000 })
+        await this.pool.execute(
+          'UPDATE pi_text_deductibles SET text = ?, default_values = ? WHERE text = ?',
+          [withFields, vals, seeded]
+        )
+        await this.pool.execute(
+          'UPDATE quotation_text_deductibles SET text = ?, field_values = ? WHERE text = ?',
+          [withFields, vals, seeded]
+        )
+      }
+
       // Migration: quotations.lol_show_premium (print each limit alternative's premium beside it)
       const [lspCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'lol_show_premium'")
       if ((lspCol as RowDataPacket[]).length === 0)
@@ -11459,11 +11491,12 @@ export class MySQLAdapter {
   async getPITextDeductibles(): Promise<PITextDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, title, text, default_included as defaultIncluded, COALESCE(type_scope, 'pi') as typeScope, order_index as `order` FROM pi_text_deductibles ORDER BY order_index ASC"
+      "SELECT id, title, text, default_included as defaultIncluded, COALESCE(type_scope, 'pi') as typeScope, order_index as `order`, default_values as defaultValues FROM pi_text_deductibles ORDER BY order_index ASC"
     )
     return (rows as Row<PITextDeductible>[]).map((r) => ({
       ...r,
-      defaultIncluded: Boolean(r.defaultIncluded)
+      defaultIncluded: Boolean(r.defaultIncluded),
+      defaultValues: r.defaultValues ? safeJson(r.defaultValues, null) : null
     }))
   }
 
@@ -11471,6 +11504,7 @@ export class MySQLAdapter {
     title?: string
     text: string
     defaultIncluded?: boolean
+    defaultValues?: Record<string, string | number | null> | null
   }): Promise<PITextDeductible> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
@@ -11479,8 +11513,15 @@ export class MySQLAdapter {
     )
     const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
-      'INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index) VALUES (?, ?, ?, ?, ?)',
-      [id, data.title || '', data.text, data.defaultIncluded ? 1 : 0, order]
+      'INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index, default_values) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        data.title || '',
+        data.text,
+        data.defaultIncluded ? 1 : 0,
+        order,
+        data.defaultValues ? JSON.stringify(data.defaultValues) : null
+      ]
     )
     return {
       id,
@@ -11493,7 +11534,12 @@ export class MySQLAdapter {
 
   async updatePITextDeductible(
     id: string,
-    updates: { title?: string; text?: string; defaultIncluded?: boolean }
+    updates: {
+      title?: string
+      text?: string
+      defaultIncluded?: boolean
+      defaultValues?: Record<string, string | number | null> | null
+    }
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
@@ -11505,6 +11551,10 @@ export class MySQLAdapter {
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
+    }
+    if (updates.defaultValues !== undefined) {
+      fields.push('default_values = ?')
+      values.push(updates.defaultValues ? JSON.stringify(updates.defaultValues) : null)
     }
     if (updates.defaultIncluded !== undefined) {
       fields.push('default_included = ?')
@@ -14344,7 +14394,7 @@ export class MySQLAdapter {
       },
       {
         table: 'quotation_text_deductibles',
-        cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id'
+        cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id, field_values'
       },
       {
         table: 'quotation_exclusions',
@@ -15926,13 +15976,14 @@ export class MySQLAdapter {
   async getQuotationTextDeductibles(quotationId: string): Promise<QuotationTextDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`,
+      `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, field_values as fieldValues FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
     return (rows as Row<QuotationTextDeductible>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
-      alternativeId: r.alternativeId || null
+      alternativeId: r.alternativeId || null,
+      fieldValues: r.fieldValues ? safeJson(r.fieldValues, null) : null
     }))
   }
 
@@ -15943,13 +15994,14 @@ export class MySQLAdapter {
     text: string
     order?: number
     vesselScope?: string[]
+    fieldValues?: Record<string, string | number | null> | null
   }): Promise<QuotationTextDeductible> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const fk = await this.fkOff()
     try {
       await fk.execute(
-        'INSERT INTO quotation_text_deductibles (id, quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO quotation_text_deductibles (id, quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, field_values) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           data.quotationId,
@@ -15957,7 +16009,8 @@ export class MySQLAdapter {
           data.title || '',
           data.text,
           data.order ?? 0,
-          data.vesselScope ? JSON.stringify(data.vesselScope) : null
+          data.vesselScope ? JSON.stringify(data.vesselScope) : null,
+          data.fieldValues ? JSON.stringify(data.fieldValues) : null
         ]
       )
     } finally {
@@ -15970,17 +16023,27 @@ export class MySQLAdapter {
       title: data.title || '',
       text: data.text,
       order: data.order ?? 0,
-      vesselScope: data.vesselScope || null
+      vesselScope: data.vesselScope || null,
+      fieldValues: data.fieldValues || null
     }
   }
 
   async updateQuotationTextDeductible(
     id: string,
-    updates: { title?: string; text?: string; vesselScope?: string[] | null }
+    updates: {
+      title?: string
+      text?: string
+      vesselScope?: string[] | null
+      fieldValues?: Record<string, string | number | null> | null
+    }
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
     const values: SqlValue[] = []
+    if (updates.fieldValues !== undefined) {
+      fields.push('field_values = ?')
+      values.push(updates.fieldValues ? JSON.stringify(updates.fieldValues) : null)
+    }
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)

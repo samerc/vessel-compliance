@@ -737,9 +737,8 @@ const api: Api = {
   piDeleteDeductibleSet: (id: string) => ipcRenderer.invoke('pi:deleteDeductibleSet', id),
 
   piGetTextDeductibles: () => ipcRenderer.invoke('pi:getTextDeductibles'),
-  piAddTextDeductible: (data: { text: string; defaultIncluded?: boolean }) =>
-    ipcRenderer.invoke('pi:addTextDeductible', data),
-  piUpdateTextDeductible: (id: string, updates: { text?: string; defaultIncluded?: boolean }) =>
+  piAddTextDeductible: (data) => ipcRenderer.invoke('pi:addTextDeductible', data),
+  piUpdateTextDeductible: (id, updates) =>
     ipcRenderer.invoke('pi:updateTextDeductible', id, updates),
   piDeleteTextDeductible: (id: string) => ipcRenderer.invoke('pi:deleteTextDeductible', id),
   piReorderTextDeductibles: (orderedIds: string[]) =>
@@ -1118,7 +1117,7 @@ const api: Api = {
   getQuotationTextDeductibles: (qId: string) =>
     ipcRenderer.invoke('db:getQuotationTextDeductibles', qId),
   addQuotationTextDeductible: (data) => ipcRenderer.invoke('db:addQuotationTextDeductible', data),
-  updateQuotationTextDeductible: (id: string, updates: { text?: string }) =>
+  updateQuotationTextDeductible: (id, updates) =>
     ipcRenderer.invoke('db:updateQuotationTextDeductible', id, updates),
   deleteQuotationTextDeductible: (id: string) =>
     ipcRenderer.invoke('db:deleteQuotationTextDeductible', id),

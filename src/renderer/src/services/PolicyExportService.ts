@@ -79,6 +79,7 @@ import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
 import { ok, isIpcError } from '../utils/ipc'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
+import { fillTextDeductibles } from '../../../shared/deductibleValues'
 import { BC_DEFAULTS } from './policyExportDefaults'
 // formatDate not needed — blue cards use bcFormatDate, policies use polFormatDateUS
 
@@ -1610,7 +1611,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     allWarranties: Array.isArray(allWarranties) ? allWarranties : [],
     customWarranties: filterByAlt(Array.isArray(customWarranties) ? customWarranties : []),
     deductibles: filterByAlt(Array.isArray(deductibles) ? deductibles : []),
-    textDeductibles: filterByAlt(Array.isArray(textDeductibles) ? textDeductibles : []),
+    // Values ({percent}, {minimum}...) filled into the wording
+    textDeductibles: filterByAlt(fillTextDeductibles(textDeductibles, quotation.premiumCurrency)),
     selectedExclusions: filterByAlt(Array.isArray(selectedExclusions) ? selectedExclusions : []),
     allExclusions: Array.isArray(allExclusions) ? allExclusions : [],
     customExclusions: filterByAlt(Array.isArray(customExclusions) ? customExclusions : []),

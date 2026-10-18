@@ -97,6 +97,7 @@ import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
+import { fillTextDeductibles } from '../../../shared/deductibleValues'
 
 // ==================== Export Snapshot ====================
 
@@ -582,7 +583,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
     customWarranties,
     deductibles,
-    textDeductibles,
+    // Values ({percent}, {minimum}...) filled into the wording
+    textDeductibles: fillTextDeductibles(textDeductibles, quotation.premiumCurrency),
     selectedExclusions,
     allExclusions: resolvedAllExclusions,
     customExclusions,

@@ -13,7 +13,9 @@ import {
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, PickerDropdown, MoneyInput } from './shared'
-import { ALT_COLORS } from './sharedUtils'
+import { ALT_COLORS, confirmDelete } from './sharedUtils'
+import DeductibleValueInputs from './DeductibleValueInputs'
+import { fillDeductibleText, withCurrency } from '../../../../shared/deductibleValues'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
@@ -104,6 +106,7 @@ export default function DeductiblesTab({
             piTextDeductibleId: defaults[i].id,
             title: defaults[i].title,
             text: defaults[i].text,
+            fieldValues: defaults[i].defaultValues || null,
             order: i
           })
         }
@@ -277,6 +280,7 @@ export default function DeductiblesTab({
       piTextDeductibleId: master.id,
       title: master.title,
       text: master.text,
+      fieldValues: master.defaultValues || null,
       order: textDeds.length
     })
     showSuccess('Text deductible added')
@@ -320,17 +324,19 @@ export default function DeductiblesTab({
         specific alternative.
       </p>
 
-      {/* Add from settings dropdown */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <PickerDropdown
-          placeholder="Add deductible from settings..."
-          options={masterDeductibles.map((d) => ({
-            value: d.id,
-            label: d.title || d.description.slice(0, 80) || 'Untitled deductible'
-          }))}
-          onSelect={handleAddFromMaster}
-        />
-      </div>
+      {/* Add from settings dropdown (none for a type without amount deductibles, e.g. FD&D) */}
+      {masterDeductibles.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <PickerDropdown
+            placeholder="Add deductible from settings..."
+            options={masterDeductibles.map((d) => ({
+              value: d.id,
+              label: d.title || d.description.slice(0, 80) || 'Untitled deductible'
+            }))}
+            onSelect={handleAddFromMaster}
+          />
+        </div>
+      )}
 
       {/* Deductibles list */}
       {deductibles.map((d, i) => (
@@ -928,12 +934,26 @@ export default function DeductiblesTab({
                         whiteSpace: 'pre-wrap'
                       }}
                     >
-                      {td.text}
+                      {fillDeductibleText(
+                        td.text,
+                        withCurrency(td.fieldValues, quotation.premiumCurrency)
+                      )}
                     </div>
                   )}
+                  <DeductibleValueInputs
+                    key={td.id + '|' + td.text}
+                    text={td.text}
+                    values={td.fieldValues}
+                    onCommit={async (vals) => {
+                      setTextDeds((prev) =>
+                        prev.map((x) => (x.id === td.id ? { ...x, fieldValues: vals } : x))
+                      )
+                      await window.api.updateQuotationTextDeductible(td.id, { fieldValues: vals })
+                    }}
+                  />
                 </div>
                 <button
-                  title="Edit"
+                  title="Edit the wording"
                   aria-label="Edit"
                   onClick={() => {
                     setEditingTextId(td.id)
@@ -945,16 +965,16 @@ export default function DeductiblesTab({
                     border: 'none',
                     cursor: 'pointer',
                     color: 'var(--text-secondary)',
-                    padding: '1px',
-                    opacity: 0.6
+                    padding: '2px'
                   }}
                 >
-                  <Pencil size={10} />
+                  <Pencil size={12} />
                 </button>
                 <button
                   title="Delete"
                   aria-label="Delete"
                   onClick={async () => {
+                    if (!(await confirmDelete('deductible', td.title || td.text))) return
                     await window.api.deleteQuotationTextDeductible(td.id)
                     await reload()
                   }}
@@ -1033,6 +1053,10 @@ export default function DeductiblesTab({
           <Plus size={12} />
         </button>
       </div>
+      <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: '-8px 0 14px' }}>
+        Values: write {'{percent}'}, {'{minimum}'}, {'{maximum}'} (or any {'{name}'}) in the text
+        and fill them in below the deductible; {'{currency}'} is the quotation&apos;s currency.
+      </p>
 
       {/* ═══ Additional Text (collapsible) ═══ */}
       <div style={{ marginBottom: '10px' }}>

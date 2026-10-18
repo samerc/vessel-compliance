@@ -75,6 +75,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
+import DeductibleValueInputs from './quotation-tabs/DeductibleValueInputs'
 import { confirmDialog } from './DialogHost'
 import { Modal, Field } from './ui'
 
@@ -3492,6 +3493,18 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                       {td.text}
                     </div>
                   )}
+                  {/* Default values of the wording's placeholders (each quotation can change them) */}
+                  <DeductibleValueInputs
+                    key={td.id + '|' + td.text}
+                    text={td.text}
+                    values={td.defaultValues}
+                    onCommit={async (vals) => {
+                      await window.api.piUpdateTextDeductible(td.id, { defaultValues: vals })
+                      setTextDeds((prev) =>
+                        prev.map((x) => (x.id === td.id ? { ...x, defaultValues: vals } : x))
+                      )
+                    }}
+                  />
                   {td.defaultIncluded && (
                     <span
                       style={{
