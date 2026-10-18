@@ -25,7 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
-import { ALT_COLORS, confirmDelete } from './sharedUtils'
+import { ALT_COLORS, confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { Modal, Field } from '../ui'
@@ -122,7 +122,10 @@ export default function WarrantiesTab({
       setCustomWarranties(safeCustom)
 
       // Apply default-selected sets on first load if quotation has no warranties yet
-      // Skip if load failed (error from safeHandle) to avoid destructive re-application
+      // Skip if load failed (error from safeHandle) to avoid destructive re-application.
+      // Wait for the quotation type: without it no warranty is in scope and the defaults
+      // would be skipped for good (the effect runs again once the type is known)
+      if (!quotation.quotationTypeCode) return
       if (
         !defaultsApplied.current &&
         !loadError &&
@@ -336,8 +339,29 @@ export default function WarrantiesTab({
     })()
   }, [quotation.id, isCargo])
 
-  // FD&D has no cargo clause to select, so its cargo warranties are always offered
-  const showCargoWarranties = isCargo || qTypeCode === 'f' || hasCargoClauseSelected
+  // FD&D has no cargo clause to select: its cargo warranties are offered unless every vessel
+  // is a livestock carrier (as P&I, where the cargo clauses are unticked for them)
+  const [vesselTypes, setVesselTypes] = useState<{ name: string; description?: string }[]>([])
+  useEffect(() => {
+    void masterData('getVesselTypes').then((t) => setVesselTypes(Array.isArray(t) ? t : []))
+  }, [])
+  const fddLivestock = qTypeCode === 'f' && allLivestockCarriers(qVessels, vesselTypes)
+  const showCargoWarranties =
+    isCargo || (qTypeCode === 'f' && !fddLivestock) || hasCargoClauseSelected
+  // Cargo warranties already ticked on a livestock FD&D quotation are removed once
+  const livestockCleaned = useRef(false)
+  useEffect(() => {
+    if (!fddLivestock || livestockCleaned.current || allWarranties.length === 0) return
+    const cargoIds = new Set(allWarranties.filter((w) => w.isCargoRelated).map((w) => w.id))
+    const kept = selectedIds.filter((id) => !cargoIds.has(id))
+    livestockCleaned.current = true
+    if (kept.length < selectedIds.length) {
+      void window.api.setQuotationWarranties(quotation.id, kept).then(() => {
+        setSelectedIds(kept)
+        showSuccess('Cargo warranties removed (livestock carrier)')
+      })
+    }
+  }, [fddLivestock, allWarranties, selectedIds, quotation.id, showSuccess])
   const visibleWarranties = allWarranties.filter((w) => {
     // Exclude cargo-related warranties unless cargo type or cargo clause selected
     if (!showCargoWarranties && w.isCargoRelated) return false

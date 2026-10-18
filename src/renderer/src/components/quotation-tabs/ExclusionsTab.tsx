@@ -13,7 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { Modal } from '../ui'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
-import { confirmDelete } from './sharedUtils'
+import { confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
@@ -50,7 +50,9 @@ export default function ExclusionsTab({
   const [importText, setImportText] = useState('')
   const [allClauses, setAllClauses] = useState<PIClause[]>([])
   const [selectedClauseIds, setSelectedClauseIds] = useState<Set<string>>(new Set())
-  const [vesselTypes, setVesselTypes] = useState<{ id: string; name: string }[]>([])
+  const [vesselTypes, setVesselTypes] = useState<
+    { id: string; name: string; description?: string }[]
+  >([])
   const autoApplied = useRef(false)
   const dragExcRef = useRef<number | null>(null)
   const dragCustomRef = useRef<number | null>(null)
@@ -144,11 +146,28 @@ export default function ExclusionsTab({
 
   // Check if any cargo clause is selected (only relevant for cargo quotations)
   const isCargo = quotation.quotationTypeCode?.toLowerCase() === 'c'
-  // FD&D has no cargo clause to select: its cargo exclusions (stowage, glass...) are always offered
+  // FD&D has no cargo clause to select: its cargo exclusions (stowage, glass...) are offered
+  // unless every vessel is a livestock carrier (as P&I, where the cargo clauses are unticked)
+  const fddLivestock =
+    quotation.quotationTypeCode === 'F' && allLivestockCarriers(qVessels, vesselTypes)
   const hasCargoClause =
     isCargo ||
-    quotation.quotationTypeCode === 'F' ||
+    (quotation.quotationTypeCode === 'F' && !fddLivestock) ||
     allClauses.some((c) => c.isCargoRelated && selectedClauseIds.has(c.id))
+  // Cargo exclusions already ticked on a livestock FD&D quotation are removed once
+  const livestockCleaned = useRef(false)
+  useEffect(() => {
+    if (!fddLivestock || livestockCleaned.current || allExclusions.length === 0) return
+    livestockCleaned.current = true
+    const cargoIds = new Set(allExclusions.filter((e) => e.isCargoRelated).map((e) => e.id))
+    const cargoRows = selectedRows.filter((r) => r.piExclusionId && cargoIds.has(r.piExclusionId))
+    if (cargoRows.length === 0) return
+    void (async () => {
+      for (const r of cargoRows) await window.api.deleteQuotationExclusion(r.id)
+      setSelectedRows((prev) => prev.filter((r) => !cargoRows.some((c) => c.id === r.id)))
+      showSuccessRef.current('Cargo exclusions removed (livestock carrier)')
+    })()
+  }, [fddLivestock, allExclusions, selectedRows])
 
   // Filter: hide cargo-related exclusions from non-cargo quotations
   const visibleExclusions = allExclusions.filter((e) => {

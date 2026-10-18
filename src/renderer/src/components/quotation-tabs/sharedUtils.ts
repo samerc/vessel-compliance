@@ -51,3 +51,26 @@ export function fmtNiceDate(iso: string): string {
   ]
   return `${months[m - 1]} ${d}, ${y}`
 }
+
+/** A vessel type is a livestock carrier: code MLV, or "livestock" in its name or description */
+export function isLivestockType(
+  typeName: string | null | undefined,
+  types: { name: string; description?: string }[]
+): boolean {
+  const n = (typeName || '').trim().toLowerCase()
+  if (!n) return false
+  if (n === 'mlv' || n.includes('livestock')) return true
+  const t = types.find((x) => x.name.trim().toLowerCase() === n)
+  return !!t && /livestock/i.test(t.description || '')
+}
+
+/**
+ * Every vessel of the quotation (at least one) is a livestock carrier: FD&D then offers no
+ * cargo warranties or exclusions (P&I does the same through its cargo clauses)
+ */
+export function allLivestockCarriers(
+  vessels: { vesselType?: string | null }[],
+  types: { name: string; description?: string }[]
+): boolean {
+  return vessels.length > 0 && vessels.every((v) => isLivestockType(v.vesselType, types))
+}

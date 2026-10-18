@@ -201,6 +201,7 @@ import {
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
+import { inTypeScope } from '../../shared/quotationTypes'
 import schemaSql from './schema.sql?raw'
 
 /** Rows grouped by a key column, keeping their order (one query instead of one per parent) */
@@ -13328,16 +13329,14 @@ export class MySQLAdapter {
     const id = uuidv4()
     // Auto-generate draft reference: DRAFT-{code}-XXXX (reuse gaps from deleted drafts)
     let referenceNumber = q.referenceNumber || null
-    if (!referenceNumber) {
-      let typeCode: string | undefined
-      if (q.quotationTypeId) {
-        const [tcRows] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [
-          q.quotationTypeId
-        ])
-        typeCode = (tcRows as RowDataPacket[])[0]?.code || undefined
-      }
-      referenceNumber = await this.nextDraftRef(typeCode)
+    let typeCode: string | undefined
+    if (q.quotationTypeId) {
+      const [tcRows] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [
+        q.quotationTypeId
+      ])
+      typeCode = (tcRows as RowDataPacket[])[0]?.code || undefined
     }
+    if (!referenceNumber) referenceNumber = await this.nextDraftRef(typeCode)
     // Get initial workflow step
     let initialStepId: string | null = null
     try {
@@ -13374,6 +13373,13 @@ export class MySQLAdapter {
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
       ]
     )
+    // Default warranties from the start: a quotation exported without opening the Warranties
+    // tab must not go out without them
+    try {
+      await this.applyDefaultWarranties(id, typeCode)
+    } catch (err) {
+      console.error('[addQuotation] default warranties not applied:', err)
+    }
     return {
       ...q,
       id,
@@ -13390,6 +13396,26 @@ export class MySQLAdapter {
       nonRefundableType:
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
     } as Quotation
+  }
+
+  /**
+   * A new quotation gets the warranties of the default-selected warranty sets that are offered for
+   * its type, in the settings order (the same choice the Warranties tab makes for an empty one)
+   */
+  private async applyDefaultWarranties(quotationId: string, typeCode?: string): Promise<void> {
+    if (!this.pool || !typeCode) return
+    const [sets, all] = await Promise.all([this.getPIWarrantySets(), this.getPIWarranties()])
+    const inScope = new Set(all.filter((w) => inTypeScope(w.typeScope, typeCode)).map((w) => w.id))
+    const ids: string[] = []
+    for (const set of sets) {
+      if (!set.defaultSelected) continue
+      for (const wid of set.warrantyIds || [])
+        if (inScope.has(wid) && !ids.includes(wid)) ids.push(wid)
+    }
+    if (ids.length === 0) return
+    const order = new Map(all.map((w, i) => [w.id, i]))
+    ids.sort((a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
+    await this.setQuotationWarranties(quotationId, ids)
   }
 
   /**
