@@ -8,6 +8,7 @@ import { parseIsfSanctions } from './parsers/isfParser'
 import { parseSicExcel } from './parsers/sicParser'
 import { parseUkSanctions } from './parsers/ukParser'
 import { foldArabic } from './normalize'
+import { matchEntity, nameTokens, type MatchField } from './matchScore'
 
 const DATA_SOURCES = {
   OFAC: 'https://www.treasury.gov/ofac/downloads/sdn.xml',
@@ -88,7 +89,13 @@ export interface SearchResult {
   match_type: 'exact' | 'fuzzy'
   score: number // 0-1 (1 = perfect)
   entity: Omit<SanctionsEntity, 'id'>
+  /** What matched: the entity's name, one of its aliases, its IMO or a parent's name */
+  matched_on?: { field: MatchField; value: string }
 }
+
+// Candidates taken from each search before scoring (scoring decides; the caller's limit applies
+// after it, so a strong match is never cut off by weaker candidates found first)
+const CANDIDATES = 400
 
 /** Entity as indexed by Fuse: aliases also flattened (and Arabic-folded) into one string. */
 type SearchableEntity = SanctionsEntity & { aliasesFlat: string }
@@ -102,6 +109,9 @@ export class SanctionsService {
   private gramCounts: Uint16Array = new Uint16Array(0)
   // Slots of `searchable` replaced/removed by a SIC edit since the last full build (tombstones)
   private dead = new Set<number>()
+  // How many listed entities use each word (name or alias): the scorer weights rare words
+  private wordCounts = new Map<string, number>()
+  private wordCount = (w: string): number => this.wordCounts.get(w) || 0
   public initialized = false
   private markReady: () => void = () => {}
   private readonly ready = new Promise<void>((resolve) => (this.markReady = resolve))
@@ -163,6 +173,13 @@ export class SanctionsService {
     this.gramIndex = new Map()
     searchable.forEach((e, idx) => this.indexGrams(e, idx))
     this.gramCounts = new Uint16Array(searchable.length)
+    const counts = new Map<string, number>()
+    for (const e of this.entityCache) {
+      const words = new Set<string>()
+      for (const n of [e.name, ...(e.aliases || [])]) for (const w of nameTokens(n)) words.add(w)
+      for (const w of words) counts.set(w, (counts.get(w) || 0) + 1)
+    }
+    this.wordCounts = counts
   }
 
   // A single SIC add/edit/delete used to rebuild the whole index (every list, ~seconds on the
@@ -231,61 +248,43 @@ export class SanctionsService {
   ): { query: string; total: number; results: SearchResult[] } {
     const mode = options.mode || 'both'
     const limit = options.limit || 100
-    const threshold = options.threshold ?? 0.6
-    let results: SearchResult[] = []
-
+    // Candidates from the "contains" search and the fuzzy index; every one is then scored on
+    // whole words (matchScore.ts): a few letters inside a longer word is not a match
+    const candidates = new Map<string, SanctionsEntity>()
+    // Name in the key: SIC entries from one letter share their source_id (the letter reference)
+    const key = (e: SanctionsEntity): string => `${e.source}-${e.source_id}-${e.name}`
+    const srcSet = options.sources?.length
+      ? new Set(options.sources.map((s) => s.toUpperCase()))
+      : null
     if (mode === 'exact' || mode === 'both') {
-      const exactResults = this.searchExact(query, options)
-      results.push(...exactResults)
+      const sourceFilter = options.sources?.length === 1 ? options.sources[0] : undefined
+      for (const e of this.db.searchExact(query, { source: sourceFilter, limit: CANDIDATES }))
+        if (!srcSet || srcSet.has(e.source)) candidates.set(key(e), e)
     }
-
-    if (mode === 'fuzzy' || mode === 'both') {
-      const fuzzyResults = this.searchFuzzy(query, threshold, options)
-      if (mode === 'both') {
-        // Name in the key: SIC entries from one letter share their source_id (the letter reference)
-        const key = (r: SearchResult): string =>
-          `${r.entity.source}-${r.entity.source_id}-${r.entity.name}`
-        const exactKeys = new Set(results.map(key))
-        results.push(...fuzzyResults.filter((r) => !exactKeys.has(key(r))))
-      } else {
-        results.push(...fuzzyResults)
+    if ((mode === 'fuzzy' || mode === 'both') && this.fuseIndex) {
+      let n = 0
+      for (const r of this.fuzzyCandidatesSearch(foldArabic(query), options.minScore ?? 0)) {
+        if (srcSet && !srcSet.has(r.item.source)) continue
+        if (!candidates.has(key(r.item))) candidates.set(key(r.item), r.item)
+        if (++n >= CANDIDATES) break
       }
     }
 
+    const qTokens = nameTokens(query)
+    const results: SearchResult[] = []
+    for (const e of candidates.values()) {
+      const m = matchEntity(query, e, qTokens, this.wordCount)
+      if (m.score <= 0) continue
+      results.push({
+        match_type: m.score >= 0.999 ? 'exact' : 'fuzzy',
+        score: m.score,
+        entity: stripId(e),
+        matched_on: { field: m.field, value: m.value }
+      })
+    }
     results.sort((a, b) => b.score - a.score)
-    results = results.slice(0, limit)
-    return { query, total: results.length, results }
-  }
-
-  private searchExact(query: string, options: SearchOptions): SearchResult[] {
-    const sourceFilter = options.sources?.length === 1 ? options.sources[0] : undefined
-    const rows = this.db.searchExact(query, { source: sourceFilter, limit: options.limit || 100 })
-    let filtered = rows
-    if (options.sources && options.sources.length > 1) {
-      const srcSet = new Set(options.sources.map((s) => s.toUpperCase()))
-      filtered = rows.filter((r) => srcSet.has(r.source))
-    }
-    return filtered.map((entity) => ({
-      match_type: 'exact' as const,
-      score: 1.0,
-      entity: stripId(entity)
-    }))
-  }
-
-  private searchFuzzy(query: string, threshold: number, options: SearchOptions): SearchResult[] {
-    if (!this.fuseIndex) return []
-    let fuseResults = this.fuzzyCandidatesSearch(foldArabic(query), options.minScore ?? 0)
-    fuseResults = fuseResults.filter((r) => (r.score ?? 1) <= threshold)
-    if (options.sources && options.sources.length > 0) {
-      const srcSet = new Set(options.sources.map((s) => s.toUpperCase()))
-      fuseResults = fuseResults.filter((r) => srcSet.has(r.item.source))
-    }
-    fuseResults = fuseResults.slice(0, options.limit || 100)
-    return fuseResults.map((r) => ({
-      match_type: 'fuzzy' as const,
-      score: parseFloat((1 - (r.score ?? 1)).toFixed(4)),
-      entity: stripId(r.item)
-    }))
+    const top = results.slice(0, limit)
+    return { query, total: top.length, results: top }
   }
 
   async refreshSource(

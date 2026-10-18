@@ -47,6 +47,47 @@ interface SicEntry {
   father_name: string | null
 }
 
+const MATCHED_ON_LABEL: Record<string, string> = {
+  name: 'name',
+  alias: 'alias',
+  imo: 'IMO',
+  father: "father's name",
+  mother: "mother's name"
+}
+
+const wordKey = (w: string): string =>
+  w
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+
+/** The listed name with the words that were searched for in bold */
+function HighlightWords({ text, query }: { text: string; query: string }): React.JSX.Element {
+  const wanted = new Set(query.split(/\s+/).map(wordKey).filter(Boolean))
+  return (
+    <>
+      {text.split(/(\s+)/).map((part, i) =>
+        wanted.has(wordKey(part)) ? (
+          <mark
+            key={i}
+            style={{
+              background: 'color-mix(in srgb, var(--accent-primary) 25%, transparent)',
+              color: 'inherit',
+              borderRadius: '3px',
+              padding: '0 2px'
+            }}
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
+
 const EMPTY_FORM: Omit<SicEntry, 'id'> = {
   name: '',
   entity_type: 'individual',
@@ -90,6 +131,8 @@ export default function SanctionsSearch({
   const [savedThreshold, setSavedThreshold] = useState(user?.sanctionsThreshold || 60)
   const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu', 'uk', 'isf', 'sic'])
   const [results, setResults] = useState<SanctionsMatch[]>([])
+  // The words searched for (highlighted in the results; the box may already hold a new search)
+  const [searchedQuery, setSearchedQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -170,11 +213,19 @@ export default function SanctionsSearch({
   const handleSearch = async (e?: React.FormEvent): Promise<void> => {
     if (e) e.preventDefault()
     if (!query.trim()) return
+    // One or two letters match parts of thousands of names: not a useful screening
+    if (query.trim().replace(/\s+/g, '').length < 3) {
+      setHasSearched(true)
+      setResults([])
+      setError('Type at least 3 letters to search')
+      return
+    }
 
     setIsSearching(true)
     setError(null)
     setHasSearched(true)
     setExpandedId(null)
+    setSearchedQuery(query.trim())
 
     try {
       const response = await window.api.checkSanctions(query, threshold / 100, sources)
@@ -742,18 +793,27 @@ export default function SanctionsSearch({
                   {} as Record<string, number>
                 )
               ).map(([type, count]) => (
-                <span
+                <button
                   key={type}
+                  type="button"
+                  onClick={() =>
+                    document
+                      .getElementById(`sanctions-group-${type}`)
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                  title={`Go to the ${type} results`}
                   style={{
                     fontSize: '0.78rem',
                     padding: '3px 10px',
                     borderRadius: '12px',
+                    border: 'none',
+                    cursor: 'pointer',
                     background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
                     color: 'var(--text-secondary)'
                   }}
                 >
                   {type}: {count}
-                </span>
+                </button>
               ))}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
                 <button
@@ -807,7 +867,9 @@ export default function SanctionsSearch({
               return sortedTypes.map((type) => (
                 <div key={type}>
                   <div
+                    id={`sanctions-group-${type}`}
                     style={{
+                      scrollMarginTop: '12px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
@@ -879,7 +941,7 @@ export default function SanctionsSearch({
                                 color: 'var(--text-primary)'
                               }}
                             >
-                              {match.names[0]}
+                              <HighlightWords text={match.names[0]} query={searchedQuery} />
                             </span>
                             <span
                               style={{
@@ -920,6 +982,18 @@ export default function SanctionsSearch({
                               </span>
                             )}
                           </div>
+                          {match.matched_on && match.matched_on.field !== 'name' && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                                marginTop: '4px'
+                              }}
+                            >
+                              Matched on {MATCHED_ON_LABEL[match.matched_on.field]}:{' '}
+                              <HighlightWords text={match.matched_on.value} query={searchedQuery} />
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ textAlign: 'right' }}>

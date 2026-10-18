@@ -392,6 +392,8 @@ export interface SanctionsMatch {
   created_at: string
   score?: number
   imo_number?: string
+  /** What matched: the listed name, one of its aliases, its IMO or a parent's name */
+  matched_on?: { field: 'name' | 'alias' | 'imo' | 'father' | 'mother'; value: string }
 }
 
 export interface FileTypeSettings {
