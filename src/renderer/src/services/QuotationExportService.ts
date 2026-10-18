@@ -4842,7 +4842,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wSingleTiming =
       wFirstInstDays === 0 ? 'at inception' : `within ${wFirstInstDays} days of inception`
     if (wNumInst === 1 && st(data, 'premiumPaymentIntroSingle')) {
-      const introText = st(data, 'premiumPaymentIntroSingle').replace(/\{timing\}/g, wSingleTiming)
+      // A saved text "payable on {timing}" would read "payable on at inception": drop the "on"
+      const introText = st(data, 'premiumPaymentIntroSingle')
+        .replace(/\bon\s+\{timing\}/gi, '{timing}')
+        .replace(/\{timing\}/g, wSingleTiming)
       premContent.push(...mp(introText))
       premContent.push(emptyP())
       // Non-refundable sentence right after for single instalment
