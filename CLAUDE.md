@@ -1132,8 +1132,9 @@ Multiple Limit of Liability options without full P&I alternatives:
 
 - **Table**: `quotation_lol_options` (id, quotation_id, label, amount, currency, premium_amount, order_index)
 - **UI**: Click "Add LOL Alternative" → primary LOL becomes Alternative 1, empty Alternative 2 created. Add more with "Add Alternative". Delete down to 1 reverts to primary.
-- **PremiumTab**: Per-alternative premium inputs when LOL options exist
-- **Export**: Alternatives listed at top of LOL section, shared text below. Per-alternative premium lines.
+- **PremiumTab**: Per-alternative premium inputs when LOL options exist (entered only there, not on the Limit of Liability tab)
+- **Show premium beside the limits** (`quotations.lol_show_premium`, checkbox on the Limit of Liability tab with 2+ different limits, LOL options or P&I alternatives): the LOL lines read "Alternative 1: USD X - Premium USD Y"; the Premium section always keeps them
+- **Export**: Alternatives listed first, a blank line, then the wording ("on all claims...") and the closing sentence. Premium section: bold `Limit : Premium` table (no per annum line)
 - **Clone/duplicate**: LOL options copied to new quotation
 
 ### Warranty & Subjectivity Multi-Type Scope

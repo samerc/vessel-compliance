@@ -1862,14 +1862,15 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     // carries the same limit, otherwise one line per alternative. No "all claims in the aggregate" suffix
     // (that wording follows them). Rendered first, then a blank line and the wording.
     const buildLolAmountParas = (): Paragraph[] => {
-      let items: { label: string; amount: number; currency: string }[] = []
+      let items: { label: string; amount: number; currency: string; premium?: number | null }[] = []
       if (dHasLolOptions) {
         items = data.lolOptions
           .filter((o) => o.amount != null)
           .map((o, i) => ({
             label: o.label || `Alternative ${i + 1}`,
             amount: o.amount as number,
-            currency: o.currency || cur
+            currency: o.currency || cur,
+            premium: o.premiumAmount
           }))
       } else if (dPiAltLol) {
         items = data.piAlternatives
@@ -1877,7 +1878,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           .map((a, i) => ({
             label: a.label || `Alternative ${i + 1}`,
             amount: a.lolAmount as number,
-            currency: a.lolCurrency || cur
+            currency: a.lolCurrency || cur,
+            premium: a.premiumAmount
           }))
       }
       if (items.length === 0) return []
@@ -1885,7 +1887,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         (x) => x.amount === items[0].amount && x.currency === items[0].currency
       )
       if (allSame) return [np(formatCurrency(items[0].amount, items[0].currency))]
-      return items.map((x) => np(`${x.label}: ${formatCurrency(x.amount, x.currency)}`))
+      // The premiums stay in the Premium section; the quotation can also list them here
+      const withPremium = !!data.quotation.lolShowPremium
+      return items.map((x) =>
+        np(
+          `${x.label}: ${formatCurrency(x.amount, x.currency)}` +
+            (withPremium && x.premium != null
+              ? ` - Premium ${formatCurrency(x.premium, data.quotation.premiumCurrency)}`
+              : '')
+        )
+      )
     }
     const dLolAmountParas = buildLolAmountParas()
 

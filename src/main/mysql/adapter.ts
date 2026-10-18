@@ -309,6 +309,7 @@ const QUOTATION_CONTENT_COLS = [
   'outstanding_premium_underline',
   'full_premium_loss_enabled',
   'full_premium_loss_text',
+  'lol_show_premium',
   'is_pro_rata',
   'annual_premium_amount',
   'pro_rata_months',
@@ -5747,6 +5748,13 @@ export class MySQLAdapter {
                     INDEX idx_en_entity (entity_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
       }
+
+      // Migration: quotations.lol_show_premium (print each limit alternative's premium beside it)
+      const [lspCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'lol_show_premium'")
+      if ((lspCol as RowDataPacket[]).length === 0)
+        await this.pool.query(
+          'ALTER TABLE quotations ADD COLUMN lol_show_premium TINYINT(1) NOT NULL DEFAULT 0'
+        )
 
       // Migration: document_history (earlier files of vessel / entity documents, links only)
       const [dhTable] = await this.pool.query("SHOW TABLES LIKE 'document_history'")
@@ -13123,6 +13131,7 @@ export class MySQLAdapter {
                 q.pro_rata_months as proRataMonths,
                 q.full_premium_loss_enabled as fullPremiumLossEnabled,
                 q.full_premium_loss_text as fullPremiumLossText,
+                q.lol_show_premium as lolShowPremium,
                 q.outstanding_premium_enabled as outstandingPremiumEnabled,
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
@@ -13232,6 +13241,7 @@ export class MySQLAdapter {
       proRataMonths: r.proRataMonths != null ? Number(r.proRataMonths) : null,
       fullPremiumLossEnabled: Boolean(r.fullPremiumLossEnabled),
       fullPremiumLossText: r.fullPremiumLossText || null,
+      lolShowPremium: Boolean(r.lolShowPremium),
       outstandingPremiumEnabled: Boolean(r.outstandingPremiumEnabled),
       outstandingPremiumText: r.outstandingPremiumText || null,
       outstandingPremiumBold:
@@ -13449,6 +13459,7 @@ export class MySQLAdapter {
       outstandingPremiumUnderline: 'outstanding_premium_underline',
       fullPremiumLossEnabled: 'full_premium_loss_enabled',
       fullPremiumLossText: 'full_premium_loss_text',
+      lolShowPremium: 'lol_show_premium',
       subjectivityDays: 'subjectivity_days'
     }
     const fields: string[] = []

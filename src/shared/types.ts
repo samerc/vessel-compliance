@@ -1207,6 +1207,8 @@ export interface Quotation {
   outstandingPremiumUnderline?: boolean
   fullPremiumLossEnabled?: boolean
   fullPremiumLossText?: string | null
+  /** Limit alternatives (2+): also print each premium next to its limit in the LOL section */
+  lolShowPremium?: boolean
   subjectivityDays?: number
   /** The subjectivities tab filled its defaults (or the user added one): never auto-fill again */
   subjectivitiesFilled?: boolean

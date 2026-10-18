@@ -310,24 +310,6 @@ export default function LiabilityTab({
                     placeholder="Amount"
                     style={{ flex: 1, maxWidth: '200px', fontSize: '0.85rem', textAlign: 'right' }}
                   />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Premium:
-                  </span>
-                  <MoneyInput
-                    value={opt.premiumAmount}
-                    onChange={(val) =>
-                      setLolOptions((prev) =>
-                        prev.map((o) =>
-                          o.id === opt.id ? { ...o, premiumAmount: val ?? null } : o
-                        )
-                      )
-                    }
-                    onBlur={(val) =>
-                      window.api.lolUpdateOption(opt.id, { premiumAmount: val ?? null })
-                    }
-                    placeholder="—"
-                    style={{ width: '120px', fontSize: '0.85rem', textAlign: 'right' }}
-                  />
                   <button
                     title="Delete"
                     aria-label="Delete"
@@ -405,6 +387,36 @@ export default function LiabilityTab({
           )}
         </div>
       )}
+
+      {/* Premiums are entered in the Premium tab; with 2+ limits they can also print here */}
+      {isPiLike(quotation.quotationTypeCode) &&
+        (lolOptions.length >= 2 ||
+          (piAlts.length >= 2 &&
+            new Set(piAlts.filter((a) => a.lolAmount != null).map((a) => a.lolAmount)).size >
+              1)) && (
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.82rem',
+              marginBottom: '16px',
+              cursor: 'pointer'
+            }}
+            title="The premiums are always in the Premium section; this also lists them beside the limits"
+          >
+            <input
+              type="checkbox"
+              checked={!!quotation.lolShowPremium}
+              onChange={(e) => {
+                const v = e.target.checked
+                setQ((p) => ({ ...p, lolShowPremium: v }))
+                updateField('lolShowPremium', v)
+              }}
+            />
+            Also show each alternative&apos;s premium next to its limit
+          </label>
+        )}
 
       {qVessels.length >= 2 && (
         <div style={{ marginBottom: '16px' }}>
