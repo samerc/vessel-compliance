@@ -4702,7 +4702,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (wHasDiscount) {
           // Two-section table: Technical then Payable
           const rows: TableRow[] = []
-          rows.push(premRow(lines.length > 1 ? 'Technical Premium' : '', ''))
+          // A heading row only when several premiums follow (one premium: no empty row above it)
+          if (lines.length > 1) rows.push(premRow('Technical Premium', ''))
           for (const l of lines) {
             const hasPrev =
               wq.previousPremiumAmount != null &&
@@ -4747,7 +4748,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               )
             }
           }
-          rows.push(premRow(lines.length > 1 ? 'Payable Premium' : '', ''))
+          if (lines.length > 1) rows.push(premRow('Payable Premium', ''))
           for (const l of lines) {
             rows.push(
               premRow(
@@ -4890,7 +4891,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wNumInst = wq.numInstalments || 1
     const wFirstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
     const wSingleTiming =
-      wFirstInstDays === 0 ? 'at inception' : `within ${wFirstInstDays} days of inception`
+      wFirstInstDays === 0 ? 'prior inception' : `within ${wFirstInstDays} days of inception`
     if (wNumInst === 1 && st(data, 'premiumPaymentIntroSingle')) {
       // A saved text "payable on {timing}" would read "payable on at inception": drop the "on"
       const introText = st(data, 'premiumPaymentIntroSingle')
