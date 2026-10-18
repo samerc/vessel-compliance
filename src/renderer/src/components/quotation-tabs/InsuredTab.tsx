@@ -550,6 +550,25 @@ export default function InsuredTab({
         }}
       >
         <h3 style={{ fontSize: '1rem', margin: 0 }}>Assureds</h3>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.82rem',
+            marginLeft: 'auto',
+            marginRight: '12px',
+            cursor: 'pointer'
+          }}
+          title="Prints each assured's address (the vessel's address for that assured, else the first address in the Directory) and the broker's address"
+        >
+          <input
+            type="checkbox"
+            checked={!!quotation.showAddresses}
+            onChange={(e) => updateField('showAddresses', e.target.checked)}
+          />
+          Print addresses
+        </label>
         <button
           onClick={() => {
             loadData()

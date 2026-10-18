@@ -201,7 +201,7 @@ import {
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
-import { inTypeScope, isPiLike } from '../../shared/quotationTypes'
+import { defaultTradingCountries, inTypeScope, isPiLike } from '../../shared/quotationTypes'
 import schemaSql from './schema.sql?raw'
 
 /** Rows grouped by a key column, keeping their order (one query instead of one per parent) */
@@ -311,6 +311,7 @@ const QUOTATION_CONTENT_COLS = [
   'full_premium_loss_enabled',
   'full_premium_loss_text',
   'lol_show_premium',
+  'show_addresses',
   'is_pro_rata',
   'annual_premium_amount',
   'pro_rata_months',
@@ -5787,6 +5788,13 @@ export class MySQLAdapter {
       if ((lspCol as RowDataPacket[]).length === 0)
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN lol_show_premium TINYINT(1) NOT NULL DEFAULT 0'
+        )
+
+      // Migration: quotations.show_addresses (print the insureds' and broker's addresses)
+      const [qsaCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'show_addresses'")
+      if ((qsaCol as RowDataPacket[]).length === 0)
+        await this.pool.query(
+          'ALTER TABLE quotations ADD COLUMN show_addresses TINYINT(1) NOT NULL DEFAULT 0'
         )
 
       // Migration: document_history (earlier files of vessel / entity documents, links only)
@@ -13183,6 +13191,7 @@ export class MySQLAdapter {
                 q.full_premium_loss_enabled as fullPremiumLossEnabled,
                 q.full_premium_loss_text as fullPremiumLossText,
                 q.lol_show_premium as lolShowPremium,
+                q.show_addresses as showAddresses,
                 q.outstanding_premium_enabled as outstandingPremiumEnabled,
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
@@ -13293,6 +13302,7 @@ export class MySQLAdapter {
       fullPremiumLossEnabled: Boolean(r.fullPremiumLossEnabled),
       fullPremiumLossText: r.fullPremiumLossText || null,
       lolShowPremium: Boolean(r.lolShowPremium),
+      showAddresses: Boolean(r.showAddresses),
       outstandingPremiumEnabled: Boolean(r.outstandingPremiumEnabled),
       outstandingPremiumText: r.outstandingPremiumText || null,
       outstandingPremiumBold:
@@ -13413,6 +13423,16 @@ export class MySQLAdapter {
     // Types with a Warranties tab
     if (['P', 'H', 'W', 'F', 'L'].includes(typeCode))
       await step('warranties', () => this.applyDefaultWarranties(quotationId, typeCode))
+    // Types with a Trading tab: the excluded / DDQ countries
+    if (['P', 'F', 'H'].includes(typeCode))
+      await step('trading countries', async () => {
+        const [master, typeDefaultsRaw] = await Promise.all([
+          this.getTradingExcludedCountries(),
+          this.getSetting(`default_excluded_countries_${typeCode}`)
+        ])
+        const countries = defaultTradingCountries(master, typeCode, typeDefaultsRaw)
+        if (countries.length > 0) await this.setQuotationExcludedCountries(quotationId, countries)
+      })
     if (!isPiLike(typeCode)) return
     // Conditions: every clause offered for the type is ticked (FD&D starts with none)
     if (typeCode !== 'F')
@@ -13604,6 +13624,7 @@ export class MySQLAdapter {
       fullPremiumLossEnabled: 'full_premium_loss_enabled',
       fullPremiumLossText: 'full_premium_loss_text',
       lolShowPremium: 'lol_show_premium',
+      showAddresses: 'show_addresses',
       subjectivityDays: 'subjectivity_days'
     }
     const fields: string[] = []

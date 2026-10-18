@@ -11,7 +11,7 @@ import {
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { asArray } from '../../utils/ipc'
-import { isPiLike } from '../../../../shared/quotationTypes'
+import { defaultTradingCountries, isPiLike } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
 interface TradingIntro {
   id: string
@@ -96,36 +96,14 @@ export default function TradingTab({
         !initRef.current
       ) {
         initRef.current = true
+        // An older quotation created before the defaults were applied at creation
         const typeCode = quotation.quotationTypeCode || 'P'
-        // Filter master countries by exclude_types: null = all types, otherwise check type code
-        const typeFiltered = masterCountries.filter((c) => {
-          if (!c.excludeTypes) return true // null = applies to all types
-          return c.excludeTypes.split(',').includes(typeCode)
-        })
-        // Check for type-specific default excluded countries (legacy app_settings override)
-        let countriesToSet: { name: string; listType: string }[] = typeFiltered
-        try {
-          const typeDefaultsRaw = await window.api.getSetting(
-            `default_excluded_countries_${typeCode}`
-          )
-          if (typeDefaultsRaw) {
-            const typeDefaults: { name: string; listType: string }[] = JSON.parse(typeDefaultsRaw)
-            if (typeDefaults.length > 0) {
-              countriesToSet = typeDefaults
-            }
-          }
-        } catch {
-          /* no or invalid type-specific defaults: keep the master list */
-        }
-        // Fallback: For Hull type with no type-specific defaults, use Israel + DDQ only
-        if (countriesToSet === typeFiltered && typeCode === 'H') {
-          countriesToSet = typeFiltered.filter(
-            (c) => c.listType === 'ddq' || c.name.toLowerCase() === 'israel'
-          )
-        }
+        const typeDefaultsRaw = await window.api
+          .getSetting(`default_excluded_countries_${typeCode}`)
+          .catch(() => null)
         await window.api.setQuotationExcludedCountries(
           quotation.id,
-          countriesToSet.map((c) => ({ name: c.name, listType: c.listType }))
+          defaultTradingCountries(masterCountries, typeCode, typeDefaultsRaw)
         )
         const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
         setCountries(asArray(refreshed))

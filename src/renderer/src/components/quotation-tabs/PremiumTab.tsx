@@ -23,6 +23,7 @@ import { MoneyInput } from './shared'
 import { Field } from '../ui'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
+import { hullClausesPerVesselOnly } from '../../../../shared/premium'
 import { cachedSetting, masterData } from './masterDataCache'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
@@ -368,9 +369,11 @@ export default function PremiumTab({
   const upccFixedAmt = quotation.upccEnabled ? quotation.upccDiscountAmount || 0 : 0
   const isMultiVessel = qVessels.length >= 2
   const piMultiAlt = isPiLike(quotation.quotationTypeCode) && piAlternatives.length > 1
-  // Hull quotes with alternatives price per alternative (not per vessel), regardless of vessel count.
+  // Hull quotes with alternatives price per alternative (not per vessel), regardless of vessel
+  // count. A vessel with only its own clause wording is not an alternative: priced per vessel.
   const hullMultiAlt =
     quotation.quotationTypeCode === 'H' &&
+    !hullClausesPerVesselOnly(hullAlternatives) &&
     (hullAlternatives.filter((a) => !a.vesselScopeId).length > 1 ||
       hullAlternatives.some((a) => a.vesselScopeId))
   const technicalPremium =

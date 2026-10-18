@@ -56,3 +56,32 @@ export function textsForType<T extends object>(texts: T, code?: string | null): 
   }
   return out as T
 }
+
+/**
+ * The excluded / DDQ countries a new quotation starts with (Trading tab): the settings list
+ * filtered by type, unless a type-specific list is saved (`default_excluded_countries_{code}`);
+ * Hull without one takes Israel + the DDQ list only.
+ */
+export function defaultTradingCountries(
+  master: { name: string; listType: string; excludeTypes?: string | null }[],
+  typeCode: string,
+  typeDefaultsRaw?: string | null
+): { name: string; listType: string }[] {
+  const typeFiltered = master.filter(
+    (c) => !c.excludeTypes || c.excludeTypes.split(',').includes(typeCode)
+  )
+  if (typeDefaultsRaw) {
+    try {
+      const typeDefaults: { name: string; listType: string }[] = JSON.parse(typeDefaultsRaw)
+      if (Array.isArray(typeDefaults) && typeDefaults.length > 0)
+        return typeDefaults.map((c) => ({ name: c.name, listType: c.listType }))
+    } catch {
+      /* invalid: keep the settings list */
+    }
+  }
+  const list =
+    typeCode === 'H'
+      ? typeFiltered.filter((c) => c.listType === 'ddq' || c.name.toLowerCase() === 'israel')
+      : typeFiltered
+  return list.map((c) => ({ name: c.name, listType: c.listType }))
+}

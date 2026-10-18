@@ -76,6 +76,23 @@ export function computePayablePremium(
   return round2(r)
 }
 
+/** Hull "alternatives" that only give vessels their own clause wording (at most one shared
+ *  clause, at most one own clause per vessel) are not alternatives to choose from: the
+ *  quotation is priced per vessel, not per clause. */
+export function hullClausesPerVesselOnly(
+  alts: Pick<QuotationHullAlternative, 'vesselScopeId'>[]
+): boolean {
+  if (!alts.some((a) => a.vesselScopeId)) return false
+  if (alts.filter((a) => !a.vesselScopeId).length > 1) return false
+  const seen = new Set<string>()
+  for (const a of alts) {
+    if (!a.vesselScopeId) continue
+    if (seen.has(a.vesselScopeId)) return false
+    seen.add(a.vesselScopeId)
+  }
+  return true
+}
+
 /** Split a total into `count` instalments; the rounding remainder goes into the FIRST one. */
 export function splitInstalments(total: number, count: number): number[] {
   if (count <= 0) return []

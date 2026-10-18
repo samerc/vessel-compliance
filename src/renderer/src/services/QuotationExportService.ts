@@ -51,6 +51,8 @@ import {
   Quotation,
   Vessel,
   QuotationAssured,
+  EntityAddress,
+  VesselAssured,
   QuotationSubLimit,
   QuotationDeductible,
   QuotationTextDeductible,
@@ -98,6 +100,7 @@ import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 import { fillTextDeductibles } from '../../../shared/deductibleValues'
+import { hullClausesPerVesselOnly } from '../../../shared/premium'
 
 // ==================== Export Snapshot ====================
 
@@ -125,6 +128,9 @@ interface QuotationData {
   allVessels: Vessel[]
   flagStates: { id: string; name: string; iso3Code?: string }[]
   assureds: QuotationAssured[]
+  /** "Print addresses" on: assured id → its address (several lines), and the broker's */
+  assuredAddresses: Record<string, string>
+  brokerAddress: string
   assuredGroups: QuotationAssuredGroup[]
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
@@ -347,6 +353,42 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
       (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
   )
 
+  // "Print addresses": each assured's address on that vessel (vessel assured link), else the
+  // entity's first address; the broker's first address. Live data, like the assureds.
+  const assuredAddresses: Record<string, string> = {}
+  let brokerAddress = ''
+  if (quotation.showAddresses) {
+    try {
+      const allAddrs = await window.api.getEntityAddresses()
+      const addrs = Array.isArray(allAddrs) ? allAddrs : []
+      const firstOf = (entityId: string): EntityAddress | undefined =>
+        addrs.find((x) => x.entityId === entityId)
+      const qvs = Array.isArray(quotationVessels) ? quotationVessels : []
+      const vesselAssureds = new Map<string, VesselAssured[]>()
+      for (const qv of qvs) {
+        if (!qv.vesselId || vesselAssureds.has(qv.vesselId)) continue
+        const va = await window.api.getVesselAssureds(qv.vesselId)
+        vesselAssureds.set(qv.vesselId, Array.isArray(va) ? va : [])
+      }
+      for (const a of assuredsSorted) {
+        if (!a.entityId) continue
+        const qv =
+          qvs.find((v) => v.vesselLabel === a.vesselLabel) || (qvs.length === 1 ? qvs[0] : null)
+        const links = (qv?.vesselId && vesselAssureds.get(qv.vesselId)) || []
+        const link =
+          links.find((l) => l.entityId === a.entityId && l.role === a.role && l.addressId) ||
+          links.find((l) => l.entityId === a.entityId && l.addressId)
+        const addr = (link && addrs.find((x) => x.id === link.addressId)) || firstOf(a.entityId)
+        const text = formatEntityAddress(addr)
+        if (text) assuredAddresses[a.id] = text
+      }
+      if (quotation.customerEntityId)
+        brokerAddress = formatEntityAddress(firstOf(quotation.customerEntityId))
+    } catch {
+      /* addresses are optional: export without them */
+    }
+  }
+
   // Extract IDs and vessel scope / alternative maps from new object return format
   const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
   const selectedClauseIds = safeClauseRows.map((r) => r.piClauseId)
@@ -565,6 +607,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     allVessels,
     flagStates: Array.isArray(flagStatesRaw) ? flagStatesRaw : [],
     assureds: assuredsSorted,
+    assuredAddresses,
+    brokerAddress,
     assuredGroups: Array.isArray(assuredGroupsRaw)
       ? (assuredGroupsRaw as QuotationAssuredGroup[]).sort((a, b) => a.order - b.order)
       : [],
@@ -660,6 +704,19 @@ function hasAltScoping<T extends { alternativeId?: string | null }>(items: T[]):
 }
 
 // ==================== Helpers ====================
+
+/** An entity address as printed: its lines, then "city, country" */
+function formatEntityAddress(addr?: EntityAddress | null): string {
+  if (!addr) return ''
+  return [
+    ...(addr.addressLine1 || '').split('\n'),
+    addr.addressLine2 || '',
+    [addr.city, addr.country].filter(Boolean).join(', ')
+  ]
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('\n')
+}
 
 /**
  * Resolve vessel scope to a display suffix like " (VESSEL A, VESSEL B)".
@@ -1305,6 +1362,35 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Insured ----
   {
     const insuredContent: (Paragraph | Table)[] = []
+    // "Print addresses": an assured's address goes on a full-width row under it; the same address
+    // on the next assured of the list (owners and managers) is printed once, after the last
+    const addrOf = (a: QuotationAssured): string =>
+      data.quotation.showAddresses ? data.assuredAddresses[a.id] || '' : ''
+    const addrRowsAfter = (list: QuotationAssured[], i: number): TableRow[] => {
+      const text = addrOf(list[i])
+      if (!text || (i + 1 < list.length && addrOf(list[i + 1]) === text)) return []
+      return [
+        new TableRow({
+          children: [
+            new TableCell({
+              borders: noBorders(),
+              columnSpan: 2,
+              children: text.split('\n').map(
+                (line) =>
+                  new Paragraph({
+                    spacing: { before: 0, after: 0 },
+                    children: [
+                      new TextRun({ text: line, size: 22, font: 'Arial', color: '000000' })
+                    ]
+                  })
+              )
+            })
+          ]
+        })
+      ]
+    }
+    const withAddr = (list: QuotationAssured[], rows: TableRow[]): TableRow[] =>
+      rows.flatMap((r, i) => [r, ...addrRowsAfter(list, i)])
     if (data.assureds.length > 0) {
       if (data.assuredGroups.length > 0) {
         // Render by group — sort groups to match vessel order
@@ -1347,7 +1433,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           )
           // Assured rows under this group
-          for (const a of groupAssureds) {
+          for (const [ai, a] of groupAssureds.entries()) {
             groupRows.push(
               new TableRow({
                 children: [
@@ -1381,6 +1467,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                 ]
               })
             )
+            groupRows.push(...addrRowsAfter(groupAssureds, ai))
           }
         }
         // Ungrouped assureds (if any)
@@ -1411,7 +1498,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           )
         }
-        for (const a of ungrouped) {
+        for (const [ai, a] of ungrouped.entries()) {
           groupRows.push(
             new TableRow({
               children: [
@@ -1446,6 +1533,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               ]
             })
           )
+          groupRows.push(...addrRowsAfter(ungrouped, ai))
         }
         if (groupRows.length > 0) {
           insuredContent.push(
@@ -1474,44 +1562,47 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               new Table({
                 width: { size: BODY_W, type: WidthType.DXA },
                 layout: TableLayoutType.FIXED,
-                rows: vesselAssureds.map(
-                  (a) =>
-                    new TableRow({
-                      children: [
-                        new TableCell({
-                          borders: noBorders(),
-                          width: { size: Math.round(BODY_W * 0.6), type: WidthType.DXA },
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new TextRun({
-                                  text: a.name,
-                                  size: 22,
-                                  font: 'Arial',
-                                  color: '000000'
-                                })
-                              ]
-                            })
-                          ]
-                        }),
-                        new TableCell({
-                          borders: noBorders(),
-                          width: { size: Math.round(BODY_W * 0.4), type: WidthType.DXA },
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new TextRun({
-                                  text: a.role ? `"as ${a.role}"` : '',
-                                  size: 22,
-                                  font: 'Arial',
-                                  color: '000000'
-                                })
-                              ]
-                            })
-                          ]
-                        })
-                      ]
-                    })
+                rows: withAddr(
+                  vesselAssureds,
+                  vesselAssureds.map(
+                    (a) =>
+                      new TableRow({
+                        children: [
+                          new TableCell({
+                            borders: noBorders(),
+                            width: { size: Math.round(BODY_W * 0.6), type: WidthType.DXA },
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new TextRun({
+                                    text: a.name,
+                                    size: 22,
+                                    font: 'Arial',
+                                    color: '000000'
+                                  })
+                                ]
+                              })
+                            ]
+                          }),
+                          new TableCell({
+                            borders: noBorders(),
+                            width: { size: Math.round(BODY_W * 0.4), type: WidthType.DXA },
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new TextRun({
+                                    text: a.role ? `"as ${a.role}"` : '',
+                                    size: 22,
+                                    font: 'Arial',
+                                    color: '000000'
+                                  })
+                                ]
+                              })
+                            ]
+                          })
+                        ]
+                      })
+                  )
                 )
               })
             )
@@ -1525,7 +1616,59 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               new Table({
                 width: { size: BODY_W, type: WidthType.DXA },
                 layout: TableLayoutType.FIXED,
-                rows: noLabel.map(
+                rows: withAddr(
+                  noLabel,
+                  noLabel.map(
+                    (a) =>
+                      new TableRow({
+                        children: [
+                          new TableCell({
+                            borders: noBorders(),
+                            width: { size: Math.round(BODY_W * 0.6), type: WidthType.DXA },
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new TextRun({
+                                    text: a.name,
+                                    size: 22,
+                                    font: 'Arial',
+                                    color: '000000'
+                                  })
+                                ]
+                              })
+                            ]
+                          }),
+                          new TableCell({
+                            borders: noBorders(),
+                            width: { size: Math.round(BODY_W * 0.4), type: WidthType.DXA },
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new TextRun({
+                                    text: a.role ? `"as ${a.role}"` : '',
+                                    size: 22,
+                                    font: 'Arial',
+                                    color: '000000'
+                                  })
+                                ]
+                              })
+                            ]
+                          })
+                        ]
+                      })
+                  )
+                )
+              })
+            )
+          }
+        } else {
+          insuredContent.push(
+            new Table({
+              width: { size: BODY_W, type: WidthType.DXA },
+              layout: TableLayoutType.FIXED,
+              rows: withAddr(
+                data.assureds,
+                data.assureds.map(
                   (a) =>
                     new TableRow({
                       children: [
@@ -1564,52 +1707,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                       ]
                     })
                 )
-              })
-            )
-          }
-        } else {
-          insuredContent.push(
-            new Table({
-              width: { size: BODY_W, type: WidthType.DXA },
-              layout: TableLayoutType.FIXED,
-              rows: data.assureds.map(
-                (a) =>
-                  new TableRow({
-                    children: [
-                      new TableCell({
-                        borders: noBorders(),
-                        width: { size: Math.round(BODY_W * 0.6), type: WidthType.DXA },
-                        children: [
-                          new Paragraph({
-                            children: [
-                              new TextRun({
-                                text: a.name,
-                                size: 22,
-                                font: 'Arial',
-                                color: '000000'
-                              })
-                            ]
-                          })
-                        ]
-                      }),
-                      new TableCell({
-                        borders: noBorders(),
-                        width: { size: Math.round(BODY_W * 0.4), type: WidthType.DXA },
-                        children: [
-                          new Paragraph({
-                            children: [
-                              new TextRun({
-                                text: a.role ? `"as ${a.role}"` : '',
-                                size: 22,
-                                font: 'Arial',
-                                color: '000000'
-                              })
-                            ]
-                          })
-                        ]
-                      })
-                    ]
-                  })
               )
             })
           )
@@ -1665,6 +1762,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (wordCoName) {
       insuredContent.push(emptyP())
       insuredContent.push(np(`c/o ${wordCoName}`))
+      if (data.quotation.showAddresses && data.brokerAddress)
+        for (const line of data.brokerAddress.split('\n')) insuredContent.push(np(line))
     }
     rowMap.set('insured', makeRow('Insured', insuredContent))
   }
@@ -2662,15 +2761,49 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return def?.hullClauseId || ''
       }
 
+      // Clauses per vessel: the vessels printed under each clause section (the shared clause
+      // also lists the vessels with their own clause that are included in it)
+      const dSectionVessels = new Map<string, Set<string>>()
+      if (dIsPerVessel) {
+        if (dSharedAlts.length === 1)
+          dSectionVessels.set(
+            dSharedAlts[0].id,
+            new Set(
+              data.quotationVessels
+                .filter(
+                  (v) =>
+                    !dVesselIdsWithOverrides.has(v.id) ||
+                    dAlts.some((a) => a.vesselScopeId === v.id && a.includeInShared !== false)
+                )
+                .map((v) => v.id)
+            )
+          )
+        for (const a of dAlts)
+          if (
+            a.vesselScopeId &&
+            dAlts.filter((x) => x.vesselScopeId === a.vesselScopeId).length === 1
+          )
+            dSectionVessels.set(a.id, new Set([a.vesselScopeId]))
+      }
+      // The clause section whose vessels are exactly the condition's vessel chips
+      const dSectionForScope = (scope?: string[] | null): string | null => {
+        if (!scope || scope.length === 0) return null
+        for (const [altId, vs] of dSectionVessels)
+          if (vs.size === scope.length && scope.every((id) => vs.has(id))) return altId
+        return null
+      }
+
       // Determine where each additional condition belongs
       const dGetAddlBelonging = (
         qa: (typeof ha)[0]
       ):
-        | { type: 'alt'; altId: string }
+        | { type: 'alt'; altId: string; byScope?: boolean }
         | { type: 'allAlts' }
         | { type: 'iv' }
         | { type: 'both' }
         | { type: 'none' } => {
+        const scopeAlt = dSectionForScope(qa.vesselScope)
+        if (scopeAlt) return { type: 'alt', altId: scopeAlt, byScope: true }
         if (qa.__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(
           (c) => c.id === qa.hullAdditionalConditionId
@@ -2679,6 +2812,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const ids = def.hullClauseIds || []
         if (ids.length === 0) return { type: 'both' }
         const matchedAlts = dEffectiveAlts.filter((a) => ids.includes(a.hullClauseId))
+        // Clauses per vessel: vessels sharing one clause are expanded per vessel above; a
+        // condition linked only to that clause belongs to its section, not to all vessels
+        const matchedReal = [...new Set(matchedAlts.map((a) => a.id.split('_virtual_')[0]))]
+        if (dIsPerVessel && matchedAlts.length < dEffectiveAlts.length && matchedReal.length === 1)
+          return { type: 'alt', altId: matchedReal[0] }
         const matchesIv = dIvClauseId && ids.includes(dIvClauseId)
         if (matchedAlts.length === dEffectiveAlts.length && matchesIv) return { type: 'both' }
         if (matchedAlts.length === dEffectiveAlts.length && !matchesIv) {
@@ -2723,7 +2861,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                 ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD')
                 : ''
             )
-          const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
+          // Placed in its vessels' clause section: the section already names them
+          const scope =
+            belonging.type === 'alt' && belonging.byScope
+              ? ''
+              : vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           const ttl = isCustom && qa.__customTitle ? `${qa.__customTitle} — ` : ''
           const isNewHullAddl =
             !isCustom &&
@@ -4118,8 +4260,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wIsMultiVessel = data.quotationVessels.length >= 2
     // Hull quotes with alternatives price per alternative, not per vessel — don't let stale
     // per-vessel premium values divert the export away from the per-alternative rendering.
+    // A vessel with only its own clause wording is not an alternative: priced per vessel
+    const wHullPerVesselClauses = hullClausesPerVesselOnly(data.hullAlternatives)
     const wHullMultiAlt =
       wq.quotationTypeCode === 'H' &&
+      !wHullPerVesselClauses &&
       (data.hullAlternatives.filter((a) => !a.vesselScopeId).length > 1 ||
         data.hullAlternatives.some((a) => a.vesselScopeId))
     const wHasVesselPremiums =
@@ -4509,15 +4654,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (
       wq.premiumAmount != null ||
       wq.warExcessEnabled ||
-      data.hullAlternatives.length > 1 ||
-      data.hullAlternatives.some((a) => a.vesselScopeId) ||
+      (!wHullPerVesselClauses &&
+        (data.hullAlternatives.length > 1 || data.hullAlternatives.some((a) => a.vesselScopeId))) ||
       data.piAlternatives.length > 1 ||
       (data.agreedValueOptions.length > 0 &&
         data.agreedValueOptions.some((o) => o.premiumAmount != null)) ||
       (data.lolOptions.length > 0 && data.lolOptions.some((o) => o.premiumAmount != null))
     ) {
       const wMultiAlt =
-        data.hullAlternatives.length > 1 || data.hullAlternatives.some((a) => a.vesselScopeId)
+        !wHullPerVesselClauses &&
+        (data.hullAlternatives.length > 1 || data.hullAlternatives.some((a) => a.vesselScopeId))
       const wPerVessel = data.hullAlternatives.some((a) => a.vesselScopeId)
       const wPiMultiAlt = data.piAlternatives.length > 1
       const premLabelW = Math.round(BODY_W * 0.35)

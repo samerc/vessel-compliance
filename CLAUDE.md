@@ -195,6 +195,7 @@ Customer/broker is tracked at the **policy level**, not the vessel level. A vess
 - **Auto-sync**: When `broker_entity_id` is updated on a policy without explicit `customer_entity_id`, the adapter auto-syncs customer fields
 - **Multi-broker vessels**: A vessel appears under every customer that has an active policy on it. FleetManager "By Customer" view, CustomerComplianceReport, DAB, and analytics all derive customer from active policies
 - **Policy edit UI**: "Customer / Broker" field with broker/direct toggle buttons + entity search combobox in VesselDetail policy edit form
+- **Quotation addresses**: "Print addresses" switch on the Insured tab (`quotations.show_addresses`, default off): each assured's address (the vessel assured's `address_id`, else the entity's first address) on a row under it, printed once after consecutive assureds with the same address, and the broker's first address under "c/o"
 - **Quotation customer**: `customer_entity_id` + `customer_type` on `quotations` table, set in InsuredTab with entity search and broker/direct toggle. Auto-copied from vessel's existing policy when adding a vessel. Synced to vessel dynamic policy on quotation-to-policy conversion.
 - **Document filtering**: Customer compliance reports only show document types tagged for the policy types the customer covers (e.g., Hull broker sees only Hull-tagged docs)
 - **Vessel list**: Customer column hidden by default (labeled "Legacy" in column selector)
@@ -591,6 +592,7 @@ Tag-based warranty categorization with sets, custom warranties, type scope, and 
 
 A new quotation (`addQuotation` -> `applyNewQuotationDefaults` in adapter.ts) starts with what its tabs used to fill in only when first opened, so a quotation exported without visiting a tab is complete:
 - **Warranties** (types with a Warranties tab: P, H, W, F, L): the default-selected warranty sets, warranties in the type's scope, settings order
+- **Trading countries** (types with a Trading tab: P, F, H): the excluded / DDQ list, `defaultTradingCountries` (shared/quotationTypes.ts, also used by the tab for an empty older quotation): `default_excluded_countries_{code}` setting, else the settings list for the type (Hull: Israel + DDQ only)
 - **P&I / FD&D**: all conditions offered for the type (P&I only; FD&D starts with none), default additional-clause sets then individually default clauses, text deductibles marked default (with their default values)
 - **Subjectivities** cannot be set at creation (they come from the vessels' / assureds' missing documents): `fillDefaultSubjectivities` (`quotation-tabs/subjectivityDefaults.ts`, shared with the tab) runs before the export checks of a DRAFT quotation that never had them; approved quotations are never changed
 - Each tab still fills an EMPTY older quotation on first open
@@ -1036,6 +1038,8 @@ Per-quotation P&I alternatives (similar to hull):
 - **`vessel_scope_id`** on `quotation_hull_alternatives`: Links alternative to a specific vessel
 - **Vessel Selector**: In HullConditionsTab when 2+ vessels
 - **Export**: Per-vessel sections with vessel names instead of "Alternative 1/2"
+- **Priced per vessel**: when the clauses only give vessels their own wording (at most one shared clause, at most one own clause per vessel: `hullClausesPerVesselOnly` in shared/premium.ts) they are not alternatives: the Premium tab and the export use the vessels' own premiums (Technical / Payable per vessel), not one premium per clause. `vesselTechnical` already falls back to the vessel premium when the clause has none
+- **Placed by vessel chips**: an additional / custom condition whose vessel chips are exactly the vessels of one clause section prints inside that section (no "(VESSEL)" suffix); one linked in settings only to the shared clause prints under it, not under "Applicable to all vessels"
 - **`include_in_shared` toggle**: `include_in_shared TINYINT(1) DEFAULT 1` on `quotation_hull_alternatives`. When a vessel has an override, HullConditionsTab shows "Also include in shared conditions" toggle. When enabled (default), that vessel also appears in the shared section of the export. Toggle updates ALL alternatives for that `vesselScopeId` at once.
 - **`includeInShared` in export**: `sharedSectionVesselIds` = non-override vessels PLUS override vessels where `includeInShared !== false`. Override vessels with `includeInShared = false` appear only in their dedicated per-vessel section.
 

@@ -1209,6 +1209,8 @@ export interface Quotation {
   fullPremiumLossText?: string | null
   /** Limit alternatives (2+): also print each premium next to its limit in the LOL section */
   lolShowPremium?: boolean
+  /** Print the insureds' addresses (and the broker's) in the Insured section */
+  showAddresses?: boolean
   subjectivityDays?: number
   /** The subjectivities tab filled its defaults (or the user added one): never auto-fill again */
   subjectivitiesFilled?: boolean
