@@ -4905,7 +4905,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           nrText = stripHtml(
             st(data, 'nonRefundableFirstText') ||
               'The first instalment is deemed to be non-refundable.'
-          )
+          ).trim()
+          // The text is often written to follow "1st Instalment prior inception -" ("non-refundable
+          // in case of cancellation..."): on its own it needs a subject
+          if (/^[a-z]/.test(nrText)) nrText = `The premium is ${nrText}`
         } else if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
           nrText = stripHtml(
             (
