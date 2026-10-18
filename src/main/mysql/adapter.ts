@@ -201,7 +201,7 @@ import {
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
-import { inTypeScope } from '../../shared/quotationTypes'
+import { inTypeScope, isPiLike } from '../../shared/quotationTypes'
 import schemaSql from './schema.sql?raw'
 
 /** Rows grouped by a key column, keeping their order (one query instead of one per parent) */
@@ -13373,13 +13373,9 @@ export class MySQLAdapter {
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
       ]
     )
-    // Default warranties from the start: a quotation exported without opening the Warranties
-    // tab must not go out without them
-    try {
-      await this.applyDefaultWarranties(id, typeCode)
-    } catch (err) {
-      console.error('[addQuotation] default warranties not applied:', err)
-    }
+    // The settings' defaults from the start (warranties, P&I conditions, additional clauses, text
+    // deductibles): a quotation exported without opening those tabs must not go out without them
+    await this.applyNewQuotationDefaults(id, typeCode)
     return {
       ...q,
       id,
@@ -13396,6 +13392,78 @@ export class MySQLAdapter {
       nonRefundableType:
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
     } as Quotation
+  }
+
+  /**
+   * A new quotation starts with what its tabs used to fill in only when first opened: default
+   * warranties, all P&I conditions (not FD&D), default additional clauses and default text
+   * deductibles (with their default values). Each part is optional: a failure is only logged.
+   * Subjectivities are not here: they depend on the vessels' missing documents (filled when the
+   * Subjectivities tab opens or at the first export).
+   */
+  private async applyNewQuotationDefaults(quotationId: string, typeCode?: string): Promise<void> {
+    if (!this.pool || !typeCode) return
+    const step = async (what: string, fn: () => Promise<void>): Promise<void> => {
+      try {
+        await fn()
+      } catch (err) {
+        console.error(`[addQuotation] default ${what} not applied:`, err)
+      }
+    }
+    // Types with a Warranties tab
+    if (['P', 'H', 'W', 'F', 'L'].includes(typeCode))
+      await step('warranties', () => this.applyDefaultWarranties(quotationId, typeCode))
+    if (!isPiLike(typeCode)) return
+    // Conditions: every clause offered for the type is ticked (FD&D starts with none)
+    if (typeCode !== 'F')
+      await step('conditions', async () => {
+        const clauses = (await this.getPIClauses()).filter((c) =>
+          inTypeScope(c.typeScope, typeCode)
+        )
+        if (clauses.length > 0)
+          await this.setQuotationClauses(
+            quotationId,
+            clauses.map((c) => c.id),
+            {}
+          )
+      })
+    // Additional clauses: default sets first (in set order), then individually default ones
+    await step('additional clauses', async () => {
+      const [all, sets] = await Promise.all([
+        this.getPIAdditionalClauses(),
+        this.piGetAdditionalClauseSets()
+      ])
+      const scoped = all.filter((c) => inTypeScope(c.typeScope, typeCode))
+      const ordered: string[] = []
+      for (const set of sets) {
+        if (!set.defaultSelected) continue
+        for (const cid of set.clauseIds || [])
+          if (!ordered.includes(cid) && scoped.some((c) => c.id === cid)) ordered.push(cid)
+      }
+      for (const c of scoped)
+        if (Boolean(c.defaultSelected) && !ordered.includes(c.id)) ordered.push(c.id)
+      for (let i = 0; i < ordered.length; i++)
+        await this.addQuotationAdditionalClause({
+          quotationId,
+          piAdditionalClauseId: ordered[i],
+          order: i
+        })
+    })
+    // Text deductibles included by default (e.g. FD&D 25% / minimum / maximum), with their values
+    await step('text deductibles', async () => {
+      const defaults = (await this.getPITextDeductibles()).filter(
+        (t) => t.defaultIncluded && inTypeScope(t.typeScope, typeCode)
+      )
+      for (let i = 0; i < defaults.length; i++)
+        await this.addQuotationTextDeductible({
+          quotationId,
+          piTextDeductibleId: defaults[i].id,
+          title: defaults[i].title,
+          text: defaults[i].text,
+          fieldValues: defaults[i].defaultValues || null,
+          order: i
+        })
+    })
   }
 
   /**

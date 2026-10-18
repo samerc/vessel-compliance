@@ -47,6 +47,7 @@ import {
 } from 'lucide-react'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 import InsuredTab from './quotation-tabs/InsuredTab'
+import { fillDefaultSubjectivities } from './quotation-tabs/subjectivityDefaults'
 import VesselTab from './quotation-tabs/VesselTab'
 import LiabilityTab from './quotation-tabs/LiabilityTab'
 import ConditionsTab from './quotation-tabs/ConditionsTab'
@@ -857,6 +858,16 @@ export default function QuotationEditor({
     format: 'pdf' | 'word',
     action: 'direct' | 'approve' | 'draft'
   ): Promise<boolean> => {
+    // A draft exported without opening the Subjectivities tab gets its default subjectivities
+    // now (worked out from the vessels' missing documents, as the tab does); an approved
+    // quotation is never changed here
+    if (quotation.status === 'draft') {
+      try {
+        await fillDefaultSubjectivities(quotation.id, quotation.quotationTypeCode)
+      } catch {
+        /* the export goes on; the subjectivities can still be added in the tab */
+      }
+    }
     const warnings = await validateBeforeExport(quotation)
     if (warnings.length > 0) {
       setExportWarnings({ warnings, format, action })

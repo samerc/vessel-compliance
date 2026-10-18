@@ -578,7 +578,7 @@ Tag-based warranty categorization with sets, custom warranties, type scope, and 
 
 - **Type Scope**: `type_scope` column on `pi_warranties` (`'pi'` | `'hull'` | `'both'`). Editor filters visible warranties by quotation type code. Admin UI shows scope selector and badge per warranty.
 - **Warranty Tags** (`pi_warranty_tags`): Admin-created category labels (e.g. "Cargo", "Navigation"). Managed in QuotationSettings Warranties tab.
-- **Warranty Sets** (`pi_warranty_sets`, `pi_warranty_set_items`): Named groups of warranties (e.g. "Default", "Cargo Warranties") with optional `default_selected` flag. Default sets are applied when the quotation is CREATED (`applyDefaultWarranties` in `addQuotation`, warranties in the type's scope, settings order), so a quotation exported without opening the Warranties tab has them; the tab still fills an empty older quotation on first open (only once the quotation type is known).
+- **Warranty Sets** (`pi_warranty_sets`, `pi_warranty_set_items`): Named groups of warranties (e.g. "Default", "Cargo Warranties") with optional `default_selected` flag. Default sets are applied when the quotation is CREATED, see Quotation Defaults below; the tab still fills an empty older quotation on first open (only once the quotation type is known).
 - **Cargo Tag Auto-Linking**: In QuotationEditor, a tag named "Cargo" (case-insensitive) automatically includes warranties with `isCargoRelated = true` in its tab, even if they don't have the tag explicitly assigned via `tagIds`. The "Other" (untagged) tab excludes these to avoid duplication.
 - **Bulk Tag Assignment**: QuotationSettings has a "Bulk Tag" mode — checkboxes on each warranty row, Select All/Deselect All, toolbar with tag assign/remove chips, + Cargo/- Cargo, + Default/- Default bulk actions.
 - **Custom Warranties** (`quotation_custom_warranties`): Per-quotation ad-hoc warranties added inline in the selected list. Support add, edit, delete, reorder, and bulk import (paste with bullet extraction).
@@ -586,6 +586,15 @@ Tag-based warranty categorization with sets, custom warranties, type scope, and 
 - **Import Modal**: Bulk paste warranties with bullet/dash/number stripping, parse preview, then confirm to add as custom warranties.
 - **Selected Warranties Order**: `selectedWarrantyIds` array preserves selection order; reorderable via up/down arrows in the selected list.
 - **Collapsible sections**: "Additional Text" and "Breach of Warranties" are separate collapsible sections in WarrantiesTab (not nested under Standard Texts)
+
+### Quotation Defaults (at creation)
+
+A new quotation (`addQuotation` -> `applyNewQuotationDefaults` in adapter.ts) starts with what its tabs used to fill in only when first opened, so a quotation exported without visiting a tab is complete:
+- **Warranties** (types with a Warranties tab: P, H, W, F, L): the default-selected warranty sets, warranties in the type's scope, settings order
+- **P&I / FD&D**: all conditions offered for the type (P&I only; FD&D starts with none), default additional-clause sets then individually default clauses, text deductibles marked default (with their default values)
+- **Subjectivities** cannot be set at creation (they come from the vessels' / assureds' missing documents): `fillDefaultSubjectivities` (`quotation-tabs/subjectivityDefaults.ts`, shared with the tab) runs before the export checks of a DRAFT quotation that never had them; approved quotations are never changed
+- Each tab still fills an EMPTY older quotation on first open
+- Duplicates, revisions and renewals copy their source instead (they do not go through `addQuotation`, except a renewal with no earlier policy, which is a blank new quotation)
 
 ### Quotation Standard Texts
 
