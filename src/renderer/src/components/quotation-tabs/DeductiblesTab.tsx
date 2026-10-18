@@ -316,120 +316,117 @@ export default function DeductiblesTab({
     await window.api.updateQuotationTextDeductible(id, { vesselScope: scope })
   }
 
+  // FD&D has no amount deductibles: one list of deductible wordings (amount ones already on an
+  // older quotation still show, they are exported)
+  const isFdd = quotation.quotationTypeCode === 'F'
+  const showAmountSection = !isFdd || deductibles.length > 0
+
   return (
     <div>
       <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Deductibles</h3>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>
-        Configure deductible amounts and text deductibles. Each deductible can be scoped to a
-        specific alternative.
+        {isFdd
+          ? 'The deductibles of this quotation: change the values below each one, edit its wording or add your own.'
+          : 'Amount deductibles (with per-vessel and previous amounts, used in the QuickBooks export) and other deductible wordings. Each deductible can be scoped to a specific alternative.'}
       </p>
 
-      {/* Add from settings dropdown (none for a type without amount deductibles, e.g. FD&D) */}
-      {masterDeductibles.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <PickerDropdown
-            placeholder="Add deductible from settings..."
-            options={masterDeductibles.map((d) => ({
-              value: d.id,
-              label: d.title || d.description.slice(0, 80) || 'Untitled deductible'
-            }))}
-            onSelect={handleAddFromMaster}
-          />
-        </div>
-      )}
-
-      {/* Deductibles list */}
-      {deductibles.map((d, i) => (
-        <div
-          key={d.id}
-          style={{
-            padding: '10px 14px',
-            borderRadius: '8px',
-            border: '1px solid var(--table-border)',
-            marginBottom: '8px',
-            ...altStyle(d.alternativeId)
-          }}
-        >
-          {/* Row 1: reorder + title + amounts + actions */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-            <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => moveDeductible(i, 'up')}
-                disabled={i === 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0',
-                  color: 'var(--text-secondary)',
-                  opacity: i === 0 ? 0.2 : 0.6,
-                  lineHeight: 1
-                }}
-              >
-                <ChevronUp size={12} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => moveDeductible(i, 'down')}
-                disabled={i === deductibles.length - 1}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0',
-                  color: 'var(--text-secondary)',
-                  opacity: i === deductibles.length - 1 ? 0.2 : 0.6,
-                  lineHeight: 1
-                }}
-              >
-                <ChevronDown size={12} />
-              </button>
+      {showAmountSection && (
+        <>
+          {!isFdd && (
+            <h4 style={{ fontSize: '0.9rem', margin: '0 0 10px' }}>Deductibles (amount)</h4>
+          )}
+          {/* Add from settings dropdown (none for a type without amount deductibles, e.g. FD&D) */}
+          {masterDeductibles.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <PickerDropdown
+                placeholder="Add deductible from settings..."
+                options={masterDeductibles.map((d) => ({
+                  value: d.id,
+                  label: d.title || d.description.slice(0, 80) || 'Untitled deductible'
+                }))}
+                onSelect={handleAddFromMaster}
+              />
             </div>
-            {d.title && (
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {d.title}
-              </span>
-            )}
-            <input
-              type="text"
-              defaultValue={d.currency}
-              onBlur={(e) => handleUpdate(d.id, { currency: e.target.value })}
+          )}
+
+          {/* Deductibles list */}
+          {deductibles.map((d, i) => (
+            <div
+              key={d.id}
               style={{
-                width: '60px',
-                padding: '4px 6px',
-                fontSize: '0.82rem',
-                borderRadius: '4px'
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1px solid var(--table-border)',
+                marginBottom: '8px',
+                ...altStyle(d.alternativeId)
               }}
-            />
-            <MoneyInput
-              value={d.amount || undefined}
-              onChange={(val) =>
-                setDeductibles((prev) =>
-                  prev.map((dd) => (dd.id === d.id ? { ...dd, amount: val || 0 } : dd))
-                )
-              }
-              onBlur={(val) => handleUpdate(d.id, { amount: val || 0 })}
-              style={{
-                width: '120px',
-                padding: '4px 6px',
-                fontSize: '0.82rem',
-                borderRadius: '4px'
-              }}
-            />
-            {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
-              <>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
+            >
+              {/* Row 1: reorder + title + amounts + actions */}
+              <div
+                style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}
+              >
+                <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
+                  <button
+                    title="Move up"
+                    aria-label="Move up"
+                    onClick={() => moveDeductible(i, 'up')}
+                    disabled={i === 0}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0',
+                      color: 'var(--text-secondary)',
+                      opacity: i === 0 ? 0.2 : 0.6,
+                      lineHeight: 1
+                    }}
+                  >
+                    <ChevronUp size={12} />
+                  </button>
+                  <button
+                    title="Move down"
+                    aria-label="Move down"
+                    onClick={() => moveDeductible(i, 'down')}
+                    disabled={i === deductibles.length - 1}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0',
+                      color: 'var(--text-secondary)',
+                      opacity: i === deductibles.length - 1 ? 0.2 : 0.6,
+                      lineHeight: 1
+                    }}
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+                {d.title && (
+                  <span
+                    style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}
+                  >
+                    {d.title}
+                  </span>
+                )}
+                <input
+                  type="text"
+                  defaultValue={d.currency}
+                  onBlur={(e) => handleUpdate(d.id, { currency: e.target.value })}
+                  style={{
+                    width: '60px',
+                    padding: '4px 6px',
+                    fontSize: '0.82rem',
+                    borderRadius: '4px'
+                  }}
+                />
                 <MoneyInput
-                  value={d.secondaryAmount || undefined}
+                  value={d.amount || undefined}
                   onChange={(val) =>
                     setDeductibles((prev) =>
-                      prev.map((dd) => (dd.id === d.id ? { ...dd, secondaryAmount: val || 0 } : dd))
+                      prev.map((dd) => (dd.id === d.id ? { ...dd, amount: val || 0 } : dd))
                     )
                   }
-                  onBlur={(val) => handleUpdate(d.id, { secondaryAmount: val || 0 })}
+                  onBlur={(val) => handleUpdate(d.id, { amount: val || 0 })}
                   style={{
                     width: '120px',
                     padding: '4px 6px',
@@ -437,355 +434,406 @@ export default function DeductiblesTab({
                     borderRadius: '4px'
                   }}
                 />
-              </>
-            )}
-            {!d.piDeductibleId && (
-              <span
+                {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
+                  <>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      2nd:
+                    </span>
+                    <MoneyInput
+                      value={d.secondaryAmount || undefined}
+                      onChange={(val) =>
+                        setDeductibles((prev) =>
+                          prev.map((dd) =>
+                            dd.id === d.id ? { ...dd, secondaryAmount: val || 0 } : dd
+                          )
+                        )
+                      }
+                      onBlur={(val) => handleUpdate(d.id, { secondaryAmount: val || 0 })}
+                      style={{
+                        width: '120px',
+                        padding: '4px 6px',
+                        fontSize: '0.82rem',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </>
+                )}
+                {!d.piDeductibleId && (
+                  <span
+                    style={{
+                      fontSize: '0.6rem',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    custom
+                  </span>
+                )}
+                <div style={{ flex: 1 }} />
+                <button
+                  title="Edit"
+                  aria-label="Edit"
+                  onClick={() => {
+                    setEditingDescId(editingDescId === d.id ? null : d.id)
+                    setEditDescText(d.description)
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    padding: '2px'
+                  }}
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  title="Delete"
+                  aria-label="Delete"
+                  onClick={async () => {
+                    await window.api.deleteQuotationDeductible(d.id)
+                    await reload()
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--danger)',
+                    padding: '2px'
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              {/* Row 2: previous amounts (compact, secondary) */}
+              <div
                 style={{
-                  fontSize: '0.6rem',
-                  padding: '1px 4px',
-                  borderRadius: '3px',
-                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                  color: 'var(--accent-primary)'
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'center',
+                  paddingLeft: '24px',
+                  marginBottom: '4px'
                 }}
               >
-                custom
-              </span>
-            )}
-            <div style={{ flex: 1 }} />
-            <button
-              title="Edit"
-              aria-label="Edit"
-              onClick={() => {
-                setEditingDescId(editingDescId === d.id ? null : d.id)
-                setEditDescText(d.description)
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-secondary)',
-                padding: '2px'
-              }}
-            >
-              <Pencil size={12} />
-            </button>
-            <button
-              title="Delete"
-              aria-label="Delete"
-              onClick={async () => {
-                await window.api.deleteQuotationDeductible(d.id)
-                await reload()
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--danger)',
-                padding: '2px'
-              }}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-          {/* Row 2: previous amounts (compact, secondary) */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'center',
-              paddingLeft: '24px',
-              marginBottom: '4px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>
-                Previous:
-              </span>
-              <MoneyInput
-                value={d.previousAmount}
-                onChange={(val) =>
-                  setDeductibles((prev) =>
-                    prev.map((dd) => (dd.id === d.id ? { ...dd, previousAmount: val ?? null } : dd))
-                  )
-                }
-                onBlur={(val) => handleUpdate(d.id, { previousAmount: val || null })}
-                placeholder="—"
-                style={{
-                  width: '90px',
-                  padding: '3px 6px',
-                  fontSize: '0.75rem',
-                  color: 'var(--danger)',
-                  borderRadius: '4px'
-                }}
-              />
-            </div>
-            {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>
-                  Previous 2nd:
-                </span>
-                <MoneyInput
-                  value={d.previousSecondaryAmount}
-                  onChange={(val) =>
-                    setDeductibles((prev) =>
-                      prev.map((dd) =>
-                        dd.id === d.id ? { ...dd, previousSecondaryAmount: val ?? null } : dd
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span
+                    style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+                  >
+                    Previous:
+                  </span>
+                  <MoneyInput
+                    value={d.previousAmount}
+                    onChange={(val) =>
+                      setDeductibles((prev) =>
+                        prev.map((dd) =>
+                          dd.id === d.id ? { ...dd, previousAmount: val ?? null } : dd
+                        )
                       )
-                    )
-                  }
-                  onBlur={(val) => handleUpdate(d.id, { previousSecondaryAmount: val || null })}
-                  placeholder="—"
-                  style={{
-                    width: '90px',
-                    padding: '3px 6px',
-                    fontSize: '0.75rem',
-                    color: 'var(--danger)',
-                    borderRadius: '4px'
-                  }}
-                />
-              </div>
-            )}
-          </div>
-          {/* Per-vessel amount inputs (only the vessels this deductible is scoped to) */}
-          {(() => {
-            const scopedVessels = d.vesselScope
-              ? qVessels.filter((v) => d.vesselScope!.includes(v.id))
-              : qVessels
-            if (scopedVessels.length < 2 || !(d.amount > 0 || d.vesselAmounts)) return null
-            const hasSecondary = !!(
-              d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)
-            )
-            return (
-              <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}
-                >
-                  <span
-                    style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', width: '140px' }}
-                  >
-                    Amount (per vessel):
-                  </span>
-                  <span
-                    style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', width: '150px' }}
-                  >
-                    Primary
-                  </span>
-                  {hasSecondary && (
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-secondary)',
-                        width: '150px'
-                      }}
-                    >
-                      2nd
-                    </span>
-                  )}
+                    }
+                    onBlur={(val) => handleUpdate(d.id, { previousAmount: val || null })}
+                    placeholder="—"
+                    style={{
+                      width: '90px',
+                      padding: '3px 6px',
+                      fontSize: '0.75rem',
+                      color: 'var(--danger)',
+                      borderRadius: '4px'
+                    }}
+                  />
                 </div>
-                {scopedVessels.map((v) => {
-                  const perVesselVal = d.vesselAmounts ? d.vesselAmounts[v.id] : undefined
-                  const displayVal = perVesselVal ?? d.amount ?? ''
-                  const perVesselSec = d.vesselSecondaryAmounts
-                    ? d.vesselSecondaryAmounts[v.id]
-                    : undefined
-                  const displaySec = perVesselSec ?? d.secondaryAmount ?? undefined
-                  return (
+                {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span
+                      style={{ fontSize: '0.68rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+                    >
+                      Previous 2nd:
+                    </span>
+                    <MoneyInput
+                      value={d.previousSecondaryAmount}
+                      onChange={(val) =>
+                        setDeductibles((prev) =>
+                          prev.map((dd) =>
+                            dd.id === d.id ? { ...dd, previousSecondaryAmount: val ?? null } : dd
+                          )
+                        )
+                      }
+                      onBlur={(val) => handleUpdate(d.id, { previousSecondaryAmount: val || null })}
+                      placeholder="—"
+                      style={{
+                        width: '90px',
+                        padding: '3px 6px',
+                        fontSize: '0.75rem',
+                        color: 'var(--danger)',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Per-vessel amount inputs (only the vessels this deductible is scoped to) */}
+              {(() => {
+                const scopedVessels = d.vesselScope
+                  ? qVessels.filter((v) => d.vesselScope!.includes(v.id))
+                  : qVessels
+                if (scopedVessels.length < 2 || !(d.amount > 0 || d.vesselAmounts)) return null
+                const hasSecondary = !!(
+                  d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)
+                )
+                return (
+                  <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
                     <div
-                      key={v.id}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        marginBottom: '3px'
+                        marginBottom: '4px'
                       }}
                     >
                       <span
                         style={{
-                          fontSize: '0.75rem',
+                          fontSize: '0.78rem',
                           color: 'var(--text-secondary)',
-                          width: '140px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                          width: '140px'
                         }}
-                        title={(v.name || v.vesselLabel).toUpperCase()}
                       >
-                        {(v.name || v.vesselLabel).toUpperCase()}
+                        Amount (per vessel):
                       </span>
-                      <MoneyInput
-                        value={
-                          typeof displayVal === 'number'
-                            ? displayVal
-                            : parseFloat(String(displayVal)) || undefined
-                        }
-                        onChange={(val) => updateDeductibleVesselAmount(d.id, v.id, val)}
-                        onBlur={() => saveDeductibleVesselAmounts(d.id)}
-                        placeholder="0"
-                        showZero
+                      <span
                         style={{
-                          width: '150px',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.82rem'
+                          fontSize: '0.72rem',
+                          color: 'var(--text-secondary)',
+                          width: '150px'
                         }}
-                      />
+                      >
+                        Primary
+                      </span>
                       {hasSecondary && (
-                        <MoneyInput
-                          value={displaySec}
-                          onChange={(val) => updateDeductibleVesselSecondaryAmount(d.id, v.id, val)}
-                          onBlur={() => saveDeductibleVesselSecondaryAmounts(d.id)}
-                          placeholder="0"
-                          showZero
+                        <span
                           style={{
-                            width: '150px',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.82rem'
+                            fontSize: '0.72rem',
+                            color: 'var(--text-secondary)',
+                            width: '150px'
                           }}
-                        />
+                        >
+                          2nd
+                        </span>
                       )}
                     </div>
-                  )
-                })}
+                    {scopedVessels.map((v) => {
+                      const perVesselVal = d.vesselAmounts ? d.vesselAmounts[v.id] : undefined
+                      const displayVal = perVesselVal ?? d.amount ?? ''
+                      const perVesselSec = d.vesselSecondaryAmounts
+                        ? d.vesselSecondaryAmounts[v.id]
+                        : undefined
+                      const displaySec = perVesselSec ?? d.secondaryAmount ?? undefined
+                      return (
+                        <div
+                          key={v.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '3px'
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--text-secondary)',
+                              width: '140px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={(v.name || v.vesselLabel).toUpperCase()}
+                          >
+                            {(v.name || v.vesselLabel).toUpperCase()}
+                          </span>
+                          <MoneyInput
+                            value={
+                              typeof displayVal === 'number'
+                                ? displayVal
+                                : parseFloat(String(displayVal)) || undefined
+                            }
+                            onChange={(val) => updateDeductibleVesselAmount(d.id, v.id, val)}
+                            onBlur={() => saveDeductibleVesselAmounts(d.id)}
+                            placeholder="0"
+                            showZero
+                            style={{
+                              width: '150px',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.82rem'
+                            }}
+                          />
+                          {hasSecondary && (
+                            <MoneyInput
+                              value={displaySec}
+                              onChange={(val) =>
+                                updateDeductibleVesselSecondaryAmount(d.id, v.id, val)
+                              }
+                              onBlur={() => saveDeductibleVesselSecondaryAmounts(d.id)}
+                              placeholder="0"
+                              showZero
+                              style={{
+                                width: '150px',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.82rem'
+                              }}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+              {/* Description (editable) */}
+              {editingDescId === d.id ? (
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                  <textarea
+                    value={editDescText}
+                    onChange={(e) => setEditDescText(e.target.value)}
+                    style={{
+                      flex: 1,
+                      minHeight: '40px',
+                      resize: 'vertical',
+                      fontSize: '0.82rem',
+                      padding: '4px 8px',
+                      borderRadius: '4px'
+                    }}
+                  />
+                  <button
+                    onClick={async () => {
+                      await handleUpdate(d.id, { description: editDescText })
+                      setEditingDescId(null)
+                      setDeductibles((prev) =>
+                        prev.map((dd) =>
+                          dd.id === d.id ? { ...dd, description: editDescText } : dd
+                        )
+                      )
+                    }}
+                    className="btn-primary"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem', alignSelf: 'flex-end' }}
+                  >
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    fontSize: '0.83rem',
+                    paddingLeft: '24px',
+                    whiteSpace: 'pre-wrap',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  {d.description
+                    .replace(
+                      /\{currency\}\s*\{amount\}/g,
+                      d.secondaryAmount != null
+                        ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
+                        : '___'
+                    )
+                    .replace(/\{currency\}/g, d.currency)
+                    .replace(
+                      /\{amount\}/g,
+                      d.secondaryAmount != null
+                        ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
+                        : '___'
+                    )}
+                </div>
+              )}
+              {d.secondaryDescription && (
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    paddingLeft: '24px',
+                    whiteSpace: 'pre-wrap',
+                    color: 'var(--text-secondary)',
+                    marginTop: '2px'
+                  }}
+                >
+                  {d.secondaryDescription
+                    .replace(
+                      /\{currency\}\s*\{amount\}/g,
+                      d.secondaryAmount != null
+                        ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
+                        : '___'
+                    )
+                    .replace(/\{currency\}/g, d.currency)
+                    .replace(
+                      /\{amount\}/g,
+                      d.secondaryAmount != null
+                        ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
+                        : '___'
+                    )}
+                </div>
+              )}
+              <div style={{ paddingLeft: '30px' }}>
+                <VesselScopeChips
+                  vessels={qVessels}
+                  vesselScope={d.vesselScope}
+                  onChange={(scope) => updateDeductibleScope(d.id, scope)}
+                />
+                <AlternativeScopeChips
+                  alternatives={piAlternatives}
+                  currentAltId={d.alternativeId || null}
+                  onChangeAltId={(altId) => updateDeductibleAltId(d.id, altId)}
+                />
               </div>
-            )
-          })()}
-          {/* Description (editable) */}
-          {editingDescId === d.id ? (
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+            </div>
+          ))}
+
+          {/* Add custom amount deductible (not for FD&D) */}
+          {!isFdd && (
+            <div
+              style={{ display: 'flex', gap: '6px', marginBottom: '14px', alignItems: 'flex-end' }}
+            >
               <textarea
-                value={editDescText}
-                onChange={(e) => setEditDescText(e.target.value)}
+                value={newCustomDesc}
+                onChange={(e) => {
+                  setNewCustomDesc(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = e.target.scrollHeight + 'px'
+                }}
+                placeholder="Add an amount deductible (wording; the amount is entered after adding)..."
+                rows={1}
                 style={{
                   flex: 1,
-                  minHeight: '40px',
-                  resize: 'vertical',
-                  fontSize: '0.82rem',
-                  padding: '4px 8px',
-                  borderRadius: '4px'
+                  minHeight: '32px',
+                  maxHeight: '200px',
+                  resize: 'none',
+                  fontSize: '0.8rem',
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  overflow: 'auto'
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    addCustomDeductible()
+                  }
                 }}
               />
               <button
-                onClick={async () => {
-                  await handleUpdate(d.id, { description: editDescText })
-                  setEditingDescId(null)
-                  setDeductibles((prev) =>
-                    prev.map((dd) => (dd.id === d.id ? { ...dd, description: editDescText } : dd))
-                  )
-                }}
+                onClick={addCustomDeductible}
                 className="btn-primary"
-                style={{ padding: '4px 8px', fontSize: '0.75rem', alignSelf: 'flex-end' }}
+                style={{ padding: '5px 10px', fontSize: '0.75rem' }}
+                title="Add custom deductible"
               >
-                Save
+                <Plus size={12} />
               </button>
             </div>
-          ) : (
-            <div
-              style={{
-                fontSize: '0.83rem',
-                paddingLeft: '24px',
-                whiteSpace: 'pre-wrap',
-                color: 'var(--text-primary)'
-              }}
-            >
-              {d.description
-                .replace(
-                  /\{currency\}\s*\{amount\}/g,
-                  d.secondaryAmount != null
-                    ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
-                    : '___'
-                )
-                .replace(/\{currency\}/g, d.currency)
-                .replace(
-                  /\{amount\}/g,
-                  d.secondaryAmount != null
-                    ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
-                    : '___'
-                )}
-            </div>
           )}
-          {d.secondaryDescription && (
-            <div
-              style={{
-                fontSize: '0.78rem',
-                paddingLeft: '24px',
-                whiteSpace: 'pre-wrap',
-                color: 'var(--text-secondary)',
-                marginTop: '2px'
-              }}
-            >
-              {d.secondaryDescription
-                .replace(
-                  /\{currency\}\s*\{amount\}/g,
-                  d.secondaryAmount != null
-                    ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
-                    : '___'
-                )
-                .replace(/\{currency\}/g, d.currency)
-                .replace(
-                  /\{amount\}/g,
-                  d.secondaryAmount != null
-                    ? `${d.currency} ${d.secondaryAmount.toLocaleString()}`
-                    : '___'
-                )}
-            </div>
-          )}
-          <div style={{ paddingLeft: '30px' }}>
-            <VesselScopeChips
-              vessels={qVessels}
-              vesselScope={d.vesselScope}
-              onChange={(scope) => updateDeductibleScope(d.id, scope)}
-            />
-            <AlternativeScopeChips
-              alternatives={piAlternatives}
-              currentAltId={d.alternativeId || null}
-              onChangeAltId={(altId) => updateDeductibleAltId(d.id, altId)}
-            />
-          </div>
-        </div>
-      ))}
 
-      {/* Add custom deductible */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', alignItems: 'flex-end' }}>
-        <textarea
-          value={newCustomDesc}
-          onChange={(e) => {
-            setNewCustomDesc(e.target.value)
-            e.target.style.height = 'auto'
-            e.target.style.height = e.target.scrollHeight + 'px'
-          }}
-          placeholder="Add a custom deductible..."
-          rows={1}
-          style={{
-            flex: 1,
-            minHeight: '32px',
-            maxHeight: '200px',
-            resize: 'none',
-            fontSize: '0.8rem',
-            padding: '5px 8px',
-            borderRadius: '6px',
-            overflow: 'auto'
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              addCustomDeductible()
-            }
-          }}
-        />
-        <button
-          onClick={addCustomDeductible}
-          className="btn-primary"
-          style={{ padding: '5px 10px', fontSize: '0.75rem' }}
-          title="Add custom deductible"
-        >
-          <Plus size={12} />
-        </button>
-      </div>
-
-      {/* ═══ Divider ═══ */}
-      <div style={{ borderTop: '2px solid var(--table-border)', margin: '18px 0 14px' }} />
+          {/* ═══ Divider ═══ */}
+          <div style={{ borderTop: '2px solid var(--table-border)', margin: '18px 0 14px' }} />
+        </>
+      )}
 
       {/* Text-Based Deductibles */}
       <div
@@ -796,7 +844,7 @@ export default function DeductiblesTab({
           marginBottom: '10px'
         }}
       >
-        <h4 style={{ fontSize: '0.9rem' }}>Text Deductibles</h4>
+        <h4 style={{ fontSize: '0.9rem' }}>{isFdd ? '' : 'Other deductibles (wording)'}</h4>
         {masterTextDeds.length > 0 && (
           <PickerDropdown
             placeholder="Add from settings..."
@@ -1005,13 +1053,16 @@ export default function DeductiblesTab({
           </div>
         </div>
       ))}
+      <div className="field-label" style={{ margin: '10px 0 4px' }}>
+        {isFdd ? 'Add a deductible' : 'Add other deductible wording'}
+      </div>
       <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', alignItems: 'flex-end' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <input
             type="text"
             value={newTextTitle}
             onChange={(e) => setNewTextTitle(e.target.value)}
-            placeholder="Title..."
+            placeholder="Title (optional, not printed)..."
             style={{
               fontSize: '0.8rem',
               padding: '5px 8px',
@@ -1025,7 +1076,7 @@ export default function DeductiblesTab({
               e.target.style.height = 'auto'
               e.target.style.height = e.target.scrollHeight + 'px'
             }}
-            placeholder="Text content..."
+            placeholder="Wording of the deductible..."
             rows={1}
             style={{
               minHeight: '32px',
