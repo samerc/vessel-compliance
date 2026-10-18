@@ -1810,10 +1810,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
     // Build the amount string for the template
     let amountDisplay: string
-    if (dHasLolOptions) {
+    if (dHasLolOptions || dPiAltLol) {
+      // The alternatives' limits are listed above the wording ("Alternative 1: USD X")
       amountDisplay = ''
-    } else if (dPiAltLol) {
-      amountDisplay = 'values as per below'
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
     } else if (multiVessel && baseAmt != null) {
@@ -1861,7 +1860,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
     // LOL amount lines (P&I alternatives or LOL options): a single "USD X" line when every alternative
     // carries the same limit, otherwise one line per alternative. No "all claims in the aggregate" suffix
-    // (that wording lives in the intro paragraph). Rendered right after the intro paragraph, not at the end.
+    // (that wording follows them). Rendered first, then a blank line and the wording.
     const buildLolAmountParas = (): Paragraph[] => {
       let items: { label: string; amount: number; currency: string }[] = []
       if (dHasLolOptions) {
@@ -1890,10 +1889,17 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
     const dLolAmountParas = buildLolAmountParas()
 
-    const dCurDisplay = dHasLolOptions ? '' : cur
-    // Section order: intro paragraph → LOL amounts → sub-limits → "Under no circumstances" closing
+    const dCurDisplay = dHasLolOptions || dPiAltLol ? '' : cur
+    // Section order: LOL amounts → wording ("on all claims…") → sub-limits → "Under no circumstances"
+    const pushLolAmounts = (): void => {
+      if (dLolAmountParas.length > 0) liabContent.push(...dLolAmountParas, emptyP())
+    }
     const renderLolTextWithSubLimits = (text: string): boolean => {
-      const cleanText = text.replace(/[ \t]{2,}/g, ' ').trim()
+      // An empty {currency} {amount} (limits listed above) leaves a leading space in the paragraph
+      const cleanText = text
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/(<p[^>]*>)[ \t]+/gi, '$1')
+        .trim()
       const hasPlaceholder = cleanText.includes('{sub_limits}')
       const underNoMatch = !hasPlaceholder
         ? cleanText.match(/(Under\s+no\s+circumstances.*)/is)
@@ -1908,14 +1914,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         let underNoPart = underNoMatch[1].trim()
         if (!/<(p|span|div)[\s>]/i.test(underNoPart))
           underNoPart = underNoPart.replace(/(\s*<\/(p|span|div)>)+$/i, '').trim()
+        pushLolAmounts()
         if (beforeUnderNo) liabContent.push(...lolTextParas(beforeUnderNo))
-        if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
         if (wordSubLimitParas.length > 0) liabContent.push(emptyP(), ...wordSubLimitParas)
         liabContent.push(emptyP(), ...lolTextParas(underNoPart))
         return wordSubLimitParas.length > 0
       }
+      pushLolAmounts()
       liabContent.push(...injectSubLimits(cleanText))
-      if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
       return hasPlaceholder && wordSubLimitParas.length > 0
     }
     let dSubLimitsInserted = false
@@ -1933,10 +1939,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         .replace('{currency}', dCurDisplay)
       dSubLimitsInserted = renderLolTextWithSubLimits(lolText)
     } else if (baseAmt != null || dHasLolOptions || dPiAltLol) {
+      pushLolAmounts()
       liabContent.push(
         np(`${amountDisplay} all claims in the aggregate.`.replace(/  +/g, ' ').trim())
       )
-      if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
     }
 
     const lolRawHasPlaceholder = (
@@ -4537,6 +4543,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // Build premium line items: { label, tech, prev? }
       type PremLine = { label: string; tech: number; prev?: number }
       const lines: PremLine[] = []
+      // Limit alternatives: each premium is labelled with its limit, in a "Limit : Premium" table
+      let wLolPremTable = false
       // War P&I Excess: per-vessel Section 1 + Section 2 premiums
       const dWarExcessPrem = wq.quotationTypeCode === 'W' && wq.warExcessEnabled
       if (dWarExcessPrem) {
@@ -4627,9 +4635,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         data.lolOptions.length > 0 &&
         data.lolOptions.some((o) => o.premiumAmount != null)
       ) {
+        wLolPremTable = true
         for (const opt of data.lolOptions) {
           lines.push({
-            label: opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`,
+            label:
+              opt.amount != null
+                ? formatCurrency(
+                    opt.amount,
+                    opt.currency || data.quotation.limitOfLiabilityCurrency || 'USD'
+                  )
+                : opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`,
             tech: opt.premiumAmount || 0
           })
         }
@@ -4729,6 +4744,28 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             )
           }
           premContent.push(premTable(rows))
+        } else if (wLolPremTable) {
+          // Limit alternatives: "Limit : Premium" (as the FD&D / P&I quotes are written)
+          const lolW = [2648, 400, 2649]
+          const lolRow = (a: string, b: string, c: string): TableRow =>
+            new TableRow({
+              children: [
+                premCell(a, true, undefined, lolW[0]),
+                premCell(b, true, undefined, lolW[1]),
+                premCell(c, true, undefined, lolW[2])
+              ]
+            })
+          const rows: TableRow[] = [lolRow('Limit', '', 'Premium')]
+          for (const l of lines)
+            rows.push(lolRow(l.label, ':', formatCurrency(l.tech, wq.premiumCurrency)))
+          premContent.push(
+            new Table({
+              width: { size: lolW[0] + lolW[1] + lolW[2], type: WidthType.DXA },
+              columnWidths: lolW,
+              layout: TableLayoutType.FIXED,
+              rows
+            })
+          )
         } else {
           // Simple table: just amounts
           const rows: TableRow[] = []
@@ -4737,7 +4774,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
           premContent.push(premTable(rows))
         }
-        premContent.push(np('per annum'))
+        if (!wLolPremTable || wHasDiscount) premContent.push(np('per annum'))
         premContent.push(emptyP())
       } else if (lines.length === 1) {
         // Single line (S2-only war or plain single premium) — bold text
