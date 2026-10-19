@@ -3375,6 +3375,8 @@ app.whenReady().then(() => {
             created_at: formatDateForMySQL(new Date()),
             score: result.score,
             imo_number: result.entity.vessel_imo || undefined,
+            date_of_birth: result.entity.date_of_birth || null,
+            nationality: result.entity.nationality || null,
             matched_on: result.matched_on
           }))
           .filter((match) => (match.score || 0) >= effectiveThreshold)

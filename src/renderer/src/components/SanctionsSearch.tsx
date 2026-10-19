@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import {
   Search,
   Shield,
   AlertTriangle,
   Info,
-  Ship,
   ChevronRight,
   ChevronDown,
   Plus,
@@ -32,6 +31,16 @@ import { ok, isIpcError } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 import { hasArabic } from '../utils/arabicNames'
 import { saveFile, SaveCancelledError } from '../utils/saveFile'
+import {
+  checkBirth,
+  checkImo,
+  checkNationality,
+  daysSince,
+  nationalityName,
+  scoreBand,
+  updatedAgo,
+  type DetailCheck
+} from '../utils/sanctionsDetails'
 
 interface SicEntry {
   id: number
@@ -133,6 +142,15 @@ export default function SanctionsSearch({
   const [results, setResults] = useState<SanctionsMatch[]>([])
   // The words searched for (highlighted in the results; the box may already hold a new search)
   const [searchedQuery, setSearchedQuery] = useState('')
+  // Optional details that narrow the results
+  const [showDetails, setShowDetails] = useState(false)
+  const [dob, setDob] = useState('')
+  const [nationality, setNationality] = useState('')
+  const [imo, setImo] = useState('')
+  const [searchedDetails, setSearchedDetails] = useState({ dob: '', nationality: '', imo: '' })
+  const [showLeftOut, setShowLeftOut] = useState(false)
+  // When each list was last updated (shown by the list chips)
+  const [listStatus, setListStatus] = useState<Record<string, string>>({})
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -210,11 +228,44 @@ export default function SanctionsSearch({
     }
   }, [activeTab])
 
+  // Last searches (this computer, per user): chips under the search box
+  const recentKey = `sanctions_recent_u${user?.id || ''}`
+  const [recent, setRecent] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(recentKey)
+      return raw ? (JSON.parse(raw) as string[]) : []
+    } catch {
+      return []
+    }
+  })
+  const rememberSearch = (q: string): void => {
+    const next = [q, ...recent.filter((r) => r.toLowerCase() !== q.toLowerCase())].slice(0, 10)
+    setRecent(next)
+    try {
+      localStorage.setItem(recentKey, JSON.stringify(next))
+    } catch {
+      /* storage unavailable: kept for this session only */
+    }
+  }
+  const clearRecent = (): void => {
+    setRecent([])
+    try {
+      localStorage.removeItem(recentKey)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const handleSearch = async (e?: React.FormEvent): Promise<void> => {
     if (e) e.preventDefault()
-    if (!query.trim()) return
+    await runSearch(query)
+  }
+
+  const runSearch = async (raw: string): Promise<void> => {
+    const q = raw.trim()
+    if (!q) return
     // One or two letters match parts of thousands of names: not a useful screening
-    if (query.trim().replace(/\s+/g, '').length < 3) {
+    if (q.replace(/\s+/g, '').length < 3) {
       setHasSearched(true)
       setResults([])
       setError('Type at least 3 letters to search')
@@ -225,10 +276,13 @@ export default function SanctionsSearch({
     setError(null)
     setHasSearched(true)
     setExpandedId(null)
-    setSearchedQuery(query.trim())
+    setShowLeftOut(false)
+    setSearchedQuery(q)
+    setSearchedDetails({ dob: dob.trim(), nationality: nationality.trim(), imo: imo.trim() })
+    rememberSearch(q)
 
     try {
-      const response = await window.api.checkSanctions(query, threshold / 100, sources)
+      const response = await window.api.checkSanctions(q, threshold / 100, sources)
 
       if (response.status === 'ERROR') {
         setError(
@@ -237,9 +291,18 @@ export default function SanctionsSearch({
         )
         setResults([])
       } else {
-        const filteredMatches = (response.matches || []).filter(
-          (m: SanctionsMatch) => Math.round((m.score || 0) * 100) >= threshold
-        )
+        let matches: SanctionsMatch[] = response.matches || []
+        // An IMO typed in the details is searched too: a renamed vessel is still found
+        const imoDigits = imo.replace(/\D/g, '')
+        if (imoDigits.length === 7 && imoDigits !== q) {
+          const byImo = await window.api.checkSanctions(imoDigits, threshold / 100, sources)
+          if (byImo.status !== 'ERROR')
+            for (const m of byImo.matches || [])
+              if (!matches.some((x) => x.id === m.id)) matches = [...matches, m]
+        }
+        const filteredMatches = matches
+          .filter((m: SanctionsMatch) => Math.round((m.score || 0) * 100) >= threshold)
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
         setResults(filteredMatches)
       }
     } catch (err) {
@@ -248,6 +311,31 @@ export default function SanctionsSearch({
       setIsSearching(false)
     }
   }
+
+  // Extra details (optional): a result whose listed date of birth, nationality or IMO differs
+  // is left out (it can be shown again); a matching one is ticked
+  const detailChecks = (
+    m: SanctionsMatch
+  ): { birth: DetailCheck; nat: DetailCheck; imo: DetailCheck } => ({
+    birth: checkBirth(searchedDetails.dob, m.date_of_birth),
+    nat: checkNationality(searchedDetails.nationality, m.nationality),
+    imo: checkImo(searchedDetails.imo, m.imo_number)
+  })
+  const leftOut = results.filter((m) => Object.values(detailChecks(m)).includes('differs'))
+  const shownResults = showLeftOut ? results : results.filter((m) => !leftOut.includes(m))
+  // Results by kind (individual, entity, vessel...), in that order
+  const resultGroups: [string, SanctionsMatch[]][] = (() => {
+    const groups = new Map<string, SanctionsMatch[]>()
+    for (const m of shownResults) {
+      const t = (m.target_type || 'unknown').toLowerCase()
+      groups.set(t, [...(groups.get(t) || []), m])
+    }
+    // The kind with the strongest match first; then individual, entity, vessel, aircraft
+    const order = ['individual', 'entity', 'vessel', 'aircraft']
+    const rank = (t: string): number => (order.indexOf(t) === -1 ? 99 : order.indexOf(t))
+    const best = (l: SanctionsMatch[]): number => Math.max(...l.map((m) => m.score || 0))
+    return [...groups].sort((a, b) => best(b[1]) - best(a[1]) || rank(a[0]) - rank(b[0]))
+  })()
 
   const saveThresholdAsDefault = async (): Promise<void> => {
     if (!user) return
@@ -263,20 +351,26 @@ export default function SanctionsSearch({
   const exportResults = async (): Promise<void> => {
     try {
       const XLSX = (await import('xlsx-js-style')).default
-      const rows = results.map((m) => ({
-        'Searched name': query.trim(),
+      const rows = shownResults.map((m) => ({
+        'Searched name': searchedQuery,
         'Name on list': m.names?.[0] || '',
+        'Matched on': m.matched_on
+          ? `${MATCHED_ON_LABEL[m.matched_on.field]}: ${m.matched_on.value}`
+          : '',
         'Also known as': (m.names || []).slice(1).join('; '),
         List: m.source,
         'List reference': m.source_id,
         Kind: m.target_type,
         'Score %': Math.round((m.score || 0) * 100),
+        Strength: scoreBand(m.score).label,
+        Born: m.date_of_birth || '',
+        Nationality: nationalityName(m.nationality),
         IMO: m.imo_number || '',
         'Listed on': m.listed_on || '',
         Remarks: m.remarks || ''
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
-      ws['!cols'] = [22, 30, 40, 8, 16, 12, 8, 10, 12, 60].map((wch) => ({ wch }))
+      ws['!cols'] = [22, 30, 30, 40, 8, 16, 12, 8, 10, 14, 14, 10, 12, 60].map((wch) => ({ wch }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Results')
       const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
@@ -318,15 +412,6 @@ export default function SanctionsSearch({
       default:
         return '#ffd43b'
     }
-  }
-
-  const getScoreColor = (
-    score?: number
-  ): 'var(--danger)' | 'var(--text-secondary)' | 'var(--warning)' | 'var(--success)' => {
-    if (!score) return 'var(--text-secondary)'
-    if (score >= 0.9) return 'var(--danger)'
-    if (score >= 0.7) return 'var(--warning)'
-    return 'var(--success)'
   }
 
   // SIC handlers
@@ -486,6 +571,27 @@ export default function SanctionsSearch({
     )
   })
 
+  const statusMap = (
+    st: Awaited<ReturnType<typeof window.api.sanctionsGetStatus>>
+  ): Record<string, string> =>
+    Object.fromEntries((st?.sources || []).map((x) => [x.source, x.updated_at || '']))
+  const loadListStatus = (): void => {
+    window.api
+      .sanctionsGetStatus()
+      .then((st) => setListStatus(statusMap(st)))
+      .catch(() => {
+        /* freshness is informative only */
+      })
+  }
+  useEffect(() => {
+    window.api
+      .sanctionsGetStatus()
+      .then((st) => setListStatus(statusMap(st)))
+      .catch(() => {
+        /* freshness is informative only */
+      })
+  }, [])
+
   const handleUpdateLists = async (): Promise<void> => {
     const SANCTION_SOURCES = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
     setUpdatingLists(true)
@@ -519,6 +625,7 @@ export default function SanctionsSearch({
     } finally {
       setUpdatingLists(false)
       setUpdateProgress('')
+      loadListStatus()
     }
   }
 
@@ -624,7 +731,7 @@ export default function SanctionsSearch({
                       style={{
                         fontSize: '0.85rem',
                         fontWeight: '700',
-                        color: getScoreColor(threshold / 100)
+                        color: scoreBand(threshold / 100).color
                       }}
                     >
                       {threshold}%
@@ -695,32 +802,146 @@ export default function SanctionsSearch({
                     SANCTIONS LISTS
                   </label>
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    {['OFAC', 'UN', 'EU', 'UK', 'ISF', 'SIC'].map((source) => (
-                      <button
-                        key={source}
-                        type="button"
-                        onClick={() => toggleSource(source.toLowerCase())}
-                        style={{
-                          padding: '8px 16px',
-                          borderRadius: '8px',
-                          border: `1px solid ${sources.includes(source.toLowerCase()) ? getSourceColor(source) : 'var(--input-border)'}`,
-                          background: sources.includes(source.toLowerCase())
-                            ? `${getSourceColor(source)}15`
-                            : 'transparent',
-                          color: sources.includes(source.toLowerCase())
-                            ? getSourceColor(source)
-                            : 'var(--text-secondary)',
-                          fontSize: '0.8rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {source}
-                      </button>
-                    ))}
+                    {['OFAC', 'UN', 'EU', 'UK', 'ISF', 'SIC'].map((source) => {
+                      // SIC is kept by hand: no download date to show
+                      const updated = source === 'SIC' ? '' : updatedAgo(listStatus[source])
+                      const stale = source !== 'SIC' && daysSince(listStatus[source]) > 7
+                      return (
+                        <button
+                          key={source}
+                          type="button"
+                          onClick={() => toggleSource(source.toLowerCase())}
+                          title={
+                            source === 'SIC'
+                              ? 'SIC list (kept by hand in the SIC List tab)'
+                              : listStatus[source]
+                                ? `${source} list last updated ${updated}${stale ? ' - use Update Lists' : ''}`
+                                : `${source} list never downloaded - use Update Lists`
+                          }
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            lineHeight: 1.2,
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            border: `1px solid ${sources.includes(source.toLowerCase()) ? getSourceColor(source) : 'var(--input-border)'}`,
+                            background: sources.includes(source.toLowerCase())
+                              ? `${getSourceColor(source)}15`
+                              : 'transparent',
+                            color: sources.includes(source.toLowerCase())
+                              ? getSourceColor(source)
+                              : 'var(--text-secondary)',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {source}
+                          {source !== 'SIC' && (
+                            <span
+                              style={{
+                                fontSize: '0.64rem',
+                                fontWeight: 500,
+                                color: stale ? 'var(--warning)' : 'var(--text-secondary)'
+                              }}
+                            >
+                              {updated || 'never'}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  style={{ alignSelf: 'flex-start' }}
+                  onClick={() => setShowDetails((v) => !v)}
+                  aria-expanded={showDetails}
+                >
+                  {showDetails ? <ChevronDown size={14} /> : <ChevronRight size={14} />} More
+                  details (date of birth, nationality, IMO)
+                  {(dob || nationality || imo) && !showDetails ? ' - in use' : ''}
+                </button>
+                {showDetails && (
+                  <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    <Field label="Date of birth (or year)">
+                      <input
+                        type="text"
+                        value={dob}
+                        onChange={(e) => setDob(e.target.value)}
+                        placeholder="e.g. 1965 or 15/03/1965"
+                      />
+                    </Field>
+                    <Field label="Nationality">
+                      <input
+                        type="text"
+                        value={nationality}
+                        onChange={(e) => setNationality(e.target.value)}
+                        placeholder="e.g. Lebanese"
+                      />
+                    </Field>
+                    <Field label="IMO">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={imo}
+                        onChange={(e) => setImo(e.target.value)}
+                        placeholder="7 digits"
+                      />
+                    </Field>
+                    <div
+                      style={{
+                        gridColumn: '1 / -1',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      A result whose listed date of birth (year), nationality or IMO is different is
+                      left out (you can still show it); one that matches is ticked. The IMO is also
+                      searched on its own.
+                    </div>
+                  </div>
+                )}
+                {recent.length > 0 && (
+                  <div
+                    style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}
+                  >
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Recent:
+                    </span>
+                    {recent.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '0.78rem' }}
+                        onClick={() => {
+                          setQuery(r)
+                          void runSearch(r)
+                        }}
+                        title={`Search ${r} again`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}
+                      onClick={clearRecent}
+                      title="Clear the recent searches"
+                    >
+                      <X size={12} /> Clear
+                    </button>
+                  </div>
+                )}
               </div>
             </form>
           </div>
@@ -774,25 +995,16 @@ export default function SanctionsSearch({
               style={{
                 display: 'flex',
                 gap: '10px',
-                marginBottom: '16px',
+                marginBottom: '12px',
                 flexWrap: 'wrap',
                 alignItems: 'center'
               }}
             >
               <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
-                {results.length} result{results.length !== 1 ? 's' : ''}
+                {shownResults.length} result{shownResults.length !== 1 ? 's' : ''}
               </span>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>—</span>
-              {Object.entries(
-                results.reduce(
-                  (acc, m) => {
-                    const t = m.target_type || 'Unknown'
-                    acc[t] = (acc[t] || 0) + 1
-                    return acc
-                  },
-                  {} as Record<string, number>
-                )
-              ).map(([type, count]) => (
+              {resultGroups.map(([type, list]) => (
                 <button
                   key={type}
                   type="button"
@@ -812,7 +1024,7 @@ export default function SanctionsSearch({
                     color: 'var(--text-secondary)'
                   }}
                 >
-                  {type}: {count}
+                  {type}: {list.length}
                 </button>
               ))}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
@@ -826,7 +1038,7 @@ export default function SanctionsSearch({
                 <button
                   className="btn-secondary btn-sm"
                   onClick={() => {
-                    setReportSubject({ name: query.trim(), nonce: Date.now() })
+                    setReportSubject({ name: searchedQuery || query.trim(), nonce: Date.now() })
                     setActiveTab('report')
                   }}
                   title="Screen this name as a check report: link it to an entity, record the decision, export a PDF"
@@ -837,278 +1049,231 @@ export default function SanctionsSearch({
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {(() => {
-              const groups: Record<string, SanctionsMatch[]> = {}
-              for (const m of results) {
-                const type = m.target_type || 'Unknown'
-                if (!groups[type]) groups[type] = []
-                groups[type].push(m)
-              }
-              const typeOrder = ['Individual', 'Entity', 'Vessel', 'Aircraft']
-              const sortedTypes = Object.keys(groups).sort((a, b) => {
-                const ia = typeOrder.indexOf(a)
-                const ib = typeOrder.indexOf(b)
-                return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
-              })
-              const typeIcons: Record<string, string> = {
-                Individual: '👤',
-                Entity: '🏢',
-                Vessel: '🚢',
-                Aircraft: '✈️'
-              }
-              const typeColors: Record<string, string> = {
-                Individual: '#ffa726',
-                Entity: '#42a5f5',
-                Vessel: '#26c6da',
-                Aircraft: '#ab47bc'
-              }
+          {leftOut.length > 0 && (
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '12px',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center'
+              }}
+            >
+              <Info size={14} />
+              {leftOut.length} result{leftOut.length !== 1 ? 's' : ''}{' '}
+              {showLeftOut ? 'shown with' : 'left out:'} a different date of birth, nationality or
+              IMO.
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={() => setShowLeftOut((v) => !v)}
+              >
+                {showLeftOut ? 'Hide them' : 'Show them'}
+              </button>
+            </div>
+          )}
 
-              return sortedTypes.map((type) => (
-                <div key={type}>
-                  <div
-                    id={`sanctions-group-${type}`}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {resultGroups.map(([type, list]) => (
+              <div key={type}>
+                <div
+                  id={`sanctions-group-${type}`}
+                  style={{
+                    scrollMarginTop: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '6px 2px',
+                    marginBottom: '6px'
+                  }}
+                >
+                  <span
                     style={{
-                      scrollMarginTop: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 4px',
-                      marginTop: '8px',
-                      marginBottom: '4px',
-                      borderBottom: `2px solid ${typeColors[type] || 'var(--table-border)'}`
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
                     }}
                   >
-                    <span style={{ fontSize: '1.1rem' }}>{typeIcons[type] || '📋'}</span>
-                    <span
-                      style={{
-                        fontSize: '0.88rem',
-                        fontWeight: 700,
-                        color: typeColors[type] || 'var(--text-primary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      {type}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        background: `${typeColors[type] || 'var(--accent-primary)'}18`,
-                        color: typeColors[type] || 'var(--text-secondary)'
-                      }}
-                    >
-                      {groups[type].length}
-                    </span>
-                  </div>
-                  {groups[type].map((match) => (
-                    <div
-                      key={match.id}
-                      className="glass-card"
-                      style={{
-                        padding: '0',
-                        overflow: 'hidden',
-                        borderLeft: `4px solid ${getSourceColor(match.source)}`,
-                        marginBottom: '12px'
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: '20px 24px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '20px',
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              marginBottom: '4px'
-                            }}
-                          >
-                            <span
+                    {type}
+                  </span>
+                  <span className="badge">{list.length}</span>
+                </div>
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name on list</th>
+                        <th style={{ width: '70px' }}>List</th>
+                        <th style={{ width: '220px' }}>Born / nationality / IMO</th>
+                        <th style={{ width: '200px' }}>Programmes</th>
+                        <th className="num" style={{ width: '90px' }}>
+                          Score
+                        </th>
+                        <th style={{ width: '28px' }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((match) => {
+                        const checks = detailChecks(match)
+                        const band = scoreBand(match.score)
+                        const tick = (c: DetailCheck): string =>
+                          c === 'match' ? ' ✓' : c === 'differs' ? ' ✗' : ''
+                        const facts = [
+                          match.date_of_birth
+                            ? `Born ${match.date_of_birth}${tick(checks.birth)}`
+                            : '',
+                          match.nationality
+                            ? `${nationalityName(match.nationality)}${tick(checks.nat)}`
+                            : '',
+                          match.imo_number ? `IMO ${match.imo_number}${tick(checks.imo)}` : ''
+                        ].filter(Boolean)
+                        const open = expandedId === match.id
+                        return (
+                          <Fragment key={match.id}>
+                            <tr
+                              className={`clickable${open ? ' selected' : ''}`}
+                              onClick={() => setExpandedId(open ? null : match.id)}
                               style={{
-                                fontSize: '1.1rem',
-                                fontWeight: '700',
-                                color: 'var(--text-primary)'
+                                opacity: Object.values(checks).includes('differs') ? 0.6 : 1
                               }}
                             >
-                              <HighlightWords text={match.names[0]} query={searchedQuery} />
-                            </span>
-                            <span
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                background: `${getSourceColor(match.source)}20`,
-                                color: getSourceColor(match.source),
-                                fontSize: '0.65rem',
-                                fontWeight: '800',
-                                textTransform: 'uppercase'
-                              }}
-                            >
-                              {match.source}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '16px',
-                              fontSize: '0.8rem',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Shield size={14} /> {match.target_type}
-                            </span>
-                            {match.imo_number && (
-                              <span
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  color: 'var(--info)',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                <Ship size={14} /> IMO: {match.imo_number}
-                              </span>
-                            )}
-                          </div>
-                          {match.matched_on && match.matched_on.field !== 'name' && (
-                            <div
-                              style={{
-                                fontSize: '0.8rem',
-                                color: 'var(--text-secondary)',
-                                marginTop: '4px'
-                              }}
-                            >
-                              Matched on {MATCHED_ON_LABEL[match.matched_on.field]}:{' '}
-                              <HighlightWords text={match.matched_on.value} query={searchedQuery} />
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div
-                            style={{
-                              fontSize: '1.2rem',
-                              fontWeight: '800',
-                              color: getScoreColor(match.score)
-                            }}
-                          >
-                            {Math.round((match.score || 0) * 100)}%
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '0.7rem',
-                              color: 'var(--text-secondary)',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            MATCH SCORE
-                          </div>
-                        </div>
-
-                        {expandedId === match.id ? (
-                          <ChevronDown size={20} />
-                        ) : (
-                          <ChevronRight size={20} />
-                        )}
-                      </div>
-
-                      {expandedId === match.id && (
-                        <div
-                          style={{
-                            padding: '0 24px 24px',
-                            borderTop: '1px solid var(--glass-border-color)',
-                            background: isLight
-                              ? 'rgba(0, 0, 0, 0.02)'
-                              : 'rgba(255, 255, 255, 0.02)'
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr 1fr',
-                              gap: '24px',
-                              marginTop: '20px'
-                            }}
-                          >
-                            <div>
-                              <h4
-                                style={{
-                                  margin: '0 0 12px 0',
-                                  fontSize: '0.8rem',
-                                  color: 'var(--text-secondary)',
-                                  textTransform: 'uppercase'
-                                }}
-                              >
-                                ALIASES & KNOWN NAMES
-                              </h4>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                {match.names.map((n, i) => (
-                                  <span
-                                    key={i}
+                              <td>
+                                <div style={{ fontWeight: 600 }}>
+                                  <HighlightWords text={match.names[0]} query={searchedQuery} />
+                                </div>
+                                {match.matched_on && match.matched_on.field !== 'name' && (
+                                  <div
                                     style={{
-                                      padding: '4px 10px',
-                                      borderRadius: '6px',
-                                      background: 'var(--input-bg)',
-                                      fontSize: '0.8rem'
+                                      fontSize: '0.76rem',
+                                      color: 'var(--text-secondary)',
+                                      marginTop: '2px'
                                     }}
                                   >
-                                    {n}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <h4
-                                style={{
-                                  margin: '0 0 12px 0',
-                                  fontSize: '0.8rem',
-                                  color: 'var(--text-secondary)',
-                                  textTransform: 'uppercase'
-                                }}
-                              >
-                                DETAILS & REMARKS
-                              </h4>
-                              <p
-                                style={{
-                                  margin: 0,
-                                  fontSize: '0.85rem',
-                                  color: 'var(--text-secondary)',
-                                  lineHeight: '1.6'
-                                }}
-                              >
-                                {match.remarks || 'No additional remarks provided.'}
-                              </p>
-                              {match.source_id && (
-                                <div style={{ marginTop: '12px', fontSize: '0.8rem' }}>
-                                  <span style={{ color: 'var(--text-secondary)' }}>
-                                    Source ID:{' '}
-                                  </span>
-                                  <code style={{ color: 'var(--text-primary)' }}>
-                                    {match.source_id}
-                                  </code>
+                                    Matched on {MATCHED_ON_LABEL[match.matched_on.field]}:{' '}
+                                    <HighlightWords
+                                      text={match.matched_on.value}
+                                      query={searchedQuery}
+                                    />
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <span
+                                  style={{
+                                    padding: '2px 7px',
+                                    borderRadius: '4px',
+                                    background: `${getSourceColor(match.source)}20`,
+                                    color: getSourceColor(match.source),
+                                    fontSize: '0.66rem',
+                                    fontWeight: 800,
+                                    textTransform: 'uppercase'
+                                  }}
+                                >
+                                  {match.source}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                {facts.length > 0 ? facts.map((f) => <div key={f}>{f}</div>) : '-'}
+                              </td>
+                              <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                {match.positions?.length
+                                  ? match.positions.slice(0, 2).join(', ') +
+                                    (match.positions.length > 2
+                                      ? ` +${match.positions.length - 2}`
+                                      : '')
+                                  : '-'}
+                              </td>
+                              <td className="num">
+                                <div style={{ fontWeight: 800, color: band.color }}>
+                                  {Math.round((match.score || 0) * 100)}%
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                                <div style={{ fontSize: '0.68rem', color: band.color }}>
+                                  {band.label}
+                                </div>
+                              </td>
+                              <td>
+                                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              </td>
+                            </tr>
+                            {open && (
+                              <tr>
+                                <td colSpan={6} style={{ background: 'var(--bg-secondary)' }}>
+                                  <div
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: '1fr 1fr',
+                                      gap: '20px',
+                                      padding: '8px 4px'
+                                    }}
+                                  >
+                                    <div>
+                                      <div className="field-label" style={{ marginBottom: '8px' }}>
+                                        Aliases and known names
+                                      </div>
+                                      <div
+                                        style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}
+                                      >
+                                        {match.names.map((n, i) => (
+                                          <span
+                                            key={i}
+                                            style={{
+                                              padding: '3px 9px',
+                                              borderRadius: '6px',
+                                              background: 'var(--input-bg)',
+                                              fontSize: '0.78rem'
+                                            }}
+                                          >
+                                            <HighlightWords text={n} query={searchedQuery} />
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.82rem', lineHeight: 1.6 }}>
+                                      <div className="field-label" style={{ marginBottom: '8px' }}>
+                                        Details and remarks
+                                      </div>
+                                      <div style={{ color: 'var(--text-secondary)' }}>
+                                        {match.remarks || 'No additional remarks provided.'}
+                                      </div>
+                                      {match.positions?.length > 0 && (
+                                        <div>
+                                          <span style={{ color: 'var(--text-secondary)' }}>
+                                            Programmes:{' '}
+                                          </span>
+                                          {match.positions.join(', ')}
+                                        </div>
+                                      )}
+                                      {match.listed_on && (
+                                        <div>
+                                          <span style={{ color: 'var(--text-secondary)' }}>
+                                            Listed on:{' '}
+                                          </span>
+                                          {match.listed_on}
+                                        </div>
+                                      )}
+                                      {match.source_id && (
+                                        <div>
+                                          <span style={{ color: 'var(--text-secondary)' }}>
+                                            List reference:{' '}
+                                          </span>
+                                          <code>{match.source_id}</code>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))
-            })()}
+              </div>
+            ))}
           </div>
         </>
       )}
