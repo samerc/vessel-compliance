@@ -1,6 +1,7 @@
 import { BrowserWindow, Notification } from 'electron'
 import { db, MySQLAdapter } from '../mysql/adapter'
 import { sanctionsService } from '../sanctions/SanctionsService'
+import { searchSanctions } from '../sanctions/searchProcess'
 
 class ComplianceScheduler {
   private checkTimer: NodeJS.Timeout | null = null
@@ -152,7 +153,8 @@ class ComplianceScheduler {
             ? db.updateVessel(subject.id, fields)
             : db.updateEntity(subject.id, fields)
         try {
-          const data = sanctionsService.search(subject.name, {
+          // In the search process: the app stays responsive during the run
+          const data = await searchSanctions(subject.name, {
             threshold: 0.6,
             limit: 10,
             mode: 'both',

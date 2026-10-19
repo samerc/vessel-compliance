@@ -109,7 +109,8 @@ Sanctions screening runs entirely within the Electron app — no external API de
 - **Normalize**: `normalize.ts` — lowercase, NFD unicode, strip diacritics, strip special chars
 - **Startup**: `sanctionsService.initialize(dbDir)` called in `app.whenReady()`, loads all entities into Fuse.js in-memory index
 - **Shutdown**: `sanctionsService.close()` in `window-all-closed` handler
-- **IPC**: `ofac:checkSanctions` uses `SanctionsService.search()` locally (no HTTP calls)
+- **Search process** (2026-10-19): `ofac:checkSanctions` and the weekly check call `searchSanctions` (`sanctions/searchProcess.ts`), which runs `SanctionsService.search` in a utility process (`workers/sanctionsSearch.ts`, own copy of the index from the same sanctions.db). A search takes 0.5-3 s; on the main process it froze the app (the weekly check of ~2,300 names made it stutter for 20+ minutes). Started on the first search (index build a few seconds), closed after 10 idle minutes; `SanctionsService.getDataVersion()` is bumped by every index (re)build / SIC patch and the process reloads when its copy is older. Loaded from `__dirname` (same build, so it ships in hot-updates); on failure (3 in a row = for the session) the search runs in the main process as before
+- **IPC**: `ofac:checkSanctions` uses the local lists (no HTTP calls)
 - **OfacService** (`src/renderer/src/services/OfacService.ts`) - thin wrapper calling IPC (unchanged)
 - **SanctionsModal** (`src/renderer/src/components/SanctionsModal.tsx`) - displays potential matches (unchanged)
 - **Status flow**: `PENDING` → `POTENTIAL_MATCH` (yellow, needs review) → `CLEARED` or `MATCH` (user decision)

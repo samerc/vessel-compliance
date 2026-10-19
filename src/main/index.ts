@@ -55,6 +55,7 @@ import { formatDateForMySQL } from './mysql/utils'
 import { assignRegistryNumber, markRegistryCancelled } from './services/QuotationRegistryService'
 import { hotUpdateService } from './services/HotUpdateService'
 import { sanctionsService } from './sanctions/SanctionsService'
+import { searchSanctions, stopSanctionsSearchProcess } from './sanctions/searchProcess'
 import type { SanctionsEntity } from './sanctions/SanctionsDatabase'
 import { normalizeText } from './sanctions/normalize'
 import type { ParsedDefect } from './workers/defectParser'
@@ -3087,6 +3088,7 @@ app.whenReady().then(() => {
     })
   }
   app.on('before-quit', sicOcrStop)
+  app.on('before-quit', stopSanctionsSearchProcess)
   safeHandle('word:importDefects', async (event, surveyId: string, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) throw new Error('Invalid file path')
@@ -3352,7 +3354,7 @@ app.whenReady().then(() => {
           }
         }
 
-        const data = sanctionsService.search(name, {
+        const data = await searchSanctions(name, {
           threshold: effectiveThreshold,
           sources: sources?.map((s) => s.toUpperCase()),
           limit: 20,

@@ -113,6 +113,10 @@ export class SanctionsService {
   private wordCounts = new Map<string, number>()
   private wordCount = (w: string): number => this.wordCounts.get(w) || 0
   public initialized = false
+  // Folder of sanctions.db, and a counter bumped whenever the index changes: the search process
+  // (searchProcess.ts) reloads the lists when its copy is older
+  private dbDir = ''
+  private dataVersion = 0
   private markReady: () => void = () => {}
   private readonly ready = new Promise<void>((resolve) => (this.markReady = resolve))
 
@@ -121,8 +125,17 @@ export class SanctionsService {
     return this.ready
   }
 
+  getDbDir(): string {
+    return this.initialized ? this.dbDir : ''
+  }
+
+  getDataVersion(): number {
+    return this.dataVersion
+  }
+
   initialize(dbDir: string): void {
     try {
+      this.dbDir = dbDir
       this.db.open(dbDir)
       this.buildIndex()
       this.initialized = true
@@ -163,6 +176,7 @@ export class SanctionsService {
   }
 
   private buildIndex(): void {
+    this.dataVersion++
     this.entityCache = this.db.getAllEntities()
     const searchable = this.entityCache.map(SanctionsService.toSearchable)
     // Fuse keeps (and Fuse.add pushes onto) the array it is given: hand it a copy so its slots
@@ -186,6 +200,7 @@ export class SanctionsService {
   // main process). Now: tombstone the old slot and append the new version; Fuse.add appends,
   // so Fuse refIndex stays equal to the `searchable` slot. Full rebuild after many edits.
   private patchIndex(id: number, replacement: SanctionsEntity | null): void {
+    this.dataVersion++
     if (!this.fuseIndex) {
       this.buildIndex()
       return
