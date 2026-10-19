@@ -116,6 +116,7 @@ import {
   PolicyRenewalRow,
   CustomerOverview,
   VesselCustomerMap,
+  VesselBusinessMap,
   PolicyType,
   PolicyTypeCharacteristic,
   PolicyTypeCondition,
@@ -19838,6 +19839,54 @@ export class MySQLAdapter {
           email: r.email || null,
           type: r.type || null
         })
+    }
+    return map
+  }
+
+  async getVesselBusiness(): Promise<VesselBusinessMap> {
+    if (!this.pool) return {}
+    const map: VesselBusinessMap = {}
+    const get = (id: string): VesselBusinessMap[string] =>
+      (map[id] ||= { policyTypeIds: [], renewalDate: null, renewalType: null, quotations: [] })
+    const [pols] = await this.pool.query(
+      `SELECT DISTINCT vessel_id AS vesselId, policy_type_id AS policyTypeId
+         FROM vessel_dynamic_policies WHERE status = 'active'`
+    )
+    for (const r of pols as RowDataPacket[]) {
+      const b = get(r.vesselId)
+      if (r.policyTypeId && !b.policyTypeIds.includes(r.policyTypeId))
+        b.policyTypeIds.push(r.policyTypeId)
+    }
+    const [ends] = await this.pool.query(
+      `SELECT vdp.vessel_id AS vesselId, pt.name AS typeName, vpv.value_date AS endDate
+         FROM vessel_dynamic_policies vdp
+         JOIN policy_types pt ON pt.id = vdp.policy_type_id
+         JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+         JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+        WHERE vdp.status = 'active' AND ptc.field_type = 'date'
+          AND LOWER(ptc.name) LIKE '%end%' AND vpv.value_date IS NOT NULL AND vpv.value_date <> ''
+          AND vpv.value_date BETWEEN DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 30 DAY), '%Y-%m-%d')
+                                 AND DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 30 DAY), '%Y-%m-%d')`
+    )
+    for (const r of ends as RowDataPacket[]) {
+      const b = get(r.vesselId)
+      const d = String(r.endDate).slice(0, 10)
+      if (!b.renewalDate || d < b.renewalDate) {
+        b.renewalDate = d
+        b.renewalType = r.typeName || null
+      }
+    }
+    const [quotes] = await this.pool.query(
+      `SELECT DISTINCT qv.vessel_id AS vesselId, q.id, q.reference_number AS reference
+         FROM quotation_vessels qv JOIN quotations q ON q.id = qv.quotation_id
+        WHERE qv.vessel_id IS NOT NULL AND q.deleted_at IS NULL
+          AND (q.status IS NULL OR q.status <> 'converted')
+          AND q.updated_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`
+    )
+    for (const r of quotes as RowDataPacket[]) {
+      const b = get(r.vesselId)
+      if (!b.quotations.some((x) => x.id === r.id))
+        b.quotations.push({ id: r.id, reference: r.reference || '' })
     }
     return map
   }

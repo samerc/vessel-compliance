@@ -5652,6 +5652,10 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getVesselCustomers()
   })
+  safeHandle('compliance:getVesselBusiness', (event) => {
+    requireSession(event)
+    return db.getVesselBusiness()
+  })
   safeHandle('policies:getVesselPolicyExpiries', (event) => {
     requireSession(event)
     return db.getVesselPolicyExpiries()

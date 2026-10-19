@@ -138,6 +138,7 @@ import {
   PolicyRenewalRow,
   CustomerOverview,
   VesselCustomerMap,
+  VesselBusinessMap,
   RenewalStatusType,
   PolicyRenewalNote,
   VesselNote,
@@ -1225,6 +1226,8 @@ export interface Api {
   getExpiredActivePolicies: () => Promise<PolicyExpiryRow[]>
   /** vesselId -> end date annual documents follow (active P&I, else H&M) */
   getVesselPolicyExpiries: () => Promise<Record<string, string>>
+  /** vesselId -> active policy types, renewal within 30 days, quotations in progress */
+  getVesselBusiness: () => Promise<VesselBusinessMap>
   /** Quotations, policies, active vessel policies and receipts of a customer / broker entity */
   getCustomerOverview: (entityId: string) => Promise<CustomerOverview>
   /** vesselId -> customers / brokers on its active vessel policies */

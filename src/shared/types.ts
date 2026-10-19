@@ -2168,6 +2168,20 @@ export type VesselCustomerMap = Record<
   { entityId: string; name: string; email: string | null; type: string | null }[]
 >
 
+/** vesselId -> what makes its missing documents urgent (Compliance Center Document Alerts) */
+export type VesselBusinessMap = Record<
+  string,
+  {
+    /** Policy types of its active policies (document type tags) */
+    policyTypeIds: string[]
+    /** Earliest end date of an active policy from 30 days ago to 30 days ahead (renewing now) */
+    renewalDate: string | null
+    renewalType: string | null
+    /** Quotations in progress (not converted, changed in the last 90 days) */
+    quotations: { id: string; reference: string }[]
+  }
+>
+
 export interface PolicyRenewalRow {
   id: string
   vesselId: string

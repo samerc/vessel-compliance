@@ -916,6 +916,7 @@ const api: Api = {
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getVesselPolicyExpiries: () => ipcRenderer.invoke('policies:getVesselPolicyExpiries'),
+  getVesselBusiness: () => ipcRenderer.invoke('compliance:getVesselBusiness'),
   getCustomerOverview: (entityId: string) =>
     ipcRenderer.invoke('entities:getCustomerOverview', entityId),
   getVesselCustomers: () => ipcRenderer.invoke('entities:getVesselCustomers'),

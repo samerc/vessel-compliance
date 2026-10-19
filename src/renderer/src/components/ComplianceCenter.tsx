@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import {
   AlertCircle,
-  Clock,
   CheckCircle,
   ShieldAlert,
   Shield,
@@ -19,12 +18,7 @@ import {
   Settings,
   Plus,
   Pencil,
-  Trash2,
-  List,
-  Layers,
-  Search,
-  FileText,
-  Briefcase
+  Trash2
 } from 'lucide-react'
 import {
   Vessel,
@@ -33,13 +27,15 @@ import {
   ComplianceCheckLog,
   ComplianceCheckResult,
   CustomValidationRule,
+  VesselAssured,
   EntityDocumentType,
   EntityDocument,
-  VesselAssured,
   EndorsementDueRow,
   PolicyExpiryRow,
   Entity,
-  VesselDynamicPolicy
+  VesselDynamicPolicy,
+  VesselBusinessMap,
+  VesselCustomerMap
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -47,9 +43,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog, promptDialog } from './DialogHost'
-import { PageHeader, Tabs, Badge, Field, EmptyState, Spinner, SegmentedControl } from './ui'
-import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
-import AlertsByCustomer from './AlertsByCustomer'
+import { PageHeader, Tabs, Badge, Field, Spinner } from './ui'
+import DocumentAlerts from './DocumentAlerts'
+import { buildDocAlerts } from '../utils/docAlerts'
 import SanctionsReviewDetail from './SanctionsReviewDetail'
 
 const STATIC_RULES = [
@@ -157,36 +153,7 @@ const EMPTY_RULE_FORM = {
   severity: 'warning'
 }
 
-/**
- * vessel_assureds row as read here. getVesselAssureds returns only the VesselAssured columns,
- * so the entity fields below are never set (kept because the alert builder reads them).
- */
-type AssuredRow = VesselAssured & { entityType?: string; entityName?: string; name?: string }
-
-/** One document/entity/endorsement alert in the Document Alerts tab */
-interface DocAlert {
-  id: string
-  vesselId: string
-  /** Entity documents: the entity they belong to */
-  entityId?: string
-  vessel: string
-  document: string
-  category: 'vessel' | 'entity' | 'endorsement'
-  type: 'missing' | 'expired' | 'soon'
-  severity: 'high' | 'critical' | 'medium'
-  message: string
-  date: string
-}
-
 type VesselSection = 'documents' | 'assureds' | 'surveys' | 'policies'
-
-/** Vessel tab that shows what an alert is about (entity documents live with the assureds) */
-const alertSection = (alert: Pick<DocAlert, 'category'>): VesselSection =>
-  alert.category === 'entity'
-    ? 'assureds'
-    : alert.category === 'endorsement'
-      ? 'surveys'
-      : 'documents'
 
 interface ComplianceCenterProps extends SubTabProps {
   onNavigateToVessel?: (vesselId: string, section?: VesselSection) => void
@@ -210,26 +177,9 @@ export default function ComplianceCenter({
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
-  const [allAssureds, setAllAssureds] = useState<AssuredRow[]>([])
-  const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-  const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat' | 'customer'>(
-    'vessel'
-  )
-  const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
-  const toggleGroup = (key: string): void =>
-    setExpandedVessels((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  // Flat view: sort and pages
-  const [flatSort, setFlatSort] = useState<{
-    key: 'vessel' | 'document' | 'type' | 'date' | 'severity'
-    dir: 'asc' | 'desc'
-  }>({ key: 'severity', dir: 'desc' })
-  const [flatPage, setFlatPage] = useState(0)
-  const [docSearch, setDocSearch] = useState('')
+  const [allAssureds, setAllAssureds] = useState<VesselAssured[]>([])
+  const [vesselBusiness, setVesselBusiness] = useState<VesselBusinessMap>({})
+  const [vesselCustomers, setVesselCustomers] = useState<VesselCustomerMap>({})
   // First load of the documents tab still running (never show "fully compliant" before it ends)
   const [docsLoading, setDocsLoading] = useState(true)
   const [endorsementsDue, setEndorsementsDue] = useState<EndorsementDueRow[]>([])
@@ -296,17 +246,32 @@ export default function ComplianceCenter({
 
   const loadData = useCallback(async (): Promise<void> => {
     try {
-      const [vData, dData, tData, edtData, edData, assuredData, endorsements, peData] =
-        await Promise.all([
-          window.api.getVessels(),
-          window.api.getVesselDocuments(),
-          window.api.getDocumentTypes(),
-          window.api.getEntityDocumentTypes(),
-          window.api.getEntityDocuments(),
-          window.api.getVesselAssureds(),
-          window.api.surveyWarrantyGetEndorsementsDue().catch(() => []),
-          window.api.getVesselPolicyExpiries()
-        ])
+      const [
+        vData,
+        dData,
+        tData,
+        edtData,
+        edData,
+        assuredData,
+        endorsements,
+        peData,
+        bizData,
+        custData
+      ] = await Promise.all([
+        window.api.getVessels(),
+        window.api.getVesselDocuments(),
+        window.api.getDocumentTypes(),
+        window.api.getEntityDocumentTypes(),
+        window.api.getEntityDocuments(),
+        window.api.getVesselAssureds(),
+        window.api.surveyWarrantyGetEndorsementsDue().catch(() => []),
+        window.api.getVesselPolicyExpiries(),
+        window.api.getVesselBusiness().catch(() => ({})),
+        window.api.getVesselCustomers().catch(() => ({}))
+      ])
+      const isMap = (x: unknown): boolean => !!x && typeof x === 'object' && !('error' in x)
+      setVesselBusiness(isMap(bizData) ? (bizData as VesselBusinessMap) : {})
+      setVesselCustomers(isMap(custData) ? (custData as VesselCustomerMap) : {})
       setPolicyExpiries(peData && typeof peData === 'object' && !('error' in peData) ? peData : {})
       setVessels(Array.isArray(vData) ? vData.filter((v) => v.isActive !== false) : [])
       setDocs(Array.isArray(dData) ? dData : [])
@@ -644,251 +609,38 @@ export default function ComplianceCenter({
     }
   }
 
-  // Every document/entity alert across the fleet — recomputed only when its inputs change
-  // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
-  const allAlerts = useMemo((): DocAlert[] => {
-    // Midnight, like the vessel page: a document expiring today is not expired yet
-    const today = new Date(new Date().setHours(0, 0, 0, 0))
-    const thirtyDaysFromNow = new Date()
-    thirtyDaysFromNow.setDate(today.getDate() + 30)
-
-    const alerts: DocAlert[] = []
-    const docMap = new Map<string, VesselDocument>()
-    for (const d of docs) docMap.set(`${d.vesselId}:${d.documentTypeId}`, d)
-
-    vessels.forEach((v) => {
-      // Vessel document alerts
-      docTypes.forEach((t) => {
-        const doc = docMap.get(`${v.id}:${t.id}`)
-        const isRequired = doc ? doc.required : t.required
-        const hasFile = !!doc?.filePath
-
-        if (isRequired && !hasFile) {
-          alerts.push({
-            id: `${v.id}-${t.id}-missing`,
-            vesselId: v.id,
-            vessel: v.name,
-            document: t.name,
-            category: 'vessel',
-            type: 'missing',
-            severity: 'high',
-            message: 'Required file missing',
-            date: '-'
-          })
-        }
-
-        // Annual documents follow the vessel's policy end date (same rule as the vessel page)
-        const effExpiry = effectiveDocExpiry(
-          t.annualRenewal,
-          doc?.expiryDate,
-          policyExpiries[v.id] || v.policyExpiryDate
-        )
-        const status = hasFile
-          ? getDocStatus({
-              hasFile,
-              expiryDate: effExpiry,
-              required: isRequired,
-              annualRenewal: t.annualRenewal,
-              receivedDate: doc?.receivedDate,
-              soonDays: 30,
-              today
-            })
-          : null
-        if (hasFile && effExpiry) {
-          if (status === 'expired') {
-            alerts.push({
-              id: `${v.id}-${t.id}-expired`,
-              vesselId: v.id,
-              vessel: v.name,
-              document: t.name,
-              category: 'vessel',
-              type: 'expired',
-              severity: 'critical',
-              message: 'Document expired',
-              date: effExpiry
-            })
-          } else if (status === 'expiring') {
-            alerts.push({
-              id: `${v.id}-${t.id}-soon`,
-              vesselId: v.id,
-              vessel: v.name,
-              document: t.name,
-              category: 'vessel',
-              type: 'soon',
-              severity: 'medium',
-              message: 'Expiring soon',
-              date: effExpiry
-            })
-          }
-        }
-      })
-
-      // Entity document alerts for this vessel's assureds
-      const vesselAssureds = allAssureds.filter((a) => a.vesselId === v.id)
-      const seenEntities = new Set<string>()
-      vesselAssureds.forEach((a) => {
-        if (!a.entityId || seenEntities.has(a.entityId)) return
-        seenEntities.add(a.entityId)
-        const entityType = a.entityType === 'person' ? 'person' : 'company'
-        const applicableTypes = entityDocTypes.filter(
-          (t) => t.entityScope === 'both' || t.entityScope === entityType
-        )
-        applicableTypes.forEach((t) => {
-          if (!t.isRequired) return
-          const ed = entityDocs.find((d) => d.entityId === a.entityId && d.documentTypeId === t.id)
-          const hasFile = !!ed?.filePath
-
-          if (!hasFile) {
-            alerts.push({
-              id: `${v.id}-entity-${a.entityId}-${t.id}-missing`,
-              entityId: a.entityId,
-              vesselId: v.id,
-              vessel: v.name,
-              document: `${t.name} (${a.entityName || a.name})`,
-              category: 'entity',
-              type: 'missing',
-              severity: 'high',
-              message: 'Required entity document missing',
-              date: '-'
-            })
-          }
-
-          if (hasFile && ed?.expiryDate) {
-            const expiry = new Date(ed.expiryDate)
-            if (expiry < today) {
-              alerts.push({
-                id: `${v.id}-entity-${a.entityId}-${t.id}-expired`,
-                entityId: a.entityId,
-                vesselId: v.id,
-                vessel: v.name,
-                document: `${t.name} (${a.entityName || a.name})`,
-                category: 'entity',
-                type: 'expired',
-                severity: 'critical',
-                message: 'Entity document expired',
-                date: ed.expiryDate
-              })
-            } else if (expiry < thirtyDaysFromNow) {
-              alerts.push({
-                id: `${v.id}-entity-${a.entityId}-${t.id}-soon`,
-                entityId: a.entityId,
-                vesselId: v.id,
-                vessel: v.name,
-                document: `${t.name} (${a.entityName || a.name})`,
-                category: 'entity',
-                type: 'soon',
-                severity: 'medium',
-                message: 'Entity document expiring soon',
-                date: ed.expiryDate
-              })
-            }
-          }
-        })
-      })
-    })
-
-    // Endorsement due alerts
-    for (const e of endorsementsDue) {
-      alerts.push({
-        id: `endorsement-${e.surveyId}`,
-        vesselId: e.vesselId,
-        vessel: e.vesselName || 'Unknown',
-        document: `Endorsement (${e.surveyType || 'Survey'} - ${e.surveyDate || ''})`,
-        category: 'endorsement',
-        type: 'missing',
-        severity: 'high',
-        message: 'Endorsement not issued',
-        date: e.endorsementReminderDate || '-'
-      })
-    }
-
-    return alerts
-  }, [
-    vessels,
-    docs,
-    docTypes,
-    entityDocTypes,
-    entityDocs,
-    allAssureds,
-    endorsementsDue,
-    policyExpiries
-  ])
-
-  // Counts per type are of the whole fleet: they do not change with the filter or search
-  const alertCounts = useMemo(() => {
-    const c = { missing: 0, expired: 0, soon: 0 }
-    for (const a of allAlerts) if (a.type in c) c[a.type as keyof typeof c]++
-    return c
-  }, [allAlerts])
-
-  // The alerts shown: type filter + search
-  const alerts = useMemo(() => {
-    let filtered = allAlerts.filter((a) => filter === 'all' || a.type === filter)
-    if (docSearch.trim()) {
-      const q = docSearch.toLowerCase()
-      filtered = filtered.filter(
-        (a) => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q)
-      )
-    }
-    return filtered
-  }, [allAlerts, filter, docSearch])
-
-  // Flat view: sorted, 50 a page
-  const FLAT_PAGE_SIZE = 50
-  const SEVERITY_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1 }
-  const flatSorted = [...alerts].sort((a, b) => {
-    const k = flatSort.key
-    const av =
-      k === 'severity'
-        ? SEVERITY_RANK[a.severity] || 0
-        : k === 'date'
-          ? a.date === '-'
-            ? ''
-            : a.date
-          : String(a[k] ?? '').toLowerCase()
-    const bv =
-      k === 'severity'
-        ? SEVERITY_RANK[b.severity] || 0
-        : k === 'date'
-          ? b.date === '-'
-            ? ''
-            : b.date
-          : String(b[k] ?? '').toLowerCase()
-    const c = av < bv ? -1 : av > bv ? 1 : 0
-    return flatSort.dir === 'asc' ? c : -c
-  })
-  const flatPages = Math.max(1, Math.ceil(flatSorted.length / FLAT_PAGE_SIZE))
-  const flatPageSafe = Math.min(flatPage, flatPages - 1)
-  const flatPageAlerts = flatSorted.slice(
-    flatPageSafe * FLAT_PAGE_SIZE,
-    (flatPageSafe + 1) * FLAT_PAGE_SIZE
+  // Document Alerts: the to-do list and each vessel's completeness (utils/docAlerts.ts)
+  const { alerts: docAlerts, completeness } = useMemo(
+    () =>
+      buildDocAlerts(
+        {
+          vessels,
+          docs,
+          docTypes,
+          entityDocTypes,
+          entityDocs,
+          assureds: allAssureds,
+          endorsements: endorsementsDue,
+          policyExpiries,
+          business: vesselBusiness
+        },
+        (d) => formatDate(d) || d
+      ),
+    [
+      vessels,
+      docs,
+      docTypes,
+      entityDocTypes,
+      entityDocs,
+      allAssureds,
+      endorsementsDue,
+      policyExpiries,
+      vesselBusiness
+    ]
   )
 
-  // Group alerts by vessel
-  const alertsByVessel = alerts.reduce<
-    Record<string, { vesselId: string; vessel: string; alerts: DocAlert[] }>
-  >((acc, a) => {
-    if (!acc[a.vesselId]) acc[a.vesselId] = { vesselId: a.vesselId, vessel: a.vessel, alerts: [] }
-    acc[a.vesselId].alerts.push(a)
-    return acc
-  }, {})
-  const vesselGroups = Object.values(alertsByVessel).sort(
-    (a, b) => b.alerts.length - a.alerts.length
-  )
-
-  // Group alerts by document type
-  const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: DocAlert[] }>>(
-    (acc, a) => {
-      const docKey = a.document.replace(/\s*\(.*\)$/, '') // Strip entity name for grouping
-      if (!acc[docKey]) acc[docKey] = { document: docKey, alerts: [] }
-      acc[docKey].alerts.push(a)
-      return acc
-    },
-    {}
-  )
-  const documentGroups = Object.values(alertsByDocument).sort(
-    (a, b) => b.alerts.length - a.alerts.length
-  )
+  // Tab badge: expired + expiring documents (missing ones are not chased fleet-wide)
+  const docDueCount = docAlerts.filter((a) => a.type !== 'missing').length
 
   const handleChangePolicyStatus = async (policyId: string, newStatus: string): Promise<void> => {
     try {
@@ -921,10 +673,7 @@ export default function ComplianceCenter({
             key: 'documents',
             icon: <AlertCircle size={16} />,
             label: (
-              <>
-                Document Alerts{' '}
-                {allAlerts.length > 0 && <Badge tone="danger">{allAlerts.length}</Badge>}
-              </>
+              <>Document Alerts {docDueCount > 0 && <Badge tone="danger">{docDueCount}</Badge>}</>
             )
           },
           {
@@ -954,549 +703,14 @@ export default function ComplianceCenter({
       />
 
       {activeTab === 'documents' && (
-        <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              marginBottom: '20px',
-              alignItems: 'center',
-              flexWrap: 'wrap'
-            }}
-          >
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <FilterButton
-                active={filter === 'all'}
-                onClick={() => setFilter('all')}
-                label="All"
-                count={allAlerts.length}
-              />
-              <FilterButton
-                active={filter === 'missing'}
-                onClick={() => setFilter('missing')}
-                label="Missing"
-                color="var(--danger)"
-                count={alertCounts.missing}
-              />
-              <FilterButton
-                active={filter === 'expired'}
-                onClick={() => setFilter('expired')}
-                label="Expired"
-                color="var(--danger)"
-                count={alertCounts.expired}
-              />
-              <FilterButton
-                active={filter === 'soon'}
-                onClick={() => setFilter('soon')}
-                label="Expiring Soon"
-                color="var(--warning)"
-                count={alertCounts.soon}
-              />
-            </div>
-            <SegmentedControl
-              value={docViewMode}
-              onChange={setDocViewMode}
-              items={[
-                { key: 'vessel', label: 'Vessel', icon: <Layers size={13} /> },
-                { key: 'document', label: 'Document', icon: <FileText size={13} /> },
-                { key: 'flat', label: 'Flat', icon: <List size={13} /> },
-                { key: 'customer', label: 'Customer', icon: <Briefcase size={13} /> }
-              ]}
-            />
-            {(docViewMode === 'vessel' || docViewMode === 'document') && alerts.length > 0 && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => {
-                  const keys =
-                    docViewMode === 'vessel'
-                      ? vesselGroups.map((g) => g.vesselId)
-                      : documentGroups.map((g) => g.document)
-                  const allOpen = keys.every((k) => expandedVessels.has(k))
-                  setExpandedVessels(allOpen ? new Set() : new Set(keys))
-                }}
-              >
-                {(docViewMode === 'vessel'
-                  ? vesselGroups.map((g) => g.vesselId)
-                  : documentGroups.map((g) => g.document)
-                ).every((k) => expandedVessels.has(k))
-                  ? 'Collapse all'
-                  : 'Expand all'}
-              </button>
-            )}
-            <div style={{ position: 'relative', marginLeft: 'auto' }}>
-              <Search
-                size={14}
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-secondary)'
-                }}
-              />
-              <input
-                type="text"
-                value={docSearch}
-                onChange={(e) => setDocSearch(e.target.value)}
-                placeholder="Search vessels or documents..."
-                style={{ paddingLeft: '30px', width: '240px' }}
-              />
-            </div>
-          </div>
-
-          {docsLoading ? (
-            <div className="glass-card" style={{ padding: '48px', textAlign: 'center' }}>
-              <Spinner size={20} label="Checking the fleet's documents..." />
-            </div>
-          ) : allAlerts.length === 0 ? (
-            <div className="glass-card">
-              <EmptyState
-                icon={<CheckCircle size={40} color="var(--success)" />}
-                title="Fleet is fully compliant"
-                text="No missing, expired or expiring documents."
-              />
-            </div>
-          ) : alerts.length === 0 ? (
-            <div className="glass-card">
-              <EmptyState
-                icon={<Search size={40} />}
-                title="No alerts match your filter"
-                text={`${allAlerts.length} alert${allAlerts.length === 1 ? '' : 's'} in total.`}
-                action={
-                  <button
-                    className="btn-secondary"
-                    onClick={() => {
-                      setFilter('all')
-                      setDocSearch('')
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                }
-              />
-            </div>
-          ) : docViewMode === 'customer' ? (
-            /* Grouped by customer / broker (vessels' active policies) */
-            <AlertsByCustomer
-              alerts={alerts}
-              onOpenAlert={(alert) => onNavigateToVessel?.(alert.vesselId, alertSection(alert))}
-            />
-          ) : docViewMode === 'vessel' ? (
-            /* Grouped by vessel view */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {vesselGroups.map((group) => {
-                const isExpanded = expandedVessels.has(group.vesselId)
-                return (
-                  <div
-                    key={group.vesselId}
-                    className="glass-card"
-                    style={{ padding: '0', overflow: 'hidden' }}
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={isExpanded}
-                      style={{
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none',
-                        background: 'var(--table-header-bg)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => toggleGroup(group.vesselId)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          toggleGroup(group.vesselId)
-                        }
-                      }}
-                    >
-                      <ChevronDownIcon
-                        size={14}
-                        style={{
-                          transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
-                          transition: 'transform 0.15s',
-                          flexShrink: 0,
-                          color: 'var(--text-secondary)'
-                        }}
-                      />
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.vessel}</span>
-                      <span
-                        style={{
-                          padding: '2px 10px',
-                          borderRadius: '10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: 'rgba(255,77,77,0.15)',
-                          color: 'var(--danger)',
-                          marginLeft: 'auto'
-                        }}
-                      >
-                        {group.alerts.length}
-                      </span>
-                    </div>
-                    {isExpanded && (
-                      <table className="data-table">
-                        <tbody>
-                          {group.alerts.map((alert) => {
-                            const rowBorder =
-                              alert.type === 'expired' || alert.type === 'missing'
-                                ? 'var(--danger)'
-                                : 'var(--warning)'
-                            return (
-                              <tr
-                                key={alert.id}
-                                className="clickable"
-                                style={{ borderLeft: `4px solid ${rowBorder}` }}
-                                onClick={() =>
-                                  onNavigateToVessel?.(alert.vesselId, alertSection(alert))
-                                }
-                              >
-                                <td>
-                                  {alert.category === 'entity' && (
-                                    <button
-                                      type="button"
-                                      title="Open this entity in the Directory"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        if (alert.entityId) onNavigateToEntity?.(alert.entityId)
-                                      }}
-                                      className="badge badge-violet"
-                                      style={{
-                                        marginRight: '6px',
-                                        border: 'none',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      Entity
-                                    </button>
-                                  )}
-                                  {alert.document}
-                                </td>
-                                <td style={{ width: '120px' }}>
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      fontSize: '0.8rem'
-                                    }}
-                                  >
-                                    {alert.type === 'missing' && (
-                                      <ShieldAlert size={14} color="var(--danger)" />
-                                    )}
-                                    {alert.type === 'expired' && (
-                                      <AlertCircle size={14} color="var(--danger)" />
-                                    )}
-                                    {alert.type === 'soon' && (
-                                      <Clock size={14} color="var(--warning)" />
-                                    )}
-                                    <span style={{ textTransform: 'capitalize' }}>
-                                      {alert.type === 'soon' ? 'Expiring' : alert.type}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="muted" style={{ textAlign: 'right' }}>
-                                  {alert.date !== '-' && alert.date}
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : docViewMode === 'document' ? (
-            /* Grouped by document type view */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {documentGroups.map((group) => {
-                const isExpanded = expandedVessels.has(group.document)
-                return (
-                  <div
-                    key={group.document}
-                    className="glass-card"
-                    style={{ padding: '0', overflow: 'hidden' }}
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={isExpanded}
-                      style={{
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none',
-                        background: 'var(--table-header-bg)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => toggleGroup(group.document)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          toggleGroup(group.document)
-                        }
-                      }}
-                    >
-                      <ChevronDownIcon
-                        size={14}
-                        style={{
-                          transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
-                          transition: 'transform 0.15s',
-                          flexShrink: 0,
-                          color: 'var(--text-secondary)'
-                        }}
-                      />
-                      <FileText
-                        size={15}
-                        style={{ color: 'var(--accent-primary)', flexShrink: 0 }}
-                      />
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.document}</span>
-                      <span
-                        style={{
-                          padding: '2px 10px',
-                          borderRadius: '10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: 'rgba(255,77,77,0.15)',
-                          color: 'var(--danger)',
-                          marginLeft: 'auto'
-                        }}
-                      >
-                        {group.alerts.length}
-                      </span>
-                    </div>
-                    {isExpanded && (
-                      <table className="data-table">
-                        <tbody>
-                          {group.alerts.map((alert) => {
-                            const rowBorder =
-                              alert.type === 'expired' || alert.type === 'missing'
-                                ? 'var(--danger)'
-                                : 'var(--warning)'
-                            return (
-                              <tr
-                                key={alert.id}
-                                className="clickable"
-                                style={{ borderLeft: `4px solid ${rowBorder}` }}
-                                onClick={() =>
-                                  onNavigateToVessel?.(alert.vesselId, alertSection(alert))
-                                }
-                              >
-                                <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
-                                <td style={{ width: '120px' }}>
-                                  <div
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      fontSize: '0.8rem'
-                                    }}
-                                  >
-                                    {alert.type === 'missing' && (
-                                      <ShieldAlert size={14} color="var(--danger)" />
-                                    )}
-                                    {alert.type === 'expired' && (
-                                      <AlertCircle size={14} color="var(--danger)" />
-                                    )}
-                                    {alert.type === 'soon' && (
-                                      <Clock size={14} color="var(--warning)" />
-                                    )}
-                                    <span style={{ textTransform: 'capitalize' }}>
-                                      {alert.type === 'soon' ? 'Expiring' : alert.type}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="muted" style={{ textAlign: 'right' }}>
-                                  {alert.date !== '-' && alert.date}
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            /* Flat list view */
-            <div className="table-wrap">
-              <table className="data-table">
-                <caption className="sr-only">Document compliance alerts</caption>
-                <thead>
-                  <tr>
-                    {(
-                      [
-                        ['vessel', 'Vessel'],
-                        ['document', 'Document'],
-                        ['type', 'Type'],
-                        ['date', 'Date'],
-                        ['severity', 'Severity']
-                      ] as const
-                    ).map(([key, label]) => (
-                      <th
-                        key={key}
-                        scope="col"
-                        className="sortable"
-                        aria-sort={
-                          flatSort.key === key
-                            ? flatSort.dir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : undefined
-                        }
-                        style={{
-                          cursor: 'pointer',
-                          ...(key === 'severity' ? { textAlign: 'right' as const } : {})
-                        }}
-                        onClick={() => {
-                          setFlatSort((s) =>
-                            s.key === key
-                              ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
-                              : { key, dir: key === 'date' || key === 'severity' ? 'desc' : 'asc' }
-                          )
-                          setFlatPage(0)
-                        }}
-                      >
-                        {label}
-                        {flatSort.key === key && (flatSort.dir === 'asc' ? ' ▲' : ' ▼')}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {flatPageAlerts.map((alert) => {
-                    const rowBorder =
-                      alert.type === 'expired' || alert.type === 'missing'
-                        ? 'var(--danger)'
-                        : 'var(--warning)'
-                    return (
-                      <tr
-                        key={alert.id}
-                        className="clickable"
-                        style={{ borderLeft: `4px solid ${rowBorder}` }}
-                        onClick={() => onNavigateToVessel?.(alert.vesselId, alertSection(alert))}
-                      >
-                        <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
-                        <td>
-                          {alert.category === 'entity' && (
-                            <button
-                              type="button"
-                              title="Open this entity in the Directory"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (alert.entityId) onNavigateToEntity?.(alert.entityId)
-                              }}
-                              className="badge badge-violet"
-                              style={{ marginRight: '6px', border: 'none', cursor: 'pointer' }}
-                            >
-                              Entity
-                            </button>
-                          )}
-                          {alert.document}
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem'
-                            }}
-                          >
-                            {alert.type === 'missing' && (
-                              <ShieldAlert size={14} color="var(--danger)" />
-                            )}
-                            {alert.type === 'expired' && (
-                              <AlertCircle size={14} color="var(--danger)" />
-                            )}
-                            {alert.type === 'soon' && <Clock size={14} color="var(--warning)" />}
-                            <span style={{ textTransform: 'capitalize' }}>
-                              {alert.type === 'soon' ? 'Expiring' : alert.type}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="muted">{alert.date !== '-' ? alert.date : ''}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <span
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: '10px',
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              background:
-                                alert.severity === 'critical'
-                                  ? 'rgba(255,77,77,0.15)'
-                                  : alert.severity === 'high'
-                                    ? 'rgba(255,120,77,0.15)'
-                                    : 'rgba(255,204,0,0.12)',
-                              color:
-                                alert.severity === 'critical'
-                                  ? 'var(--danger)'
-                                  : alert.severity === 'high'
-                                    ? '#ff784d'
-                                    : 'var(--warning)'
-                            }}
-                          >
-                            {alert.severity}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {flatPages > 1 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 16px',
-                    borderTop: '1px solid var(--table-border)',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <span>
-                    {flatPageSafe * FLAT_PAGE_SIZE + 1}-
-                    {Math.min((flatPageSafe + 1) * FLAT_PAGE_SIZE, flatSorted.length)} of{' '}
-                    {flatSorted.length}
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <button
-                      className="btn-secondary btn-sm"
-                      disabled={flatPageSafe === 0}
-                      onClick={() => setFlatPage(flatPageSafe - 1)}
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span>
-                      {flatPageSafe + 1} / {flatPages}
-                    </span>
-                    <button
-                      className="btn-secondary btn-sm"
-                      disabled={flatPageSafe >= flatPages - 1}
-                      onClick={() => setFlatPage(flatPageSafe + 1)}
-                      aria-label="Next page"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <DocumentAlerts
+          alerts={docAlerts}
+          completeness={completeness}
+          customers={vesselCustomers}
+          loading={docsLoading}
+          onOpenVessel={onNavigateToVessel}
+          onOpenEntity={onNavigateToEntity}
+        />
       )}
 
       {activeTab === 'policies' &&
