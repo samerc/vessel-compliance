@@ -729,6 +729,7 @@ Vessel and entity documents keep their earlier files as LINKS (never copies; a f
 ### Vessel Document Expiry (`VesselDocumentsView`)
 
 - **Expiry clear button**: explicit `×` (`X` icon, 18px circle) button renders next to the expiry date input when a date is set; calls `updateVesselDocumentExpiry(..., null)` directly. Chromium date input native clear is unreliable for controlled React inputs.
+- **No dates popup for annual documents**: after linking a file of an `annualRenewal` type the dates popup (`DocumentDatesModal`) is skipped when the vessel has a P&I / H&M end date (received = today is set by the upload; a toast names the policy end date). Without a policy end date it still asks (the document's own date is then the fallback). Both the card view (VesselDocumentsView) and the table view (VesselDetail `askDocDates`)
 - **No expiry inheritance**: `uploadDoc` sets `expiryDate: undefined` (not `existing?.expiryDate || undefined`) so a newly uploaded file never inherits the previous file's expiry date.
 - **Annual doc expiry row**: shows P&I date as a read-only cyan badge if found, plus an always-editable `<input type="date">` for the document's own stored expiry (with clear button). The doc's stored date is the fallback for compliance when no P&I policy end date is configured.
 

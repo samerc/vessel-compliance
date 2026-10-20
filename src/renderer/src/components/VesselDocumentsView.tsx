@@ -170,6 +170,13 @@ export default function VesselDocumentsView({
       })
       loadData()
       const type = docTypes.find((t) => t.id === docTypeId)
+      // Annual documents expire with the policy: no date to ask (received = today already)
+      if (type?.annualRenewal && effectivePolicyExpiry) {
+        showSuccess(
+          `${type.name} linked - expires with the policy on ${formatDate(effectivePolicyExpiry)}`
+        )
+        return
+      }
       setDatesRequest({
         vesselId: vessel.id,
         documentTypeId: docTypeId,

@@ -444,13 +444,19 @@ export default function VesselDetail({
   const [docDatesRequest, setDocDatesRequest] = useState<DocumentDatesRequest | null>(null)
   const askDocDates = (docTypeId: string): void => {
     const type = docTypes.find((t) => t.id === docTypeId)
+    const piEndDate = resolveEffectivePolicyExpiry(dynamicPolicies || []) || undefined
+    // Annual documents expire with the policy: no date to ask (received = today already)
+    if (type?.annualRenewal && piEndDate) {
+      showSuccess(`${type.name} linked - expires with the policy on ${formatDate(piEndDate)}`)
+      return
+    }
     setDocDatesRequest({
       vesselId: vessel.id,
       documentTypeId: docTypeId,
       documentName:
         type?.name || customDocTypes.find((c) => c.id === docTypeId)?.name || 'The document',
       annualRenewal: !!type?.annualRenewal,
-      piEndDate: resolveEffectivePolicyExpiry(dynamicPolicies || []) || undefined
+      piEndDate
     })
   }
   // Inline date edits of the table view: confirmed with a toast, failures reported
