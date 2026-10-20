@@ -47,6 +47,7 @@ import { MoneyInput } from './quotation-tabs/shared'
 import { isPiLike } from '../../../shared/quotationTypes'
 import { TypeChip } from './ui'
 import { useUnsavedGuard } from '../utils/useUnsavedGuard'
+import { htmlToPlainText } from '../utils/htmlToDocx'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -668,7 +669,7 @@ export default function PolicySetupWizard({
             commissionPercent: resolvedCommission,
             insuredByVessel,
             outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
-            outstandingPremiumText: quot.outstandingPremiumText || '',
+            outstandingPremiumText: htmlToPlainText(quot.outstandingPremiumText || ''),
             blueCardInception: inception,
             blueCardExpiry: expiry,
             blueCardOwners: defaultBlueCardOwners,

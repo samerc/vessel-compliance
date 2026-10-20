@@ -25,6 +25,7 @@ import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
 import { hullClausesPerVesselOnly } from '../../../../shared/premium'
 import { cachedSetting, masterData } from './masterDataCache'
+import { htmlToPlainText } from '../../utils/htmlToDocx'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
 const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
@@ -245,8 +246,10 @@ export default function PremiumTab({
         .then(([globalTexts, policyRaw]) => {
           const qDefault = globalTexts?.outstandingPremiumDefaultText
           const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
-          const text =
+          // The Standard Texts default is rich text ("<p>...</p>"); this notice is plain text
+          const text = htmlToPlainText(
             qDefault || pDefault || 'All outstanding premium to be settled prior inception'
+          )
           setQ((p) => ({ ...p, outstandingPremiumText: text }))
           updateField('outstandingPremiumText', text)
         })
@@ -3132,8 +3135,9 @@ export default function PremiumTab({
                   const pDefault = policyRaw
                     ? JSON.parse(policyRaw).outstandingPremiumDefaultText
                     : null
-                  const text =
+                  const text = htmlToPlainText(
                     qDefault || pDefault || 'All outstanding premium to be settled prior inception'
+                  )
                   setQ((p) => ({ ...p, outstandingPremiumText: text }))
                   updateField('outstandingPremiumText', text)
                 } catch {
@@ -3149,7 +3153,7 @@ export default function PremiumTab({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <input
               type="text"
-              value={quotation.outstandingPremiumText || ''}
+              value={htmlToPlainText(quotation.outstandingPremiumText || '')}
               onChange={(e) => setQ((p) => ({ ...p, outstandingPremiumText: e.target.value }))}
               onBlur={(e) => updateField('outstandingPremiumText', e.target.value)}
               placeholder="All outstanding premium to be settled prior inception"
@@ -3240,8 +3244,9 @@ export default function PremiumTab({
                     const pDefault = policyRaw
                       ? JSON.parse(policyRaw).fullPremiumLossDefaultText
                       : null
-                    const text =
+                    const text = htmlToPlainText(
                       qDefault || pDefault || 'Full annual premium payable in case of loss.'
+                    )
                     setQ((p) => ({ ...p, fullPremiumLossText: text }))
                     updateField('fullPremiumLossText', text)
                   } catch {
@@ -3256,7 +3261,7 @@ export default function PremiumTab({
           {quotation.fullPremiumLossEnabled && (
             <input
               type="text"
-              value={quotation.fullPremiumLossText || ''}
+              value={htmlToPlainText(quotation.fullPremiumLossText || '')}
               onChange={(e) => setQ((p) => ({ ...p, fullPremiumLossText: e.target.value }))}
               onBlur={(e) => updateField('fullPremiumLossText', e.target.value)}
               placeholder="Full annual premium payable in case of loss."

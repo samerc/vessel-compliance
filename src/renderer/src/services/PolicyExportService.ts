@@ -4015,7 +4015,8 @@ async function polBuildPremiumPaymentSection(
         spacing: { after: 0, line: 240, lineRule: 'auto' as const },
         children: [
           new TextRun({
-            text: outstandingText,
+            // Older quotations copied the rich-text default ("<p>...</p>")
+            text: htmlToPlainText(outstandingText),
             size: POL_FONT_SIZE,
             font: 'Arial',
             color: '000000',
@@ -4030,7 +4031,7 @@ async function polBuildPremiumPaymentSection(
 
   // 2c. Full premium in case of loss
   if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
-    content.push(polNpTight(wq.fullPremiumLossText))
+    content.push(polNpTight(htmlToPlainText(wq.fullPremiumLossText)))
     content.push(polSpacerPts(6))
   }
 

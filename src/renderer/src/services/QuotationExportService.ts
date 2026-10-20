@@ -93,7 +93,7 @@ import {
   getDefaultSectionOrder,
   addMissingSections
 } from '../components/quotationSettingsConstants'
-import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
+import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
@@ -5114,7 +5114,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           spacing: { after: 80, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({
-              text: wq.outstandingPremiumText,
+              // Older quotations copied the rich-text default ("<p>...</p>")
+              text: htmlToPlainText(wq.outstandingPremiumText),
               size: 22,
               font: 'Arial',
               color: '000000',
@@ -5127,7 +5128,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       premContent.push(emptyP())
     }
     if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
-      premContent.push(np(wq.fullPremiumLossText))
+      premContent.push(np(htmlToPlainText(wq.fullPremiumLossText)))
       premContent.push(emptyP())
     }
     if (wq.premiumAdditionalText) {
