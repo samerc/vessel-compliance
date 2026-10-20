@@ -60,6 +60,21 @@ export default function VesselSidePanel({
   const [activity, setActivity] = useState<VesselAuditEntry[] | null>(null)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
+  // Bumped after every save in the app (the preload's vc-save-end event): the card reloads, so a
+  // change made on this page shows at once. A burst of saves reloads once.
+  const [refresh, setRefresh] = useState(0)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const onSaved = (): void => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setRefresh((n) => n + 1), 400)
+    }
+    window.addEventListener('vc-save-end', onSaved)
+    return () => {
+      window.removeEventListener('vc-save-end', onSaved)
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +85,7 @@ export default function VesselSidePanel({
     return () => {
       cancelled = true
     }
-  }, [vesselId, noteCount])
+  }, [vesselId, noteCount, refresh])
 
   useEffect(() => {
     let cancelled = false
@@ -81,7 +96,7 @@ export default function VesselSidePanel({
     return () => {
       cancelled = true
     }
-  }, [vesselId])
+  }, [vesselId, refresh])
 
   const addNote = async (): Promise<void> => {
     if (!text.trim()) return

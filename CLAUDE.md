@@ -693,7 +693,7 @@ MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) cau
 ### Vessel Detail Navigation
 
 - **Header card** (redesign 2026-10): name, flag, Active/Inactive pill, labelled key facts, actions; below it `VesselSummaryTiles` (Documents, Policies, Quotations, Sanctions, Surveys), each opening its tab
-- **Notes & activity panel** (`VesselSidePanel`): beside the tabs, latest 3 notes + quick add (vessels:edit, Ctrl+Enter), last 5 audit entries; "All notes" opens the notes window, "See all" the Activity tab; hidden/shown per computer (localStorage `vessel_side_panel`)
+- **Notes & activity panel** (`VesselSidePanel`): beside the tabs, latest 3 notes + quick add (vessels:edit, Ctrl+Enter), last 5 audit entries, reloaded after every save in the app (`vc-save-end`, 400 ms debounce) so a change shows at once; "All notes" opens the notes window, "See all" the Activity tab; hidden/shown per computer (localStorage `vessel_side_panel`)
 - **New quotation** (header, quotations:create): type menu → draft quotation with the vessel already added via `addRegistryVessel` (`utils/addRegistryVessel.ts`, shared with the quotation Vessel tab: particulars, assureds by role order, c/o as broker, customer from the vessel's active policy of the same type)
 
 - **Sections**: Toggle between Documents, Assured, Surveys, Policies, and Activity views via `detailView` state
