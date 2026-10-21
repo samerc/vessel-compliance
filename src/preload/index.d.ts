@@ -283,6 +283,12 @@ export interface Api {
   getEntityNotes: (entityId: string) => Promise<import('../shared/types').EntityNote[]>
   addEntityNote: (entityId: string, note: string) => Promise<import('../shared/types').EntityNote>
   deleteEntityNote: (noteId: string) => Promise<void>
+  /** Quotation currency + every currency of the quotation still on the old one */
+  updateQuotationCurrency: (
+    id: string,
+    from: string,
+    to: string
+  ) => Promise<{ changed: number; kept: number }>
   // Wiki
   wikiList: () => Promise<import('../shared/types').WikiTopicSummary[]>
   wikiListDeleted: () => Promise<import('../shared/types').WikiTopicSummary[]>

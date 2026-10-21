@@ -80,6 +80,8 @@ const api: Api = {
   addEntityNote: (entityId: string, note: string) =>
     ipcRenderer.invoke('entityNotes:add', entityId, note),
   deleteEntityNote: (noteId: string) => ipcRenderer.invoke('entityNotes:delete', noteId),
+  updateQuotationCurrency: (id: string, from: string, to: string) =>
+    ipcRenderer.invoke('db:updateQuotationCurrency', id, from, to),
   // Wiki
   wikiList: () => ipcRenderer.invoke('wiki:list'),
   wikiListDeleted: () => ipcRenderer.invoke('wiki:listDeleted'),

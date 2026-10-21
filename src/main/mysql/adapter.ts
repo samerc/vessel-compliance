@@ -13671,6 +13671,74 @@ export class MySQLAdapter {
     )
   }
 
+  // Every currency a quotation holds besides its premium currency (table, column, key column)
+  private static readonly QUOTATION_CURRENCY_COLUMNS: [string, string, string][] = [
+    ['quotations', 'limit_of_liability_currency', 'id'],
+    ['quotations', 'agreed_value_currency', 'id'],
+    ['quotations', 'iv_currency', 'id'],
+    ['quotations', 'insured_value_currency', 'id'],
+    ['quotation_agreed_value_options', 'currency', 'quotation_id'],
+    ['quotation_deductibles', 'currency', 'quotation_id'],
+    ['quotation_hull_alternatives', 'agreed_value_currency', 'quotation_id'],
+    ['quotation_lol_options', 'currency', 'quotation_id'],
+    ['quotation_pi_alternatives', 'lol_currency', 'quotation_id'],
+    ['quotation_sub_limits', 'currency', 'quotation_id'],
+    ['quotation_vessels', 'agreed_value_currency', 'quotation_id']
+  ]
+
+  /**
+   * Changes the quotation currency, and with it every currency of the quotation still on the
+   * old one (limit, agreed / insured values, deductibles, sub-limits, LOL options, alternatives,
+   * vessels). A currency set to something else was chosen on purpose and stays; an empty one
+   * already follows the quotation. Returns how many changed and how many kept their own.
+   */
+  async changeQuotationCurrency(
+    quotationId: string,
+    from: string,
+    to: string
+  ): Promise<{ changed: number; kept: number }> {
+    if (!this.pool) throw new Error('DB not connected')
+    const next = String(to || '')
+      .trim()
+      .toUpperCase()
+      .slice(0, 10)
+    const prev = String(from || '')
+      .trim()
+      .toUpperCase()
+    if (!next) throw new Error('Enter a currency')
+    const conn = await this.pool.getConnection()
+    let changed = 0
+    let kept = 0
+    try {
+      await conn.beginTransaction()
+      await conn.execute('UPDATE quotations SET premium_currency = ? WHERE id = ?', [
+        next,
+        quotationId
+      ])
+      for (const [table, col, key] of MySQLAdapter.QUOTATION_CURRENCY_COLUMNS) {
+        if (prev && prev !== next) {
+          const [res] = await conn.execute(
+            `UPDATE ${table} SET ${col} = ? WHERE ${key} = ? AND UPPER(TRIM(${col})) = ?`,
+            [next, quotationId, prev]
+          )
+          changed += (res as ResultSetHeader).affectedRows
+        }
+        const [rows] = await conn.query(
+          `SELECT COUNT(*) AS n FROM ${table} WHERE ${key} = ? AND ${col} IS NOT NULL AND TRIM(${col}) <> '' AND UPPER(TRIM(${col})) <> ?`,
+          [quotationId, next]
+        )
+        kept += Number((rows as RowDataPacket[])[0]?.n) || 0
+      }
+      await conn.commit()
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
+    return { changed, kept }
+  }
+
   async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {
     if (!this.pool) return
     if (updates.status === 'exported') {

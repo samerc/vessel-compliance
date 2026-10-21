@@ -259,6 +259,8 @@ export default function QuotationEditor({
   // Export checks per section (warning dots), refreshed when the section changes
   const [tabWarnings, setTabWarnings] = useState<Partial<Record<EditorTab, string[]>>>({})
   const [q, setQ] = useState<Quotation>(quotation)
+  // The currency last saved (the header box changes q.premiumCurrency while typing)
+  const [savedCurrency, setSavedCurrency] = useState(quotation.premiumCurrency || 'USD')
   // policyTypes removed — type shown as badge, not editable
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
@@ -435,6 +437,7 @@ export default function QuotationEditor({
         )
       }
       setQ(fullQ)
+      setSavedCurrency(fullQ.premiumCurrency || 'USD')
       // Load revision history
       const groupId = fullQ.revisionGroupId || fullQ.id
       const revs = await window.api.getQuotationRevisions(groupId)
@@ -962,6 +965,42 @@ export default function QuotationEditor({
       } catch (err) {
         showError((err instanceof Error && err.message) || `${format.toUpperCase()} export failed`)
       }
+    }
+  }
+
+  // The quotation currency: every currency of the quotation still on the old one follows
+  // (limit, values, deductibles, sub-limits, options, alternatives); others stay as set
+  const changeCurrency = async (raw: string): Promise<void> => {
+    if (isLocked || !canEdit) return
+    const next = raw.trim().toUpperCase()
+    if (!next || next === savedCurrency) {
+      setQ((p) => ({ ...p, premiumCurrency: savedCurrency }))
+      return
+    }
+    try {
+      const res = await window.api.updateQuotationCurrency(q.id, savedCurrency, next)
+      const fresh = await window.api.getQuotation(q.id)
+      if (fresh && !hasIpcError(fresh)) setQ((p) => ({ ...p, ...fresh }))
+      else setQ((p) => ({ ...p, premiumCurrency: next }))
+      setSavedCurrency(next)
+      hasEdited.current = true
+      // Vessels, alternatives and the open tab hold their own copies: load them again
+      setVesselVersion((v) => v + 1)
+      if (isPiLike(q.quotationTypeCode)) {
+        const alts = await window.api.piGetQuotationAlternatives(q.id)
+        if (Array.isArray(alts)) setPiAlternatives(alts)
+      }
+      setSettingsNonce((n) => n + 1)
+      showSuccess(
+        `Currency changed to ${next}` +
+          (res.changed
+            ? `: ${res.changed} other amount${res.changed === 1 ? '' : 's'} followed`
+            : '') +
+          (res.kept ? `; ${res.kept} kept ${res.kept === 1 ? 'its' : 'their'} own currency` : '')
+      )
+    } catch (err) {
+      setQ((p) => ({ ...p, premiumCurrency: savedCurrency }))
+      showError((err instanceof Error && err.message) || 'Failed to change the currency')
     }
   }
 
@@ -1634,9 +1673,19 @@ export default function QuotationEditor({
               type="text"
               value={q.premiumCurrency || 'USD'}
               onChange={(e) => setQ((p) => ({ ...p, premiumCurrency: e.target.value }))}
-              onBlur={(e) => updateField('premiumCurrency', e.target.value)}
+              onBlur={(e) => void changeCurrency(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              }}
+              title="The quotation currency: amounts still in the old currency follow it"
+              style={{
+                width: '50px',
+                padding: '4px 6px',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                textTransform: 'uppercase'
+              }}
               disabled={isLocked || !canEdit}
-              style={{ width: '50px', padding: '4px 6px', borderRadius: '6px', fontSize: '0.8rem' }}
             />
           </div>
           {/* Spacer */}

@@ -139,7 +139,7 @@ export default function DeductiblesTab({
       title: master.title,
       description: master.description,
       amount: 0,
-      currency: 'USD',
+      currency: quotation.premiumCurrency || 'USD',
       secondaryDescription: master.hasSecondary ? master.secondaryDescription : undefined,
       order: deductibles.length
     })
@@ -153,7 +153,7 @@ export default function DeductiblesTab({
       quotationId: quotation.id,
       description: newCustomDesc.trim(),
       amount: 0,
-      currency: 'USD',
+      currency: quotation.premiumCurrency || 'USD',
       order: deductibles.length
     })
     setNewCustomDesc('')

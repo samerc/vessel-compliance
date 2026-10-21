@@ -57,7 +57,7 @@ Per-item vessel scoping for multi-vessel quotations:
 Premium management with per-vessel amounts, sequential discounts, and non-refundable options:
 
 - **Per-vessel premiums**: `premium_amount DECIMAL(15,2)` on `quotation_vessels` table. Multi-vessel quotations show a premium table in PremiumTab with per-vessel inputs; total auto-syncs to `quotation.premiumAmount`
-- **Currency**: Quotation-level `premiumCurrency` field displayed in the header (applies to all sections)
+- **Currency**: Quotation-level `premiumCurrency` in the editor header. Changing it (`changeQuotationCurrency`, IPC `db:updateQuotationCurrency`) moves every currency of the quotation still on the OLD one to the new one: the quotation's limit / agreed value / IV / insured value currencies, deductibles, sub-limits, LOL options, agreed value options, P&I and hull alternatives, vessels (`QUOTATION_CURRENCY_COLUMNS`). A currency set to something else was chosen on purpose and stays (the toast counts both); empty ones follow anyway. New deductibles take the quotation currency, new sub-limits the limit's currency
 - **Auto-label**: Premium field shows "Technical Premium" when NCB or UPCC is enabled; "Premium" otherwise
 - **NCB (No Claims Bonus)**: Checkbox + percentage/amount + rich text. Export renders only the `ncbText` with `{ncb_amount}` and `{ncb_percent}` placeholders replaced. Text is seeded from standard default on first enable.
 - **UPCC (Upfront Continuity)**: Checkbox + percentage/amount + rich text. Same placeholder pattern (`{upcc_amount}`, `{upcc_percent}`). DB columns still named `cpc_*` (aliased to `upcc*` in adapter)

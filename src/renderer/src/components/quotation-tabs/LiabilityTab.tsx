@@ -47,7 +47,9 @@ export default function LiabilityTab({
   >([])
   const [newText, setNewText] = useState('')
   const [newAmount, setNewAmount] = useState('')
-  const [newCurrency, setNewCurrency] = useState('USD')
+  // A new sub-limit is in the limit's currency (the quotation's unless changed there)
+  const lolCurrency = quotation.limitOfLiabilityCurrency || quotation.premiumCurrency || 'USD'
+  const [newCurrency, setNewCurrency] = useState(lolCurrency)
   const [showStandardText, setShowStandardText] = useState(false)
 
   const [reloadKey, setReloadKey] = useState(0)
@@ -94,7 +96,7 @@ export default function LiabilityTab({
     })
     setNewText('')
     setNewAmount('')
-    setNewCurrency('USD')
+    setNewCurrency(lolCurrency)
     showSuccess('Sub-limit added')
     loadData()
   }
@@ -103,7 +105,7 @@ export default function LiabilityTab({
     const t = templates.find((x) => x.id === templateId)
     if (!t) return
     setNewText(t.textTemplate)
-    setNewCurrency(t.defaultCurrency || 'USD')
+    setNewCurrency(lolCurrency)
     setNewAmount('')
   }
 

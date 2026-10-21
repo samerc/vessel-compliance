@@ -6232,6 +6232,16 @@ app.whenReady().then(() => {
       )
     return db.updateQuotation(id, updates)
   })
+  // The quotation currency, and every currency in the quotation still on the old one
+  safeHandle('db:updateQuotationCurrency', async (event, id: string, from: string, to: string) => {
+    const user = await requirePermission(event, 'quotations:edit')
+    const lockedBy = await db.getActiveQuotationLock(id)
+    if (lockedBy && lockedBy.userId !== user.id)
+      throw new Error(
+        `${lockedBy.username || 'Another user'} is editing this quotation now, so this change was not saved. Reopen it when they are done.`
+      )
+    return db.changeQuotationCurrency(id, from, to)
+  })
   safeHandle('db:deleteQuotation', async (event, id: string) => {
     const user = await requirePermission(event, 'quotations:delete')
     const existing = await db.getQuotation(id)
