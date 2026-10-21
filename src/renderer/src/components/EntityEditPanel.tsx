@@ -128,6 +128,16 @@ export default function EntityEditPanel({
     phone: string
   }>({ name: '', type: 'company', identifier: '', email: '', phone: '' })
   const [savingCore, setSavingCore] = useState(false)
+  // A UBO edited in its own card (UBOs are entities too: the change shows wherever it is used)
+  const [uboEdit, setUboEdit] = useState<{
+    id: string
+    name: string
+    type: 'company' | 'person'
+    identifier: string
+    email: string
+    phone: string
+  } | null>(null)
+  const [savingUbo, setSavingUbo] = useState(false)
 
   // ── Sanctions ───────────────────────────────────────────────────────────────────
   const [checkingId, setCheckingId] = useState<string | null>(null)
@@ -292,6 +302,27 @@ export default function EntityEditPanel({
       showError((e instanceof Error && e.message) || 'Failed to update entity')
     } finally {
       setSavingCore(false)
+    }
+  }
+
+  const handleSaveUbo = async (): Promise<void> => {
+    if (!uboEdit || !uboEdit.name.trim()) return
+    setSavingUbo(true)
+    try {
+      await window.api.updateEntity(uboEdit.id, {
+        name: uboEdit.name.trim(),
+        type: uboEdit.type,
+        identifier: uboEdit.identifier.trim() || undefined,
+        email: uboEdit.email.trim() || undefined,
+        phone: uboEdit.phone.trim() || undefined
+      })
+      showSuccess('UBO updated')
+      setUboEdit(null)
+      refresh()
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to update the UBO')
+    } finally {
+      setSavingUbo(false)
     }
   }
 
@@ -1138,6 +1169,35 @@ export default function EntityEditPanel({
                 </span>
                 {canManage && (
                   <button
+                    onClick={() =>
+                      setUboEdit(
+                        uboEdit?.id === ubo.id
+                          ? null
+                          : {
+                              id: ubo.id,
+                              name: ubo.name,
+                              type: ubo.type,
+                              identifier: ubo.identifier || '',
+                              email: ubo.email || '',
+                              phone: ubo.phone || ''
+                            }
+                      )
+                    }
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)',
+                      padding: '2px'
+                    }}
+                    title="Edit UBO"
+                    aria-label="Edit UBO"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+                {canManage && (
+                  <button
                     onClick={() => handleDeleteUBO(ubo.id)}
                     style={{
                       background: 'transparent',
@@ -1153,6 +1213,99 @@ export default function EntityEditPanel({
                   </button>
                 )}
               </div>
+              {uboEdit?.id === ubo.id ? (
+                <div className="form-grid cols-2" style={{ marginBottom: '8px' }}>
+                  <Field label="Name" required span="all">
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={uboEdit.name}
+                        onChange={(e) =>
+                          setUboEdit((u) => (u ? { ...u, name: e.target.value } : u))
+                        }
+                        style={{ width: '100%', paddingRight: '44px' }}
+                      />
+                      <CaseToggleBtn
+                        value={uboEdit.name}
+                        onChange={(v) => setUboEdit((u) => (u ? { ...u, name: v } : u))}
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Type">
+                    <select
+                      value={uboEdit.type}
+                      onChange={(e) =>
+                        setUboEdit((u) =>
+                          u ? { ...u, type: e.target.value as 'company' | 'person' } : u
+                        )
+                      }
+                    >
+                      <option value="person">Person</option>
+                      <option value="company">Company</option>
+                    </select>
+                  </Field>
+                  <Field label="Identifier">
+                    <input
+                      type="text"
+                      value={uboEdit.identifier}
+                      onChange={(e) =>
+                        setUboEdit((u) => (u ? { ...u, identifier: e.target.value } : u))
+                      }
+                      placeholder="Optional"
+                    />
+                  </Field>
+                  <Field label="Email(s)" span="all">
+                    <input
+                      type="text"
+                      value={uboEdit.email}
+                      onChange={(e) => setUboEdit((u) => (u ? { ...u, email: e.target.value } : u))}
+                      placeholder="Separate multiple with commas"
+                    />
+                  </Field>
+                  <Field label="Phone" span="all">
+                    <input
+                      type="text"
+                      value={uboEdit.phone}
+                      onChange={(e) => setUboEdit((u) => (u ? { ...u, phone: e.target.value } : u))}
+                    />
+                  </Field>
+                  <div style={{ display: 'flex', gap: '8px', gridColumn: '1 / -1' }}>
+                    <button
+                      onClick={() => void handleSaveUbo()}
+                      disabled={!uboEdit.name.trim() || savingUbo}
+                      className="btn-primary btn-sm"
+                    >
+                      {savingUbo ? <Loader2 size={13} className="spinner" /> : <Save size={13} />}{' '}
+                      Save
+                    </button>
+                    <button onClick={() => setUboEdit(null)} className="btn-secondary btn-sm">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                (ubo.identifier || ubo.email || ubo.phone) && (
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '4px 12px'
+                    }}
+                  >
+                    {ubo.identifier && <span>ID: {ubo.identifier}</span>}
+                    {ubo.email && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Mail size={11} /> {ubo.email}
+                      </span>
+                    )}
+                    {ubo.phone && <span>{ubo.phone}</span>}
+                  </div>
+                )
+              )}
               {renderOfacBadge(ubo)}
               <div style={{ marginTop: '8px' }}>{renderDocRow(ubo)}</div>
             </div>

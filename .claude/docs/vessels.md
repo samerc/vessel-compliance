@@ -248,7 +248,7 @@ Redesigned to table + slide-in panel layout:
   - Role editing
   - Address selector with add-new
   - Dynamic document list with upload/replace/delete per doc type
-  - UBOs section — each UBO as a card with doc score, sanctions, documents, delete button
+  - UBOs section — each UBO as a card with doc score, identifier / contacts, sanctions, documents, edit (pencil: name, type, identifier, email, phone in the card; the UBO is an entity, so the change shows everywhere it is used) and delete buttons. Shared `EntityEditPanel`, so the Directory panel has the same
   - Add UBO form at the bottom
 
 ### Entity Addresses
