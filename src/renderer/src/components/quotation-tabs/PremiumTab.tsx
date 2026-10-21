@@ -91,6 +91,34 @@ export default function PremiumTab({
   // Per-vessel premium under each hull alternative, keyed `${altId}:${vesselId}`
   const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
   const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
+  // Vessels of a new-business quotation that already have a policy of this type with us
+  const [alreadyInsured, setAlreadyInsured] = useState<string[]>([])
+  const linkedVesselKey = qVessels
+    .filter((v) => v.vesselId)
+    .map((v) => v.vesselId)
+    .join(',')
+  useEffect(() => {
+    if (quotation.isRenewal || !quotation.quotationTypeId || !linkedVesselKey) return
+    let live = true
+    const typeId = quotation.quotationTypeId
+    Promise.all(
+      qVessels
+        .filter((v) => v.vesselId)
+        .map(async (v) => {
+          const pols = await window.api.getVesselDynamicPolicies(v.vesselId!).catch(() => [])
+          const has =
+            Array.isArray(pols) &&
+            pols.some((p) => p.policyTypeId === typeId && p.status !== 'cancelled')
+          return has ? v.name || '' : null
+        })
+    )
+      .then((names) => live && setAlreadyInsured(names.filter((n): n is string => n !== null)))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotation.isRenewal, quotation.quotationTypeId, linkedVesselKey])
 
   const loadDiscounts = async (): Promise<void> => {
     const d = await window.api.quotationDiscountGetByQuotation(quotation.id)
@@ -759,6 +787,42 @@ export default function PremiumTab({
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
         Configure premium amounts, discounts, instalments, and non-refundable terms.
       </p>
+
+      {!quotation.isRenewal && alreadyInsured.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 14px',
+            marginBottom: '14px',
+            borderRadius: '8px',
+            border: '1px solid var(--warning)',
+            fontSize: '0.82rem'
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            {alreadyInsured.length === qVessels.length
+              ? alreadyInsured.length === 1
+                ? 'This vessel already has'
+                : 'All vessels already have'
+              : `${alreadyInsured.filter(Boolean).join(', ') || 'Some vessels'} already ${
+                  alreadyInsured.length === 1 ? 'has' : 'have'
+                }`}{' '}
+            a {quotation.quotationTypeName || 'policy'} policy with us. This quotation is marked as
+            new business, so the previous premium fields are hidden.
+          </span>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => {
+              setQ((p) => ({ ...p, isRenewal: true }))
+              updateField('isRenewal', true)
+            }}
+          >
+            Mark as renewal
+          </button>
+        </div>
+      )}
 
       {/* Single vessel: premium inputs */}
       {!isMultiVessel && (

@@ -1646,6 +1646,29 @@ export default function QuotationEditor({
               )}
             </div>
           )}
+          {/* New business or renewal: renewals show the previous premiums and get R in the
+              registry number. Set by the Renewals page; can be changed until approval */}
+          <select
+            value={q.isRenewal ? 'renewal' : 'new'}
+            onChange={(e) => {
+              const v = e.target.value === 'renewal'
+              setQ((p) => ({ ...p, isRenewal: v }))
+              updateField('isRenewal', v)
+              setSettingsNonce((n) => n + 1)
+            }}
+            disabled={isLocked || !canEdit}
+            title="New business or renewal (renewals show the previous premium fields)"
+            aria-label="New business or renewal"
+            style={{
+              marginLeft: '8px',
+              padding: '4px 6px',
+              borderRadius: '6px',
+              fontSize: '0.8rem'
+            }}
+          >
+            <option value="new">New business</option>
+            <option value="renewal">Renewal</option>
+          </select>
           {/* Date + Currency inline */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Date:</span>
