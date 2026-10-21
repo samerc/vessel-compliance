@@ -82,6 +82,7 @@ import ReceiptManager from './ReceiptManager'
 import { ok, asArray } from '../utils/ipc'
 import { useUnsavedGuard, leaveThen } from '../utils/useUnsavedGuard'
 import { confirmDialog } from './DialogHost'
+import { POLICY_NUMBER_CODE_KEY, policyNumberCode } from '../../../shared/policyNumber'
 
 /** Vessel update where null clears the column (updateVessel accepts it at runtime) */
 type NullableVesselUpdate = { [K in keyof Vessel]?: Vessel[K] | null }
@@ -4859,13 +4860,17 @@ function DynamicPoliciesView({
             if (iv?.valueDate) newInception = addOneYear(iv.valueDate)
           }
 
-          // Generate new policy number: type letter + inverted year from new inception
+          // New policy number: type letter + the year code of the new inception (Policy
+          // Settings > Policy Numbers, e.g. {YY}20 -> "2620")
           const policyType = policyTypes.find((pt) => pt.id === p.policyTypeId)
           const typeCode = policyType?.name?.charAt(0)?.toUpperCase() || 'P'
           let newPolicyNumber = typeCode
           if (newInception) {
-            const yr = newInception.substring(0, 4) // e.g., "2026"
-            newPolicyNumber += yr.substring(2, 4) + yr.substring(0, 2) // "2620"
+            const pattern = await window.api.getSetting(POLICY_NUMBER_CODE_KEY).catch(() => null)
+            newPolicyNumber += policyNumberCode(
+              typeof pattern === 'string' ? pattern : null,
+              newInception.substring(0, 4)
+            )
           }
 
           // 3. Create new policy

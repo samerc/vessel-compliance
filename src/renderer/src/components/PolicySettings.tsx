@@ -23,7 +23,8 @@ import {
   Edit3,
   LayoutList,
   Star,
-  Eye
+  Eye,
+  Hash
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -40,6 +41,12 @@ import type {
   EndorsementTriggerField,
   EndorsementTemplate
 } from '../../../shared/types'
+import {
+  DEFAULT_POLICY_NUMBER_CODE,
+  POLICY_NUMBER_CODE_KEY,
+  policyNumberCode,
+  policyNumberCodeError
+} from '../../../shared/policyNumber'
 
 // ── Loaders shared by a tab's mount effect and its reload-after-save handlers ──
 
@@ -171,6 +178,7 @@ type PolicySettingsTab =
   | 'declaration'
   | 'endorsements'
   | 'sectionOrder'
+  | 'policyNumbers'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -193,7 +201,8 @@ const CATEGORY_TABS: Record<
     { id: 'timezones', label: 'Timezones', icon: <Globe size={15} /> },
     { id: 'headerTitles', label: 'Header Titles', icon: <BookOpen size={15} /> },
     { id: 'footerText', label: 'Footer Text', icon: <FileText size={15} /> },
-    { id: 'sectionOrder', label: 'Section Order', icon: <LayoutList size={15} /> }
+    { id: 'sectionOrder', label: 'Section Order', icon: <LayoutList size={15} /> },
+    { id: 'policyNumbers', label: 'Policy Numbers', icon: <Hash size={15} /> }
   ],
   documents: [
     { id: 'premiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> },
@@ -340,6 +349,7 @@ export default function PolicySettings(): React.JSX.Element {
         {activeTab === 'fontSize' && <FontSizeTab showSuccess={showSuccess} />}
         {activeTab === 'timezones' && <TimezonesTab showSuccess={showSuccess} />}
         {activeTab === 'baseCurrency' && <BaseCurrencyTab showSuccess={showSuccess} />}
+        {activeTab === 'policyNumbers' && <PolicyNumbersTab showSuccess={showSuccess} />}
         {activeTab === 'footerText' && <FooterTextTab showSuccess={showSuccess} />}
         {activeTab === 'headerTitles' && <HeaderTitlesTab showSuccess={showSuccess} />}
         {activeTab === 'banks' && <BanksTab showSuccess={showSuccess} showError={showError} />}
@@ -772,6 +782,89 @@ function BaseCurrencyTab({
         >
           Save
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ==================== Policy Numbers Tab ====================
+function PolicyNumbersTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
+  const [pattern, setPattern] = useState(DEFAULT_POLICY_NUMBER_CODE)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const raw = await window.api.getSetting(POLICY_NUMBER_CODE_KEY)
+        if (typeof raw === 'string' && raw.trim()) setPattern(raw)
+      } catch {
+        /* default */
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const error = policyNumberCodeError(pattern)
+  const year = new Date().getFullYear()
+  const example = (y: number): string => `P${policyNumberCode(pattern, y)}0001`
+
+  const handleSave = async (): Promise<void> => {
+    if (error) return
+    ok(await window.api.setSetting(POLICY_NUMBER_CODE_KEY, pattern.trim().toUpperCase()))
+    showSuccess('Policy number code saved')
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+
+  return (
+    <div>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Policy Numbers</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+        The 4-digit code after the type letter, e.g. P<strong>2620</strong>0001. {'{YY}'} is the
+        last two digits of the year. Used when a converted policy gets its number and when a vessel
+        policy is renewed with Fill in. Numbers already given are not changed.
+      </p>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={pattern}
+          onChange={(e) => setPattern(e.target.value)}
+          maxLength={12}
+          style={{ width: '140px', fontFamily: 'var(--font-mono)' }}
+          aria-label="Policy number code"
+        />
+        <button
+          onClick={handleSave}
+          className="btn-primary"
+          disabled={!!error}
+          style={{ padding: '8px 16px', fontSize: '0.84rem' }}
+        >
+          Save
+        </button>
+        <button
+          className="btn-ghost btn-sm"
+          onClick={() => setPattern(DEFAULT_POLICY_NUMBER_CODE)}
+          title="Back to {YY}20"
+        >
+          Default
+        </button>
+      </div>
+      <div style={{ marginTop: '10px', fontSize: '0.82rem' }}>
+        {error ? (
+          <span style={{ color: 'var(--danger)' }}>{error}</span>
+        ) : (
+          <span style={{ color: 'var(--text-secondary)' }}>
+            {year}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{example(year)}</strong>
+            {' · '}
+            {year + 1}:{' '}
+            <strong style={{ fontFamily: 'var(--font-mono)' }}>{example(year + 1)}</strong>
+          </span>
+        )}
       </div>
     </div>
   )

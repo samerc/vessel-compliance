@@ -212,6 +212,7 @@ import {
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
+import { POLICY_NUMBER_CODE_KEY, policyNumberCode } from '../../shared/policyNumber'
 import { defaultTradingCountries, inTypeScope, isPiLike } from '../../shared/quotationTypes'
 import {
   htmlToSearchText,
@@ -14264,9 +14265,11 @@ export class MySQLAdapter {
       typeCode = (qRows as RowDataPacket[])[0]?.code || 'P'
     }
 
-    // Generate policy number: type + inverted year + 4-digit serial
-    const yearStr = String(new Date().getFullYear())
-    const invertedYear = yearStr.slice(2) + yearStr.slice(0, 2)
+    // Policy number: type + 4-digit code (Policy Settings, e.g. {YY}20 -> 2620) + serial
+    const invertedYear = policyNumberCode(
+      await this.getSetting(POLICY_NUMBER_CODE_KEY).catch(() => null),
+      new Date().getFullYear()
+    )
 
     // Get next serial number
     const [serialRow] = await this.pool.query(

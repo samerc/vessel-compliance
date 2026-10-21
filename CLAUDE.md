@@ -847,7 +847,7 @@ User groups and granular permissions:
 Insurance policy document management:
 
 - **Policy Documents** (`policy_documents`): Created from quotations via 6-step conversion wizard
-- **Policy Numbering**: `{type_code}{inverted_year}{4-digit serial}` (e.g., P26200001)
+- **Policy Numbering**: `{type_code}{4-digit code}{serial}` (e.g., P26200001). The code is a pattern in Policy Settings > General > Policy Numbers (`app_settings.policy_number_code`, default `{YY}20`, {YY} = the year's last two digits; `shared/policyNumber.ts`), used by the converter's number (`assignPolicyNumber`, current year) and the vessel policy renewal Fill in (year of the new inception). Always 4 digits: the serial is read from the 6th character and the SUR reference strips letter + 4 digits
 - **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review. Layout (redesign 2026-10): 6 visible steps (Vessel and cover, Period and premium, Insured and bank, Subjectivities and warranties, Blue cards, Review) on the left, content with Back / Continue at its foot, live summary on the right. Step ids stay 0-7 (`STEP_LABELS` / `STEP_HINTS` / `STEP_ICONS` indexed by id): Premium (2) renders inside step 1 and `validateStep(1)` also runs step 2's checks; Survey Warranties (7) renders inside step 6, which shows when the quotation has subjectivities or survey warranties
 - **Policy Detail** (`PolicyDetail.tsx`): Overview, Financial, Addresses, Blue Cards, Revision History, editing mode with 4 tabs
 - **Policy List** (`PolicyList.tsx`): Stats, search, filters, sortable table with conversion/export dates
