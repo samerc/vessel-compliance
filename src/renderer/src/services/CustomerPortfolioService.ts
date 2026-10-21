@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { getReportSettings } from './ReportSettingsService'
 import { formatDateLong } from '../utils/dateUtils'
 
-// ── Palette (matches ReportServiceV2) ────────────────────────────────────────
+// ── Palette (same as the vessel PDF report) ────────────────────────────────────────
 type RGB = [number, number, number]
 type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 const C: Record<string, RGB> = {

@@ -114,3 +114,9 @@ documents
 policies/*.sql
 # Sanctions blacklist source (PII) — never commit
 BDL Black List.xlsx
+# Business documents (client data, registers, samples): kept on disk, never committed
+policies/
+cargo/
+*.xlsx
+*.xls
+*.doc

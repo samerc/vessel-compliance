@@ -281,7 +281,7 @@ For `annualRenewal = true` document types, the effective expiry is inherited fro
 - **`resolveEffectivePolicyExpiry(policies)`**: filters `status === 'active'`, matches policy name containing "p&i" or "protection" first, then "hull" or "h&m". Looks for a characteristic whose name contains "end date" and returns its `valueDate`.
 - **Short-cycle rule**: if `(expiryDate − receivedDate) < 60 days`, the document is treated as **Compliant** even when it would otherwise be flagged "Expiring Soon". Rationale: a document placed today against a P&I policy expiring in 30 days was intentionally uploaded knowing its short remaining life.
 - **Helper**: `annualShortCycle(expiry, received)` — returns `true` if span < 60 days
-- **Applied in**: one shared rule in `utils/docStatus.ts` (`effectiveDocExpiry`, `getDocStatus`, `isDocExpired`) used by `VesselDocumentsView.tsx`, Home and the Compliance Center (they now count the same expired documents; "expiring soon" is 60 days on the vessel page, 30 in the Compliance Center). Home and the Compliance Center get each vessel's P&I / H&M end date from IPC `policies:getVesselPolicyExpiries`. `ReportService.ts` / `ReportServiceV2.ts` still have their own copies (exports unchanged)
+- **Applied in**: one shared rule in `utils/docStatus.ts` (`effectiveDocExpiry`, `getDocStatus`, `isDocExpired`) used by `VesselDocumentsView.tsx`, Home and the Compliance Center (they now count the same expired documents; "expiring soon" is 60 days on the vessel page, 30 in the Compliance Center). Home and the Compliance Center get each vessel's P&I / H&M end date from IPC `policies:getVesselPolicyExpiries`. `ReportService.ts` still has its own copy (exports unchanged)
 - **CRITICAL — loading order**: `dynamicPolicies` must be loaded inside `VesselDetail.loadData()` (not just on Policies/Surveys tab switch), otherwise `effectivePolicyExpiry` is always `undefined` when the Documents tab opens. The fix: add `getVesselDynamicPolicies(vessel.id)` to the supplementary try/catch blocks in `loadData()`.
 - **Editable date**: Annual doc expiry row in `VesselDocumentsView` shows a P&I reference badge (cyan, read-only) above an always-editable date input. The stored doc date is the fallback when no P&I policy end date exists; editing it does NOT override the P&I date for compliance (P&I still takes priority in `effectiveExpiry` calculation).
 
@@ -493,23 +493,6 @@ Per-customer document compliance overview (`src/renderer/src/components/Customer
 - **Export Excel**: flat rows with customer header rows interspersed
 - **N+1 prevention**: custom doc types for all vessels in scope are batch-fetched with `Promise.all` before the vessel loop — never one IPC call per vessel
 - **`buildVesselRow(vessel, docTypes, allVesselDocs, allAssureds, allCustomDocTypes)`**: pure synchronous helper, takes pre-fetched data only
-
-### Professional PDF Report (ReportServiceV2)
-
-Vessel compliance PDF (`src/renderer/src/services/ReportServiceV2.ts`), exported via "PDF Report (Pro)" button in VesselDetail:
-
-- **Color palette**: navy `[10,22,40]`, navyMid `[22,46,80]`, accent teal `[0,170,200]`, status greens/ambers/reds
-- **Page chrome**: `drawPageHeader()` — navy bar + teal left stripe, company name, title, CONFIDENTIAL; `drawPageFooter()` — thin rule, generated date / company / page N/M; `drawSectionLabel()` — reusable navy 8mm section bar helper
-- **Header rule**: page 1 header drawn manually; `didDrawPage` callback only redraws for `data.pageNumber > 1`; footers written entirely by post-processing loop for correct total
-- **Score card** (top-right): rounded rect, 26pt rate% in rate color, "COMPLIANCE RATE" label, progress bar, compliant·total text. Height 36mm; positioned to clear stats strip via `Math.max(y + 28, scoreY + scoreH + 4)`
-- **Stats strip**: 4 boxes — COMPLIANT / EXPIRING SOON / EXPIRED / MISSING. Counts include **both** vessel documents and all assured entity/UBO documents
-- **Vessel docs table**: `autoTable`, 5 columns (Document, Description, Received, Expires, Status). Status column color-coded via `didParseCell`
-- **Entity/UBO table**: single `autoTable` call, 3 columns (Entity/Document, Role/Type, Status). Row types tracked in parallel `entityRowMeta: EntityRowMeta[]` array, styled in `didParseCell` + `didDrawCell`:
-  - `'entityHeader'`: navy bg, teal left stripe (2.5mm, drawn in `didDrawCell`), white name (9.5pt bold), accent role·type
-  - `'uboBar'`: navyMid bg, "ULTIMATE BENEFICIAL OWNERS" indented at left: 12mm
-  - `'uboEntityHeader'`: bgMid bg, navyMid left stripe (2mm), indented name (8.5pt bold)
-  - `'doc'`: alternating white/bgLight (by `row.index % 2`), left padding 12mm, ON FILE (green) / MISSING (red) status pill
-- **`resolveEffectivePolicyExpiry`**: utility at `src/renderer/src/utils/policyUtils.ts` — extracts P&I end date from dynamic policies for annual doc expiry resolution
 
 ### Unified Policy / Quotation Types
 
