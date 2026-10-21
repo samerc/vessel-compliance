@@ -104,6 +104,7 @@ Thumbs.db
 !RELEASE_NOTES.md
 !.claude/design-guide.md
 !.claude/lessons-learned.md
+!.claude/docs/*.md
 .claude/*.lock
 .claude/scheduled_tasks.lock
 db/db-config.json
