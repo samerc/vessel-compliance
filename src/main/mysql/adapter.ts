@@ -5830,6 +5830,45 @@ export class MySQLAdapter {
                     INDEX idx_wc_topic (topic_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
+      // Migration (once): a "Policy Number" characteristic (War) duplicated the policy's own
+      // number field. Its value fills the policy number where that is empty (where both are
+      // set the field wins: the characteristic often held last year's number, copied by the
+      // renewal Fill in), then the characteristic and its values are removed.
+      if ((await this.getSetting('migration_policy_number_char_v1')) !== '1') {
+        const [pnChars] = await this.pool.query(
+          "SELECT id FROM policy_type_characteristics WHERE LOWER(TRIM(name)) = 'policy number'"
+        )
+        const pnIds = (pnChars as RowDataPacket[]).map((r) => r.id as string)
+        if (pnIds.length) {
+          const conn = await this.pool.getConnection()
+          try {
+            await conn.beginTransaction()
+            const [filled] = await conn.query(
+              `UPDATE vessel_dynamic_policies p
+                 JOIN vessel_policy_values v ON v.policy_id = p.id AND v.characteristic_id IN (?)
+                  SET p.policy_number = TRIM(v.value_text)
+                WHERE TRIM(COALESCE(p.policy_number, '')) = ''
+                  AND TRIM(COALESCE(v.value_text, '')) <> ''`,
+              [pnIds]
+            )
+            await conn.query('DELETE FROM vessel_policy_values WHERE characteristic_id IN (?)', [
+              pnIds
+            ])
+            await conn.query('DELETE FROM policy_type_characteristics WHERE id IN (?)', [pnIds])
+            await conn.commit()
+            console.log(
+              `[migration] Policy Number characteristic removed; ${(filled as ResultSetHeader).affectedRows} policy numbers filled from it`
+            )
+          } catch (err) {
+            await conn.rollback()
+            throw err
+          } finally {
+            conn.release()
+          }
+        }
+        await this.setSetting('migration_policy_number_char_v1', '1')
+      }
+
       // Migration: values in text deductibles (FD&D: {percent}% ... {currency} {minimum} ...)
       const [tdvCol] = await this.pool.query(
         "SHOW COLUMNS FROM pi_text_deductibles LIKE 'default_values'"
