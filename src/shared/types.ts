@@ -2544,11 +2544,20 @@ export interface PolicyBlueCard {
   ownerEntityId: string | null
   ownerName: string | null
   ownerAddress: string | null
+  /** Further assureds printed under the owner (name + address each) */
+  additionalOwners: BlueCardOwner[]
   portOfRegistry: string | null
   addressedToFlagId: string | null
   addressedToName: string | null
   addressedToAddress: string | null
   cancelReplaceText: string | null
+}
+
+/** An assured printed on a blue card besides its owner */
+export interface BlueCardOwner {
+  entityId?: string | null
+  name: string
+  address?: string | null
 }
 
 /** A new blue card (policy:addBlueCard); the result echoes it with its id */
@@ -2564,6 +2573,7 @@ export interface PolicyBlueCardInput {
   ownerEntityId?: string
   ownerName?: string
   ownerAddress?: string
+  additionalOwners?: BlueCardOwner[]
   portOfRegistry?: string
   addressedToFlagId?: string
   addressedToName?: string
@@ -2580,6 +2590,7 @@ export interface PolicyBlueCardUpdate {
   ownerEntityId?: string | null
   ownerName?: string | null
   ownerAddress?: string | null
+  additionalOwners?: BlueCardOwner[] | null
   portOfRegistry?: string | null
   addressedToFlagId?: string | null
   addressedToName?: string | null

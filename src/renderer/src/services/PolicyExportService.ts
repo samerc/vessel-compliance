@@ -65,6 +65,7 @@ import {
   EndorsementInstalment
 } from '../../../shared/types'
 import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
+import { careOfName } from '../../../shared/careOf'
 import { resolvePolicySurveyWarranty, DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
 import JSZip from 'jszip'
@@ -104,6 +105,8 @@ export interface BlueCardData {
   portOfRegistry?: string
   ownerName?: string
   ownerAddress?: string
+  /** Further assureds printed under the owner */
+  additionalOwners?: { name: string; address?: string | null }[]
   flagAuthorityName?: string
   flagAuthorityAddress?: string
   companyName: string
@@ -255,6 +258,30 @@ function bcAddressBlock(
   )
 }
 
+/** Further assureds of a blue card, each printed like the owner: name, then its address (bold) */
+function bcAdditionalOwners(
+  data: BlueCardData,
+  nameSpacingAfter: number,
+  blockSpacingAfter: number
+): Paragraph[] {
+  const out: Paragraph[] = []
+  for (const o of data.additionalOwners || []) {
+    if (!o.name?.trim()) continue
+    const lines = (o.address || '')
+      .split('\n')
+      .map((l) => l.trim().toUpperCase())
+      .filter(Boolean)
+    out.push(
+      bcParagraph(o.name.trim().toUpperCase(), {
+        bold: true,
+        spacingAfter: lines.length ? nameSpacingAfter : blockSpacingAfter
+      })
+    )
+    if (lines.length) out.push(...bcAddressBlock(lines, blockSpacingAfter, true))
+  }
+  return out
+}
+
 /** Format date in long US style for blue cards: "November 10, 2023" */
 function bcFormatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return ''
@@ -400,6 +427,7 @@ function buildBbcWrcPage(
   } else {
     children.push(bcSpacer(240))
   }
+  children.push(...bcAdditionalOwners(data, 0, 240))
 
   // 7. Certification paragraph — justified (from settings)
   children.push(
@@ -584,6 +612,7 @@ function buildMlcPage(
   } else {
     children.push(bcSpacer(200))
   }
+  children.push(...bcAdditionalOwners(data, 40, 240))
 
   // 6. Provider block — label NOT bold, entity from settings
   children.push(
@@ -2534,11 +2563,11 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   // Broker (c/o …) comes just after the footer with a tiny 3pt gap — unless suppressed.
   // Only a broker business has a c/o line: a policy issued to a DIRECT client never shows one
   // (even if a c/o name was typed on the quotation). Customer type not set = legacy, kept as before.
-  const brokerName =
-    data.quotation.coName ||
+  const brokerName = careOfName(
+    data.quotation,
     data.assureds.find((a) => a.role?.toLowerCase().includes('broker'))?.name
-  const isDirectClient = data.quotation.customerType === 'direct'
-  if (brokerName && !isDirectClient && !data.policy.hideBroker) {
+  )
+  if (brokerName && !data.policy.hideBroker) {
     content.push(polSpacerPts(3))
     content.push(polNpTight(`c/o ${brokerName}`))
   }
@@ -5759,6 +5788,8 @@ async function buildDebitAdviceBlobFresh(
     right: noBorder
   })
 
+  // Gap between the sections (Insured, Premium, Payment, Period, Bank): 10pt under each one
+  const DA_ROW_MARGINS = { top: 60, bottom: 200, left: 80, right: 80 }
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
       // The section content may flow across pages, but the multi-line title must never split
@@ -5768,7 +5799,7 @@ async function buildDebitAdviceBlobFresh(
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          margins: DA_ROW_MARGINS,
           children: [
             new Paragraph({
               keepLines: true,
@@ -5789,7 +5820,7 @@ async function buildDebitAdviceBlobFresh(
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          margins: DA_ROW_MARGINS,
           children: content.length > 0 ? content : [polEmptyP()]
         })
       ]
@@ -6013,7 +6044,6 @@ async function buildDebitAdviceBlobFresh(
         rows: instRows
       })
     )
-    ppcpContent.push(polEmptyP())
   }
 
   // Non-refundable percentage note (only for percentage type)

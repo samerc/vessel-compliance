@@ -106,6 +106,7 @@ import {
   PaginatedResult,
   PolicyBlueCard,
   PolicyBlueCardUpdate,
+  BlueCardOwner,
   PolicyDocAddress,
   PolicyDocInstalment,
   PolicyDocument,
@@ -3982,7 +3983,9 @@ export class MySQLAdapter {
           ['addressed_to_flag_id', 'VARCHAR(36) NULL'],
           ['addressed_to_name', 'VARCHAR(255) NULL'],
           ['addressed_to_address', 'TEXT NULL'],
-          ['cancel_replace_text', 'TEXT NULL']
+          ['cancel_replace_text', 'TEXT NULL'],
+          // JSON [{entityId, name, address}]: further assureds printed under the owner
+          ['additional_owners', 'TEXT NULL']
         ]
         for (const [col, def] of bcNewCols) {
           if (!bcMigColNames.includes(col)) {
@@ -18281,7 +18284,8 @@ export class MySQLAdapter {
                    addressed_to_flag_id as addressedToFlagId,
                    addressed_to_name as addressedToName,
                    addressed_to_address as addressedToAddress,
-                   cancel_replace_text as cancelReplaceText
+                   cancel_replace_text as cancelReplaceText,
+                   additional_owners as additionalOwners
             FROM policy_blue_cards
             WHERE policy_doc_id = ?
             ORDER BY card_type ASC, revision_number DESC
@@ -18291,8 +18295,27 @@ export class MySQLAdapter {
     return (rows as Row<PolicyBlueCard>[]).map((r) => ({
       ...r,
       revisionNumber: Number(r.revisionNumber || 0),
-      status: r.status || 'active'
+      status: r.status || 'active',
+      additionalOwners: MySQLAdapter.parseBlueCardOwners(r.additionalOwners)
     }))
+  }
+
+  /** policy_blue_cards.additional_owners (JSON text) as a list; bad or empty = none */
+  static parseBlueCardOwners(raw: unknown): BlueCardOwner[] {
+    if (Array.isArray(raw)) return raw as BlueCardOwner[]
+    if (typeof raw !== 'string' || !raw.trim()) return []
+    try {
+      const v = JSON.parse(raw)
+      return Array.isArray(v) ? v.filter((o) => o && typeof o.name === 'string') : []
+    } catch {
+      return []
+    }
+  }
+
+  /** Stored form of a blue card's further assureds: JSON, or NULL when there are none */
+  static blueCardOwnersSql(list: BlueCardOwner[] | null | undefined): string | null {
+    const clean = (list || []).filter((o) => o && o.name && o.name.trim())
+    return clean.length ? JSON.stringify(clean) : null
   }
 
   async addPolicyBlueCard(data: {
@@ -18307,6 +18330,7 @@ export class MySQLAdapter {
     ownerEntityId?: string
     ownerName?: string
     ownerAddress?: string
+    additionalOwners?: BlueCardOwner[]
     portOfRegistry?: string
     addressedToFlagId?: string
     addressedToName?: string
@@ -18321,8 +18345,8 @@ export class MySQLAdapter {
                 inception_date, expiry_date, revision_number, issued_date, status,
                 owner_entity_id, owner_name, owner_address, port_of_registry,
                 addressed_to_flag_id, addressed_to_name, addressed_to_address,
-                cancel_replace_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cancel_replace_text, additional_owners)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       [
         id,
@@ -18341,7 +18365,8 @@ export class MySQLAdapter {
         data.addressedToFlagId || null,
         data.addressedToName || null,
         data.addressedToAddress || null,
-        data.cancelReplaceText || null
+        data.cancelReplaceText || null,
+        MySQLAdapter.blueCardOwnersSql(data.additionalOwners)
       ]
     )
     return { id, ...data, status: data.status || 'active' }
@@ -18370,6 +18395,10 @@ export class MySQLAdapter {
         sets.push(`${col} = ?`)
         vals.push((data as Record<string, SqlValue | undefined>)[key] ?? null)
       }
+    }
+    if ('additionalOwners' in data) {
+      sets.push('additional_owners = ?')
+      vals.push(MySQLAdapter.blueCardOwnersSql(data.additionalOwners))
     }
     if (sets.length === 0) return
     vals.push(id)
@@ -18714,8 +18743,9 @@ export class MySQLAdapter {
                 INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
                     inception_date, expiry_date, revision_number, issued_date, status,
                     owner_entity_id, owner_name, owner_address, port_of_registry,
-                    addressed_to_flag_id, addressed_to_name, addressed_to_address, cancel_replace_text)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
+                    addressed_to_flag_id, addressed_to_name, addressed_to_address, cancel_replace_text,
+                    additional_owners)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
         [
           uuidv4(),
@@ -18733,7 +18763,8 @@ export class MySQLAdapter {
           bc.addressedToFlagId || null,
           bc.addressedToName || null,
           bc.addressedToAddress || null,
-          bc.cancelReplaceText || null
+          bc.cancelReplaceText || null,
+          MySQLAdapter.blueCardOwnersSql(bc.additionalOwners)
         ]
       )
     }

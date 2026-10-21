@@ -199,6 +199,7 @@ Customer/broker is tracked at the **policy level**, not the vessel level. A vess
 - **Policy edit UI**: "Customer / Broker" field with broker/direct toggle buttons + entity search combobox in VesselDetail policy edit form
 - **Quotation addresses**: "Print addresses" switch on the Insured tab (`quotations.show_addresses`, default off): each assured's address (the vessel assured's `address_id`, else the entity's first address) on a row under it, printed once after consecutive assureds with the same address, and the broker's first address under "c/o"
 - **Quotation customer**: `customer_entity_id` + `customer_type` on `quotations` table, set in InsuredTab with entity search and broker/direct toggle. Auto-copied from vessel's existing policy when adding a vessel. Synced to vessel dynamic policy on quotation-to-policy conversion.
+- **c/o line** (`careOfName`, src/shared/careOf.ts): quotation, policy and Debit Advice print "c/o {name}" under the insured only for a broker business. `coName` also holds a DIRECT client's name (it is the Customer column of the quotation list), so `customerType = 'direct'` means no c/o line; without a customer type (older quotations) the typed c/o name, else a Broker-role insured, still prints. The converter counts a direct client as having no broker (no commission / Credit Advice)
 - **Document filtering**: Customer compliance reports only show document types tagged for the policy types the customer covers (e.g., Hull broker sees only Hull-tagged docs)
 - **Vessel list**: Customer column hidden by default (labeled "Legacy" in column selector)
 
@@ -861,6 +862,7 @@ Insurance policy document management:
 - **Per-policy choices** (converter, editable in Policy Detail before the first export; copied by revisions): subjectivity days (`policy_documents.subjectivity_days`, default 7), section order, UPCC section name (`upcc_title`, empty = the quotation's `quotations.upcc_title`, default "Upfront Profit Continuity Credit (UPCC)"). The converter's "Survey Warranties" step stores the final wording per vessel in `survey_warranty_texts` (JSON `[{id, text}]`; NULL = built from the quotation); on a policy `{days}` = 0 reads "at inception" (`utils/surveyWarrantyText.ts`)
 - **Quotation parity**: the policy export filters every alternative/vessel-scoped item to its vessel and chosen alternative (incl. hull/war conditions), uses the converter's agreed-value option, the chosen alternative's own clause wording, and `vesselTechnical` (shared/premium.ts, War Settings default rates) as the base of NCB/UPCC/discount `{amount}`. War Section 1/2 wording comes from `utils/warTexts.ts` (field → War Settings → default) in editor, quotation and policy. The Debit Advice splits the payable premium H&M / IV and War Section 1 / Section 2
 - **Instalment Dates**: Each 30 days = 1 calendar month from inception
+- **Copy instalment dates** (`CopyInstalmentDatesModal`): "Copy dates from a policy" in the converter's Premium & Instalments step and in Policy Detail editing: pick another policy (search; same inception date first) and take its number of instalments and due dates; the amounts are split again on this policy's premium (and commission)
 - **Premium**: Uses payable amount (after NCB/UPCC discounts)
 - **Export layout invariants** (PolicyExportService, see lessons-learned): nested tables use `POL_TABLE_MARGINS` (zero cell inset) to align with paragraphs; section titles use `keepLines` so a multi-line title never splits across pages (content still flows — NOT `cantSplit`); small gaps via `polSpacerPts(n)` not blank `polEmptyP()`. Policy/DA/CA share the insured (`polBuildInsuredSection`) and period (`polBuildPeriodParagraphs`) builders — a change to one applies to all.
 
@@ -893,6 +895,7 @@ P&I insurance certificates:
 - **Reissue for another flag state**: from an existing card, reissue defaults new inception = today, expiry carried over, number increments (`-2`). The addressee flag can be switched (updates the "To:"). **Cancel & Replace is driven by period OVERLAP** — `new inception < old expiry` — recomputed live as the dates change (consecutive/touching periods omit it); when on, the source card is superseded.
 - **Cancel & Replace**: Configurable text with placeholders; auto-set from period overlap on reissue
 - **Status**: Active / Superseded (one active per type)
+- **Further assureds**: `policy_blue_cards.additional_owners` (JSON `[{entityId, name, address}]`, `BlueCardOwner`): "Add another assured" under the Owner in the issue / reissue / edit dialog (picked from the vessel's assureds or typed). Printed under the owner on every card layout, each name + address in bold (`bcAdditionalOwners`); copied by reissue and policy revisions
 - **Export**: Individual DOCX per card matching real certificate templates. MLC provider block de-dupes the company name (report-settings `companyName` vs the `bc_mlc_company_address` first line, compared normalized so hyphenation differences match); Email/Tel contact rows have zero inter-row spacing. All blue-card tables use `BC_TABLE_MARGINS` (zero cell inset) to align with the surrounding paragraphs.
 
 ### Digital Signatures
@@ -1301,6 +1304,7 @@ Prevents concurrent editing of the same quotation:
 
 - **Single instalment**: "Premium of {currency} {amount} shall be payable on {date}..." (configurable in Settings)
 - **Debit Advice**: Compact header (company only), title size 10 bold underline, 2-column instalment table, premium on one line with words + "Only", period as 3-column table, bank details without title
+- **Debit Advice section gaps**: every section row (Insured, Premium, Premium Payment Condition Precedent, Period, Bank Details) has 10pt under it (`DA_ROW_MARGINS`); no extra blank line after the instalment table
 - **Credit Advice**: Broker from quotation customerEntityId at top, broker excluded from Insured + c/o line, commission wording configurable in Settings (placeholders: `{instalments}`, `{date}`), reduced cell margins
 - **Blue Cards (BBC/WRC)**: NOT TRANSFERABLE left / REF right, 3-column vessel table (label|:|value bold) with FIXED layout, 3-column period table, owner section without border, port includes country
 - **MLC Blue Cards**: Same vessel table design, provider address bold uppercase zero spacing, contact details in 2-column table

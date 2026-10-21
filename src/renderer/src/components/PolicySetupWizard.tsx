@@ -14,8 +14,10 @@ import {
   Loader2,
   LayoutList,
   ListChecks,
-  FileWarning
+  FileWarning,
+  CalendarDays
 } from 'lucide-react'
+import CopyInstalmentDatesModal from './CopyInstalmentDatesModal'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -249,6 +251,8 @@ function sumVesselInstalments(vesselPremiums: Record<string, number>, count: num
  *  an insured carries a Broker role. Commission (and so a Credit Advice) only applies then. */
 function quoteHasBroker(q: Quotation | null, rows: InsuredRow[]): boolean {
   if (!q) return false
+  // A direct client: coName holds the client itself, not a broker
+  if (q.customerType === 'direct') return false
   if (q.customerType === 'broker' && q.customerEntityId) return true
   if (q.coName && q.coName.trim()) return true
   return rows.some((r) => /broker/i.test(r.role || ''))
@@ -728,6 +732,28 @@ export default function PolicySetupWizard({
       : splitInstalments(data.totalPremium || 0, count)
     setInstalments(newInstalments)
     setData((prev) => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts }))
+  }
+
+  // Instalment dates copied from another policy: its number of instalments and due dates; the
+  // amounts are split again on this premium (days from inception kept for an inception change)
+  const applyCopiedDates = (dates: string[]): void => {
+    const count = dates.length
+    if (count === 0) return
+    const inc = data.inceptionDate ? Date.parse(data.inceptionDate) : NaN
+    const newInstalments: QuotationInstalment[] = dates.map((d, i) => ({
+      id: `wiz-inst-${i}`,
+      quotationId,
+      instalmentNumber: i + 1,
+      daysFromInception:
+        !isNaN(inc) && d
+          ? Math.round((Date.parse(d) - inc) / 86400000)
+          : instalmentDaysFor(count, i)
+    }))
+    const amounts = isMultiSelection
+      ? sumVesselInstalments(data.vesselPremiums, count)
+      : splitInstalments(data.totalPremium || 0, count)
+    setInstalments(newInstalments)
+    setData((prev) => ({ ...prev, instalmentDates: [...dates], instalmentAmounts: amounts }))
   }
 
   // Re-derive per-vessel payable premiums + instalment amounts for a selection / alternative / LOL
@@ -1274,6 +1300,7 @@ export default function PolicySetupWizard({
                 onUpdate={updateData}
                 recalcPremiumFromInstalments={recalcPremiumFromInstalments}
                 onChangeCount={changeInstalmentCount}
+                onCopyDates={applyCopiedDates}
                 hullTechnical={hullTechnical}
                 inputStyle={inputStyle}
                 qVessels={qVessels}
@@ -1874,6 +1901,7 @@ function StepInstalments({
   onUpdate,
   recalcPremiumFromInstalments,
   onChangeCount,
+  onCopyDates,
   hullTechnical,
   inputStyle,
   qVessels,
@@ -1887,6 +1915,7 @@ function StepInstalments({
   onUpdate: (partial: Partial<WizardData>) => void
   recalcPremiumFromInstalments: (amounts: number[]) => void
   onChangeCount: (count: number) => void
+  onCopyDates: (dates: string[]) => void
   hullTechnical: number
   inputStyle: React.CSSProperties
   qVessels: QuotationVessel[]
@@ -1903,13 +1932,36 @@ function StepInstalments({
     marginBottom: '8px'
   }
   const count = data.instalmentDates.length
+  const [copyOpen, setCopyOpen] = useState(false)
 
   return (
     <div>
-      <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Premium & Instalments</h2>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        Set the payable premium, the number of instalments, and review dates and amounts.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Premium & Instalments</h2>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
+            Set the payable premium, the number of instalments, and review dates and amounts.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          onClick={() => setCopyOpen(true)}
+          title="Take the number of instalments and their due dates from another policy"
+        >
+          <CalendarDays size={14} /> Copy dates from a policy
+        </button>
+      </div>
+      {copyOpen && (
+        <CopyInstalmentDatesModal
+          inceptionDate={data.inceptionDate}
+          onClose={() => setCopyOpen(false)}
+          onApply={(dates) => {
+            onCopyDates(dates)
+            setCopyOpen(false)
+          }}
+        />
+      )}
 
       {/* Premium + number of instalments */}
       <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', marginBottom: '20px' }}>

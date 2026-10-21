@@ -28,8 +28,10 @@ import {
   FileArchive,
   MoreHorizontal,
   PenTool,
-  LayoutList
+  LayoutList,
+  CalendarDays
 } from 'lucide-react'
+import CopyInstalmentDatesModal from './CopyInstalmentDatesModal'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -49,6 +51,7 @@ import type {
   PISubjectivity,
   PIWarranty,
   PolicyBlueCard,
+  BlueCardOwner,
   PolicyDocAddress,
   PolicyDocInstalment,
   PolicyDocument,
@@ -165,6 +168,8 @@ interface BlueCardFormData {
   ownerEntityId: string
   ownerName: string
   ownerAddress: string
+  /** Further assureds printed under the owner */
+  additionalOwners: BlueCardOwner[]
   portOfRegistry: string
   addressedToFlagId: string
   addressedToName: string
@@ -397,6 +402,7 @@ export default function PolicyDetail({
     ownerEntityId: '',
     ownerName: '',
     ownerAddress: '',
+    additionalOwners: [],
     portOfRegistry: '',
     addressedToFlagId: '',
     addressedToName: '',
@@ -921,6 +927,21 @@ export default function PolicyDetail({
     ])
   }
 
+  // Instalment dates copied from another policy: its number of instalments and due dates, the
+  // amounts split again on this policy's premium and commission
+  const [copyDatesOpen, setCopyDatesOpen] = useState(false)
+  const applyCopiedDates = (dates: string[]): void => {
+    const rows = dates.map((dueDate, i) => ({
+      instalmentNumber: i + 1,
+      dueDate,
+      premiumAmount: 0,
+      commissionAmount: 0,
+      isNonRefundable: editInstalments[i]?.isNonRefundable ?? false
+    }))
+    setEditInstalments(recalcInstalments(editPremium, editCommission, rows))
+    setCopyDatesOpen(false)
+  }
+
   // Remove instalment row
   const removeInstalment = (idx: number): void => {
     setEditInstalments((prev) =>
@@ -1095,6 +1116,7 @@ export default function PolicyDetail({
       ownerEntityId: ownerOptions.length > 0 ? ownerOptions[0].id : '',
       ownerName: ownerOptions.length > 0 ? ownerOptions[0].name : '',
       ownerAddress: ownerOptions.length > 0 ? ownerOptions[0].address || '' : '',
+      additionalOwners: [],
       portOfRegistry: defaultPort,
       addressedToFlagId: isRatified && fs ? fs.id : '',
       addressedToName: isRatified && fs ? fs.authorityName || '' : '',
@@ -1126,6 +1148,7 @@ export default function PolicyDetail({
       ownerEntityId: card.ownerEntityId || '',
       ownerName: card.ownerName || '',
       ownerAddress: card.ownerAddress || '',
+      additionalOwners: card.additionalOwners || [],
       portOfRegistry: card.portOfRegistry || '',
       // Carry the source addressee; the user can switch to another flag state for the reissue.
       addressedToFlagId: card.addressedToFlagId || '',
@@ -1151,6 +1174,7 @@ export default function PolicyDetail({
       ownerEntityId: card.ownerEntityId || '',
       ownerName: card.ownerName || '',
       ownerAddress: card.ownerAddress || '',
+      additionalOwners: card.additionalOwners || [],
       portOfRegistry: card.portOfRegistry || '',
       addressedToFlagId: card.addressedToFlagId || '',
       addressedToName: card.addressedToName || '',
@@ -1230,6 +1254,7 @@ export default function PolicyDetail({
           ownerEntityId: bcForm.ownerEntityId || null,
           ownerName: bcForm.ownerName || null,
           ownerAddress: bcForm.ownerAddress || null,
+          additionalOwners: bcForm.additionalOwners,
           portOfRegistry: bcForm.portOfRegistry || null,
           addressedToFlagId: bcForm.addressedToFlagId || null,
           addressedToName: bcForm.addressedToName || null,
@@ -1282,6 +1307,7 @@ export default function PolicyDetail({
           ownerEntityId: bcForm.ownerEntityId || undefined,
           ownerName: bcForm.ownerName || undefined,
           ownerAddress: bcForm.ownerAddress || undefined,
+          additionalOwners: bcForm.additionalOwners,
           portOfRegistry: bcForm.portOfRegistry || undefined,
           addressedToFlagId: bcForm.addressedToFlagId || undefined,
           addressedToName: bcForm.addressedToName || undefined,
@@ -1323,6 +1349,7 @@ export default function PolicyDetail({
     portOfRegistry: card.portOfRegistry || '',
     ownerName: card.ownerName || '',
     ownerAddress: card.ownerAddress || '',
+    additionalOwners: card.additionalOwners || [],
     flagAuthorityName: card.addressedToName || '',
     flagAuthorityAddress: card.addressedToAddress || '',
     companyName: companyName || 'Insurance Company',
@@ -2696,6 +2723,29 @@ export default function PolicyDetail({
                   >
                     <Plus size={12} /> Add
                   </button>
+                  <button
+                    className="btn-secondary"
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    onClick={() => setCopyDatesOpen(true)}
+                    title="Take the number of instalments and their due dates from another policy"
+                  >
+                    <CalendarDays size={12} /> Copy dates from a policy
+                  </button>
+                  {copyDatesOpen && (
+                    <CopyInstalmentDatesModal
+                      excludePolicyId={policyId}
+                      inceptionDate={editInception || policy?.inceptionDate || undefined}
+                      onClose={() => setCopyDatesOpen(false)}
+                      onApply={applyCopiedDates}
+                    />
+                  )}
                   <span
                     style={{
                       fontSize: '0.72rem',
@@ -4562,6 +4612,105 @@ export default function PolicyDetail({
                   rows={2}
                   style={{ width: '100%', resize: 'vertical' }}
                 />
+                {/* Further assureds: printed under the owner, each with its address */}
+                {bcForm.additionalOwners.map((o, idx) => {
+                  const setOwner = (patch: Partial<BlueCardOwner>): void =>
+                    setBcForm((f) => ({
+                      ...f,
+                      additionalOwners: f.additionalOwners.map((x, i) =>
+                        i === idx ? { ...x, ...patch } : x
+                      )
+                    }))
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        marginTop: '10px',
+                        paddingTop: '10px',
+                        borderTop: '1px dashed var(--glass-border-color)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                        <select
+                          value={o.entityId || '__custom__'}
+                          onChange={(e) => {
+                            const opt = ownerOptions.find((x) => x.id === e.target.value)
+                            setOwner(
+                              opt
+                                ? { entityId: opt.id, name: opt.name, address: opt.address || '' }
+                                : { entityId: null }
+                            )
+                          }}
+                          style={{ flex: 1 }}
+                          aria-label={`Assured ${idx + 2}`}
+                        >
+                          {ownerOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                              {opt.role ? ` (${opt.role})` : ''}
+                            </option>
+                          ))}
+                          <option value="__custom__">Custom...</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          title="Remove this assured"
+                          aria-label="Remove this assured"
+                          onClick={() =>
+                            setBcForm((f) => ({
+                              ...f,
+                              additionalOwners: f.additionalOwners.filter((_, i) => i !== idx)
+                            }))
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Assured name"
+                        value={o.name}
+                        onChange={(e) => setOwner({ name: e.target.value })}
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <textarea
+                        placeholder="Assured address"
+                        value={o.address || ''}
+                        onChange={(e) => setOwner({ address: e.target.value })}
+                        rows={2}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+                  )
+                })}
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  style={{ marginTop: '8px' }}
+                  onClick={() =>
+                    setBcForm((f) => {
+                      // Suggest the next assured not on the card yet
+                      const used = new Set(
+                        [f.ownerEntityId, ...f.additionalOwners.map((x) => x.entityId)].filter(
+                          Boolean
+                        )
+                      )
+                      const next = ownerOptions.find((x) => !used.has(x.id))
+                      return {
+                        ...f,
+                        additionalOwners: [
+                          ...f.additionalOwners,
+                          next
+                            ? { entityId: next.id, name: next.name, address: next.address || '' }
+                            : { entityId: null, name: '', address: '' }
+                        ]
+                      }
+                    })
+                  }
+                >
+                  <Plus size={14} /> Add another assured
+                </button>
               </div>
 
               {/* Port of Registry */}

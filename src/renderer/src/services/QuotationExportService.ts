@@ -100,6 +100,7 @@ import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 import { fillTextDeductibles } from '../../../shared/deductibleValues'
+import { careOfName } from '../../../shared/careOf'
 import { hullClausesPerVesselOnly, upccPercentFor, upccPercentText } from '../../../shared/premium'
 
 // ==================== Export Snapshot ====================
@@ -1758,7 +1759,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       insuredContent.push(emptyP())
       insuredContent.push(...mp(st(data, 'insuredFooter')))
     }
-    const wordCoName = data.quotation.coName || getBrokerName(data)
+    // No c/o line for a direct client (coName then holds the client itself)
+    const wordCoName = careOfName(data.quotation, getBrokerName(data))
     if (wordCoName) {
       insuredContent.push(emptyP())
       insuredContent.push(np(`c/o ${wordCoName}`))
