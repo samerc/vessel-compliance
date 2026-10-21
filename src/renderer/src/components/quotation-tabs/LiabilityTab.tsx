@@ -139,10 +139,17 @@ export default function LiabilityTab({
     } else {
       previewAmount = 'values as per below'
     }
+  } else if (quotation.limitOfLiabilityAmount) {
+    previewAmount = quotation.limitOfLiabilityAmount.toLocaleString()
   } else {
-    previewAmount = quotation.limitOfLiabilityAmount
-      ? quotation.limitOfLiabilityAmount.toLocaleString()
-      : '___'
+    // No main amount: the vessels' own amounts (the same for all, or listed per vessel)
+    const own = qVessels.map((v) => quotation.limitOfLiabilityVesselAmounts?.[v.id])
+    previewAmount =
+      qVessels.length >= 2 && own.every((a) => a)
+        ? own.every((a) => a === own[0])
+          ? `${own[0]!.toLocaleString()} (each vessel)`
+          : 'values as per above'
+        : '___'
   }
   // Standard text with placeholders replaced
   const resolvedStandardText = (

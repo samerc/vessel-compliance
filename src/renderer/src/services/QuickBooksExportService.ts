@@ -349,7 +349,12 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
       : 0
 
   // Value / insured value from quotation
-  const insuredValue = quotation?.agreedValue || quotation?.limitOfLiabilityAmount || 0
+  // (a fleet P&I limit may be this vessel's own amount)
+  const insuredValue =
+    quotation?.agreedValue ||
+    (qVessel ? quotation?.limitOfLiabilityVesselAmounts?.[qVessel.id] : undefined) ||
+    quotation?.limitOfLiabilityAmount ||
+    0
   // Technical premium of THIS vessel (not the fleet total of the quotation)
   const technicalPremium = vesselTech ?? (quotation?.premiumAmount || premium)
   const ncbApplies = !!quotation?.ncbEnabled && !qVessel?.ncbExcluded

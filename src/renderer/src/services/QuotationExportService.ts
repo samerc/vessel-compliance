@@ -1893,6 +1893,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       cur = dPiAltLolItems[0].lolCurrency || cur
     }
 
+    // No main amount but every vessel has the same amount of its own: that is the limit
+    if (baseAmt == null && multiVessel && lolVA && !dPiAltLol && !dHasLolOptions) {
+      const own = data.quotationVessels.map((qv) => lolVA[qv.id])
+      if (own.every((a) => a != null && a === own[0])) baseAmt = own[0] as number
+    }
+
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false
     if (!dPiAltLol && !dHasLolOptions && multiVessel && lolVA && Object.keys(lolVA).length > 0) {

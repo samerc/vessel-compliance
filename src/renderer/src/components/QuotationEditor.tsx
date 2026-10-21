@@ -693,15 +693,33 @@ export default function QuotationEditor({
       }
     }
 
-    // P&I: Limit of Liability (skip if LOL alternatives are set)
+    // P&I: Limit of Liability. Set by the main amount, LOL alternatives, the P&I alternatives'
+    // own limits, or (fleet) every vessel's own amount: without a main amount only the vessels
+    // left with no amount of their own are missing it
     if (
       isPiLike(typeCode) &&
       (quotation.limitOfLiabilityAmount == null || quotation.limitOfLiabilityAmount === 0)
     ) {
       try {
-        const lolOpts = await window.api.lolGetOptions(quotation.id)
-        if (!Array.isArray(lolOpts) || lolOpts.length === 0) {
-          warnings.push('Limit of Liability amount is not set')
+        const [lolOpts, alts, qvs] = await Promise.all([
+          window.api.lolGetOptions(quotation.id),
+          window.api.piGetQuotationAlternatives(quotation.id),
+          window.api.getQuotationVessels(quotation.id)
+        ])
+        const hasOptions = Array.isArray(lolOpts) && lolOpts.length > 0
+        const hasAltLimits = Array.isArray(alts) && alts.some((a) => a.lolAmount)
+        const fleet = Array.isArray(qvs) ? qvs : []
+        const own = quotation.limitOfLiabilityVesselAmounts || {}
+        if (!hasOptions && !hasAltLimits) {
+          const without = fleet.filter((v) => !own[v.id])
+          if (fleet.length < 2 || without.length === fleet.length)
+            warnings.push('Limit of Liability amount is not set')
+          else if (without.length > 0)
+            warnings.push(
+              `Limit of Liability is not set for ${without
+                .map((v) => (v.name || v.vesselLabel || '').toUpperCase())
+                .join(', ')} (no main amount and no amount of its own)`
+            )
         }
       } catch {
         warnings.push('Limit of Liability amount is not set')
@@ -830,7 +848,14 @@ export default function QuotationEditor({
     }
     // validateBeforeExport reads q; these are the fields it checks
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, q.premiumAmount, q.limitOfLiabilityAmount, q.agreedValue, q.insuredValueAmount])
+  }, [
+    activeTab,
+    q.premiumAmount,
+    q.limitOfLiabilityAmount,
+    q.limitOfLiabilityVesselAmounts,
+    q.agreedValue,
+    q.insuredValueAmount
+  ])
 
   const doExport = async (
     quotation: Quotation,

@@ -234,6 +234,11 @@ Two-section war quotations: Section 1 (Hull War) + Section 2 (P&I in excess of H
 - **War settings** (`war_settings` JSON): `defaultExcessRate`, `section1Text`, `section2Text`, `combinedLimitText`
 - **Section order**: `interest` added before `sumInsured` in WAR_SECTION_ORDER
 
+### Per-vessel Limit of Liability (fleet P&I)
+
+- `quotations.limit_of_liability_vessel_amounts` (JSON, quotation_vessel id -> amount): "Per-Vessel Override" on the Limit of Liability tab with 2+ vessels; blank = the main amount
+- The main amount may stay empty when every vessel has its own: no export warning / tab dot; with only some vessels set the warning names the vessels left without an amount. The export prints one "X (each vessel)" when all are the same, else the per-vessel lines + "values as per above"; the tab preview does the same; policy export and QuickBooks take the vessel's own amount
+
 ### LOL Alternatives (P&I)
 
 Multiple Limit of Liability options without full P&I alternatives:
