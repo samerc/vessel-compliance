@@ -31,12 +31,14 @@ export function sanitizeHtml(html: string): string {
       'tbody',
       'tr',
       'td',
+      'colgroup',
+      'col',
       'th',
       'sub',
       'sup',
       'hr'
     ],
-    ALLOWED_ATTR: ['style', 'class', 'href', 'target', 'rel', 'colspan', 'rowspan'],
+    ALLOWED_ATTR: ['style', 'class', 'href', 'target', 'rel', 'colspan', 'rowspan', 'dir'],
     ALLOW_DATA_ATTR: false
   })
 }

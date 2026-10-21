@@ -258,6 +258,8 @@ export interface GlobalSearchResults {
     source: 'policy_document' | 'vessel_policy'
     status: string
   }[]
+  /** Wiki topics (best match first) */
+  wiki: { id: string; title: string; category: string }[]
 }
 
 /** A user's stored signature image */

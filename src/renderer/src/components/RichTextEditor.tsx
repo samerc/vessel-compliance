@@ -4,8 +4,9 @@ import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { TextAlign } from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
-import { Extension, Node as TipTapNode, type AnyExtension } from '@tiptap/react'
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
+import { TableKit } from '@tiptap/extension-table'
+import { Extension, Node as TipTapNode, type AnyExtension, type Editor } from '@tiptap/react'
+import { useEffect, useRef, useMemo, useState, useCallback, type ReactNode } from 'react'
 import { useReadOnly } from '../contexts/ReadOnlyContext'
 import {
   Bold,
@@ -19,7 +20,8 @@ import {
   ChevronDown,
   WrapText,
   Link as LinkIcon,
-  Unlink
+  Unlink,
+  Table as TableIcon
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { promptDialog } from './DialogHost'
@@ -102,6 +104,26 @@ const LineHeight = TipTapNode.create({
   }
 })
 
+// Every block reads its own direction (dir="auto"): a paragraph that starts in Arabic runs right
+// to left, an English one left to right
+const AutoDirection = Extension.create({
+  name: 'autoDirection',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph', 'heading', 'bulletList', 'orderedList', 'tableCell', 'tableHeader'],
+        attributes: {
+          dir: {
+            default: 'auto',
+            parseHTML: (el) => (el as HTMLElement).getAttribute('dir') || 'auto',
+            renderHTML: (attrs) => ({ dir: attrs.dir || 'auto' })
+          }
+        }
+      }
+    ]
+  }
+})
+
 const FONT_SIZES = [
   { label: '8', value: '8pt' },
   { label: '9', value: '9pt' },
@@ -146,6 +168,14 @@ interface RichTextEditorProps {
   showPlaceholders?: boolean
   showHeadings?: boolean
   placeholderItems?: PlaceholderItem[]
+  /** Tables (insert, add / remove rows and columns) */
+  showTables?: boolean
+  /** Keep bold, lists, headings and tables when pasting (default: paste plain text) */
+  keepPasteFormatting?: boolean
+  /** Each paragraph takes its direction from its text (Arabic right to left) */
+  autoDirection?: boolean
+  /** Extra toolbar buttons (after the lists) */
+  toolbarExtra?: (editor: Editor) => ReactNode
 }
 
 export default function RichTextEditor({
@@ -160,7 +190,11 @@ export default function RichTextEditor({
   showLineSpacing,
   showPlaceholders,
   showHeadings,
-  placeholderItems
+  placeholderItems,
+  showTables,
+  keepPasteFormatting,
+  autoDirection,
+  toolbarExtra
 }: RichTextEditorProps): React.JSX.Element | null {
   const { theme } = useTheme()
   // Inside a read-only view the text stays readable and copyable but cannot be changed
@@ -208,8 +242,18 @@ export default function RichTextEditor({
     if (showLineSpacing) {
       exts.push(LineHeight)
     }
+    if (showTables) exts.push(TableKit.configure({ table: { resizable: false } }))
+    if (autoDirection) exts.push(AutoDirection)
     return exts
-  }, [showFontSize, showFontFamily, showAlignment, showLineSpacing, showHeadings])
+  }, [
+    showFontSize,
+    showFontFamily,
+    showAlignment,
+    showLineSpacing,
+    showHeadings,
+    showTables,
+    autoDirection
+  ])
 
   const editor = useEditor(
     {
@@ -224,6 +268,8 @@ export default function RichTextEditor({
       },
       editorProps: {
         handlePaste: (view, event) => {
+          // Formatting kept: the editor keeps only what it knows (bold, lists, tables...)
+          if (keepPasteFormatting) return false
           // Strip rich formatting on paste — insert as plain text to avoid foreign styles
           const text = event.clipboardData?.getData('text/plain')
           if (text) {
@@ -582,6 +628,60 @@ export default function RichTextEditor({
             strokeWidth={2.5}
           />
         </button>
+        {showTables && (
+          <>
+            <div className="rte-separator" />
+            <button
+              type="button"
+              className={btn(editor.isActive('table'))}
+              onClick={() =>
+                editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+              }
+              title="Insert table"
+            >
+              <TableIcon
+                size={14}
+                color={editor.isActive('table') ? activeIconColor : iconColor}
+                strokeWidth={2.2}
+              />
+            </button>
+            {editor.isActive('table') &&
+              (
+                [
+                  ['+ Row', 'Add a row below', () => editor.chain().focus().addRowAfter().run()],
+                  [
+                    '+ Col',
+                    'Add a column to the right',
+                    () => editor.chain().focus().addColumnAfter().run()
+                  ],
+                  ['- Row', 'Delete this row', () => editor.chain().focus().deleteRow().run()],
+                  [
+                    '- Col',
+                    'Delete this column',
+                    () => editor.chain().focus().deleteColumn().run()
+                  ],
+                  ['x Table', 'Delete the table', () => editor.chain().focus().deleteTable().run()]
+                ] as [string, string, () => void][]
+              ).map(([label, title, run]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="rte-btn"
+                  onClick={run}
+                  title={title}
+                  style={{ fontSize: '0.7rem', fontWeight: 600, color: iconColor, width: 'auto' }}
+                >
+                  {label}
+                </button>
+              ))}
+          </>
+        )}
+        {toolbarExtra && (
+          <>
+            <div className="rte-separator" />
+            {toolbarExtra(editor)}
+          </>
+        )}
         {showPlaceholders && placeholderItems && placeholderItems.length > 0 && (
           <>
             <div className="rte-separator" />

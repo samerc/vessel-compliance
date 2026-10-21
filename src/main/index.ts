@@ -37,7 +37,10 @@ import type {
   VesselDynamicPolicy,
   VesselPolicyValue,
   VesselQueryParams,
-  VesselType
+  VesselType,
+  WikiImportFile,
+  WikiSettings,
+  WikiTopicInput
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { tmpdir } from 'os'
@@ -1795,6 +1798,205 @@ app.whenReady().then(() => {
   safeHandle('entityNotes:delete', async (event, noteId: string) => {
     const user = await requirePermission(event, 'entities:edit')
     return db.deleteEntityNote(noteId, user.id)
+  })
+  // Wiki: everyone signed in reads and writes; comments only when switched on (wiki_settings)
+  safeHandle('wiki:list', (event) => {
+    requireSession(event)
+    return db.getWikiTopics(false)
+  })
+  safeHandle('wiki:listDeleted', (event) => {
+    requireSession(event)
+    return db.getWikiTopics(true)
+  })
+  safeHandle('wiki:search', (event, query: string) => {
+    requireSession(event)
+    return db.searchWikiTopics(String(query || ''))
+  })
+  safeHandle('wiki:get', (event, id: string) => {
+    requireSession(event)
+    return db.getWikiTopic(id)
+  })
+  safeHandle('wiki:saveTopic', async (event, input: WikiTopicInput) => {
+    const user = requireSession(event)
+    const res = await db.saveWikiTopic(input, user)
+    if (!res.conflict)
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: input.id ? 'UPDATE' : 'CREATE',
+        module: 'Wiki',
+        entityType: 'wiki',
+        entityId: res.topic.id,
+        entityName: res.topic.title,
+        details: `${input.id ? 'Updated' : 'Created'} wiki topic ${res.topic.title}`
+      }).catch(() => {})
+    return res
+  })
+  safeHandle('wiki:deleteTopic', async (event, id: string) => {
+    const user = requireSession(event)
+    const topic = await db.getWikiTopic(id)
+    await db.deleteWikiTopic(id, user.username)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'DELETE',
+      module: 'Wiki',
+      entityType: 'wiki',
+      entityId: id,
+      entityName: topic?.title,
+      details: `Deleted wiki topic ${topic?.title || id}`
+    }).catch(() => {})
+  })
+  safeHandle('wiki:restoreTopic', async (event, id: string) => {
+    const user = requireSession(event)
+    await db.restoreWikiTopic(id)
+    const topic = await db.getWikiTopic(id)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Wiki',
+      entityType: 'wiki',
+      entityId: id,
+      entityName: topic?.title,
+      details: `Restored wiki topic ${topic?.title || id}`
+    }).catch(() => {})
+    return topic
+  })
+  safeHandle('wiki:versions', (event, topicId: string) => {
+    requireSession(event)
+    return db.getWikiVersions(topicId)
+  })
+  safeHandle('wiki:restoreVersion', async (event, versionId: string) => {
+    const user = requireSession(event)
+    return db.restoreWikiVersion(versionId, user)
+  })
+  safeHandle('wiki:attachments', (event, topicId: string) => {
+    requireSession(event)
+    return db.getWikiAttachments(topicId)
+  })
+  // Files are linked where they are (never copied); no paths = pick them
+  safeHandle('wiki:addAttachments', async (event, topicId: string, paths?: string[]) => {
+    const user = requireSession(event)
+    let list = Array.isArray(paths) ? paths.filter((p) => typeof p === 'string' && p) : []
+    if (list.length === 0) {
+      const picked = await dialog.showOpenDialog({
+        title: 'Attach files (they stay where they are)',
+        properties: ['openFile', 'multiSelections']
+      })
+      if (picked.canceled || picked.filePaths.length === 0) return db.getWikiAttachments(topicId)
+      list = picked.filePaths
+    }
+    if (isRemoteUser && filePathLocal && filePathNetwork) {
+      const outside = list.find((p) => !isSharedPath(p))
+      if (outside)
+        throw new Error(`Files must be located in the shared folder (${filePathNetwork})`)
+    }
+    const files = list.map((p) => ({ filePath: canonicalizeFilePath(p), fileName: basename(p) }))
+    return db.addWikiAttachments(topicId, files, user.username)
+  })
+  safeHandle('wiki:removeAttachment', (event, id: string) => {
+    requireSession(event)
+    return db.removeWikiAttachment(id)
+  })
+  safeHandle('wiki:comments', (event, topicId: string) => {
+    requireSession(event)
+    return db.getWikiComments(topicId)
+  })
+  safeHandle(
+    'wiki:addComment',
+    async (event, topicId: string, body: string, parentId?: string | null) => {
+      const user = requireSession(event)
+      if (!(await db.getWikiSettings()).commentsEnabled)
+        throw new Error('Comments are switched off in the wiki')
+      const comment = await db.addWikiComment(topicId, body, parentId || null, user)
+      // A reply notifies the comment's author, an @username that user (once each)
+      try {
+        const topic = await db.getWikiTopic(topicId)
+        const title = topic?.title || 'a wiki topic'
+        const notified = new Set<string>([user.id])
+        if (parentId) {
+          const parent = await db.getWikiComment(parentId)
+          if (parent?.userId && !notified.has(parent.userId)) {
+            notified.add(parent.userId)
+            await db.notifyUser(
+              parent.userId,
+              'note_reply',
+              `${user.username} replied to your comment on "${title}"`,
+              comment.body,
+              'wiki',
+              topicId
+            )
+          }
+        }
+        const mentions = comment.body.match(/@(\w+)/g)
+        if (mentions) {
+          const usernames = [...new Set(mentions.map((m) => m.slice(1)))]
+          for (const mu of await db.getUsersByUsername(usernames)) {
+            if (notified.has(mu.id)) continue
+            notified.add(mu.id)
+            await db.notifyUser(
+              mu.id,
+              'note_mention',
+              `${user.username} mentioned you in a comment on "${title}"`,
+              comment.body,
+              'wiki',
+              topicId
+            )
+          }
+        }
+      } catch (err) {
+        console.error('Wiki comment notification error:', err)
+      }
+      return comment
+    }
+  )
+  safeHandle('wiki:deleteComment', async (event, id: string) => {
+    const user = requireSession(event)
+    const isAdmin = await requirePermission(event, 'admin:settings').then(
+      () => true,
+      () => false
+    )
+    return db.deleteWikiComment(id, user.id, isAdmin)
+  })
+  safeHandle('wiki:getSettings', (event) => {
+    requireSession(event)
+    return db.getWikiSettings()
+  })
+  safeHandle('wiki:setSettings', async (event, settings: WikiSettings) => {
+    const user = await requirePermission(event, 'admin:settings')
+    return db.setWikiSettings(settings, user.username)
+  })
+  // Word (.docx) / text files picked for import, converted to the editor's HTML (not saved yet)
+  safeHandle('wiki:readImportFiles', async (event): Promise<WikiImportFile[]> => {
+    requireSession(event)
+    const picked = await dialog.showOpenDialog({
+      title: 'Import into the wiki',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Word or text', extensions: ['docx', 'txt', 'doc'] }]
+    })
+    if (picked.canceled) return []
+    const { readWikiImportFile } = await import('./wikiImport')
+    const out: WikiImportFile[] = []
+    for (const p of picked.filePaths.slice(0, 100)) out.push(await readWikiImportFile(p))
+    return out
+  })
+  safeHandle('wiki:importTopics', async (event, items: WikiTopicInput[]) => {
+    const user = requireSession(event)
+    let created = 0
+    for (const item of (Array.isArray(items) ? items : []).slice(0, 100)) {
+      const res = await db.saveWikiTopic({ ...item, id: undefined, force: true }, user)
+      if (!res.conflict) created++
+    }
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'CREATE',
+      module: 'Wiki',
+      entityType: 'wiki',
+      details: `Imported ${created} wiki topic(s)`
+    }).catch(() => {})
+    return { created }
   })
   safeHandle('db:addEntity', async (event, entity: Omit<Entity, 'id'> & { id?: string }) => {
     const user = await requirePermission(event, 'entities:create')

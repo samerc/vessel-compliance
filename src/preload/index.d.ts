@@ -283,6 +283,40 @@ export interface Api {
   getEntityNotes: (entityId: string) => Promise<import('../shared/types').EntityNote[]>
   addEntityNote: (entityId: string, note: string) => Promise<import('../shared/types').EntityNote>
   deleteEntityNote: (noteId: string) => Promise<void>
+  // Wiki
+  wikiList: () => Promise<import('../shared/types').WikiTopicSummary[]>
+  wikiListDeleted: () => Promise<import('../shared/types').WikiTopicSummary[]>
+  wikiSearch: (query: string) => Promise<import('../shared/types').WikiSearchHit[]>
+  wikiGet: (id: string) => Promise<import('../shared/types').WikiTopic | null>
+  wikiSaveTopic: (
+    input: import('../shared/types').WikiTopicInput
+  ) => Promise<import('../shared/types').WikiSaveResult>
+  wikiDeleteTopic: (id: string) => Promise<void>
+  wikiRestoreTopic: (id: string) => Promise<import('../shared/types').WikiTopic | null>
+  wikiVersions: (topicId: string) => Promise<import('../shared/types').WikiVersion[]>
+  wikiRestoreVersion: (versionId: string) => Promise<import('../shared/types').WikiTopic>
+  wikiAttachments: (topicId: string) => Promise<import('../shared/types').WikiAttachment[]>
+  /** No paths = pick files; files stay where they are */
+  wikiAddAttachments: (
+    topicId: string,
+    paths?: string[]
+  ) => Promise<import('../shared/types').WikiAttachment[]>
+  wikiRemoveAttachment: (id: string) => Promise<void>
+  wikiComments: (topicId: string) => Promise<import('../shared/types').WikiComment[]>
+  wikiAddComment: (
+    topicId: string,
+    body: string,
+    parentId?: string | null
+  ) => Promise<import('../shared/types').WikiComment>
+  wikiDeleteComment: (id: string) => Promise<void>
+  wikiGetSettings: () => Promise<import('../shared/types').WikiSettings>
+  wikiSetSettings: (
+    settings: import('../shared/types').WikiSettings
+  ) => Promise<import('../shared/types').WikiSettings>
+  wikiReadImportFiles: () => Promise<import('../shared/types').WikiImportFile[]>
+  wikiImportTopics: (
+    items: import('../shared/types').WikiTopicInput[]
+  ) => Promise<{ created: number }>
   addEntity: (entity: Omit<Entity, 'id'>) => Promise<Entity>
   updateEntity: (id: string, updates: Partial<Entity>) => Promise<void>
   deleteEntity: (id: string) => Promise<void>
@@ -2307,6 +2341,7 @@ export interface Api {
       policyTypeName: string
       status: string
     }>
+    wiki?: Array<{ id: string; title: string; category: string }>
   }>
 
   // Recent Items

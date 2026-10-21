@@ -2660,3 +2660,94 @@ export type TcTemplateSummary = Pick<
   | 'contentHtml'
   | 'name'
 >
+
+// --- Wiki (knowledge base: procedures, insurance terms, how the app works) ---
+
+/** A topic in a list (no text) */
+export interface WikiTopicSummary {
+  id: string
+  title: string
+  category: string
+  tags: string[]
+  /** Page of the app the topic explains (features.ts id), shown as "Open in the app" */
+  featureId: string | null
+  updatedAt: string
+  updatedByUsername: string | null
+  deletedAt?: string | null
+  deletedByUsername?: string | null
+}
+
+/** A search hit: the topic + the text around the first searched word */
+export interface WikiSearchHit extends WikiTopicSummary {
+  snippet: string
+}
+
+export interface WikiTopic extends WikiTopicSummary {
+  bodyHtml: string
+  createdAt: string
+  createdByUsername: string | null
+  /** Raised by every save; a save made on an older revision is a conflict */
+  revision: number
+}
+
+export interface WikiTopicInput {
+  id?: string
+  title: string
+  category: string
+  tags: string[]
+  bodyHtml: string
+  featureId?: string | null
+  /** Revision the editor started from (conflict check); omitted for a new topic */
+  baseRevision?: number
+  /** Save even if someone else saved in between */
+  force?: boolean
+}
+
+export type WikiSaveResult =
+  | { conflict: false; topic: WikiTopic }
+  | { conflict: true; updatedByUsername: string | null; updatedAt: string }
+
+export interface WikiVersion {
+  id: string
+  topicId: string
+  title: string
+  category: string
+  tags: string[]
+  bodyHtml: string
+  savedByUsername: string | null
+  savedAt: string
+}
+
+/** A linked file: stays where it is on disk / the shared folder */
+export interface WikiAttachment {
+  id: string
+  topicId: string
+  filePath: string
+  fileName: string
+  addedByUsername: string | null
+  addedAt: string
+}
+
+export interface WikiComment {
+  id: string
+  topicId: string
+  parentId: string | null
+  body: string
+  userId: string
+  username: string
+  createdAt: string
+}
+
+export interface WikiSettings {
+  /** Comments under topics (off until switched on in the Wiki) */
+  commentsEnabled: boolean
+}
+
+/** A Word / text file read for import */
+export interface WikiImportFile {
+  fileName: string
+  title: string
+  bodyHtml: string
+  /** Why it could not be read (then bodyHtml is empty) */
+  error?: string
+}

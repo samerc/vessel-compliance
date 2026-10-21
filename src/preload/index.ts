@@ -80,6 +80,28 @@ const api: Api = {
   addEntityNote: (entityId: string, note: string) =>
     ipcRenderer.invoke('entityNotes:add', entityId, note),
   deleteEntityNote: (noteId: string) => ipcRenderer.invoke('entityNotes:delete', noteId),
+  // Wiki
+  wikiList: () => ipcRenderer.invoke('wiki:list'),
+  wikiListDeleted: () => ipcRenderer.invoke('wiki:listDeleted'),
+  wikiSearch: (query: string) => ipcRenderer.invoke('wiki:search', query),
+  wikiGet: (id: string) => ipcRenderer.invoke('wiki:get', id),
+  wikiSaveTopic: (input: unknown) => ipcRenderer.invoke('wiki:saveTopic', input),
+  wikiDeleteTopic: (id: string) => ipcRenderer.invoke('wiki:deleteTopic', id),
+  wikiRestoreTopic: (id: string) => ipcRenderer.invoke('wiki:restoreTopic', id),
+  wikiVersions: (topicId: string) => ipcRenderer.invoke('wiki:versions', topicId),
+  wikiRestoreVersion: (versionId: string) => ipcRenderer.invoke('wiki:restoreVersion', versionId),
+  wikiAttachments: (topicId: string) => ipcRenderer.invoke('wiki:attachments', topicId),
+  wikiAddAttachments: (topicId: string, paths?: string[]) =>
+    ipcRenderer.invoke('wiki:addAttachments', topicId, paths),
+  wikiRemoveAttachment: (id: string) => ipcRenderer.invoke('wiki:removeAttachment', id),
+  wikiComments: (topicId: string) => ipcRenderer.invoke('wiki:comments', topicId),
+  wikiAddComment: (topicId: string, body: string, parentId?: string | null) =>
+    ipcRenderer.invoke('wiki:addComment', topicId, body, parentId),
+  wikiDeleteComment: (id: string) => ipcRenderer.invoke('wiki:deleteComment', id),
+  wikiGetSettings: () => ipcRenderer.invoke('wiki:getSettings'),
+  wikiSetSettings: (settings: unknown) => ipcRenderer.invoke('wiki:setSettings', settings),
+  wikiReadImportFiles: () => ipcRenderer.invoke('wiki:readImportFiles'),
+  wikiImportTopics: (items: unknown[]) => ipcRenderer.invoke('wiki:importTopics', items),
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),

@@ -962,6 +962,19 @@ Unified template system (merged email + document):
 - **Actions**: Generate DOCX (with policy header/footer) or Copy Text (for emails)
 - **Template Manager** (`DocumentTemplateManager.tsx`): Two-panel layout, placeholder chips
 
+### Wiki
+
+Knowledge base anyone can write (`components/wiki/`, Tools > Wiki, feature ids `wiki` / `wiki-new`): procedures, insurance terms, how the app works.
+- **Tables**: `wiki_topics` (title, category free text, tags JSON, body_html, body_text + folded `search_text`, `feature_id`, `revision`, soft delete `deleted_at`), `wiki_topic_versions` (every save; saves by the same person within 10 minutes update their last version), `wiki_attachments` (LINKS to files where they are, never copied; remapped by `remapAllFilePaths`), `wiki_comments` (one reply level). A starter topic "How to use the wiki" is seeded when the table is created
+- **Search** (`shared/wikiSearch.ts`, pure): `foldSearch` = lower case, accents and Arabic harakat / tatweel removed, hamza seats joined (أ إ آ ٱ -> ا, ؤ -> و, ئ -> ي), ى -> ي, ة -> ه, Arabic-Indic digits -> 0-9. Every searched word must be in the folded title / tags / text (`search_text LIKE`), ranked by `rankTopic` (title first), with `snippetText` around the first word; `highlightParts` marks hits in the list, the open topic uses the CSS Custom Highlight API (`::highlight(wiki-hit)`, the HTML is not changed). Ctrl+K shows wiki topics (`globalSearch` returns `wiki`)
+- **Arabic**: the editor's `autoDirection` gives every block `dir="auto"` (a paragraph starting in Arabic runs right to left); the read view adds it to HTML that lacks it (`wiki/autoDir.ts`, Word imports). IBM Plex Sans Arabic is bundled (arabic subset) and in `--font-family`, so Arabic anywhere in the app uses it
+- **RichTextEditor options** (all off by default, quotations unchanged): `showTables` (@tiptap/extension-table TableKit + row / column buttons), `keepPasteFormatting`, `autoDirection`, `toolbarExtra` (the wiki's "link to another topic" button: href `#wiki/{id}`, opened in place by the read view; http links open in the browser)
+- **Saving**: `wiki:saveTopic` with `baseRevision`; if someone saved since, it returns `{ conflict: true }` and the editor asks before saving over it (`force`); theirs stays in the history. History modal: any version can be made current (saved as a new version). Deleted topics are listed under "Deleted topics" and can be restored
+- **Page help**: `PageHeader` has a ? button (and F1 anywhere) that fires `vc-page-help` (`utils/pageHelp.ts`); App opens the wiki with `page:{activeTab}`: the topics whose `feature_id` is one of that page's features (one = opened directly, none = "Write the first topic" linked to the page). Wiki requests: `topic:{id}`, `feature:{id}`, `page:{tab}`, `new`
+- **Comments**: off until an admin switches them on in the Wiki header (`app_settings.wiki_settings.commentsEnabled`); a reply notifies the comment's author, @username that user (link type `wiki`)
+- **Import**: Word (.docx via mammoth, in `main/wikiImport.ts` loaded on demand: mammoth takes ~0.2 s to load) or .txt, one topic per file; a heading at the top becomes the title; pictures are dropped; .doc is refused
+- Recent items and notifications open topics (item / link type `wiki`)
+
 ### Report Builder
 
 Customizable reports with 9 data sources:

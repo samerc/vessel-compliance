@@ -7679,7 +7679,8 @@ const SECTION_TEXT_FIELDS: {
   },
   {
     key: 'premiumPaymentIntroSingle',
-    label: 'Payment Intro — Single Instalment ({timing} = "prior inception" or "within X days of inception")',
+    label:
+      'Payment Intro — Single Instalment ({timing} = "prior inception" or "within X days of inception")',
     section: 'Premium',
     rows: 2
   },

@@ -22,6 +22,7 @@ export type AppTab =
   | 'analytics'
   | 'activity-log'
   | 'templates'
+  | 'wiki'
   | 'policies-list'
   | 'policy-detail'
   | 'policy-setup'
@@ -427,6 +428,25 @@ export const FEATURES: Feature[] = [
     description:
       'Document and email templates with placeholders; generate a Word file or copy the text.',
     keywords: 'email letter placeholder'
+  },
+  {
+    id: 'wiki',
+    title: 'Wiki',
+    area: 'Tools',
+    kind: 'page',
+    target: { tab: 'wiki' },
+    description:
+      'Procedures, insurance terms and how the app works. Anyone can write; search in English or Arabic.',
+    keywords: 'knowledge base help guide glossary procedure explain how to manual arabic'
+  },
+  {
+    id: 'wiki-new',
+    title: 'New wiki topic',
+    area: 'Tools',
+    kind: 'view',
+    target: { tab: 'wiki', sub: 'new' },
+    description: 'Write a topic: a procedure, an insurance term or how a page of the app works.',
+    keywords: 'write article knowledge'
   },
   {
     id: 'calc-premium',

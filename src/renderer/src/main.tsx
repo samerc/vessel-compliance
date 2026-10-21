@@ -1,4 +1,4 @@
-// App font (bundled: works offline). Latin + Latin Extended only; other scripts fall back
+// App font (bundled: works offline). Latin + Latin Extended, plus Arabic below
 import '@fontsource/ibm-plex-sans/latin-400.css'
 import '@fontsource/ibm-plex-sans/latin-ext-400.css'
 import '@fontsource/ibm-plex-sans/latin-500.css'
@@ -9,6 +9,10 @@ import '@fontsource/ibm-plex-sans/latin-700.css'
 import '@fontsource/ibm-plex-sans/latin-ext-700.css'
 import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
+// Arabic (wiki, SIC names): its own font, used only for Arabic letters (unicode-range)
+import '@fontsource/ibm-plex-sans-arabic/arabic-400.css'
+import '@fontsource/ibm-plex-sans-arabic/arabic-600.css'
+import '@fontsource/ibm-plex-sans-arabic/arabic-700.css'
 import './assets/main.css'
 
 import { StrictMode } from 'react'

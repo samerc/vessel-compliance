@@ -32,6 +32,7 @@ import {
   BarChart2,
   ScrollText,
   Mail,
+  Library,
   FileCheck,
   List,
   Anchor,
@@ -60,6 +61,7 @@ import GlobalSearch from './components/GlobalSearch'
 import { PageHeader, SegmentedControl, Field } from './components/ui'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './utils/accent'
 import { leaveThen } from './utils/useUnsavedGuard'
+import { PAGE_HELP_EVENT } from './utils/pageHelp'
 import { useToast } from './contexts/ToastContext'
 import { AppTab, AppAction, NavTarget, visibleFeatures, FEATURES } from './features'
 import type { RecentItem } from '../../shared/types'
@@ -81,6 +83,7 @@ const Reports = lazy(() => import('./components/Reports'))
 const FleetAnalytics = lazy(() => import('./components/FleetAnalytics'))
 const ActivityLog = lazy(() => import('./components/ActivityLog'))
 const TemplatesPage = lazy(() => import('./components/TemplatesPage'))
+const WikiPage = lazy(() => import('./components/wiki/WikiPage'))
 const PolicyList = lazy(() => import('./components/PolicyList'))
 const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
@@ -291,6 +294,9 @@ function App(): React.JSX.Element {
       } else if (type === 'policy') {
         setSelectedPolicyId(id)
         setActiveTab('policy-detail')
+      } else if (type === 'wiki') {
+        setPageRequest({ tab: 'wiki', sub: `topic:${id}`, n: Date.now() })
+        setActiveTab('wiki')
       } else if (type === 'vessel_policy') {
         setNavigateToVesselId(id)
         setNavigateToVesselSection('policies')
@@ -392,6 +398,22 @@ function App(): React.JSX.Element {
     [runAction]
   )
 
+  // The ? of a page header and F1: the wiki topics about the page on screen
+  useEffect(() => {
+    const open = (): void => navigateTo({ tab: 'wiki', sub: `page:${activeTab}` })
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'F1') return
+      e.preventDefault()
+      open()
+    }
+    window.addEventListener(PAGE_HELP_EVENT, open)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener(PAGE_HELP_EVENT, open)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [activeTab, navigateTo])
+
   /** Opens a recently viewed record (sidebar Recent list and Home) */
   const openRecentItem = (item: RecentItem): void => leaveThen(() => openRecentNow(item))
 
@@ -409,6 +431,9 @@ function App(): React.JSX.Element {
       setQuotationPolicyContext(null)
       setInitialQuotationId(item.itemId)
       setActiveTab('quotations')
+    } else if (item.itemType === 'wiki') {
+      setPageRequest({ tab: 'wiki', sub: `topic:${item.itemId}`, n: Date.now() })
+      setActiveTab('wiki')
     } else if (item.itemType === 'policy') {
       setSelectedPolicyId(item.itemId)
       setActiveTab('policy-detail')
@@ -674,6 +699,7 @@ function App(): React.JSX.Element {
     analytics: 'Fleet Analytics',
     'activity-log': 'Activity Log',
     templates: 'Templates',
+    wiki: 'Wiki',
     receipts: 'Receipts',
     'policies-list': 'Policies',
     'policy-detail': 'Policies',
@@ -1228,7 +1254,8 @@ function App(): React.JSX.Element {
                     vessel: <Anchor size={14} />,
                     entity: <Building2 size={14} />,
                     quotation: <FileText size={14} />,
-                    policy: <FileCheck size={14} />
+                    policy: <FileCheck size={14} />,
+                    wiki: <Library size={14} />
                   }
                   const icon = iconMap[item.itemType] || <FileText size={14} />
                   return (
@@ -1365,6 +1392,7 @@ function App(): React.JSX.Element {
             >
               {navItem('calculators', <Calculator size={18} />, 'Calculators')}
               {navItem('templates', <Mail size={18} />, 'Templates')}
+              {navItem('wiki', <Library size={18} />, 'Wiki')}
             </NavGroup>
 
             {/* Help and settings sit at the bottom of the menu */}
@@ -1848,6 +1876,11 @@ function App(): React.JSX.Element {
                 <TemplatesPage />
               </Suspense>
             )}
+            {activeTab === 'wiki' && (
+              <Suspense fallback={<LoadingFallback />}>
+                <WikiPage {...sub('wiki')} onNavigate={navigateTo} />
+              </Suspense>
+            )}
             {activeTab === 'features' && (
               <Suspense fallback={<LoadingFallback />}>
                 <FeaturesPage onNavigate={navigateTo} />
@@ -1938,6 +1971,8 @@ function App(): React.JSX.Element {
                     } else if (linkType === 'policy') {
                       setSelectedPolicyId(linkId)
                       setActiveTab('policy-detail')
+                    } else if (linkType === 'wiki') {
+                      navigateTo({ tab: 'wiki', sub: `topic:${linkId}` })
                     } else if (linkType === 'entity') {
                       setInitialEntityId(linkId)
                       setNavigateBackTab('notifications')

@@ -2,7 +2,7 @@
    Aurora (.aurora) themes map to dark and light. The accent is per user: utils/accent.ts sets
    --accent-primary, --accent-primary-rgb, --accent-secondary and --accent-contrast on <body>. */
 :root {
-  --font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
 
   /* Colors */
@@ -277,6 +277,11 @@ button[class*='btn-']:active {
 
 .btn-icon.btn-sm {
   padding: 4px;
+}
+
+/* Secondary text anywhere (tables have their own rule) */
+.muted {
+  color: var(--text-secondary);
 }
 
 /* Page layout */

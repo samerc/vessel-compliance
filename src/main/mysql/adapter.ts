@@ -73,6 +73,15 @@ import {
   EntityGap,
   EntityDirectoryStats,
   EntityNote,
+  WikiAttachment,
+  WikiComment,
+  WikiSaveResult,
+  WikiSearchHit,
+  WikiSettings,
+  WikiTopic,
+  WikiTopicInput,
+  WikiTopicSummary,
+  WikiVersion,
   EntityUBO,
   FlagState,
   FlagStatePort,
@@ -204,6 +213,13 @@ import {
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
 import { defaultTradingCountries, inTypeScope, isPiLike } from '../../shared/quotationTypes'
+import {
+  htmlToSearchText,
+  rankTopic,
+  searchWords,
+  snippetText,
+  topicSearchText
+} from '../../shared/wikiSearch'
 import schemaSql from './schema.sql?raw'
 
 /** Rows grouped by a key column, keeping their order (one query instead of one per parent) */
@@ -5754,6 +5770,64 @@ export class MySQLAdapter {
                     INDEX idx_en_entity (entity_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
       }
+
+      // Migration: wiki (topics + saved versions + linked files + comments)
+      const [wikiTable] = await this.pool.query("SHOW TABLES LIKE 'wiki_topics'")
+      if ((wikiTable as RowDataPacket[]).length === 0) {
+        await this.pool.query(`CREATE TABLE wiki_topics (
+                    id VARCHAR(36) PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) NULL,
+                    tags TEXT NULL,
+                    body_html MEDIUMTEXT NULL,
+                    body_text MEDIUMTEXT NULL,
+                    search_text MEDIUMTEXT NULL,
+                    feature_id VARCHAR(100) NULL,
+                    revision INT NOT NULL DEFAULT 1,
+                    created_by VARCHAR(36) NULL,
+                    created_by_username VARCHAR(255) NULL,
+                    created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    updated_by VARCHAR(36) NULL,
+                    updated_by_username VARCHAR(255) NULL,
+                    updated_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    deleted_at DATETIME NULL,
+                    deleted_by_username VARCHAR(255) NULL,
+                    INDEX idx_wiki_category (category),
+                    INDEX idx_wiki_feature (feature_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+        await this.seedWikiWelcome()
+      }
+      await this.pool.query(`CREATE TABLE IF NOT EXISTS wiki_topic_versions (
+                    id VARCHAR(36) PRIMARY KEY,
+                    topic_id VARCHAR(36) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) NULL,
+                    tags TEXT NULL,
+                    body_html MEDIUMTEXT NULL,
+                    saved_by VARCHAR(36) NULL,
+                    saved_by_username VARCHAR(255) NULL,
+                    saved_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    INDEX idx_wv_topic (topic_id, saved_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      await this.pool.query(`CREATE TABLE IF NOT EXISTS wiki_attachments (
+                    id VARCHAR(36) PRIMARY KEY,
+                    topic_id VARCHAR(36) NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_name VARCHAR(255) NULL,
+                    added_by_username VARCHAR(255) NULL,
+                    added_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    INDEX idx_wa_topic (topic_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      await this.pool.query(`CREATE TABLE IF NOT EXISTS wiki_comments (
+                    id VARCHAR(36) PRIMARY KEY,
+                    topic_id VARCHAR(36) NOT NULL,
+                    parent_id VARCHAR(36) NULL,
+                    body TEXT NOT NULL,
+                    user_id VARCHAR(36) NULL,
+                    username VARCHAR(255) NULL,
+                    created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                    INDEX idx_wc_topic (topic_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
       // Migration: values in text deductibles (FD&D: {percent}% ... {currency} {minimum} ...)
       const [tdvCol] = await this.pool.query(
@@ -23300,8 +23374,414 @@ export class MySQLAdapter {
     }
   }
 
+  // --- Wiki ---
+  private static readonly WIKI_SUMMARY_COLS = `id, title, category, tags, feature_id AS featureId,
+    updated_at AS updatedAt, updated_by_username AS updatedByUsername,
+    deleted_at AS deletedAt, deleted_by_username AS deletedByUsername`
+
+  static wikiTags(raw: unknown): string[] {
+    if (!raw) return []
+    try {
+      const v = JSON.parse(String(raw))
+      return Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []
+    } catch {
+      return []
+    }
+  }
+
+  private static wikiSummary(r: RowDataPacket): WikiTopicSummary {
+    return {
+      id: r.id,
+      title: r.title,
+      category: r.category || '',
+      tags: MySQLAdapter.wikiTags(r.tags),
+      featureId: r.featureId || null,
+      updatedAt: r.updatedAt,
+      updatedByUsername: r.updatedByUsername ?? null,
+      deletedAt: r.deletedAt ?? null,
+      deletedByUsername: r.deletedByUsername ?? null
+    }
+  }
+
+  /** Topics by title (or the deleted ones, newest deletion first) */
+  async getWikiTopics(deleted = false): Promise<WikiTopicSummary[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT ${MySQLAdapter.WIKI_SUMMARY_COLS} FROM wiki_topics
+        WHERE deleted_at IS ${deleted ? 'NOT ' : ''}NULL
+        ORDER BY ${deleted ? 'deleted_at DESC' : 'title'}`
+    )
+    return (rows as RowDataPacket[]).map(MySQLAdapter.wikiSummary)
+  }
+
+  /**
+   * Topics holding every searched word (title, tags or text, folded: case, accents and Arabic
+   * spelling variants do not matter), best match first, with the text around the first word.
+   */
+  async searchWikiTopics(query: string, limit = 100): Promise<WikiSearchHit[]> {
+    if (!this.pool) return []
+    const words = searchWords(query).slice(0, 8)
+    if (words.length === 0) return []
+    // Folded words hold only letters and digits: nothing to escape for LIKE
+    const [rows] = await this.pool.query(
+      `SELECT ${MySQLAdapter.WIKI_SUMMARY_COLS}, body_text AS bodyText FROM wiki_topics
+        WHERE deleted_at IS NULL AND ${words.map(() => 'search_text LIKE ?').join(' AND ')}`,
+      words.map((w) => `%${w}%`)
+    )
+    return (rows as RowDataPacket[])
+      .map((r) => {
+        const hit = MySQLAdapter.wikiSummary(r)
+        const bodyText = String(r.bodyText || '')
+        return {
+          hit: { ...hit, snippet: snippetText(bodyText, words) },
+          score: rankTopic({ title: hit.title, tags: hit.tags, bodyText }, words)
+        }
+      })
+      .sort((a, b) => b.score - a.score || a.hit.title.localeCompare(b.hit.title))
+      .slice(0, limit)
+      .map((x) => x.hit)
+  }
+
+  async getWikiTopic(id: string): Promise<WikiTopic | null> {
+    if (!this.pool) return null
+    const [rows] = await this.pool.query(
+      `SELECT ${MySQLAdapter.WIKI_SUMMARY_COLS}, body_html AS bodyHtml, revision,
+              created_at AS createdAt, created_by_username AS createdByUsername
+         FROM wiki_topics WHERE id = ?`,
+      [id]
+    )
+    const r = (rows as RowDataPacket[])[0]
+    if (!r) return null
+    return {
+      ...MySQLAdapter.wikiSummary(r),
+      bodyHtml: r.bodyHtml || '',
+      revision: Number(r.revision) || 1,
+      createdAt: r.createdAt,
+      createdByUsername: r.createdByUsername ?? null
+    }
+  }
+
+  /**
+   * Saves a topic (new when no id). Refused as a conflict when someone else saved it after the
+   * editor opened it (unless forced). Every save is kept as a version; saves by the same person
+   * within 10 minutes update their last version instead of adding one.
+   */
+  async saveWikiTopic(
+    input: WikiTopicInput,
+    user: { id: string; username: string }
+  ): Promise<WikiSaveResult> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const title = String(input.title || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 255)
+    if (!title) throw new Error('The topic needs a title')
+    const category = String(input.category || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 100)
+    const tags = [...new Set((input.tags || []).map((x) => String(x).replace(/\s+/g, ' ').trim()))]
+      .filter(Boolean)
+      .slice(0, 30)
+    const bodyHtml = String(input.bodyHtml || '')
+    const bodyText = htmlToSearchText(bodyHtml)
+    const searchText = topicSearchText(title, tags, bodyText)
+    const featureId = input.featureId || null
+    let id = input.id
+    if (id) {
+      const [cur] = await this.pool.query(
+        'SELECT revision, updated_by_username AS updatedByUsername, updated_at AS updatedAt FROM wiki_topics WHERE id = ?',
+        [id]
+      )
+      const c = (cur as RowDataPacket[])[0]
+      if (!c) throw new Error('This topic no longer exists')
+      if (!input.force && input.baseRevision !== undefined && c.revision !== input.baseRevision)
+        return { conflict: true, updatedByUsername: c.updatedByUsername, updatedAt: c.updatedAt }
+      await this.pool.execute(
+        `UPDATE wiki_topics SET title = ?, category = ?, tags = ?, body_html = ?, body_text = ?,
+                search_text = ?, feature_id = ?, revision = revision + 1, updated_by = ?,
+                updated_by_username = ?, updated_at = NOW(3)
+          WHERE id = ?`,
+        [
+          title,
+          category || null,
+          JSON.stringify(tags),
+          bodyHtml,
+          bodyText,
+          searchText,
+          featureId,
+          user.id,
+          user.username,
+          id
+        ]
+      )
+    } else {
+      id = uuidv4()
+      await this.pool.execute(
+        `INSERT INTO wiki_topics (id, title, category, tags, body_html, body_text, search_text,
+                feature_id, revision, created_by, created_by_username, created_at, updated_by,
+                updated_by_username, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NOW(3), ?, ?, NOW(3))`,
+        [
+          id,
+          title,
+          category || null,
+          JSON.stringify(tags),
+          bodyHtml,
+          bodyText,
+          searchText,
+          featureId,
+          user.id,
+          user.username,
+          user.id,
+          user.username
+        ]
+      )
+    }
+    const [last] = await this.pool.query(
+      `SELECT id, saved_by AS savedBy, TIMESTAMPDIFF(SECOND, saved_at, NOW(3)) AS age
+         FROM wiki_topic_versions WHERE topic_id = ? ORDER BY saved_at DESC LIMIT 1`,
+      [id]
+    )
+    const l = (last as RowDataPacket[])[0]
+    if (l && l.savedBy === user.id && Number(l.age) < 600) {
+      await this.pool.execute(
+        'UPDATE wiki_topic_versions SET title = ?, category = ?, tags = ?, body_html = ?, saved_at = NOW(3) WHERE id = ?',
+        [title, category || null, JSON.stringify(tags), bodyHtml, l.id]
+      )
+    } else {
+      await this.pool.execute(
+        `INSERT INTO wiki_topic_versions (id, topic_id, title, category, tags, body_html, saved_by,
+                saved_by_username, saved_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
+        [
+          uuidv4(),
+          id,
+          title,
+          category || null,
+          JSON.stringify(tags),
+          bodyHtml,
+          user.id,
+          user.username
+        ]
+      )
+    }
+    const topic = await this.getWikiTopic(id)
+    if (!topic) throw new Error('The topic could not be saved')
+    return { conflict: false, topic }
+  }
+
+  async deleteWikiTopic(id: string, username: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute(
+      'UPDATE wiki_topics SET deleted_at = NOW(), deleted_by_username = ? WHERE id = ?',
+      [username, id]
+    )
+  }
+
+  async restoreWikiTopic(id: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute(
+      'UPDATE wiki_topics SET deleted_at = NULL, deleted_by_username = NULL WHERE id = ?',
+      [id]
+    )
+  }
+
+  async getWikiVersions(topicId: string): Promise<WikiVersion[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT id, topic_id AS topicId, title, category, tags, body_html AS bodyHtml,
+              saved_by_username AS savedByUsername, saved_at AS savedAt
+         FROM wiki_topic_versions WHERE topic_id = ? ORDER BY saved_at DESC LIMIT 200`,
+      [topicId]
+    )
+    return (rows as RowDataPacket[]).map((r) => ({
+      id: r.id,
+      topicId: r.topicId,
+      title: r.title,
+      category: r.category || '',
+      tags: MySQLAdapter.wikiTags(r.tags),
+      bodyHtml: r.bodyHtml || '',
+      savedByUsername: r.savedByUsername ?? null,
+      savedAt: r.savedAt
+    }))
+  }
+
+  /** An earlier version becomes the current text again (saved as a new version) */
+  async restoreWikiVersion(
+    versionId: string,
+    user: { id: string; username: string }
+  ): Promise<WikiTopic> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const [rows] = await this.pool.query(
+      'SELECT topic_id AS topicId, title, category, tags, body_html AS bodyHtml FROM wiki_topic_versions WHERE id = ?',
+      [versionId]
+    )
+    const v = (rows as RowDataPacket[])[0]
+    if (!v) throw new Error('This version no longer exists')
+    const cur = await this.getWikiTopic(v.topicId)
+    if (!cur) throw new Error('This topic no longer exists')
+    const res = await this.saveWikiTopic(
+      {
+        id: v.topicId,
+        title: v.title,
+        category: v.category || '',
+        tags: MySQLAdapter.wikiTags(v.tags),
+        bodyHtml: v.bodyHtml || '',
+        featureId: cur.featureId,
+        force: true
+      },
+      user
+    )
+    if (res.conflict) throw new Error('The version could not be restored')
+    return res.topic
+  }
+
+  async getWikiAttachments(topicId: string): Promise<WikiAttachment[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT id, topic_id AS topicId, file_path AS filePath, file_name AS fileName,
+              added_by_username AS addedByUsername, added_at AS addedAt
+         FROM wiki_attachments WHERE topic_id = ? ORDER BY added_at`,
+      [topicId]
+    )
+    return rows as Row<WikiAttachment>[]
+  }
+
+  /** Links files to a topic (they stay where they are); a file already linked is skipped */
+  async addWikiAttachments(
+    topicId: string,
+    files: { filePath: string; fileName: string }[],
+    username: string
+  ): Promise<WikiAttachment[]> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const have = new Set(
+      (await this.getWikiAttachments(topicId)).map((a) => a.filePath.toLowerCase())
+    )
+    for (const f of files) {
+      if (!f.filePath || have.has(f.filePath.toLowerCase())) continue
+      have.add(f.filePath.toLowerCase())
+      await this.pool.execute(
+        'INSERT INTO wiki_attachments (id, topic_id, file_path, file_name, added_by_username, added_at) VALUES (?, ?, ?, ?, ?, NOW(3))',
+        [uuidv4(), topicId, f.filePath, f.fileName.slice(0, 255), username]
+      )
+    }
+    return this.getWikiAttachments(topicId)
+  }
+
+  async removeWikiAttachment(id: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute('DELETE FROM wiki_attachments WHERE id = ?', [id])
+  }
+
+  async getWikiComments(topicId: string): Promise<WikiComment[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT id, topic_id AS topicId, parent_id AS parentId, body, user_id AS userId, username,
+              created_at AS createdAt
+         FROM wiki_comments WHERE topic_id = ? ORDER BY created_at`,
+      [topicId]
+    )
+    return rows as Row<WikiComment>[]
+  }
+
+  async getWikiComment(id: string): Promise<WikiComment | null> {
+    if (!this.pool) return null
+    const [rows] = await this.pool.query(
+      `SELECT id, topic_id AS topicId, parent_id AS parentId, body, user_id AS userId, username,
+              created_at AS createdAt
+         FROM wiki_comments WHERE id = ?`,
+      [id]
+    )
+    return (rows as Row<WikiComment>[])[0] || null
+  }
+
+  async addWikiComment(
+    topicId: string,
+    body: string,
+    parentId: string | null,
+    user: { id: string; username: string }
+  ): Promise<WikiComment> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const text = String(body || '').trim()
+    if (!text) throw new Error('The comment is empty')
+    const id = uuidv4()
+    await this.pool.execute(
+      'INSERT INTO wiki_comments (id, topic_id, parent_id, body, user_id, username, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW(3))',
+      [id, topicId, parentId || null, text, user.id, user.username]
+    )
+    const c = await this.getWikiComment(id)
+    if (!c) throw new Error('The comment could not be saved')
+    return c
+  }
+
+  /** Deletes a comment and its replies (own comments; an admin may delete any) */
+  async deleteWikiComment(id: string, userId: string, isAdmin: boolean): Promise<void> {
+    if (!this.pool) return
+    const c = await this.getWikiComment(id)
+    if (!c) return
+    if (!isAdmin && c.userId !== userId) throw new Error('You can only delete your own comments')
+    await this.pool.execute('DELETE FROM wiki_comments WHERE id = ? OR parent_id = ?', [id, id])
+  }
+
+  async getWikiSettings(): Promise<WikiSettings> {
+    const raw = await this.getSetting('wiki_settings')
+    let parsed: Partial<WikiSettings>
+    try {
+      parsed = JSON.parse(raw || '{}')
+    } catch {
+      parsed = {}
+    }
+    return { commentsEnabled: parsed.commentsEnabled === true }
+  }
+
+  async setWikiSettings(settings: WikiSettings, updatedBy?: string): Promise<WikiSettings> {
+    const next: WikiSettings = { commentsEnabled: settings?.commentsEnabled === true }
+    await this.setSetting('wiki_settings', JSON.stringify(next), updatedBy)
+    return next
+  }
+
+  /** First topic of a new wiki: how to use it */
+  private async seedWikiWelcome(): Promise<void> {
+    if (!this.pool) return
+    const bodyHtml = [
+      '<p>The wiki holds what we know: how we do things (procedures), what insurance terms mean, and how the app works. Anyone can write or change a topic.</p>',
+      '<h2>Finding a topic</h2>',
+      '<ul><li><p>Type in the search box of the Wiki: titles, tags and the text are searched. Upper / lower case, accents and Arabic spelling variants (أ / ا, ة / ه, ى / ي, short vowels) do not matter.</p></li>',
+      '<li><p>Ctrl+K anywhere in the app also finds wiki topics.</p></li>',
+      '<li><p>The ? button at the top of a page (or F1) shows the topics written about that page.</p></li></ul>',
+      '<h2>Writing a topic</h2>',
+      '<ul><li><p>New topic: a title, a category, tags (other words people may search for) and the explanation. Headings, lists, tables and links are in the toolbar.</p></li>',
+      '<li><p>Link to another topic with the book button of the toolbar; select text first to make that text the link.</p></li>',
+      '<li><p>Arabic can be typed anywhere: each paragraph runs right to left when it starts in Arabic.</p></li>',
+      '<li><p>Attach files (circulars, wordings): they are linked where they are and never copied.</p></li>',
+      '<li><p>"Explains a page of the app" links the topic to that page, so it opens from the page\'s ? button.</p></li>',
+      '<li><p>Word files can be brought in with Import (one topic per file).</p></li></ul>',
+      '<h2>Changes</h2>',
+      '<p>Every save is kept: History shows who changed what and puts an earlier version back. Deleted topics can be restored from the Deleted list.</p>'
+    ].join('')
+    const title = 'How to use the wiki'
+    const tags = ['help', 'search', 'arabic']
+    const bodyText = htmlToSearchText(bodyHtml)
+    await this.pool.execute(
+      `INSERT INTO wiki_topics (id, title, category, tags, body_html, body_text, search_text,
+              feature_id, revision, created_by_username, updated_by_username)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'system', 'system')`,
+      [
+        uuidv4(),
+        title,
+        'Using the app',
+        JSON.stringify(tags),
+        bodyHtml,
+        bodyText,
+        topicSearchText(title, tags, bodyText),
+        'wiki'
+      ]
+    )
+  }
+
   async globalSearch(query: string, limit: number = 20): Promise<GlobalSearchResults> {
-    if (!this.pool) return { vessels: [], entities: [], quotations: [], policies: [] }
+    if (!this.pool) return { vessels: [], entities: [], quotations: [], policies: [], wiki: [] }
     const like = `%${query}%`
     const perCategory = Math.min(Math.floor(limit / 4), 5) || 5
 
@@ -23374,7 +23854,12 @@ export class MySQLAdapter {
         .then(([rows]) => rows as Row<GlobalSearchResults['policies'][number]>[])
     ])
 
-    return { vessels, entities, quotations, policies }
+    const wiki = (await this.searchWikiTopics(query, perCategory).catch(() => [])).map((w) => ({
+      id: w.id,
+      title: w.title,
+      category: w.category
+    }))
+    return { vessels, entities, quotations, policies, wiki }
   }
 
   async seedDefaultNotificationGroups(): Promise<void> {
@@ -24903,6 +25388,7 @@ export class MySQLAdapter {
       { table: 'vessel_documents', column: 'file_path' },
       { table: 'entity_documents', column: 'file_path' },
       { table: 'document_history', column: 'file_path' },
+      { table: 'wiki_attachments', column: 'file_path' },
       { table: 'survey_attachments', column: 'file_path' },
       { table: 'entities', column: 'passport_file_path' },
       { table: 'entities', column: 'certificate_of_incorporation_path' },

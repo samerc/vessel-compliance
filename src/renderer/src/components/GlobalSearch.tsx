@@ -9,7 +9,8 @@ import {
   Loader2,
   ArrowRight,
   Zap,
-  Compass
+  Compass,
+  Library
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { Feature, NavTarget, searchFeatures } from '../features'
@@ -55,12 +56,13 @@ interface SearchResults {
     /** returned by the adapter but missing from the shared IPC type */
     source?: 'policy_document' | 'vessel_policy'
   }>
+  wiki?: Array<{ id: string; title: string; category: string }>
 }
 
 type FlatItem =
   | { category: 'feature'; id: string; extra: Feature }
   | {
-      category: 'vessel' | 'entity' | 'quotation' | 'policy'
+      category: 'vessel' | 'entity' | 'quotation' | 'policy' | 'wiki'
       id: string
       extra?: SearchResults['policies'][number]
     }
@@ -104,6 +106,7 @@ export default function GlobalSearch({
     for (const e of results.entities) items.push({ category: 'entity', id: e.id })
     for (const q of results.quotations) items.push({ category: 'quotation', id: q.id })
     for (const p of results.policies) items.push({ category: 'policy', id: p.id, extra: p })
+    for (const w of results.wiki || []) items.push({ category: 'wiki', id: w.id })
     return items
   }, [results, featureMatches])
 
@@ -268,7 +271,8 @@ export default function GlobalSearch({
     (results.vessels.length > 0 ||
       results.entities.length > 0 ||
       results.quotations.length > 0 ||
-      results.policies.length > 0)
+      results.policies.length > 0 ||
+      (results.wiki?.length ?? 0) > 0)
 
   const noResults = results && !hasResults && query.trim().length >= 2
 
@@ -436,7 +440,8 @@ export default function GlobalSearch({
                 fontSize: '0.78rem'
               }}
             >
-              Type at least 2 letters to also search vessels, entities, quotations and policies
+              Type at least 2 letters to also search vessels, entities, quotations, policies and the
+              wiki
             </div>
           )}
 
@@ -617,6 +622,45 @@ export default function GlobalSearch({
                         {p.policyTypeName ? `${p.policyTypeName} — ` : ''}
                         {p.vesselName || 'Unknown Vessel'}
                         {p.status === 'inactive' && ' (Inactive)'}
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {renderCategory(
+                'Wiki',
+                <Library size={12} />,
+                results!.wiki || [],
+                'wiki',
+                (w, idx) => (
+                  <div
+                    key={w.id}
+                    data-idx={idx}
+                    style={itemStyle(idx)}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    onClick={() => {
+                      onNavigate('wiki', w.id)
+                      onClose()
+                    }}
+                  >
+                    <Library size={16} style={{ color: '#ffb020', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        dir="auto"
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          textAlign: 'left'
+                        }}
+                      >
+                        {w.title}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {w.category || 'Wiki'}
                       </div>
                     </div>
                   </div>
