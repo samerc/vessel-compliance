@@ -745,6 +745,8 @@ export interface PISubjectivity {
   docTypeIds: string[]
   typeScope: QuotationTypeScope
   order: number
+  /** Added only by hand: never by the automatic fill or Select All */
+  manualOnly?: boolean
 }
 
 export interface QuotationSubjectivity {

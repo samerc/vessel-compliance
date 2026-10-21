@@ -1710,10 +1710,11 @@ export interface Api {
     docTypeIds?: string[]
     typeScope?: string
     order?: number
+    manualOnly?: boolean
   }) => Promise<PISubjectivity>
   updatePISubjectivity: (
     id: string,
-    data: { text: string; docTypeIds?: string[]; typeScope?: string }
+    data: { text: string; docTypeIds?: string[]; typeScope?: string; manualOnly?: boolean }
   ) => Promise<void>
   deletePISubjectivity: (id: string) => Promise<void>
   reorderPISubjectivities: (ids: string[]) => Promise<void>

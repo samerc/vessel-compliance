@@ -82,6 +82,8 @@ export async function autoPopulate(
   dts: DocumentType[],
   sink: SubjectivitySink
 ): Promise<void> {
+  // Subjectivities marked "only by hand" are never added automatically
+  masters = masters.filter((m) => !m.manualOnly)
   if (masters.length === 0) return
   try {
     const qVessels: QuotationVessel[] = await window.api.getQuotationVessels(quotationId)

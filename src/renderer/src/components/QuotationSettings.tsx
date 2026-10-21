@@ -6923,6 +6923,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
   const [newText, setNewText] = useState('')
   const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
   const [newTypeScope, setNewTypeScope] = useState<string>('all')
+  const [newManualOnly, setNewManualOnly] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
@@ -6950,11 +6951,13 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
         text: newText.trim(),
         docTypeIds: newDocTypeIds,
         typeScope: newTypeScope,
-        order: items.length
+        order: items.length,
+        manualOnly: newManualOnly
       })
       setNewText('')
       setNewDocTypeIds([])
       setNewTypeScope('all')
+      setNewManualOnly(false)
       showSuccess('Subjectivity added')
       loadData()
     } catch (err) {
@@ -6980,6 +6983,22 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
       setEditingId(null)
       showSuccess('Updated')
       loadData()
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
+    }
+  }
+
+  // Automatic <-> only by hand, in one click (text, links and scope unchanged)
+  const toggleManualOnly = async (s: PISubjectivity): Promise<void> => {
+    try {
+      await window.api.updatePISubjectivity(s.id, {
+        text: s.text,
+        docTypeIds: s.docTypeIds || [],
+        typeScope: s.typeScope,
+        manualOnly: !s.manualOnly
+      })
+      setItems((list) => list.map((x) => (x.id === s.id ? { ...x, manualOnly: !s.manualOnly } : x)))
+      showSuccess(!s.manualOnly ? 'Only added by hand from now on' : 'Added automatically again')
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to update')
     }
@@ -7025,8 +7044,10 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
       <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
         <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Master Subjectivities</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-          Define subjectivities and link them to document types. Linked subjectivities auto-populate
-          when the vessel has missing or expiring documents.
+          Define subjectivities and link them to document types. A new quotation gets the
+          subjectivities whose linked documents are missing or expiring on its vessels or assureds,
+          and every subjectivity with no linked document. Mark rare ones &quot;Only by hand&quot;:
+          they are then never added automatically (nor by Select All), only when picked.
         </p>
 
         {/* Add form */}
@@ -7078,6 +7099,23 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
               <option value="war">War only</option>
             </select>
           </div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.8rem',
+              marginBottom: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={newManualOnly}
+              onChange={(e) => setNewManualOnly(e.target.checked)}
+            />
+            Only by hand (never added automatically)
+          </label>
           <button
             onClick={handleAdd}
             className="btn-primary"
@@ -7257,6 +7295,33 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
                     </div>
                   </div>
                   <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => void toggleManualOnly(s)}
+                      title={
+                        s.manualOnly
+                          ? 'Never added automatically. Click to add it automatically again.'
+                          : 'Click so it is only added by hand'
+                      }
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        border: s.manualOnly
+                          ? '1px solid var(--warning)'
+                          : '1px solid var(--glass-border-color)',
+                        background: 'transparent',
+                        color: s.manualOnly ? 'var(--warning)' : 'var(--text-secondary)',
+                        fontWeight: s.manualOnly ? 600 : 400
+                      }}
+                    >
+                      {s.manualOnly
+                        ? 'Only by hand'
+                        : (s.docTypeIds || []).length === 0
+                          ? 'Automatic: every quotation'
+                          : 'Automatic: when a document is missing'}
+                    </button>
                     {s.typeScope &&
                       s.typeScope !== 'all' &&
                       s.typeScope !== 'both' &&

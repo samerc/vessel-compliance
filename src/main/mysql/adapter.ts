@@ -5830,6 +5830,15 @@ export class MySQLAdapter {
                     INDEX idx_wc_topic (topic_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
+      // Migration: subjectivities added only by hand (never by the automatic fill)
+      const [subjManualCol] = await this.pool.query(
+        "SHOW COLUMNS FROM pi_subjectivities LIKE 'manual_only'"
+      )
+      if ((subjManualCol as RowDataPacket[]).length === 0)
+        await this.pool.query(
+          'ALTER TABLE pi_subjectivities ADD COLUMN manual_only TINYINT(1) NOT NULL DEFAULT 0'
+        )
+
       // Migration (once): a "Policy Number" characteristic (War) duplicated the policy's own
       // number field. Its value fills the policy number where that is empty (where both are
       // set the field wins: the characteristic often held last year's number, copied by the
@@ -16692,9 +16701,12 @@ export class MySQLAdapter {
   async getPISubjectivities(): Promise<PISubjectivity[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC"
+      "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order`, manual_only AS manualOnly FROM pi_subjectivities ORDER BY order_index ASC"
     )
-    const subjs = rows as Row<PISubjectivity>[]
+    const subjs = (rows as Row<PISubjectivity>[]).map((s) => ({
+      ...s,
+      manualOnly: Boolean(s.manualOnly)
+    }))
     // Doc type links, all in one query
     const [links] = await this.pool.query(
       'SELECT subjectivity_id, doc_type_id as docTypeId FROM pi_subjectivity_doc_types'
@@ -16709,12 +16721,13 @@ export class MySQLAdapter {
     docTypeIds?: string[]
     typeScope?: string
     order?: number
+    manualOnly?: boolean
   }): Promise<PISubjectivity> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
-      'INSERT INTO pi_subjectivities (id, text, type_scope, order_index) VALUES (?, ?, ?, ?)',
-      [id, data.text, data.typeScope || 'all', data.order || 0]
+      'INSERT INTO pi_subjectivities (id, text, type_scope, order_index, manual_only) VALUES (?, ?, ?, ?, ?)',
+      [id, data.text, data.typeScope || 'all', data.order || 0, data.manualOnly ? 1 : 0]
     )
     if (data.docTypeIds && data.docTypeIds.length > 0) {
       for (const dtId of data.docTypeIds) {
@@ -16729,13 +16742,14 @@ export class MySQLAdapter {
       text: data.text,
       docTypeIds: data.docTypeIds || [],
       typeScope: data.typeScope || 'all',
-      order: data.order || 0
+      order: data.order || 0,
+      manualOnly: !!data.manualOnly
     }
   }
 
   async updatePISubjectivity(
     id: string,
-    data: { text: string; docTypeIds?: string[]; typeScope?: string }
+    data: { text: string; docTypeIds?: string[]; typeScope?: string; manualOnly?: boolean }
   ): Promise<void> {
     if (!this.pool) return
     const fields = ['text = ?']
@@ -16743,6 +16757,10 @@ export class MySQLAdapter {
     if (data.typeScope !== undefined) {
       fields.push('type_scope = ?')
       vals.push(data.typeScope)
+    }
+    if (data.manualOnly !== undefined) {
+      fields.push('manual_only = ?')
+      vals.push(data.manualOnly ? 1 : 0)
     }
     vals.push(id)
     await this.pool.execute(`UPDATE pi_subjectivities SET ${fields.join(', ')} WHERE id = ?`, vals)

@@ -297,6 +297,8 @@ export default function SubjectivitiesTab({
               onClick={async () => {
                 for (const m of availableMasters) {
                   if (items.some((i) => i.piSubjectivityId === m.id)) continue
+                  // Rare ones are picked one by one
+                  if (m.manualOnly) continue
                   // Skip if all linked doc types are non-required (optional)
                   if (
                     m.docTypeIds &&
@@ -346,6 +348,11 @@ export default function SubjectivitiesTab({
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {m.text}
+              {m.manualOnly && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--warning)', marginLeft: '8px' }}>
+                  by hand only
+                </span>
+              )}
               {m.docTypeIds && m.docTypeIds.length > 0 && (
                 <span
                   style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '8px' }}
