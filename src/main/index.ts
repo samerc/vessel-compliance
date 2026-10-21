@@ -45,7 +45,7 @@ import type {
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { tmpdir } from 'os'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs'
-import { access as fsAccess } from 'fs/promises'
+import { access as fsAccess, readdir } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
@@ -3095,6 +3095,38 @@ app.whenReady().then(() => {
       return false
     }
   }
+  // Remap dialog: where files with these names are now. Searched in a folder and its subfolders
+  // (5 levels, 20,000 entries at most), nearest first; paths come back in the stored form
+  safeHandle('fs:findFilesByName', async (event, folder: string, names: string[]) => {
+    requireSession(event)
+    const found: Record<string, string> = {}
+    if (typeof folder !== 'string' || !folder.trim() || !Array.isArray(names)) return found
+    const wanted = new Set(
+      names.filter((n) => typeof n === 'string' && n).map((n) => n.toLowerCase())
+    )
+    const queue: [string, number][] = [[normalize(resolveFilePath(folder.trim())), 0]]
+    let seen = 0
+    while (queue.length && seen < 20000 && Object.keys(found).length < wanted.size) {
+      const [dir, depth] = queue.shift()!
+      let items: import('fs').Dirent[]
+      try {
+        items = await readdir(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const it of items) {
+        seen++
+        const p = join(dir, it.name)
+        if (it.isDirectory()) {
+          if (depth < 5) queue.push([p, depth + 1])
+        } else {
+          const k = it.name.toLowerCase()
+          if (wanted.has(k) && !found[k]) found[k] = canonicalizeFilePath(p)
+        }
+      }
+    }
+    return found
+  })
   safeHandle('fs:exists', async (event, filePath: string) => {
     requireSession(event)
     return fileExistsAsync(filePath)

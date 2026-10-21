@@ -433,6 +433,8 @@ export interface Api {
   maintenanceSyncSettings: () => Promise<{ added: number }>
 
   fsExists: (filePath: string) => Promise<boolean>
+  /** Files with these names in a folder and its subfolders: lower-case name -> path */
+  fsFindFilesByName: (folder: string, names: string[]) => Promise<Record<string, string>>
   fsExistsMany: (filePaths: string[]) => Promise<boolean[]>
   fsOpen: (filePath: string) => Promise<void>
   getFilePath: (file: File) => string

@@ -257,6 +257,7 @@ Redesigned to table + slide-in panel layout:
 - **Per-Vessel-Role**: `vessel_assureds.address_id` links to specific address
 - **Add from Policy**: Addresses entered in policy editing sync back to entity
 - **Remap**: File path remap extended to entity documents
+- **Remap file paths dialog** (`RemapFilePathsModal`, vessel or entity): swaps the old folder prefix (auto-detected = common start of all paths) for the new one, joined with exactly one separator; a file still not found there is then looked up BY NAME in the new folder and its subfolders (IPC `fs:findFilesByName`, 5 levels, 20,000 entries, nearest first) and marked "Found by file name in another subfolder". Locate picks one by hand
 
 ### Flag State Enhancements
 

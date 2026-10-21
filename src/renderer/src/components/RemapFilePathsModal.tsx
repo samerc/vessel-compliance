@@ -24,6 +24,8 @@ interface MappedRow {
   candidatePath: string
   status: RowStatus
   customPath?: string // set when user manually locates
+  /** Found by its file name in the new folder (the folders below the prefix had changed) */
+  byName?: boolean
 }
 
 interface RemapFilePathsModalProps {
@@ -59,8 +61,12 @@ function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): st
   const normNew = newPrefix.replace(/\//g, '\\')
   // Case-insensitive prefix match (Windows paths)
   if (!normFile.toLowerCase().startsWith(normOld.toLowerCase())) return filePath
-  return normNew + normFile.slice(normOld.length)
+  // Exactly one separator where the two parts meet ("...\\Documents\\" + "\\file" was doubled)
+  const rest = normFile.slice(normOld.length).replace(/^\\+/, '')
+  return rest ? normNew.replace(/\\+$/, '') + '\\' + rest : normNew
 }
+
+const fileNameOf = (p: string): string => p.split(/[\\/]/).pop() || ''
 
 export default function RemapFilePathsModal({
   vesselId,
@@ -138,6 +144,26 @@ export default function RemapFilePathsModal({
         status = oldExists ? 'accessible' : 'lost'
       }
       mapped.push({ entry, candidatePath: candidate, status })
+    }
+    // Files moved into other folders below the new prefix: find them by file name
+    const lost = mapped.filter((r) => r.status === 'lost' && fileNameOf(r.entry.filePath))
+    if (lost.length > 0) {
+      try {
+        const found = await window.api.fsFindFilesByName(
+          newPrefix,
+          lost.map((r) => fileNameOf(r.entry.filePath))
+        )
+        for (const r of lost) {
+          const hit = found?.[fileNameOf(r.entry.filePath).toLowerCase()]
+          if (hit) {
+            r.candidatePath = hit
+            r.status = 'matched'
+            r.byName = true
+          }
+        }
+      } catch {
+        /* keep them as not found */
+      }
     }
     setRows(mapped)
     setChecking(false)
@@ -449,6 +475,18 @@ export default function RemapFilePathsModal({
                               }}
                             >
                               {resolvedPath}
+                              {row.byName && !row.customPath && (
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    fontFamily: 'var(--font-family)',
+                                    fontSize: '0.7rem',
+                                    color: 'var(--text-secondary)'
+                                  }}
+                                >
+                                  Found by file name in another subfolder
+                                </span>
+                              )}
                             </span>
                           </div>
                         ) : row.status === 'accessible' ? (

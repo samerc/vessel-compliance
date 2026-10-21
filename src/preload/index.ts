@@ -203,6 +203,8 @@ const api: Api = {
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsExistsMany: (filePaths) => ipcRenderer.invoke('fs:existsMany', filePaths),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
+  fsFindFilesByName: (folder: string, names: string[]) =>
+    ipcRenderer.invoke('fs:findFilesByName', folder, names),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getFilePathCanonicalized: async (file: File) => {
     const raw = webUtils.getPathForFile(file)
