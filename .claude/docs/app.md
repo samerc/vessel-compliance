@@ -186,6 +186,8 @@ Extensible calculator section with sub-navigation for insurance calculation tool
   - **Day counting**: DST-safe using calendar-day objects (not raw millisecond division); adds 1 day if end time-of-day > start time-of-day
   - **Instalment logic**: Based on annual premium / number of instalments as the base instalment amount; checks how many full annual instalments the pro-rata covers; remainder goes in first instalment
   - **Commission**: Same instalment pattern applied to commission (annual commission / instalments as base)
+  - **Reclaim NCB/UPCC** (cancellation, off by default): the FULL discount given (a % of the annual premium, or an amount) is deducted from the pro-rata premium (`calcProRataPremium` 6th arg `reclaimAmount`; result has `grossProRataPremium`, `reclaimAmount`, `proRataPremium` = net). Instalments and commission are on the net figure. Calculator only for now; the Cancel Policy dialog will get it once the user confirms the calculator works
+  - **Step numbers** count as shown (the reclaim step is Step 3 when used)
   - **Calculation Steps**: All 10 intermediate steps displayed in the results section for transparency
   - **Pure calculator**: No database persistence, instant reactive computation via `useMemo`
 - **TLO Rate Calculator** (`src/renderer/src/components/TLORateCalculator.tsx`):

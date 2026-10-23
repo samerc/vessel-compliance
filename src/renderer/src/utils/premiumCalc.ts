@@ -44,6 +44,11 @@ export interface InstalmentRow {
 }
 
 export interface ProRataResult {
+  /** Days x annual premium / standard period, before any reclaim */
+  grossProRataPremium: number
+  /** NCB/UPCC taken back on cancellation (0 = none) */
+  reclaimAmount: number
+  /** The result: gross pro-rata less the reclaim. Instalments and commission are based on it */
   proRataPremium: number
   annualInstalment: number
   fullInstalments: number
@@ -63,6 +68,8 @@ export interface ProRataResult {
  * @param standardPeriod - Standard period in days (typically 365)
  * @param numInstalments - Number of instalments
  * @param commissionPct - Commission percentage
+ * @param reclaimAmount - NCB/UPCC given to the client and taken back (cancellation), deducted
+ *   from the pro-rata premium before the instalments and the commission
  * @returns Full calculation result with instalment rows
  */
 export function calcProRataPremium(
@@ -70,11 +77,15 @@ export function calcProRataPremium(
   annualPremium: number,
   standardPeriod: number,
   numInstalments: number,
-  commissionPct: number
+  commissionPct: number,
+  reclaimAmount = 0
 ): ProRataResult {
-  const proRataPremium = round2((days * annualPremium) / standardPeriod)
+  const grossProRataPremium = round2((days * annualPremium) / standardPeriod)
+  const reclaim = round2(Math.max(0, reclaimAmount || 0))
+  const proRataPremium = round2(grossProRataPremium - reclaim)
   const annualInstalment = round2(annualPremium / numInstalments)
-  const fullInstalments = annualInstalment > 0 ? Math.floor(proRataPremium / annualInstalment) : 0
+  const fullInstalments =
+    annualInstalment > 0 && proRataPremium > 0 ? Math.floor(proRataPremium / annualInstalment) : 0
   const firstPremiumInstalment = round2(proRataPremium - annualInstalment * fullInstalments)
 
   const commissionTotal = round2((proRataPremium * commissionPct) / 100)
@@ -103,6 +114,8 @@ export function calcProRataPremium(
   }
 
   return {
+    grossProRataPremium,
+    reclaimAmount: reclaim,
     proRataPremium,
     annualInstalment,
     fullInstalments,
