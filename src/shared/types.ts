@@ -2463,6 +2463,8 @@ export interface PolicyDocument {
   nonRefundablePercent: number | null
   qrEnabled: boolean | null
   hideBroker: boolean
+  /** Year folder the exports are saved in without asking (converter); null = Save dialog */
+  exportFolder?: string | null
   /** Printed for signing: the policy's pages and the total (policy + T&C) shown in its footer */
   signingPages?: number | null
   signingTotal?: number | null

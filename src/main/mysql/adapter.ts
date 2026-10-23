@@ -5588,6 +5588,27 @@ export class MySQLAdapter {
         /* idempotent migration: already applied or not applicable */
       }
 
+      // Policy folders: the year folder a policy's exports are saved in, and the vessel's
+      // folder the converter offers next time
+      try {
+        const [efCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM policy_documents LIKE 'export_folder'"
+        )) as QueryRows
+        if ((efCol as RowDataPacket[]).length === 0) {
+          await this.pool.query(
+            'ALTER TABLE policy_documents ADD COLUMN export_folder VARCHAR(1024) NULL'
+          )
+        }
+        const [vpfCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM vessels LIKE 'policy_folder'"
+        )) as QueryRows
+        if ((vpfCol as RowDataPacket[]).length === 0) {
+          await this.pool.query('ALTER TABLE vessels ADD COLUMN policy_folder VARCHAR(1024) NULL')
+        }
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
+
       // ---- Policy Endorsements tables ----
       await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
                 id VARCHAR(36) PRIMARY KEY,
@@ -14351,6 +14372,47 @@ export class MySQLAdapter {
   }
 
   /** Assign a real policy number to a draft policy */
+  /** The folder a policy's exports are saved in (null = they ask where to save) */
+  async getPolicyExportFolder(policyId: string): Promise<string | null> {
+    if (!this.pool) throw new Error('DB not connected')
+    const [rows] = await this.pool.query(
+      'SELECT export_folder FROM policy_documents WHERE id = ?',
+      [policyId]
+    )
+    return (rows as RowDataPacket[])[0]?.export_folder || null
+  }
+
+  /** Links the policy to its year folder and remembers the vessel's folder for next time */
+  async setPolicyExportFolder(
+    policyId: string,
+    folder: string,
+    vesselFolder: string
+  ): Promise<void> {
+    if (!this.pool) throw new Error('DB not connected')
+    await this.pool.execute('UPDATE policy_documents SET export_folder = ? WHERE id = ?', [
+      folder,
+      policyId
+    ])
+    await this.pool.execute(
+      `UPDATE vessels v JOIN policy_documents pd ON pd.vessel_id = v.id
+          SET v.policy_folder = ? WHERE pd.id = ?`,
+      [vesselFolder, policyId]
+    )
+  }
+
+  /** vesselId -> the folder chosen at its last conversion */
+  async getVesselPolicyFolders(vesselIds: string[]): Promise<Record<string, string>> {
+    if (!this.pool) throw new Error('DB not connected')
+    if (vesselIds.length === 0) return {}
+    const [rows] = await this.pool.query(
+      'SELECT id, policy_folder FROM vessels WHERE id IN (?) AND policy_folder IS NOT NULL',
+      [vesselIds]
+    )
+    return Object.fromEntries(
+      (rows as RowDataPacket[]).map((r) => [r.id as string, r.policy_folder as string])
+    )
+  }
+
   async assignPolicyNumber(policyId: string): Promise<string> {
     return this.withNamedLock('vc_policy_number', () => this.assignPolicyNumberLocked(policyId))
   }
@@ -18323,6 +18385,7 @@ export class MySQLAdapter {
         r.non_refundable_percent == null ? null : Number(r.non_refundable_percent),
       qrEnabled: r.qr_enabled == null ? null : Boolean(r.qr_enabled),
       hideBroker: Boolean(r.hide_broker),
+      exportFolder: r.export_folder ?? null,
       signingPages: r.signing_pages == null ? null : Number(r.signing_pages),
       signingTotal: r.signing_total == null ? null : Number(r.signing_total),
       proRata: Boolean(r.pro_rata),
@@ -18900,7 +18963,8 @@ export class MySQLAdapter {
               n.our_share = o.our_share,
               n.exchange_rate = o.exchange_rate,
               n.upcc_title = o.upcc_title,
-              n.survey_warranty_texts = o.survey_warranty_texts
+              n.survey_warranty_texts = o.survey_warranty_texts,
+              n.export_folder = o.export_folder
         WHERE n.id = ?`,
       [policyId, newId]
     )

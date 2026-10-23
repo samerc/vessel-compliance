@@ -29,7 +29,8 @@ import {
   MoreHorizontal,
   PenTool,
   LayoutList,
-  CalendarDays
+  CalendarDays,
+  FolderOpen
 } from 'lucide-react'
 import CopyInstalmentDatesModal from './CopyInstalmentDatesModal'
 import { createPortal } from 'react-dom'
@@ -1619,6 +1620,12 @@ export default function PolicyDetail({
     }
   }
 
+  // The year folder the converter made; every export of the policy is saved there
+  const handleOpenFolder = async (): Promise<void> => {
+    const res = await window.api.policyOpenFolder(policyId)
+    if (res && res.error) showError(res.message || 'Could not open the folder')
+  }
+
   const handleExportQuickBooks = async (): Promise<void> => {
     setExportingQB(true)
     try {
@@ -1879,6 +1886,16 @@ export default function PolicyDetail({
                 <Download size={16} /> Export Policy
               </button>
             </>
+          )}
+          {!isEditing && policy.exportFolder && (
+            <button
+              className="btn-secondary"
+              style={{ ...headerBtnStyle }}
+              onClick={handleOpenFolder}
+              title={`Open the policy folder: ${policy.exportFolder}`}
+            >
+              <FolderOpen size={16} /> Open Folder
+            </button>
           )}
 
           {/* Actions dropdown */}

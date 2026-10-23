@@ -15,7 +15,8 @@ import {
   LayoutList,
   ListChecks,
   FileWarning,
-  CalendarDays
+  CalendarDays,
+  FolderOpen
 } from 'lucide-react'
 import CopyInstalmentDatesModal from './CopyInstalmentDatesModal'
 import { useTheme } from '../contexts/ThemeContext'
@@ -151,6 +152,8 @@ interface WizardData {
   // Survey warranty wording per vessel (converter vessel id -> warranty id -> text);
   // a missing entry uses the quotation's wording, '' removes the warranty
   surveyWarrantyEdits: Record<string, Record<string, string>>
+  // Vessel folder per converter vessel id: the policy's exports go to a year folder inside it
+  policyFolders: Record<string, string>
 }
 
 interface SurveyWarrantyItem {
@@ -318,7 +321,8 @@ export default function PolicySetupWizard({
     qrEnabled: false,
     selectedSubjectivityIds: [],
     subjectivityDays: 7,
-    surveyWarrantyEdits: {}
+    surveyWarrantyEdits: {},
+    policyFolders: {}
   })
   // The quotation's survey warranties (placeholders filled, policy wording)
   const [surveyItems, setSurveyItems] = useState<SurveyWarrantyItem[]>([])
@@ -639,6 +643,17 @@ export default function PolicySetupWizard({
         console.warn('[PolicyWizard] Commission resolve failed:', err)
       }
 
+      // Each vessel's folder from its last conversion
+      let policyFolders: Record<string, string> = {}
+      try {
+        const res = await window.api.policyGetVesselFolders(
+          vessels.map((v) => (v.vesselId || v.id) as string)
+        )
+        if (res && !isIpcError(res)) policyFolders = res
+      } catch {
+        /* chosen in the Review step */
+      }
+
       // QR default (P&I only) — settings toggle pre-fills the per-policy choice
       let qrDefault = false
       try {
@@ -677,7 +692,8 @@ export default function PolicySetupWizard({
             blueCardInception: inception,
             blueCardExpiry: expiry,
             blueCardOwners: defaultBlueCardOwners,
-            qrEnabled: qrDefault
+            qrEnabled: qrDefault,
+            policyFolders
           },
           safeInstalments
         )
@@ -922,6 +938,15 @@ export default function PolicySetupWizard({
       }
     }
 
+    const noFolder = data.selectedVesselIds.find((vid) => !(data.policyFolders[vid] || '').trim())
+    if (noFolder) {
+      const qv = qVessels.find((v) => (v.vesselId || v.id) === noFolder)
+      showError(
+        `Choose the folder of ${(qv?.name || qv?.vesselLabel || 'every vessel').toUpperCase()}`
+      )
+      return
+    }
+
     setConverting(true)
     try {
       const commPct =
@@ -1019,9 +1044,24 @@ export default function PolicySetupWizard({
         return
       }
       const policies = Array.isArray(result) ? result : []
+      // Each policy's year folder ({vessel folder}6, or 2026-2... when one holds a policy)
+      const folderErrors: string[] = []
+      for (const p of policies) {
+        const base = data.policyFolders[p.vesselId]
+        if (!base) continue
+        try {
+          await window.api.policySetExportFolder(p.id, base)
+        } catch (err) {
+          folderErrors.push((err instanceof Error && err.message) || base)
+        }
+      }
       showSuccess(
         `${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`
       )
+      if (folderErrors.length > 0)
+        showError(
+          `The policy folder could not be created, exports will ask where to save: ${folderErrors.join('; ')}`
+        )
       if (policies[0]?.id) onComplete(policies[0].id)
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to convert to policy')
@@ -1364,6 +1404,15 @@ export default function PolicySetupWizard({
               />
             )}
 
+            {currentStep === 5 && (
+              <StepPolicyFolders
+                qVessels={qVessels}
+                selectedVesselIds={data.selectedVesselIds}
+                folders={data.policyFolders}
+                inputStyle={inputStyle}
+                onUpdate={updateData}
+              />
+            )}
             {currentStep === 5 && (
               <StepReview
                 data={data}
@@ -3243,6 +3292,106 @@ function StepSurveyWarranties({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function StepPolicyFolders({
+  qVessels,
+  selectedVesselIds,
+  folders,
+  inputStyle,
+  onUpdate
+}: {
+  qVessels: QuotationVessel[]
+  selectedVesselIds: string[]
+  folders: Record<string, string>
+  inputStyle: React.CSSProperties
+  onUpdate: (partial: Partial<WizardData>) => void
+}): React.JSX.Element {
+  // vessel id -> the year folder the exports will go to, or why the folder cannot be used
+  const [previews, setPreviews] = useState<Record<string, { folder?: string; error?: string }>>({})
+  const foldersKey = selectedVesselIds.map((vid) => `${vid}=${folders[vid] || ''}`).join('|')
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const next: Record<string, { folder?: string; error?: string }> = {}
+      for (const vid of selectedVesselIds) {
+        const base = (folders[vid] || '').trim()
+        if (!base) continue
+        const res = await window.api.policyPreviewFolder(base)
+        next[vid] = isIpcError(res) ? { error: res.message } : { folder: res.folder }
+      }
+      if (!cancelled) setPreviews(next)
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // foldersKey stands for the selected vessels and their folders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foldersKey])
+
+  const setFolder = (vid: string, folder: string): void =>
+    onUpdate({ policyFolders: { ...folders, [vid]: folder } })
+  const browse = async (vid: string): Promise<void> => {
+    const picked = await window.api.dialogOpenFolder()
+    if (typeof picked === 'string' && picked) setFolder(vid, picked)
+  }
+  const nameOf = (vid: string): string => {
+    const qv = qVessels.find((v) => (v.vesselId || v.id) === vid)
+    return (qv?.name || qv?.vesselLabel || 'Vessel').toUpperCase()
+  }
+  const year = new Date().getFullYear()
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem' }}>Policy folder</h3>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+        The vessel&apos;s folder. A {year} folder is made inside it (or {year}-2, {year}-3... when
+        it already holds a policy) and every export of this policy is saved there.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {selectedVesselIds.map((vid) => {
+          const preview = previews[vid]
+          return (
+            <div key={vid}>
+              {selectedVesselIds.length > 1 && (
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', margin: '0 0 4px' }}>
+                  M/V {nameOf(vid)}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={folders[vid] || ''}
+                  onChange={(e) => setFolder(vid, e.target.value)}
+                  placeholder="Choose the vessel's folder"
+                  aria-label={`Folder of ${nameOf(vid)}`}
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => void browse(vid)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                >
+                  <FolderOpen size={15} /> Browse
+                </button>
+              </div>
+              {preview && (
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    marginTop: '4px',
+                    color: preview.error ? 'var(--danger)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {preview.error || `Exports go to ${preview.folder}`}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

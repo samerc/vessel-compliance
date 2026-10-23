@@ -2055,6 +2055,20 @@ export interface Api {
   ) => Promise<void>
   policyCreateRevision: (policyId: string) => Promise<string>
   policyDelete: (id: string) => Promise<void>
+  policyGetVesselFolders: (vesselIds: string[]) => Promise<Record<string, string>>
+  policyPreviewFolder: (
+    base: string
+  ) => Promise<{ folder: string; exists: boolean } | { error: true; message: string }>
+  policySetExportFolder: (policyId: string, base: string) => Promise<{ folder: string }>
+  policyWriteExportFile: (
+    policyId: string,
+    data: Uint8Array,
+    fileName: string
+  ) => Promise<
+    | { saved: true; filePath: string }
+    | { saved: false; reason: 'none' | 'missing'; folder?: string }
+  >
+  policyOpenFolder: (policyId: string) => Promise<void | { error: true; message: string }>
   policyConvertFromQuotation: (
     quotationId: string,
     options: {

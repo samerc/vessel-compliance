@@ -1,6 +1,7 @@
 import XLSX from 'xlsx-js-style'
 import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
 import { isIpcError } from '../utils/ipc'
+import { savePolicyFile } from '../utils/saveFile'
 import type {
   HullAltVesselPremium,
   PIClause,
@@ -491,5 +492,12 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
 
   // 8. Export
   const fileName = `QB - ${policy.policyNumber || 'export'}.xlsx`
-  XLSX.writeFile(wb, fileName)
+  const xlsx = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  await savePolicyFile(
+    new Blob([xlsx], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }),
+    fileName,
+    policyId
+  )
 }

@@ -17,3 +17,21 @@ export async function saveFile(blob: Blob, fileName: string): Promise<string> {
   if (!result.saved) throw new SaveCancelledError()
   return result.filePath
 }
+
+/**
+ * Saves a policy's export: into the policy's folder without asking when the converter gave it
+ * one, otherwise (or when that folder cannot be reached) through the Save dialog
+ */
+export async function savePolicyFile(
+  blob: Blob,
+  fileName: string,
+  policyId: string
+): Promise<string> {
+  const res = await window.api.policyWriteExportFile(
+    policyId,
+    new Uint8Array(await blob.arrayBuffer()),
+    fileName
+  )
+  if (res.saved) return res.filePath
+  return saveFile(blob, fileName)
+}

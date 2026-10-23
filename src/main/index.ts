@@ -62,6 +62,7 @@ import { searchSanctions, stopSanctionsSearchProcess } from './sanctions/searchP
 import type { SanctionsEntity } from './sanctions/SanctionsDatabase'
 import { normalizeText } from './sanctions/normalize'
 import type { ParsedDefect } from './workers/defectParser'
+import { findYearFolder, prepareYearFolder, writeIntoFolder } from './policyFolder'
 import Store from 'electron-store'
 import { createPool, type RowDataPacket } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -5399,6 +5400,64 @@ app.whenReady().then(() => {
   safeHandle('policy:getById', (event, id: string) => {
     requireSession(event)
     return db.getPolicyDocumentById(id)
+  })
+  // Policy folders (policyFolder.ts): stored canonical, resolved for this PC on use
+  safeHandle('policy:getVesselFolders', async (event, vesselIds: string[]) => {
+    requireSession(event)
+    const folders = await db.getVesselPolicyFolders(Array.isArray(vesselIds) ? vesselIds : [])
+    return Object.fromEntries(
+      Object.entries(folders).map(([id, f]) => [id, normalize(resolveFilePath(f))])
+    )
+  })
+  // The year folder the conversion would use (nothing is created): shown in the converter
+  safeHandle('policy:previewFolder', (event, base: string) => {
+    requireSession(event)
+    if (typeof base !== 'string' || !base.trim()) throw new Error('Choose a folder')
+    return findYearFolder(normalize(resolveFilePath(base)), new Date().getFullYear())
+  })
+  safeHandle('policy:setExportFolder', async (event, policyId: string, base: string) => {
+    await requirePermission(event, 'quotations:edit', 'policies:manage')
+    if (typeof base !== 'string' || !base.trim()) throw new Error('Choose a folder')
+    const folder = prepareYearFolder(normalize(resolveFilePath(base)), new Date().getFullYear())
+    await db.setPolicyExportFolder(
+      policyId,
+      canonicalizeFilePath(folder),
+      canonicalizeFilePath(base)
+    )
+    return { folder }
+  })
+  // Saves an export into the policy's folder without asking. saved: false = no folder (or it
+  // cannot be reached): the renderer asks where to save instead
+  safeHandle(
+    'policy:writeExportFile',
+    async (event, policyId: string, data: Uint8Array, fileName: string) => {
+      requireSession(event)
+      const stored = await db.getPolicyExportFolder(policyId)
+      if (!stored) return { saved: false, reason: 'none' }
+      const folder = normalize(resolveFilePath(stored))
+      if (!existsSync(folder)) return { saved: false, reason: 'missing', folder }
+      try {
+        return { saved: true, filePath: writeIntoFolder(folder, fileName, data) }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')
+          throw new Error(
+            `${basename(fileName)} could not be saved in ${folder}: the folder is read-only or the file is open in another program.`,
+            { cause: err }
+          )
+        throw err
+      }
+    }
+  )
+  safeHandle('policy:openFolder', async (event, policyId: string) => {
+    requireSession(event)
+    const stored = await db.getPolicyExportFolder(policyId)
+    if (!stored) throw new Error('This policy has no folder')
+    const folder = normalize(resolveFilePath(stored))
+    if (!existsSync(folder))
+      throw new Error(`The folder ${folder} was not found: it was moved, renamed or is offline`)
+    const err = await shell.openPath(folder)
+    if (err) throw new Error(err)
   })
   safeHandle('policy:getInstalments', (event, policyId: string) => {
     requireSession(event)

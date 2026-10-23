@@ -1398,6 +1398,14 @@ const api: Api = {
     ipcRenderer.invoke('policy:setAddresses', policyId, addresses),
   policyCreateRevision: (policyId: string) => ipcRenderer.invoke('policy:createRevision', policyId),
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
+  policyGetVesselFolders: (vesselIds: string[]) =>
+    ipcRenderer.invoke('policy:getVesselFolders', vesselIds),
+  policyPreviewFolder: (base: string) => ipcRenderer.invoke('policy:previewFolder', base),
+  policySetExportFolder: (policyId: string, base: string) =>
+    ipcRenderer.invoke('policy:setExportFolder', policyId, base),
+  policyWriteExportFile: (policyId: string, data: Uint8Array, fileName: string) =>
+    ipcRenderer.invoke('policy:writeExportFile', policyId, data, fileName),
+  policyOpenFolder: (policyId: string) => ipcRenderer.invoke('policy:openFolder', policyId),
   policyConvertFromQuotation: (quotationId: string, options) =>
     ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) =>
