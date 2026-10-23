@@ -3555,6 +3555,14 @@ function resolvePolicySectionOrder(data: PolicyExportData, settingsDefault?: str
 function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
   const wq = data.quotation
+  // Gap before a numbered item: the first one is set apart by a blank line, like the intro and
+  // the excluded countries above it; the items themselves keep the small list gap
+  let listStarted = false
+  const pushListGap = (): void => {
+    if (listStarted) content.push(polSpacerPts(3))
+    else if (content.length > 0) content.push(polEmptyP())
+    listStarted = true
+  }
   const excCountries = data.excludedCountries.filter((c) => c.listType === 'excluded')
   const ddqCountries = data.excludedCountries.filter((c) => c.listType === 'ddq')
 
@@ -3588,7 +3596,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
         polSt(data, 'ddqCountriesIntro') ||
           'Due Diligence Questionnaire required for trading with the following countries:'
       )
-      content.push(polSpacerPts(3))
+      pushListGap()
       if (ddqIntro.includes('{ddq_countries}')) {
         content.push(
           new Paragraph({
@@ -3629,7 +3637,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     if (wq.tradingShowDdqWarranties) {
       const intro = polSt(data, 'tradingConditionA')
       if (intro) {
-        content.push(polSpacerPts(3))
+        pushListGap()
         content.push(
           new Paragraph({
             numbering: { reference: 'trading-numbered', level: 0 },
@@ -3674,7 +3682,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
     if (wq.tradingShowIsrael && polSt(data, 'tradingIsrael')) {
-      content.push(polSpacerPts(3))
+      pushListGap()
       content.push(
         new Paragraph({
           numbering: { reference: 'trading-numbered', level: 0 },
@@ -3958,7 +3966,7 @@ async function polBuildPremiumPaymentSection(
       ppTime
     )
     content.push(polNpTight(singleIntro))
-    content.push(polSpacerPts(3))
+    content.push(polSpacerPts(6))
 
     // Non-refundable text for single instalment
     if (nrType === 'first_instalment' || instalments[0].isNonRefundable) {
@@ -3995,7 +4003,7 @@ async function polBuildPremiumPaymentSection(
       ppTime
     )
     content.push(polNpTight(premIntro))
-    content.push(polSpacerPts(3))
+    content.push(polSpacerPts(6))
 
     // Instalment lines
     if (instalments.length > 0) {
@@ -4073,7 +4081,8 @@ async function polBuildPremiumPaymentSection(
   // 4. Condition precedent text
   if (polSt(data, 'premiumCondition')) {
     content.push(...polMpTight(polSt(data, 'premiumCondition')))
-    content.push(polEmptyP())
+    // The same gap as between the other parts of the section
+    content.push(polSpacerPts(6))
   }
 
   // 5. Premium earned text
