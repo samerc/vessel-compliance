@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { RotateCcw, Copy, Check } from 'lucide-react'
-import { countDays, calcProRataPremium } from '../utils/premiumCalc'
+import { countDays, calcProRataPremium, discountGivenFromPayable } from '../utils/premiumCalc'
 import type { InstalmentRow } from '../utils/premiumCalc'
 import { StrMoneyInput } from './quotation-tabs/shared'
 import { Field } from './ui'
@@ -142,19 +142,21 @@ export default function PremiumCalculator(): React.JSX.Element {
     // The annual premium is the payable one. NCB is a % of the technical premium and UPCC a %
     // of what is left after NCB (as in quotations), so the technical premium is worked back:
     // technical = payable / ((1 - NCB%) x (1 - UPCC%)), and the discount given = NCB + UPCC
-    const r2 = (n: number): number => Math.round(n * 100) / 100
     let technical = 0
     let ncbAmount = 0
     let upccAmount = 0
     let reclaim = 0
     if (reclaimOn && reclaimMode === 'pct') {
-      const n = Math.min(Math.max(parseFloat(ncbPct) || 0, 0), 99.99)
-      const u = Math.min(Math.max(parseFloat(upccPct) || 0, 0), 99.99)
+      const n = parseFloat(ncbPct) || 0
+      const u = parseFloat(upccPct) || 0
       if (n > 0 || u > 0) {
-        technical = r2(annual / ((1 - n / 100) * (1 - u / 100)))
-        ncbAmount = r2((technical * n) / 100)
-        upccAmount = r2(((technical - ncbAmount) * u) / 100)
-        reclaim = r2(ncbAmount + upccAmount)
+        const given = discountGivenFromPayable(
+          annual,
+          { type: 'pct', value: n },
+          { type: 'pct', value: u }
+        )
+        ;({ technical, ncbAmount, upccAmount } = given)
+        reclaim = given.total
       }
     } else if (reclaimOn) {
       reclaim = parseFloat(reclaimValue) || 0

@@ -42,7 +42,13 @@ import type { DeclarationFields, BlueCardData } from '../services/PolicyExportSe
 import { getReportSettings } from '../services/ReportSettingsService'
 import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
-import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
+import {
+  countDays,
+  calcProRataPremium,
+  distributeInstalments,
+  discountGivenFromPayable
+} from '../utils/premiumCalc'
+import type { DiscountGiven, GivenDiscount } from '../utils/premiumCalc'
 import type {
   Entity,
   FlagState,
@@ -65,7 +71,7 @@ import type {
   EntityAddress,
   ReceiptPolicySummary
 } from '../../../shared/types'
-import { splitInstalments } from '../../../shared/premium'
+import { splitInstalments, upccPercentFor } from '../../../shared/premium'
 import { ok, asArray } from '../utils/ipc'
 import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
@@ -297,6 +303,53 @@ export default function PolicyDetail({
   const [cancelAfterInstalment, setCancelAfterInstalment] = useState(0)
   const [cancelDate, setCancelDate] = useState('')
   const [cancelling, setCancelling] = useState(false)
+  // Cancel on date: the NCB/UPCC given can be reclaimed (taken off the return premium). Filled
+  // from the quotation when the dialog opens; off by default (only some cancellations)
+  const [cancelReclaim, setCancelReclaim] = useState(false)
+  const [cancelNcb, setCancelNcb] = useState<{ type: GivenDiscount['type']; value: string }>({
+    type: 'pct',
+    value: ''
+  })
+  const [cancelUpcc, setCancelUpcc] = useState<{ type: GivenDiscount['type']; value: string }>({
+    type: 'pct',
+    value: ''
+  })
+  // Cancel dialog: the NCB/UPCC this vessel was given, from the quotation
+  const cancelQuotationId = showCancelModal ? policy?.quotationId : undefined
+  const cancelVesselId = policy?.vesselId
+  useEffect(() => {
+    if (!cancelQuotationId) return
+    let stale = false
+    const load = async (): Promise<void> => {
+      const [q, qvs] = await Promise.all([
+        window.api.getQuotation(cancelQuotationId),
+        window.api.getQuotationVessels(cancelQuotationId)
+      ])
+      if (stale || !q || 'error' in q) return
+      const qv = asArray(qvs).find((v) => v.vesselId === cancelVesselId) || null
+      const ncbOn = !!q.ncbEnabled && !qv?.ncbExcluded
+      const upccOn = !!q.upccEnabled && !qv?.upccExcluded
+      setCancelReclaim(false)
+      setCancelNcb(
+        !ncbOn
+          ? { type: 'pct', value: '' }
+          : q.ncbDiscountType === 'amount'
+            ? { type: 'amount', value: String(q.ncbDiscountAmount || '') }
+            : { type: 'pct', value: String(q.ncbDiscountPercent || '') }
+      )
+      setCancelUpcc(
+        !upccOn
+          ? { type: 'pct', value: '' }
+          : q.upccDiscountType === 'amount'
+            ? { type: 'amount', value: String(q.upccDiscountAmount || '') }
+            : { type: 'pct', value: String(upccPercentFor(q, qv) || '') }
+      )
+    }
+    void load()
+    return () => {
+      stale = true
+    }
+  }, [cancelQuotationId, cancelVesselId])
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -5194,6 +5247,9 @@ export default function PolicyDetail({
           // Calculate return amounts
           let returnPremium = 0
           let returnCommission = 0
+          // Pro-rata return before the NCB/UPCC reclaim, and the discount reclaimed
+          let grossReturn = 0
+          let given: DiscountGiven | null = null
           let returnInstalments: Array<{
             instalmentNumber: number
             dueDate: string
@@ -5221,14 +5277,24 @@ export default function PolicyDetail({
             const totalPrem = Number(policy.premiumAmount) || 0
             const totalPeriod = countDays(policy.inceptionDate ?? '', policy.expiryDate ?? '')
             const remainPeriod = countDays(cancelDate, policy.expiryDate ?? '')
+            if (cancelReclaim) {
+              const asGiven = (d: {
+                type: GivenDiscount['type']
+                value: string
+              }): GivenDiscount => ({ type: d.type, value: parseFloat(d.value) || 0 })
+              given = discountGivenFromPayable(totalPrem, asGiven(cancelNcb), asGiven(cancelUpcc))
+              if (given.total <= 0) given = null
+            }
             if (totalPeriod.days > 0) {
               const calc = calcProRataPremium(
                 remainPeriod.days,
                 totalPrem,
                 totalPeriod.days,
                 1,
-                commPct
+                commPct,
+                given?.total || 0
               )
+              grossReturn = calc.grossProRataPremium
               returnPremium = calc.proRataPremium
               returnCommission = calc.commissionTotal
             }
@@ -5261,12 +5327,20 @@ export default function PolicyDetail({
 
           const confirmCancel = async (): Promise<void> => {
             if (returnPremium <= 0 && cancelMode === 'date') {
-              showError('Enter a valid cancellation date')
+              showError(
+                given && grossReturn > 0
+                  ? 'The NCB/UPCC reclaimed is more than the return premium'
+                  : 'Enter a valid cancellation date'
+              )
               return
             }
             setCancelling(true)
             try {
-              const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
+              const content =
+                `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>` +
+                (given
+                  ? `<p>The No Claims Bonus / UPCC of ${currency} ${given.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} granted on this policy is reclaimed and deducted from the return premium.</p>`
+                  : '')
               await window.api.endorsementCancelPolicy(policyId, {
                 effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
                 endorsementContent: content,
@@ -5381,6 +5455,76 @@ export default function PolicyDetail({
                       onChange={(e) => setCancelDate(e.target.value)}
                     />
                   </Field>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '12px',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={cancelReclaim}
+                      onChange={(e) => setCancelReclaim(e.target.checked)}
+                    />
+                    Reclaim the NCB/UPCC given (taken off the return premium)
+                  </label>
+                  {cancelReclaim && (
+                    <div className="form-grid cols-2" style={{ marginTop: '8px' }}>
+                      {(
+                        [
+                          ['NCB', cancelNcb, setCancelNcb],
+                          ['UPCC', cancelUpcc, setCancelUpcc]
+                        ] as const
+                      ).map(([label, d, setD]) => (
+                        <Field
+                          key={label}
+                          label={label}
+                          hint={
+                            d.type === 'pct'
+                              ? label === 'NCB'
+                                ? '% of the technical premium'
+                                : '% of the premium after NCB'
+                              : `Amount in ${currency}`
+                          }
+                        >
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <select
+                              value={d.type}
+                              onChange={(e) =>
+                                setD({ ...d, type: e.target.value as GivenDiscount['type'] })
+                              }
+                              aria-label={`${label} type`}
+                              style={{ width: '96px', flexShrink: 0 }}
+                            >
+                              <option value="pct">%</option>
+                              <option value="amount">Amount</option>
+                            </select>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={d.value}
+                              onChange={(e) => setD({ ...d, value: e.target.value })}
+                              aria-label={`${label} given`}
+                              style={{ flex: 1, minWidth: 0 }}
+                            />
+                          </div>
+                        </Field>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {cancelMode === 'date' && given && grossReturn > 0 && returnPremium <= 0 && (
+                <div style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: '12px' }}>
+                  The NCB/UPCC reclaimed ({currency}{' '}
+                  {given.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}) is more than
+                  the pro-rata return ({currency}{' '}
+                  {grossReturn.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                 </div>
               )}
 
@@ -5398,6 +5542,27 @@ export default function PolicyDetail({
                   <div className="field-label" style={{ marginBottom: '8px' }}>
                     Return summary
                   </div>
+                  {given && (
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '6px'
+                      }}
+                    >
+                      Pro-rata return {currency}{' '}
+                      {grossReturn.toLocaleString('en-US', { minimumFractionDigits: 2 })} less
+                      NCB/UPCC reclaimed {currency}{' '}
+                      {given.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} (technical
+                      premium{' '}
+                      {given.technical.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {given.ncbAmount > 0 &&
+                        `, NCB ${given.ncbAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                      {given.upccAmount > 0 &&
+                        `, UPCC ${given.upccAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                      )
+                    </div>
+                  )}
                   <div
                     style={{
                       display: 'flex',

@@ -178,3 +178,40 @@ export function distributeInstalments(
   }
   return result
 }
+
+export interface GivenDiscount {
+  /** 'pct' = a percent, 'amount' = a fixed amount */
+  type: 'pct' | 'amount'
+  value: number
+}
+
+export interface DiscountGiven {
+  technical: number
+  ncbAmount: number
+  upccAmount: number
+  total: number
+}
+
+/**
+ * The NCB/UPCC a client was given, worked back from the PAYABLE premium. As in quotations, NCB
+ * is a percent of the technical premium and UPCC a percent of what is left after NCB (either
+ * can be a fixed amount instead): payable = (technical x (1 - NCB%) - NCB amount) x
+ * (1 - UPCC%) - UPCC amount. Used to reclaim the discount when a policy is cancelled.
+ */
+export function discountGivenFromPayable(
+  payable: number,
+  ncb: GivenDiscount | null,
+  upcc: GivenDiscount | null
+): DiscountGiven {
+  const pct = (d: GivenDiscount | null): number =>
+    d?.type === 'pct' ? Math.min(Math.max(d.value || 0, 0), 99.99) / 100 : 0
+  const amt = (d: GivenDiscount | null): number =>
+    d?.type === 'amount' ? Math.max(d.value || 0, 0) : 0
+  const n = pct(ncb)
+  const u = pct(upcc)
+  const technical = round2(((payable + amt(upcc)) / (1 - u) + amt(ncb)) / (1 - n))
+  const ncbAmount = ncb?.type === 'amount' ? round2(amt(ncb)) : round2(technical * n)
+  const upccAmount =
+    upcc?.type === 'amount' ? round2(amt(upcc)) : round2((technical - ncbAmount) * u)
+  return { technical, ncbAmount, upccAmount, total: round2(ncbAmount + upccAmount) }
+}
