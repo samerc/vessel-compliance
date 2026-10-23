@@ -76,6 +76,10 @@ interface CalcDetails {
   endTime: string
   grossProRataPremium: number
   reclaimAmount: number
+  // % mode: the technical premium worked back from the annual (payable) premium
+  technical: number
+  ncbAmount: number
+  upccAmount: number
   proRataPremium: number
   annualInstalment: number
   fullInstalments: number
@@ -102,6 +106,8 @@ export default function PremiumCalculator(): React.JSX.Element {
   const [reclaimOn, setReclaimOn] = useState(false)
   const [reclaimMode, setReclaimMode] = useState<'pct' | 'amount'>('pct')
   const [reclaimValue, setReclaimValue] = useState<string>('')
+  const [ncbPct, setNcbPct] = useState<string>('')
+  const [upccPct, setUpccPct] = useState<string>('')
   const [copiedField, setCopiedField] = useState<'premium' | 'commission' | null>(null)
 
   const copyToClipboard = (value: number, field: 'premium' | 'commission'): void => {
@@ -133,8 +139,26 @@ export default function PremiumCalculator(): React.JSX.Element {
       ':' +
       endObj.getMinutes().toString().padStart(2, '0')
 
-    const reclaimInput = reclaimOn ? parseFloat(reclaimValue) || 0 : 0
-    const reclaim = reclaimMode === 'pct' ? (annual * reclaimInput) / 100 : reclaimInput
+    // The annual premium is the payable one. NCB is a % of the technical premium and UPCC a %
+    // of what is left after NCB (as in quotations), so the technical premium is worked back:
+    // technical = payable / ((1 - NCB%) x (1 - UPCC%)), and the discount given = NCB + UPCC
+    const r2 = (n: number): number => Math.round(n * 100) / 100
+    let technical = 0
+    let ncbAmount = 0
+    let upccAmount = 0
+    let reclaim = 0
+    if (reclaimOn && reclaimMode === 'pct') {
+      const n = Math.min(Math.max(parseFloat(ncbPct) || 0, 0), 99.99)
+      const u = Math.min(Math.max(parseFloat(upccPct) || 0, 0), 99.99)
+      if (n > 0 || u > 0) {
+        technical = r2(annual / ((1 - n / 100) * (1 - u / 100)))
+        ncbAmount = r2((technical * n) / 100)
+        upccAmount = r2(((technical - ncbAmount) * u) / 100)
+        reclaim = r2(ncbAmount + upccAmount)
+      }
+    } else if (reclaimOn) {
+      reclaim = parseFloat(reclaimValue) || 0
+    }
     const calc = calcProRataPremium(days, annual, period, instalments, commission, reclaim)
 
     return {
@@ -143,6 +167,9 @@ export default function PremiumCalculator(): React.JSX.Element {
       addedDay,
       startTime,
       endTime,
+      technical,
+      ncbAmount,
+      upccAmount,
       ...calc
     }
   }, [
@@ -154,7 +181,9 @@ export default function PremiumCalculator(): React.JSX.Element {
     commissionPct,
     reclaimOn,
     reclaimMode,
-    reclaimValue
+    reclaimValue,
+    ncbPct,
+    upccPct
   ])
 
   const handleReset = (): void => {
@@ -167,6 +196,8 @@ export default function PremiumCalculator(): React.JSX.Element {
     setReclaimOn(false)
     setReclaimMode('pct')
     setReclaimValue('')
+    setNcbPct('')
+    setUpccPct('')
   }
 
   const stepStyle = (color: string): React.CSSProperties => ({
@@ -269,7 +300,7 @@ export default function PremiumCalculator(): React.JSX.Element {
           </Field>
           <Field
             label="Reclaim NCB/UPCC"
-            hint="When cancelling: the discount given to the client is taken off the pro-rata result"
+            hint="When cancelling: the discount given to the client is taken off the pro-rata result. The annual premium above is the payable one; NCB % is of the technical premium, UPCC % of what is left after NCB"
             span={2}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -290,7 +321,7 @@ export default function PremiumCalculator(): React.JSX.Element {
                       className={reclaimMode === 'pct' ? 'active' : ''}
                       onClick={() => setReclaimMode('pct')}
                     >
-                      % of annual premium
+                      NCB / UPCC %
                     </button>
                     <button
                       type="button"
@@ -301,17 +332,36 @@ export default function PremiumCalculator(): React.JSX.Element {
                     </button>
                   </div>
                   {reclaimMode === 'pct' ? (
-                    <input
-                      type="number"
-                      value={reclaimValue}
-                      onChange={(e) => setReclaimValue(e.target.value)}
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="e.g. 10"
-                      style={{ width: '120px' }}
-                      aria-label="NCB/UPCC percentage to reclaim"
-                    />
+                    <>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        NCB %
+                        <input
+                          type="number"
+                          value={ncbPct}
+                          onChange={(e) => setNcbPct(e.target.value)}
+                          min="0"
+                          max="99.99"
+                          step="0.01"
+                          placeholder="e.g. 5"
+                          style={{ width: '100px' }}
+                          aria-label="NCB percentage"
+                        />
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        UPCC %
+                        <input
+                          type="number"
+                          value={upccPct}
+                          onChange={(e) => setUpccPct(e.target.value)}
+                          min="0"
+                          max="99.99"
+                          step="0.01"
+                          placeholder="e.g. 5"
+                          style={{ width: '100px' }}
+                          aria-label="UPCC percentage"
+                        />
+                      </label>
+                    </>
                   ) : (
                     <StrMoneyInput
                       value={reclaimValue}
@@ -540,11 +590,34 @@ export default function PremiumCalculator(): React.JSX.Element {
               {calculation.reclaimAmount > 0 && (
                 <div style={stepStyle('255, 77, 77')}>
                   <div style={stepLabel}>{`Step ${step()}: Reclaim NCB/UPCC`}</div>
-                  {reclaimMode === 'pct' && (
-                    <div style={stepVal}>
-                      {fmt(parseFloat(annualPremium))} × {reclaimValue}% ={' '}
-                      {fmt(calculation.reclaimAmount)}
-                    </div>
+                  {reclaimMode === 'pct' && calculation.technical > 0 && (
+                    <>
+                      <div style={stepVal}>
+                        Technical premium = {fmt(parseFloat(annualPremium))} /{' '}
+                        {parseFloat(ncbPct) > 0 && parseFloat(upccPct) > 0
+                          ? `((1 - ${ncbPct}%) × (1 - ${upccPct}%))`
+                          : `(1 - ${parseFloat(ncbPct) > 0 ? ncbPct : upccPct}%)`}{' '}
+                        = {fmt(calculation.technical)}
+                      </div>
+                      {calculation.ncbAmount > 0 && (
+                        <div style={stepVal}>
+                          NCB = {fmt(calculation.technical)} × {ncbPct}% ={' '}
+                          {fmt(calculation.ncbAmount)}
+                        </div>
+                      )}
+                      {calculation.upccAmount > 0 && (
+                        <div style={stepVal}>
+                          UPCC = ({fmt(calculation.technical)} - {fmt(calculation.ncbAmount)}) ×{' '}
+                          {upccPct}% = {fmt(calculation.upccAmount)}
+                        </div>
+                      )}
+                      {calculation.ncbAmount > 0 && calculation.upccAmount > 0 && (
+                        <div style={stepVal}>
+                          Discount given = {fmt(calculation.ncbAmount)} +{' '}
+                          {fmt(calculation.upccAmount)} = {fmt(calculation.reclaimAmount)}
+                        </div>
+                      )}
+                    </>
                   )}
                   <div style={stepVal}>
                     {fmt(calculation.grossProRataPremium)} - {fmt(calculation.reclaimAmount)} ={' '}
