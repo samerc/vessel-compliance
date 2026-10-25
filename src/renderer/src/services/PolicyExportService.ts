@@ -949,7 +949,7 @@ async function buildBlueCardBlobFresh(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const bcVName = data.vesselName ? ` - ${data.vesselName}` : ''
   return { blob, fileName: `${data.policyNumber}${bcVName} - ${cardType}.docx` }
 }
@@ -2035,6 +2035,54 @@ function polEmptyP(): Paragraph {
   })
   polEmptyParas.add(p as unknown as object)
   return p
+}
+
+/**
+ * Packs a policy-family document. A blank line between two paragraphs is exactly one empty
+ * line: the blank line's own space after, and the space after / before the paragraphs on
+ * either side of it, are removed. Spacer gaps (polSpacerPts, no space after) and the empty
+ * paragraph a table cell needs after a nested table are left as they are.
+ */
+async function polPack(document: Document): Promise<Blob> {
+  const blob = await Packer.toBlob(document)
+  const zip = await JSZip.loadAsync(blob)
+  const file = zip.file('word/document.xml')
+  if (!file) return blob
+  const xml = await file.async('string')
+  const paras = [...xml.matchAll(/<w:p\b[^>]*\/>|<w:p\b[\s\S]*?<\/w:p>/g)]
+  const spaceOf = (p: string, attr: 'after' | 'before'): number =>
+    Number(p.match(new RegExp(`<w:spacing\\b[^>]*\\bw:${attr}="(\\d+)"`))?.[1] || 0)
+  const zero = (p: string, attr: 'after' | 'before'): string =>
+    p.replace(new RegExp(`(<w:spacing\\b[^>]*\\bw:${attr}=")\\d+"`), '$10"')
+  const isBlankLine = (p: string): boolean =>
+    !/<w:(t|drawing|br|tab|numPr|sym|object|pict)\b/.test(p) && spaceOf(p, 'after') > 0
+  const out = paras.map((m) => m[0])
+  // Paragraphs right next to each other (nothing but the end of one and the start of the next)
+  const adjacent = (i: number, j: number): boolean => {
+    const [a, b] = i < j ? [paras[i], paras[j]] : [paras[j], paras[i]]
+    return xml.slice(a.index! + a[0].length, b.index!).trim() === ''
+  }
+  let changed = false
+  paras.forEach((m, i) => {
+    if (!isBlankLine(m[0])) return
+    changed = true
+    out[i] = zero(out[i], 'after')
+    if (i > 0 && adjacent(i - 1, i)) out[i - 1] = zero(out[i - 1], 'after')
+    if (i + 1 < paras.length && adjacent(i, i + 1)) out[i + 1] = zero(out[i + 1], 'before')
+  })
+  if (!changed) return blob
+  let rebuilt = ''
+  let pos = 0
+  paras.forEach((m, i) => {
+    rebuilt += xml.slice(pos, m.index!) + out[i]
+    pos = m.index! + m[0].length
+  })
+  rebuilt += xml.slice(pos)
+  zip.file('word/document.xml', rebuilt)
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  })
 }
 
 // Same rule as the quotation export: a run of blank lines becomes ONE blank line, and a
@@ -5154,7 +5202,7 @@ export async function exportPolicyDocx(
     sections: docSections
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`
@@ -6128,7 +6176,7 @@ async function buildDebitAdviceBlobFresh(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const daVName = data.vesselInfo?.name || ''
   const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   return {
@@ -6549,7 +6597,7 @@ async function buildCreditAdviceBlobFresh(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   return {
@@ -6969,7 +7017,7 @@ export async function exportDeclarationDocx(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const vName = data.vesselInfo?.name || ''
   const declFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Declaration).docx` }
   await polStoreFile(policyId, declKey, declFile)
@@ -7274,7 +7322,7 @@ export async function exportEndorsementDocx(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,
@@ -7645,7 +7693,7 @@ export async function exportEndorsementDADocx(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,
@@ -7879,7 +7927,7 @@ export async function exportEndorsementCADocx(
     ]
   })
 
-  const blob = await Packer.toBlob(document)
+  const blob = await polPack(document)
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,
