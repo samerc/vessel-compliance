@@ -1,15 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  X,
-  Pencil,
-  Save,
-  Search,
-  Download
-} from 'lucide-react'
+import { Plus, Trash2, X, Pencil, Save, Search, Download } from 'lucide-react'
 import {
   Quotation,
   PISubjectivity,
@@ -137,15 +127,23 @@ export default function SubjectivitiesTab({
     loadData()
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
+  // Drag a row by its handle and drop it on another row to move it there (the handle also takes
+  // the Up / Down keys). Only the rows whose position changed are saved.
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
+  const [dropIdx, setDropIdx] = useState<number | null>(null)
+  const moveItem = async (from: number, to: number): Promise<void> => {
+    if (from === to || to < 0 || to >= items.length) return
     const arr = [...items]
-    const targetIdx = idx + dir
-    if (targetIdx < 0 || targetIdx >= arr.length) return
-    ;[arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]
+    const [moved] = arr.splice(from, 1)
+    arr.splice(to, 0, moved)
     setItems(arr)
-    for (let i = 0; i < arr.length; i++) {
+    for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
       ok(await window.api.updateQuotationSubjectivity(arr[i].id, { order: i }))
     }
+  }
+  const endDrag = (): void => {
+    setDragFrom(null)
+    setDropIdx(null)
   }
 
   const updateSubjectivityScope = async (id: string, scope: string[] | null): Promise<void> => {
@@ -374,14 +372,63 @@ export default function SubjectivitiesTab({
       {items.map((item, idx) => (
         <div
           key={item.id}
+          draggable={editingId !== item.id}
+          onDragStart={(e) => {
+            setDragFrom(idx)
+            e.dataTransfer.effectAllowed = 'move'
+          }}
+          onDragOver={(e) => {
+            if (dragFrom === null) return
+            e.preventDefault()
+            if (dropIdx !== idx) setDropIdx(idx)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            const from = dragFrom
+            endDrag()
+            if (from !== null) void moveItem(from, idx)
+          }}
+          onDragEnd={endDrag}
           style={{
             padding: '8px 12px',
             borderRadius: '6px',
             border: '1px solid var(--table-border)',
-            marginBottom: '6px'
+            marginBottom: '6px',
+            // Where the dragged row will land: a line on the side it moves to
+            boxShadow:
+              dropIdx === idx && dragFrom !== null && dragFrom !== idx
+                ? dragFrom < idx
+                  ? 'inset 0 -3px 0 var(--accent-primary)'
+                  : 'inset 0 3px 0 var(--accent-primary)'
+                : undefined,
+            opacity: dragFrom === idx && dropIdx !== null ? 0.5 : 1
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {editingId !== item.id && (
+              <span
+                role="button"
+                tabIndex={0}
+                title="Drag to reorder (or Up / Down keys)"
+                aria-label={`Move subjectivity ${idx + 1}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    void moveItem(idx, idx + (e.key === 'ArrowUp' ? -1 : 1))
+                  }
+                }}
+                style={{
+                  cursor: 'grab',
+                  color: 'var(--text-secondary)',
+                  opacity: 0.5,
+                  fontSize: '0.8rem',
+                  flexShrink: 0,
+                  userSelect: 'none'
+                }}
+              >
+                ⠿
+              </span>
+            )}
             {editingId === item.id ? (
               <div style={{ flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <input
@@ -447,36 +494,6 @@ export default function SubjectivitiesTab({
                     </span>
                   )}
                 </span>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMove(idx, -1)}
-                  disabled={idx === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                    padding: '2px'
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMove(idx, 1)}
-                  disabled={idx === items.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                    padding: '2px'
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
                 <button
                   title="Edit"
                   aria-label="Edit"
