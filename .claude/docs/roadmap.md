@@ -21,8 +21,10 @@ of a risk, so every screen is a view of the same story.
   editor, a policy still opens Policy Detail. Both get a thin CASE BAR on top (vessel + cover +
   year, clickable stages quotation -> approved -> policy -> signed -> in force -> renewal, last
   year's premium / claims, open items) and a History side panel (timeline, open items,
-  documents). The full case page is reached only from the Renewals board, the vessel's cases by
-  year and Ctrl+K. Mock-up updated with both screens.
+  documents). NO full case page (user: "the bar is better than a whole page"): the Renewals
+  board, the vessel's cases by year and Ctrl+K open the screen for the case's stage (draft
+  quotation while quoting, policy once issued; a not-yet-started renewal opens last year's policy
+  with History open and "Start renewal"). History panel = the only whole-story view.
 - One source of truth for the customer / insured on the case (fixes the open
   project_policy_customer_source issue: policy detail uses the legacy vessel customer).
 
