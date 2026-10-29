@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus,
   Trash2,
@@ -37,6 +37,14 @@ const EMPTY_NEW_VESSEL = {
   vesselType: '',
   classification: '',
   callSign: ''
+}
+
+/** Flags whose name or 3-letter code contains the typed text (all when nothing is typed) */
+function filterFlags(flags: FlagState[], typed: string): FlagState[] {
+  const q = typed.trim().toLowerCase()
+  return flags
+    .filter((f) => f.name?.toLowerCase().includes(q) || f.iso3Code?.toLowerCase().includes(q))
+    .slice(0, 50)
 }
 
 async function fetchLookupLists(): Promise<{
@@ -223,6 +231,13 @@ export default function VesselTab({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
   const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+  // Keyboard-highlighted row of the flag list; the list scrolls itself into view when it opens
+  // (the Flag field is low in the form, so on a small screen the list opened below the window)
+  const [flagHighlight, setFlagHighlight] = useState(0)
+  const flagListRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (flagDropdownOpen) flagListRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [flagDropdownOpen])
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
   const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
   const [classSocietiesLocal, setClassSocietiesLocal] = useState<ClassificationSociety[]>([])
@@ -978,24 +993,58 @@ export default function VesselTab({
                       onChange={(e) => {
                         setNewData((p) => ({ ...p, flag: e.target.value }))
                         setFlagDropdownOpen(true)
+                        setFlagHighlight(0)
                       }}
-                      onFocus={() => setFlagDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setFlagDropdownOpen(false), 150)}
+                      onFocus={() => {
+                        setFlagDropdownOpen(true)
+                        setFlagHighlight(0)
+                      }}
+                      onBlur={() =>
+                        setTimeout(() => {
+                          setFlagDropdownOpen(false)
+                          // A typed name or code that is a flag becomes that flag's name
+                          setNewData((p) => {
+                            const typed = p.flag.trim().toLowerCase()
+                            const hit = flagStatesLocal.find(
+                              (f) =>
+                                f.name?.toLowerCase() === typed ||
+                                f.iso3Code?.toLowerCase() === typed
+                            )
+                            return hit && hit.name !== p.flag ? { ...p, flag: hit.name } : p
+                          })
+                        }, 150)
+                      }
+                      onKeyDown={(e) => {
+                        const list = filterFlags(flagStatesLocal, newData.flag)
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setFlagDropdownOpen(true)
+                          setFlagHighlight((h) => Math.min(h + 1, list.length - 1))
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setFlagHighlight((h) => Math.max(h - 1, 0))
+                        } else if (e.key === 'Enter' && flagDropdownOpen && list[flagHighlight]) {
+                          e.preventDefault()
+                          setNewData((p) => ({ ...p, flag: list[flagHighlight].name }))
+                          setFlagDropdownOpen(false)
+                        } else if (e.key === 'Escape' && flagDropdownOpen) {
+                          e.stopPropagation()
+                          setFlagDropdownOpen(false)
+                        }
+                      }}
                       placeholder="Search flag states..."
+                      aria-label="Flag"
+                      aria-autocomplete="list"
+                      aria-expanded={flagDropdownOpen}
                       style={{ width: '100%' }}
                     />
                     {flagDropdownOpen &&
                       (() => {
-                        const q = newData.flag.toLowerCase()
-                        const filtered = flagStatesLocal
-                          .filter(
-                            (f) =>
-                              f.name?.toLowerCase().includes(q) ||
-                              f.iso3Code?.toLowerCase().includes(q)
-                          )
-                          .slice(0, 10)
-                        return filtered.length > 0 ? (
+                        const filtered = filterFlags(flagStatesLocal, newData.flag)
+                        return (
                           <div
+                            ref={flagListRef}
+                            role="listbox"
                             style={{
                               position: 'absolute',
                               top: '100%',
@@ -1011,26 +1060,37 @@ export default function VesselTab({
                               boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                             }}
                           >
-                            {filtered.map((f) => (
+                            {filtered.length === 0 && (
+                              <div
+                                style={{
+                                  padding: '8px 12px',
+                                  fontSize: '0.82rem',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                No flag matches. Check the spelling or type the 3-letter code.
+                              </div>
+                            )}
+                            {filtered.map((f, i) => (
                               <div
                                 key={f.id}
+                                role="option"
+                                aria-selected={i === flagHighlight}
                                 onMouseDown={() => {
                                   setNewData((p) => ({ ...p, flag: f.name }))
                                   setFlagDropdownOpen(false)
                                 }}
+                                onMouseEnter={() => setFlagHighlight(i)}
                                 style={{
                                   padding: '8px 12px',
                                   cursor: 'pointer',
                                   fontSize: '0.85rem',
-                                  borderBottom: '1px solid var(--table-border)'
+                                  borderBottom: '1px solid var(--table-border)',
+                                  background:
+                                    i === flagHighlight
+                                      ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                                      : 'transparent'
                                 }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background =
-                                    'rgba(var(--accent-primary-rgb), 0.06)')
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background = 'transparent')
-                                }
                               >
                                 {f.name}
                                 {f.iso3Code ? (
@@ -1047,7 +1107,7 @@ export default function VesselTab({
                               </div>
                             ))}
                           </div>
-                        ) : null
+                        )
                       })()}
                   </div>
                 </Field>

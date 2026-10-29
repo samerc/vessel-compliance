@@ -41,6 +41,10 @@ Quotation management system:
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export
 - **Settings lists cache** (`quotation-tabs/masterDataCache.ts`): the editor tabs read settings lists once per editor session. Every successful save on a settings-list channel (`isSettingsListSave` in index.ts `safeHandle`: pi/hull/war/cargo/premium/survey templates/entity doc types without `Quotation` in the name, db document/vessel/quotation types, classification societies, subjectivities, `settings:set`) bumps `app_settings.quotation_settings_version`; on each tab switch the editor reads it (`checkSettingsVersion`) and, if it changed, clears the cache, remounts the tab and reloads its standard texts / sanctions versions (never the quotation itself). A new settings-list channel is covered when it follows that naming
 
+### Vessel Tab: New Vessel form
+
+- **Flag field** (VesselTab): searches flag name or 3-letter code (`filterFlags`, up to 50). The list scrolls itself into view when it opens (the field is low in the form: on a small screen it used to open below the window), works with the keyboard (Down/Up, Enter picks, Escape closes), says "No flag matches" instead of showing nothing, and a typed name or code that is a flag becomes that flag's name on leaving the field. The flag list itself needs only a signed-in user (`db:getFlagStates`)
+
 ### Quotation Vessel Scope
 
 Per-item vessel scoping for multi-vessel quotations:
