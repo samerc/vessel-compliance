@@ -22,6 +22,7 @@ new area appears).
 | Compliance | `.claude/docs/compliance.md` | sanctions engine + search process, SIC list and letter OCR, weekly checks and review, Compliance Center tabs, Sanctions Search / Check Report, data validation |
 | Vessels | `.claude/docs/vessels.md` | vessel detail and tabs, documents and the annual rule, document history, audit log, vessel list / filters / compare, surveys, warranties, fleets, analytics, Directory and entity documents, flag states, address book |
 | App | `.claude/docs/app.md` | auth, RBAC, theme, Home, Ctrl+K and the feature registry, Settings hub, notifications, activity log, templates, wiki, reports and calculators, table / panel UI patterns, column prefs, file path mapping, What's New, hot-updates |
+| Roadmap | `.claude/docs/roadmap.md` | the cohesion plan (risk case backbone, premium status, claims, tasks, compliance gates, document store, wording library, shared UI, server, test net) - discussed point by point, nothing approved until the user says so |
 
 ## Build and Development Commands
 
