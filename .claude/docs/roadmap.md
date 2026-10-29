@@ -17,6 +17,12 @@ of a risk, so every screen is a view of the same story.
 - Renewals open themselves (60-90 days before expiry) pre-filled from the current policy,
   premium history and claims. The Renewals page becomes a pipeline board (opening soon ->
   drafting -> quoted -> approved -> issued) instead of a list of dates.
+- DECIDED 2026-10-29 (user): the case is CONTEXT, not a door. Clicking a quotation still opens the
+  editor, a policy still opens Policy Detail. Both get a thin CASE BAR on top (vessel + cover +
+  year, clickable stages quotation -> approved -> policy -> signed -> in force -> renewal, last
+  year's premium / claims, open items) and a History side panel (timeline, open items,
+  documents). The full case page is reached only from the Renewals board, the vessel's cases by
+  year and Ctrl+K. Mock-up updated with both screens.
 - One source of truth for the customer / insured on the case (fixes the open
   project_policy_customer_source issue: policy detail uses the legacy vessel customer).
 
