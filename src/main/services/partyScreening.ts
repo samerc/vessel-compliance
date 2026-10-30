@@ -237,7 +237,10 @@ export async function screeningStatus(
   }
 }
 
-/** A blocking step may go ahead: every party clear, or a permitted user overrode the block */
+/**
+ * A blocking step may go ahead: every party clear, or a permitted user overrode the block.
+ * A party confirmed sanctioned (MATCH) can never be overridden.
+ */
 export function screeningAllows(s: SanctionsScreening | null): boolean {
-  return !!s && (s.outcome === 'CLEAR' || !!s.overrideAt)
+  return !!s && (s.outcome === 'CLEAR' || (!!s.overrideAt && s.outcome !== 'MATCH'))
 }

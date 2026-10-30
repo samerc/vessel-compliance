@@ -450,7 +450,7 @@ export default function EndorsementManager({
       const last = Array.isArray(prev) ? prev[0] : undefined
       if (
         last &&
-        (last.outcome === 'CLEAR' || last.overrideAt) &&
+        (last.outcome === 'CLEAR' || (last.overrideAt && last.outcome !== 'MATCH')) &&
         new Date(last.createdAt) >= new Date(endorsement.updatedAt)
       )
         return true

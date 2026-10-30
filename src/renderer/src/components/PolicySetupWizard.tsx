@@ -392,7 +392,9 @@ export default function PolicySetupWizard({
   // clear, or overridden with a reason by the admin / Compliance group
   const [screening, setScreening] = useState<SanctionsScreening | null>(null)
   const [screeningRunning, setScreeningRunning] = useState(false)
-  const screeningOk = !!screening && (screening.outcome === 'CLEAR' || !!screening.overrideAt)
+  const screeningOk =
+    !!screening &&
+    (screening.outcome === 'CLEAR' || (!!screening.overrideAt && screening.outcome !== 'MATCH'))
 
   // Leaving (Back to Quotation, sidebar, Ctrl+K) asks first once the user changed anything
   // or moved past the first step

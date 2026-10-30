@@ -132,7 +132,9 @@ export function ScreeningPanel({
   const [overriding, setOverriding] = useState(false)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
-  const canOverride = hasPermission('compliance:override')
+  // A party confirmed sanctioned (MATCH) can never be overridden
+  const sanctioned = screening?.outcome === 'MATCH'
+  const canOverride = hasPermission('compliance:override') && !sanctioned
 
   const blocked = !!screening && screening.outcome !== 'CLEAR' && !screening.overrideAt
   const tone =
@@ -209,7 +211,9 @@ export function ScreeningPanel({
                 ? `Overridden by ${screening.overrideBy} on ${formatDateTime(screening.overrideAt)}: ${screening.overrideReason}`
                 : screening.outcome === 'ERROR'
                   ? `${screening.error || 'Some parties could not be checked.'} ${blockingText} stays blocked until they are checked.`
-                  : `${blockingText} is blocked until the hits are reviewed in the Compliance Center (Clear or Sanction)${canOverride ? ', or you override the block with a reason' : ', or a Compliance user overrides it'}.`}
+                  : sanctioned
+                    ? `A party is confirmed sanctioned. ${blockingText} is blocked and cannot be overridden; only reversing the decision in the Compliance Center (by a user allowed to clear hits) lifts it.`
+                    : `${blockingText} is blocked until the hits are reviewed in the Compliance Center (Clear or Sanction)${canOverride ? ', or you override the block with a reason' : ', or a Compliance user overrides it'}.`}
           </p>
           <ScreeningPartiesTable parties={screening.parties} />
           {blocked && (

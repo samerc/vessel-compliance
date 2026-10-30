@@ -4088,6 +4088,10 @@ app.whenReady().then(() => {
     const s = await db.getScreening(id)
     if (!s) throw new Error('Screening not found')
     if (s.outcome === 'CLEAR') return s
+    if (s.outcome === 'MATCH')
+      throw new Error(
+        'A party is confirmed sanctioned. This cannot be overridden: the decision must first be reversed in the Compliance Center'
+      )
     const res = await db.overrideScreening(id, user.fullName || user.username, why)
     db.logActivity({
       userId: user.id,
