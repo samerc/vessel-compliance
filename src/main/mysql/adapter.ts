@@ -6059,6 +6059,15 @@ export class MySQLAdapter {
           )
         await this.setSetting('migration_compliance_group_v1', '1')
       }
+      // User 2026-10-30: Underwriting may override a sanctions block too (once; the admin can
+      // take it away again in User Management)
+      if ((await this.getSetting('migration_override_underwriting_v1')) !== '1') {
+        await this.pool.query(
+          `INSERT IGNORE INTO group_permissions (group_id, permission_key)
+           SELECT id, 'compliance:override' FROM user_groups WHERE name = 'Underwriting'`
+        )
+        await this.setSetting('migration_override_underwriting_v1', '1')
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
