@@ -15,7 +15,7 @@ of a risk, so every screen is a view of the same story.
   by hand).
 - 3 claims: WAITING for management feedback.
 - 4 tracked tasks: NOT NEEDED now (more work for the team), kept as a note.
-- 5 compliance at every step: AGREED, to plan.
+- 5 compliance at every step: AGREED, plan written 2026-10-30, waiting for answers.
 - 6 document store: to PLAN CAREFULLY (major change for users).
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
@@ -63,8 +63,29 @@ the document or recording the survey. One "My work" inbox across modules.
 Screening runs automatically at quotation creation, conversion, endorsements that change
 owners / managers, and receipts. One compliance badge (result, date, trigger) on every vessel,
 entity and case. Conversion blocked on an unresolved hit, with a recorded override.
-Next: a short plan covering when screening runs, what a hit blocks and who may override, and the
-badge on vessels / entities / quotations / policies. The engine exists; this wires it to those moments.
+PLAN (2026-10-30, proposed, waiting for the user's answers):
+TODAY: screening runs only weekly (all vessels + entities) and by hand (Sanctions Search, Check Report,
+badge Recheck). The quotation export only READS the stored status (warnings: match / potential match /
+not screened / assured typed without an entity). Conversion, endorsements and receipts check nothing;
+a typed assured or receipt payer name is never screened.
+A. One screening step + log: a shared screenParties(parties, trigger, context) using the existing
+   search process and threshold; every run stored in a new screening log (subject, trigger, quotation /
+   policy / endorsement / receipt id, result, hits, who, when). Same rules as the weekly run: cleared
+   hits remembered, never auto-clears MATCH / pending. "Fresh" = screened after the last list update
+   and within N days; fresh parties are not screened again.
+B. Badge: vessel, entity, quotation header, Policy Detail: Clear (date, trigger) / To review / Match /
+   Not screened. A quotation's or policy's badge = the worst of its parties; a click lists them.
+C. Triggers: quotation (vessel / assured / customer added: screen in the background, warn); approval
+   (warn, or block - user to choose); CONVERSION (new Compliance check in the converter: fresh screening
+   of every party, Create Policy blocked on an unresolved hit unless overridden with a reason by a
+   permitted user; the screening report PDF saved in the policy folder); endorsements adding or changing
+   owners / managers / assureds / vessel (same gate as conversion); receipts (payer screened on save,
+   warn and record).
+D. Overrides: permission-based, reason required, shown on the policy and in the activity log.
+Order: A+B, then quotation + conversion, then endorsements + receipts.
+Questions: warn or block at each step; who may override; which parties (vessel, owners, managers,
+operators, customer / broker, payer); freshness window (30 days?); save the report PDF in the policy
+folder; typed assureds without an entity: screen the typed name or require linking.
 
 ## 6. One managed document store
 Files stored in one managed place (or the DB) with versions, linked to case / vessel / entity /
