@@ -8,6 +8,22 @@ Today the app is a set of strong modules (quotations, policies, compliance, vess
 calculators, wiki) that hand work to each other by hand. The aim: organise it around the life
 of a risk, so every screen is a view of the same story.
 
+## Status per point (user, 2026-10-30)
+- 1 risk case: ON HOLD, the user is thinking about the 4 open questions (what is a case, renewals opening
+  themselves, board columns, assignment).
+- 2 premium status: LATER, works once quotations are converted to policies (today policies are still filled in
+  by hand).
+- 3 claims: WAITING for management feedback.
+- 4 tracked tasks: NOT NEEDED now (more work for the team), kept as a note.
+- 5 compliance at every step: AGREED, to plan.
+- 6 document store: to PLAN CAREFULLY (major change for users).
+- 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
+  DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
+  quotation using it; editing a wording changes every quotation that uses it.
+- 8 shared UI building blocks: to DISCUSS.
+- 9 server: to DISCUSS / PLAN.
+- 10 safety net: detailed to the user 2026-10-30, to agree.
+
 ## 1. The risk case as the backbone (discussing first)
 - One CASE per vessel + cover + year: quotation -> approval -> policy -> endorsements ->
   (payments, claims) -> renewal are stages of it, not separate objects.
