@@ -23,3 +23,23 @@ export async function decideSanctionsSubject(
     matches: matches.map((m) => ({ source: m.source, source_id: m.source_id, names: m.names }))
   })
 }
+
+/** SANCTIONED / MATCH: a decided sanctioned party (only a Clear decision lowers it) */
+export const isConfirmedSanctioned = (status?: string | null): boolean =>
+  status === 'SANCTIONED' || status === 'MATCH'
+
+/**
+ * What a Re-check stores on a vessel / entity: the search result, except that a confirmed
+ * sanctioned status stays (a re-check finding nothing must not clear it; the server keeps it too)
+ */
+export function recheckUpdate<S extends string>(
+  currentStatus: string | null | undefined,
+  result: { timestamp: string; matchFound: boolean; status: S }
+): { ofacCheckedAt: string; ofacMatchFound?: boolean; ofacStatus?: S } {
+  if (isConfirmedSanctioned(currentStatus)) return { ofacCheckedAt: result.timestamp }
+  return {
+    ofacCheckedAt: result.timestamp,
+    ofacMatchFound: result.matchFound,
+    ofacStatus: result.status
+  }
+}

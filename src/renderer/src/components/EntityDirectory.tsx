@@ -70,7 +70,7 @@ import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { decideSanctionsSubject } from '../utils/sanctionsDecision'
+import { decideSanctionsSubject, recheckUpdate } from '../utils/sanctionsDecision'
 import { SanctionsBadge, EmptyState, Modal, Field, SegmentedControl, Tabs } from './ui'
 import { confirmDialog } from './DialogHost'
 
@@ -954,11 +954,7 @@ export default function EntityDirectory({
       const result = await OfacService.checkSanctions(entity.name)
       const autoMark = result.autoMarkCleanOnCheck ?? true
       if (result.status !== 'CLEARED' || autoMark) {
-        await window.api.updateEntity(entity.id, {
-          ofacCheckedAt: result.timestamp,
-          ofacMatchFound: result.matchFound,
-          ofacStatus: result.status
-        })
+        await window.api.updateEntity(entity.id, recheckUpdate(entity.ofacStatus, result))
         loadData()
       } else {
         showSuccess('Sanctions check complete: no matches found above threshold')
@@ -986,11 +982,7 @@ export default function EntityDirectory({
       const result = await OfacService.checkSanctions(vessel.name)
       const autoMark = result.autoMarkCleanOnCheck ?? true
       if (result.status !== 'CLEARED' || autoMark) {
-        await window.api.updateVessel(vessel.id, {
-          ofacCheckedAt: result.timestamp,
-          ofacMatchFound: result.matchFound,
-          ofacStatus: result.status
-        })
+        await window.api.updateVessel(vessel.id, recheckUpdate(vessel.ofacStatus, result))
         loadData()
       } else {
         showSuccess('Sanctions check complete: no matches found above threshold')

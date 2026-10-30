@@ -41,7 +41,7 @@ import DocumentHistoryModal from './DocumentHistoryModal'
 import { confirmDialog } from './DialogHost'
 import { SanctionsBadge, Field } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
-import { decideSanctionsSubject } from '../utils/sanctionsDecision'
+import { decideSanctionsSubject, recheckUpdate } from '../utils/sanctionsDecision'
 
 interface EntityEditPanelProps {
   /** The entity being edited (entity-level fields only — vessel-specific bits stay in the parent). */
@@ -333,11 +333,7 @@ export default function EntityEditPanel({
       const result = await OfacService.checkSanctions(ent.name)
       const autoMark = result.autoMarkCleanOnCheck ?? true
       if (result.status !== 'CLEARED' || autoMark) {
-        await window.api.updateEntity(ent.id, {
-          ofacCheckedAt: result.timestamp,
-          ofacMatchFound: result.matchFound,
-          ofacStatus: result.status
-        })
+        await window.api.updateEntity(ent.id, recheckUpdate(ent.ofacStatus, result))
         refresh()
       } else {
         showSuccess('Sanctions check complete: no matches found above threshold')

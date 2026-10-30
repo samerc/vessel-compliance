@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
-import { decideSanctionsSubject } from '../utils/sanctionsDecision'
+import { decideSanctionsSubject, recheckUpdate } from '../utils/sanctionsDecision'
 import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
@@ -409,11 +409,7 @@ export default function VesselManager({
       const result = await OfacService.checkSanctions(vessel.name)
       const autoMark = result.autoMarkCleanOnCheck ?? true
       if (result.status !== 'CLEARED' || autoMark) {
-        await window.api.updateVessel(vessel.id, {
-          ofacCheckedAt: result.timestamp,
-          ofacMatchFound: result.matchFound,
-          ofacStatus: result.status
-        })
+        await window.api.updateVessel(vessel.id, recheckUpdate(vessel.ofacStatus, result))
         loadData()
       } else {
         showSuccess('Sanctions check complete: no matches found above threshold')

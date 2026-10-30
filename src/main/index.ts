@@ -336,6 +336,32 @@ function invalidatePermissionCache(userId?: string): void {
   else permissionCache.clear()
 }
 
+/**
+ * A confirmed sanctioned vessel / entity (SANCTIONED or MATCH) keeps that status on an
+ * ordinary update (a re-check finding nothing, an edit): only a user allowed to clear hits
+ * lowers it. Otherwise the status fields are dropped from `updates`, the rest is saved.
+ */
+async function keepConfirmedSanctions(
+  event: Electron.IpcMainInvokeEvent,
+  table: 'vessels' | 'entities',
+  id: string,
+  updates: { ofacStatus?: string | null; ofacMatchFound?: boolean | null }
+): Promise<void> {
+  if (updates.ofacStatus === undefined && updates.ofacMatchFound === undefined) return
+  const confirmed = (s: unknown): boolean => s === 'SANCTIONED' || s === 'MATCH'
+  const [rows] = await db.pool!.query<RowDataPacket[]>(
+    `SELECT ofac_status FROM ${table} WHERE id = ?`,
+    [id]
+  )
+  if (!confirmed(rows[0]?.ofac_status) || confirmed(updates.ofacStatus)) return
+  try {
+    await requirePermission(event, 'compliance:clear')
+  } catch {
+    delete updates.ofacStatus
+    delete updates.ofacMatchFound
+  }
+}
+
 /** `message` of a thrown value (an Error or an error-like object), if it has one. */
 function errorMessage(err: unknown): string | undefined {
   if (err && typeof err === 'object' && 'message' in err) {
@@ -1549,6 +1575,7 @@ app.whenReady().then(() => {
       )
       const vessel = vRows[0]
       const vesselName = updates.name || vessel?.name || id
+      await keepConfirmedSanctions(event, 'vessels', id, updates)
       const result = await db.updateVessel(id, updates, user.username)
       const changedFields = Object.keys(updates).filter((k) => updates[k] !== undefined)
       const changeSummary = changedFields
@@ -2041,6 +2068,7 @@ app.whenReady().then(() => {
       'kycFilePath'
     ]
     const hasDocChange = docFields.some((f) => updates[f] !== undefined)
+    await keepConfirmedSanctions(event, 'entities', id, updates)
     await db.updateEntity(id, updates)
     const changes: string[] = []
     if (updates.name && updates.name !== old.name)
@@ -5692,7 +5720,9 @@ app.whenReady().then(() => {
         throw new Error('Run the sanctions check in the last step before creating the policy')
       if (!screeningAllows(screening))
         throw new Error(
-          'The sanctions check is not clear: review the hits in the Compliance Center, or a Compliance user overrides the block with a reason'
+          screening.outcome === 'MATCH'
+            ? 'A party is confirmed sanctioned: the policy cannot be created unless the decision is reversed in the Compliance Center'
+            : 'The sanctions check is not clear: review the hits in the Compliance Center, or a Compliance user overrides the block with a reason'
         )
       const result = await db.convertQuotationToPolicy(quotationId, {
         ...convertOptions,
