@@ -6068,6 +6068,21 @@ export class MySQLAdapter {
         )
         await this.setSetting('migration_override_underwriting_v1', '1')
       }
+      // Clearing a hit became its own permission: every group that could clear before
+      // (Review sanctions results) keeps it
+      if ((await this.getSetting('migration_compliance_clear_v1')) !== '1') {
+        await this.pool.query(
+          `INSERT IGNORE INTO group_permissions (group_id, permission_key)
+           SELECT DISTINCT group_id, 'compliance:clear' FROM group_permissions
+            WHERE permission_key = 'compliance:review'`
+        )
+        await this.pool.query(
+          `INSERT IGNORE INTO user_permission_overrides (user_id, permission_key, granted)
+           SELECT user_id, 'compliance:clear', granted FROM user_permission_overrides
+            WHERE permission_key = 'compliance:review'`
+        )
+        await this.setSetting('migration_compliance_clear_v1', '1')
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error

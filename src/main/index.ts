@@ -3919,7 +3919,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('compliance:markResultReviewed', async (event, resultId: string) => {
-    const user = await requirePermission(event, 'compliance:review')
+    const user = await requirePermission(event, 'compliance:clear')
     await db.markComplianceResultReviewed(resultId, user.username)
   })
 
@@ -3935,15 +3935,8 @@ app.whenReady().then(() => {
         matches?: { source?: string; source_id?: string; names?: string[] }[]
       }
     ) => {
-      const user = await requirePermission(
-        event,
-        'compliance:review',
-        data?.subjectType === 'vessel'
-          ? 'vessels:edit'
-          : data?.subjectType === 'name'
-            ? 'compliance:review'
-            : 'entities:edit'
-      )
+      // Clearing lifts a sanctions block: its own permission (Settings > User Management)
+      const user = await requirePermission(event, 'compliance:clear')
       if (!data || !['entity', 'vessel', 'name'].includes(data.subjectType) || !data.subjectId)
         throw new Error('Invalid subject')
       if (data.decision !== 'sanctioned' && data.decision !== 'cleared')
@@ -4112,7 +4105,7 @@ app.whenReady().then(() => {
   safeHandle(
     'compliance:decideResult',
     async (event, resultId: string, decision: 'sanctioned' | 'cleared', note?: string | null) => {
-      const user = await requirePermission(event, 'compliance:review')
+      const user = await requirePermission(event, 'compliance:clear')
       await db.decideComplianceResult(
         resultId,
         decision,

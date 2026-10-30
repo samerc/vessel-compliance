@@ -312,7 +312,11 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'compliance:view', label: 'View compliance alerts' },
       { key: 'compliance:run', label: 'Run compliance checks' },
-      { key: 'compliance:review', label: 'Review sanctions results' },
+      { key: 'compliance:review', label: 'Review sanctions results (and edit the SIC list)' },
+      {
+        key: 'compliance:clear',
+        label: 'Clear or sanction a sanctions hit (a cleared hit no longer blocks a conversion)'
+      },
       {
         key: 'compliance:override',
         label: 'Override a sanctions block (conversion, endorsements) with a reason'

@@ -194,7 +194,8 @@ export default function ComplianceCenter({
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
   const isLight = theme === 'light' || theme === 'aurora'
-  const canReview = hasPermission('compliance:review')
+  // Clear / Sanction (a cleared hit no longer blocks a conversion): its own permission
+  const canReview = hasPermission('compliance:clear')
 
   // Sanctions compliance state
   const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
