@@ -63,7 +63,7 @@ import { ACCENT_PRESETS, DEFAULT_ACCENT } from './utils/accent'
 import { leaveThen } from './utils/useUnsavedGuard'
 import { PAGE_HELP_EVENT } from './utils/pageHelp'
 import { useToast } from './contexts/ToastContext'
-import { AppTab, AppAction, NavTarget, visibleFeatures, FEATURES } from './features'
+import { AppTab, AppAction, NavTarget, NAVIGATE_EVENT, visibleFeatures, FEATURES } from './features'
 import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
@@ -413,6 +413,13 @@ function App(): React.JSX.Element {
       window.removeEventListener('keydown', onKey)
     }
   }, [activeTab, navigateTo])
+
+  // requestNavigate() from components without onNavigate (e.g. the sanctions screening panel)
+  useEffect(() => {
+    const onNav = (e: Event): void => navigateTo((e as CustomEvent<NavTarget>).detail)
+    window.addEventListener(NAVIGATE_EVENT, onNav)
+    return () => window.removeEventListener(NAVIGATE_EVENT, onNav)
+  }, [navigateTo])
 
   /** Opens a recently viewed record (sidebar Recent list and Home) */
   const openRecentItem = (item: RecentItem): void => leaveThen(() => openRecentNow(item))

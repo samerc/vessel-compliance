@@ -79,6 +79,7 @@ import {
   masterData
 } from './quotation-tabs/masterDataCache'
 import { Modal, Field, SaveStatus, Badge, TypeChip } from './ui'
+import { ScreeningBadge } from './ScreeningPanel'
 import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
@@ -306,7 +307,9 @@ export default function QuotationEditor({
   const [isLockedByOther, setIsLockedByOther] = useState(false)
   const [lockedByName, setLockedByName] = useState<string | null>(null)
   const hasEdited = useRef(false)
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showToast } = useToast()
+  // Bumped after each background sanctions screening: the header badge reloads
+  const [screeningVersion, setScreeningVersion] = useState(0)
   const [approving, setApproving] = useState(false)
   const approvingRef = useRef(false)
   const { theme } = useTheme()
@@ -634,7 +637,10 @@ export default function QuotationEditor({
 
   const isDraft = q.status === 'draft'
 
-  const validateBeforeExport = async (quotation: Quotation): Promise<string[]> => {
+  const validateBeforeExport = async (
+    quotation: Quotation,
+    trigger: 'quotation' | 'approval' = 'quotation'
+  ): Promise<string[]> => {
     const warnings: string[] = []
     const typeCode = quotation.quotationTypeCode
 
@@ -774,59 +780,58 @@ export default function QuotationEditor({
       warnings.push('Insured Value is not set')
     }
 
-    warnings.push(...(await sanctionsWarnings(quotation.id)))
+    warnings.push(...(await sanctionsWarnings(quotation.id, trigger)))
 
     return warnings
   }
 
-  /** Sanctions status of the quotation's assureds and registry vessels (read-only check) */
-  const sanctionsWarnings = async (quotationId: string): Promise<string[]> => {
-    const out: string[] = []
-    const describe = (status?: string): string | null => {
-      if (status === 'MATCH' || status === 'SANCTIONED') return 'is a sanctions MATCH'
-      if (status === 'POTENTIAL_MATCH') return 'has a potential sanctions match to review'
-      if (!status || status === 'PENDING' || status === 'ERROR')
-        return 'has not been screened for sanctions'
-      return null
-    }
+  /**
+   * Sanctions screening of the quotation's vessels, assureds (typed ones by name) and customer.
+   * Runs with the warning dots (on opening and on every section change): parties checked clear
+   * in the last 30 days are not searched again, a new party is. Approving records the check.
+   */
+  const sanctionsWarnings = async (
+    quotationId: string,
+    trigger: 'quotation' | 'approval'
+  ): Promise<string[]> => {
     try {
-      const [assureds, entities] = await Promise.all([
-        window.api.getQuotationAssureds(quotationId),
-        window.api.getEntities()
-      ])
-      const entityById = new Map((Array.isArray(entities) ? entities : []).map((e) => [e.id, e]))
-      const seen = new Set<string>()
-      for (const a of Array.isArray(assureds) ? assureds : []) {
-        const key = a.entityId || `name:${a.name.trim().replace(/\s+/g, ' ').toLowerCase()}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        if (!a.entityId) {
-          out.push(`Sanctions: assured ${a.name} is typed without a linked entity (not screened)`)
-          continue
-        }
-        const entity = entityById.get(a.entityId)
-        const issue = describe(entity?.ofacStatus)
-        if (issue) out.push(`Sanctions: assured ${entity?.name || a.name} ${issue}`)
-      }
+      const s = await window.api.screeningCreate({
+        trigger,
+        contextType: 'quotation',
+        contextId: quotationId
+      })
+      setScreeningVersion((v) => v + 1)
+      const fresh = s.parties.filter(
+        (p) => !p.reused && (p.status === 'REVIEW' || p.status === 'MATCH')
+      )
+      if (fresh.length > 0)
+        showToast(
+          `Sanctions: ${fresh.map((p) => p.name).join(', ')} ${fresh.length === 1 ? 'has' : 'have'} a potential match to review in the Compliance Center`,
+          'warning'
+        )
+      const describe = (status: string): string | null =>
+        status === 'MATCH'
+          ? 'is a sanctions MATCH'
+          : status === 'REVIEW'
+            ? 'has a potential sanctions match to review'
+            : status === 'ERROR'
+              ? 'could not be checked (the sanctions lists are not loaded on this PC)'
+              : status === 'NOT_SCREENED'
+                ? 'has not been screened for sanctions'
+                : null
+      return s.parties.flatMap((p) => {
+        const issue = describe(p.status)
+        if (!issue) return []
+        // The prefix sends the warning dot to the Vessel or Insured section
+        return [
+          p.role === 'Vessel'
+            ? `Sanctions: vessel ${p.name} ${issue}`
+            : `Sanctions: assured ${p.name} (${p.role}) ${issue}`
+        ]
+      })
     } catch {
-      /* best-effort check */
+      return []
     }
-    try {
-      const [qVessels, vessels] = await Promise.all([
-        window.api.getQuotationVessels(quotationId),
-        window.api.getVessels()
-      ])
-      const vesselById = new Map((Array.isArray(vessels) ? vessels : []).map((v) => [v.id, v]))
-      for (const qv of Array.isArray(qVessels) ? qVessels : []) {
-        const v = qv.vesselId ? vesselById.get(qv.vesselId) : undefined
-        if (!v) continue
-        const issue = describe(v.ofacStatus)
-        if (issue) out.push(`Sanctions: vessel ${v.name} ${issue}`)
-      }
-    } catch {
-      /* best-effort check */
-    }
-    return out
   }
 
   // Warning dots: the export checks, re-run shortly after the section or the key amounts change
@@ -896,7 +901,10 @@ export default function QuotationEditor({
         /* the export goes on; the subjectivities can still be added in the tab */
       }
     }
-    const warnings = await validateBeforeExport(quotation)
+    const warnings = await validateBeforeExport(
+      quotation,
+      action === 'approve' ? 'approval' : 'quotation'
+    )
     if (warnings.length > 0) {
       setExportWarnings({ warnings, format, action })
       return false
@@ -1368,6 +1376,8 @@ export default function QuotationEditor({
                 : q.title || qVessels.map((v) => v.name || v.vesselLabel).join(' / ')}
             </span>
           )}
+          {/* Sanctions status of the vessels, assureds and customer */}
+          <ScreeningBadge contextType="quotation" contextId={q.id} refreshKey={screeningVersion} />
           {/* Workflow step badge */}
           {q.workflowStepName && (
             <div style={{ position: 'relative' }}>

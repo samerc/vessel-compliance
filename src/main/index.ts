@@ -40,7 +40,10 @@ import type {
   VesselType,
   WikiImportFile,
   WikiSettings,
-  WikiTopicInput
+  WikiTopicInput,
+  ScreeningContextType,
+  ScreeningPartyInput,
+  ScreeningTrigger
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { tmpdir } from 'os'
@@ -63,6 +66,7 @@ import type { SanctionsEntity } from './sanctions/SanctionsDatabase'
 import { normalizeText } from './sanctions/normalize'
 import type { ParsedDefect } from './workers/defectParser'
 import { findYearFolder, prepareYearFolder, writeIntoFolder } from './policyFolder'
+import { screenParties, screeningAllows, screeningStatus } from './services/partyScreening'
 import Store from 'electron-store'
 import { createPool, type RowDataPacket } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -3924,7 +3928,7 @@ app.whenReady().then(() => {
     async (
       event,
       data: {
-        subjectType: 'entity' | 'vessel'
+        subjectType: 'entity' | 'vessel' | 'name'
         subjectId: string
         decision: 'sanctioned' | 'cleared'
         note?: string | null
@@ -3934,9 +3938,13 @@ app.whenReady().then(() => {
       const user = await requirePermission(
         event,
         'compliance:review',
-        data?.subjectType === 'vessel' ? 'vessels:edit' : 'entities:edit'
+        data?.subjectType === 'vessel'
+          ? 'vessels:edit'
+          : data?.subjectType === 'name'
+            ? 'compliance:review'
+            : 'entities:edit'
       )
-      if (!data || !['entity', 'vessel'].includes(data.subjectType) || !data.subjectId)
+      if (!data || !['entity', 'vessel', 'name'].includes(data.subjectType) || !data.subjectId)
         throw new Error('Invalid subject')
       if (data.decision !== 'sanctioned' && data.decision !== 'cleared')
         throw new Error('Invalid decision')
@@ -3962,6 +3970,144 @@ app.whenReady().then(() => {
       return res
     }
   )
+
+  // ── Party screening: sanctions at quotation, conversion, endorsement and receipt ──
+  // Parties come from the database; the converter adds the insureds edited in it, an
+  // endorsement editor the parties it names that are not saved yet
+  safeHandle(
+    'screening:create',
+    async (
+      event,
+      req: {
+        trigger: ScreeningTrigger
+        contextType: ScreeningContextType
+        contextId: string
+        vesselIds?: string[]
+        extraParties?: ScreeningPartyInput[]
+      }
+    ) => {
+      const user = requireSession(event)
+      const triggers: ScreeningTrigger[] = [
+        'quotation',
+        'approval',
+        'conversion',
+        'endorsement',
+        'receipt',
+        'manual'
+      ]
+      if (!req || !triggers.includes(req.trigger) || !req.contextId)
+        throw new Error('Invalid screening request')
+      const extra: ScreeningPartyInput[] = (Array.isArray(req.extraParties) ? req.extraParties : [])
+        .slice(0, 200)
+        .filter((p) => p && typeof p.name === 'string' && p.name.trim())
+        .map((p) => ({
+          kind: p.kind,
+          id: p.id || null,
+          name: p.name.slice(0, 255),
+          role: String(p.role || '').slice(0, 100)
+        }))
+      let input: ScreeningPartyInput[]
+      let label: string
+      if (req.contextType === 'quotation') {
+        const r = await db.getQuotationScreeningParties(
+          req.contextId,
+          Array.isArray(req.vesselIds) ? req.vesselIds : undefined
+        )
+        input = r.parties
+        label = r.label
+      } else if (req.contextType === 'policy') {
+        const r = await db.getPolicyScreeningParties(req.contextId)
+        input = r.parties
+        label = r.label
+      } else if (req.contextType === 'endorsement') {
+        const e = await db.getEndorsement(req.contextId)
+        if (!e) throw new Error('Endorsement not found')
+        const r = await db.getPolicyScreeningParties(e.policyDocId)
+        input = [...r.parties, ...(e.screenParties || [])]
+        label = `${r.label} endorsement ${e.endorsementNumber}`
+      } else if (req.contextType === 'receipt') {
+        const rc = await db.getReceipt(req.contextId)
+        if (!rc) throw new Error('Receipt not found')
+        input = []
+        if ((rc.payerName || '').trim())
+          input = [
+            {
+              kind: rc.payerEntityId ? 'entity' : 'name',
+              id: rc.payerEntityId || null,
+              name: rc.payerName,
+              role: 'Payer'
+            }
+          ]
+        label = `Receipt ${rc.receiptNumber}`
+      } else throw new Error('Invalid screening context')
+      const screening = await screenParties({
+        input: [...input, ...extra],
+        trigger: req.trigger,
+        contextType: req.contextType,
+        contextId: req.contextId,
+        contextLabel: label,
+        user: user.username
+      })
+      if (screening.outcome !== 'CLEAR')
+        db.logActivity({
+          userId: user.id,
+          username: user.username,
+          action: 'SCREEN',
+          module: 'Compliance',
+          entityType: req.contextType,
+          entityId: req.contextId,
+          entityName: label,
+          details: `Sanctions screening (${req.trigger}): ${screening.outcome}`
+        }).catch(() => {})
+      return screening
+    }
+  )
+
+  safeHandle(
+    'screening:getStatus',
+    async (event, contextType: 'quotation' | 'policy', contextId: string) => {
+      requireSession(event)
+      if (contextType !== 'quotation' && contextType !== 'policy')
+        throw new Error('Invalid screening context')
+      return screeningStatus(contextType, contextId)
+    }
+  )
+
+  safeHandle(
+    'screening:list',
+    async (event, contextType: ScreeningContextType, contextIds: string[]) => {
+      requireSession(event)
+      return db.getScreenings(contextType, Array.isArray(contextIds) ? contextIds : [], 50)
+    }
+  )
+
+  safeHandle('screening:get', async (event, id: string) => {
+    requireSession(event)
+    return db.getScreening(id)
+  })
+
+  // A block (conversion, endorsement) may be overridden by the admin / Compliance group, with
+  // a reason; the override shows on the screening and in the activity log
+  safeHandle('screening:setOverride', async (event, id: string, reason: string) => {
+    const user = await requirePermission(event, 'compliance:override')
+    const why = typeof reason === 'string' ? reason.trim().slice(0, 2000) : ''
+    if (why.length < 5) throw new Error('Give the reason for going ahead')
+    const s = await db.getScreening(id)
+    if (!s) throw new Error('Screening not found')
+    if (s.outcome === 'CLEAR') return s
+    const res = await db.overrideScreening(id, user.fullName || user.username, why)
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'OVERRIDE',
+      module: 'Compliance',
+      entityType: s.contextType,
+      entityId: s.contextId,
+      entityName: s.contextLabel || '',
+      details: `Sanctions block overridden (${s.trigger}, ${s.outcome}): ${why}`
+    }).catch(() => {})
+    return res
+  })
 
   safeHandle(
     'compliance:decideResult',
@@ -5534,10 +5680,34 @@ app.whenReady().then(() => {
     ) => {
       // Same gate as the Convert to Policy action in the quotation editor
       const session = await requirePermission(event, 'quotations:edit', 'policies:manage')
+      // The converter's sanctions check: this quotation's, recent, and clear or overridden
+      const { screeningId, ...convertOptions } = options as typeof options & {
+        screeningId?: string
+      }
+      const screening = screeningId ? await db.getScreening(screeningId) : null
+      if (
+        !screening ||
+        screening.contextType !== 'quotation' ||
+        screening.contextId !== quotationId ||
+        screening.trigger !== 'conversion' ||
+        Date.now() - new Date(screening.createdAt).getTime() > 6 * 3600_000
+      )
+        throw new Error('Run the sanctions check in the last step before creating the policy')
+      if (!screeningAllows(screening))
+        throw new Error(
+          'The sanctions check is not clear: review the hits in the Compliance Center, or a Compliance user overrides the block with a reason'
+        )
       const result = await db.convertQuotationToPolicy(quotationId, {
-        ...options,
+        ...convertOptions,
         createdBy: session.id
       })
+      if (Array.isArray(result))
+        await db
+          .setPoliciesScreening(
+            result.map((p) => p.id),
+            screening.id
+          )
+          .catch(() => {})
       // Notify quotation creator about conversion
       try {
         const [qRows] = await db.pool!.query<RowDataPacket[]>(
@@ -5762,6 +5932,17 @@ app.whenReady().then(() => {
   })
   safeHandle('endorsement:sign', async (event, id: string) => {
     const user = await requirePermission(event, 'policies:sign')
+    // An endorsement naming parties needs a clear (or overridden) sanctions check since its
+    // last change
+    const e = await db.getEndorsement(id)
+    if (e?.screenParties?.length) {
+      const [last] = await db.getScreenings('endorsement', [id], 1)
+      if (
+        !screeningAllows(last || null) ||
+        new Date(last.createdAt).getTime() < new Date(e.updatedAt).getTime()
+      )
+        throw new Error('The parties this endorsement names must pass the sanctions check first')
+    }
     return db.updateEndorsement(id, { signedBy: user.id, signedAt: new Date().toISOString() })
   })
 

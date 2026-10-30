@@ -22,7 +22,8 @@ interface Props {
   deciding: boolean
   position: { index: number; total: number }
   onDecide: (decision: 'cleared' | 'sanctioned') => void
-  onOpen: () => void
+  /** Opens the vessel / entity; none for a name typed by hand */
+  onOpen?: () => void
   onClose: () => void
 }
 
@@ -78,6 +79,7 @@ export default function SanctionsReviewDetail({
   }
   matches = [...matches].sort((a, b) => (b.score || 0) - (a.score || 0))
   const isVessel = result.entityType === 'vessel'
+  const isName = result.entityType === 'name'
 
   return (
     <div
@@ -98,13 +100,15 @@ export default function SanctionsReviewDetail({
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: '1rem' }}>{result.entityName}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            {isVessel ? 'Vessel' : 'Entity'} · best match{' '}
+            {isVessel ? 'Vessel' : isName ? 'Typed name' : 'Entity'} · best match{' '}
             {Number(result.matchScore || 0).toFixed(0)}% · {position.index + 1} of {position.total}
           </div>
         </div>
-        <button className="btn-ghost btn-sm" onClick={onOpen} title="Open the record">
-          <ExternalLink size={14} /> Open
-        </button>
+        {onOpen && (
+          <button className="btn-ghost btn-sm" onClick={onOpen} title="Open the record">
+            <ExternalLink size={14} /> Open
+          </button>
+        )}
         <button className="btn-ghost btn-sm" onClick={onClose} aria-label="Close review">
           <X size={14} />
         </button>
@@ -122,7 +126,12 @@ export default function SanctionsReviewDetail({
           }}
         >
           <Row label="Name" value={result.entityName} />
-          {isVessel ? (
+          {isName ? (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Typed by hand on a quotation, policy, endorsement or receipt (not in the Directory),
+              so it was screened by the name only.
+            </div>
+          ) : isVessel ? (
             <>
               <Row label="IMO" value={vessel?.imoNumber} />
               <Row label="Type" value={vessel?.vesselType} />

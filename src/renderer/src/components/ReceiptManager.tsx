@@ -487,7 +487,7 @@ function ReceiptModal({
   onClose: () => void
   onSaved: () => void
 }): React.JSX.Element {
-  const { showError, showSuccess } = useToast()
+  const { showError, showSuccess, showToast } = useToast()
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [assureds, setAssureds] = useState<VesselAssured[]>([])
   const [entityMap, setEntityMap] = useState<Record<string, string>>({})
@@ -792,13 +792,32 @@ function ReceiptModal({
       }))
     }
     try {
+      let saved: { id: string }
       if (editing) {
-        await window.api.receiptUpdate(editing.id, payload)
+        saved = await window.api.receiptUpdate(editing.id, payload)
         showSuccess('Receipt updated')
       } else {
-        await window.api.receiptCreate(payload)
+        saved = await window.api.receiptCreate(payload)
         showSuccess('Receipt created')
       }
+      // The payer is screened for sanctions (a warning, the receipt stays saved)
+      const receiptId = saved?.id || editing?.id
+      if (receiptId)
+        void window.api
+          .screeningCreate({ trigger: 'receipt', contextType: 'receipt', contextId: receiptId })
+          .then((s) => {
+            if (s.outcome === 'REVIEW' || s.outcome === 'MATCH')
+              showToast(
+                `Sanctions: the payer ${payerName} has a potential match. Review it in the Compliance Center.`,
+                'warning'
+              )
+            else if (s.outcome === 'ERROR')
+              showToast(
+                'The payer could not be screened: the sanctions lists are not loaded on this PC',
+                'warning'
+              )
+          })
+          .catch(() => {})
       onSaved()
     } catch (e) {
       showError((e instanceof Error && e.message) || 'Failed to save receipt')

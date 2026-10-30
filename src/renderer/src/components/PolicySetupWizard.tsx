@@ -29,7 +29,8 @@ import {
   QuotationInstalment,
   FlagState,
   QuotationAgreedValueOption,
-  QuotationDiscount
+  QuotationDiscount,
+  SanctionsScreening
 } from '../../../shared/types'
 import {
   computePayablePremium,
@@ -51,6 +52,11 @@ import { isPiLike } from '../../../shared/quotationTypes'
 import { TypeChip } from './ui'
 import { useUnsavedGuard } from '../utils/useUnsavedGuard'
 import { htmlToPlainText } from '../utils/htmlToDocx'
+import { ScreeningPanel } from './ScreeningPanel'
+import {
+  buildScreeningReportPdf,
+  screeningReportFileName
+} from '../services/ScreeningReportService'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -381,6 +387,12 @@ export default function PolicySetupWizard({
   const currentStepIndex = steps.indexOf(currentStep)
   const isLastStep = currentStepIndex === steps.length - 1
   const isFirstStep = currentStepIndex === 0
+
+  // Sanctions check of every party, run on reaching the last step: Create Policy needs it
+  // clear, or overridden with a reason by the admin / Compliance group
+  const [screening, setScreening] = useState<SanctionsScreening | null>(null)
+  const [screeningRunning, setScreeningRunning] = useState(false)
+  const screeningOk = !!screening && (screening.outcome === 'CLEAR' || !!screening.overrideAt)
 
   // Leaving (Back to Quotation, sidebar, Ctrl+K) asks first once the user changed anything
   // or moved past the first step
@@ -912,6 +924,43 @@ export default function PolicySetupWizard({
     }
     const nextIndex = currentStepIndex + 1
     if (nextIndex < steps.length) setCurrentStep(steps[nextIndex])
+    if (steps[nextIndex] === 5) void runScreening()
+  }
+
+  const runScreening = async (): Promise<void> => {
+    if (!quotation) return
+    setScreening(null)
+    setScreeningRunning(true)
+    try {
+      // The insureds as edited here (the quotation's vessels, assureds and customer are added
+      // by the screening itself)
+      const extraParties = data.selectedVesselIds.flatMap((vid) =>
+        (data.insuredByVessel[vid] || [])
+          .map((r) => ({
+            kind: (r.entityId ? 'entity' : 'name') as 'entity' | 'name',
+            id: r.entityId || null,
+            name:
+              (r.entityName || '').trim() ||
+              allEntities.find((e) => e.id === r.entityId)?.name ||
+              '',
+            role: r.role || 'Assured'
+          }))
+          .filter((p) => p.name)
+      )
+      setScreening(
+        await window.api.screeningCreate({
+          trigger: 'conversion',
+          contextType: 'quotation',
+          contextId: quotation.id,
+          vesselIds: data.selectedVesselIds,
+          extraParties
+        })
+      )
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'The sanctions check failed')
+    } finally {
+      setScreeningRunning(false)
+    }
   }
 
   const handleBack = (): void => {
@@ -938,6 +987,10 @@ export default function PolicySetupWizard({
       }
     }
 
+    if (!screening || !screeningOk) {
+      showError('The sanctions check must be clear (or overridden) before creating the policy')
+      return
+    }
     const noFolder = data.selectedVesselIds.find((vid) => !(data.policyFolders[vid] || '').trim())
     if (noFolder) {
       const qv = qVessels.find((v) => (v.vesselId || v.id) === noFolder)
@@ -981,6 +1034,7 @@ export default function PolicySetupWizard({
         }
       }
       const result = await window.api.policyConvertFromQuotation(quotation.id, {
+        screeningId: screening.id,
         vesselIds: data.selectedVesselIds,
         perVessel,
         inceptionDate: data.inceptionDate,
@@ -1054,6 +1108,16 @@ export default function PolicySetupWizard({
         } catch (err) {
           folderErrors.push((err instanceof Error && err.message) || base)
         }
+      }
+      // The sanctions check goes into each policy folder with the policy
+      try {
+        const pdf = new Uint8Array(await (await buildScreeningReportPdf(screening)).arrayBuffer())
+        for (const p of policies)
+          await window.api
+            .policyWriteExportFile(p.id, pdf, screeningReportFileName(screening))
+            .catch(() => null)
+      } catch {
+        /* the screening stays on the policy; only the PDF copy is missing */
       }
       showSuccess(
         `${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`
@@ -1405,6 +1469,15 @@ export default function PolicySetupWizard({
             )}
 
             {currentStep === 5 && (
+              <ScreeningPanel
+                screening={screening}
+                running={screeningRunning}
+                onRun={() => void runScreening()}
+                onChange={setScreening}
+                blockingText="Create Policy"
+              />
+            )}
+            {currentStep === 5 && (
               <StepPolicyFolders
                 qVessels={qVessels}
                 selectedVesselIds={data.selectedVesselIds}
@@ -1458,7 +1531,10 @@ export default function PolicySetupWizard({
               {isLastStep ? (
                 <button
                   onClick={handleConvert}
-                  disabled={converting}
+                  disabled={converting || screeningRunning || !screeningOk}
+                  title={
+                    screeningOk ? undefined : 'Waiting for a clear (or overridden) sanctions check'
+                  }
                   className="btn-primary"
                   style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                 >

@@ -15,7 +15,7 @@ of a risk, so every screen is a view of the same story.
   by hand).
 - 3 claims: WAITING for management feedback.
 - 4 tracked tasks: NOT NEEDED now (more work for the team), kept as a note.
-- 5 compliance at every step: AGREED, plan written 2026-10-30, waiting for answers.
+- 5 compliance at every step: BUILT 2026-10-30 (undeployed), see compliance.md Party Screening.
 - 6 document store: to PLAN CAREFULLY (major change for users).
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
@@ -83,9 +83,11 @@ C. Triggers: quotation (vessel / assured / customer added: screen in the backgro
    warn and record).
 D. Overrides: permission-based, reason required, shown on the policy and in the activity log.
 Order: A+B, then quotation + conversion, then endorsements + receipts.
-Questions: warn or block at each step; who may override; which parties (vessel, owners, managers,
-operators, customer / broker, payer); freshness window (30 days?); save the report PDF in the policy
-folder; typed assureds without an entity: screen the typed name or require linking.
+DECIDED (user 2026-10-30): warn on quotation / approval / receipt, BLOCK at conversion and on endorsements
+changing parties; override by admin and a compliance role; screen ALL parties (vessel, owners, managers,
+operators, customer / broker, payer); fresh = 30 days (and after the last list update); save the screening
+report PDF in the policy folder at conversion; typed assureds are screened by the typed name, no linking
+needed. APPROVED TO BUILD.
 
 ## 6. One managed document store
 Files stored in one managed place (or the DB) with versions, linked to case / vessel / entity /

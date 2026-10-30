@@ -1802,8 +1802,20 @@ export default function ComplianceCenter({
                           )}
                           <td style={{ fontWeight: 600 }}>{result.entityName}</td>
                           <td>
-                            <Badge tone={result.entityType === 'vessel' ? 'accent' : 'violet'}>
-                              {result.entityType === 'vessel' ? 'Vessel' : 'Entity'}
+                            <Badge
+                              tone={
+                                result.entityType === 'vessel'
+                                  ? 'accent'
+                                  : result.entityType === 'name'
+                                    ? 'neutral'
+                                    : 'violet'
+                              }
+                            >
+                              {result.entityType === 'vessel'
+                                ? 'Vessel'
+                                : result.entityType === 'name'
+                                  ? 'Typed name'
+                                  : 'Entity'}
                             </Badge>
                           </td>
                           <td>
@@ -1968,11 +1980,15 @@ export default function ComplianceCenter({
                       total: pendingResults.length
                     }}
                     onDecide={(d) => void handleDecideMatch(selectedResult.id, d)}
-                    onOpen={() => {
-                      if (selectedResult.entityType === 'vessel')
-                        onNavigateToVessel?.(selectedResult.entityId, 'assureds')
-                      else onNavigateToEntity?.(selectedResult.entityId)
-                    }}
+                    onOpen={
+                      selectedResult.entityType === 'name'
+                        ? undefined
+                        : () => {
+                            if (selectedResult.entityType === 'vessel')
+                              onNavigateToVessel?.(selectedResult.entityId, 'assureds')
+                            else onNavigateToEntity?.(selectedResult.entityId)
+                          }
+                    }
                     onClose={() => setSelectedResultId(null)}
                   />
                 )}

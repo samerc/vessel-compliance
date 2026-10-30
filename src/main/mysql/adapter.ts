@@ -172,6 +172,12 @@ import {
   ReportResultRow,
   SanctionsReportCheck,
   SanctionsReportCheckInput,
+  SanctionsScreening,
+  ScreenedParty,
+  ScreeningTrigger,
+  ScreeningContextType,
+  PartyScreeningStatus,
+  ScreeningPartyInput,
   SavedReport,
   SurveyAttachment,
   SurveyDefect,
@@ -5973,6 +5979,86 @@ export class MySQLAdapter {
                     INDEX idx_dh_owner (owner_type, owner_id, document_type_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
       }
+
+      // Party screening (sanctions at quotation / conversion / endorsement / receipt)
+      // Names typed by hand (assureds without a Directory entity, receipt payers) are screened
+      // as their own subjects, with a status like vessels and entities
+      await this.pool.query(`CREATE TABLE IF NOT EXISTS sanctions_screened_names (
+                  id VARCHAR(36) PRIMARY KEY,
+                  name VARCHAR(255) NOT NULL,
+                  name_key VARCHAR(255) NOT NULL,
+                  ofac_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                  ofac_match_found TINYINT(1) NOT NULL DEFAULT 0,
+                  ofac_checked_at DATETIME NULL,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE KEY uq_ssn_key (name_key)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      // Every screening run with its parties, result and any override
+      await this.pool.query(`CREATE TABLE IF NOT EXISTS sanctions_screenings (
+                  id VARCHAR(36) PRIMARY KEY,
+                  trigger_type VARCHAR(20) NOT NULL,
+                  context_type VARCHAR(20) NOT NULL,
+                  context_id VARCHAR(36) NOT NULL,
+                  context_label VARCHAR(255) NULL,
+                  parties MEDIUMTEXT NOT NULL,
+                  outcome VARCHAR(20) NOT NULL,
+                  error TEXT NULL,
+                  override_by VARCHAR(255) NULL,
+                  override_reason TEXT NULL,
+                  override_at DATETIME NULL,
+                  created_by VARCHAR(255) NULL,
+                  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                  INDEX idx_ss_context (context_type, context_id)
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      {
+        const [ccSrc] = await this.pool.query(
+          "SHOW COLUMNS FROM compliance_check_logs LIKE 'source'"
+        )
+        // 'weekly' = the scheduled / Run Now check; 'screening' = a party screening's hits
+        if ((ccSrc as RowDataPacket[]).length === 0)
+          await this.pool.query(
+            "ALTER TABLE compliance_check_logs ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'weekly'"
+          )
+        const [pdScr] = await this.pool.query(
+          "SHOW COLUMNS FROM policy_documents LIKE 'screening_id'"
+        )
+        if ((pdScr as RowDataPacket[]).length === 0)
+          await this.pool.query(
+            'ALTER TABLE policy_documents ADD COLUMN screening_id VARCHAR(36) NULL'
+          )
+        const [peParties] = await this.pool.query(
+          "SHOW COLUMNS FROM policy_endorsements LIKE 'screen_parties'"
+        )
+        // Parties an endorsement names (new owners, managers...): JSON [{kind, id, name, role}]
+        if ((peParties as RowDataPacket[]).length === 0)
+          await this.pool.query(
+            'ALTER TABLE policy_endorsements ADD COLUMN screen_parties TEXT NULL'
+          )
+      }
+      // A Compliance group (may override sanctions blocks), made once; the admin adds members
+      if ((await this.getSetting('migration_compliance_group_v1')) !== '1') {
+        const [cg] = await this.pool.query("SELECT id FROM user_groups WHERE name = 'Compliance'")
+        let groupId = (cg as RowDataPacket[])[0]?.id as string | undefined
+        if (!groupId) {
+          groupId = uuidv4()
+          await this.pool.execute(
+            "INSERT INTO user_groups (id, name, description, is_system) VALUES (?, 'Compliance', 'Reviews sanctions results and may override a sanctions block', FALSE)",
+            [groupId]
+          )
+        }
+        for (const key of [
+          'compliance:view',
+          'compliance:run',
+          'compliance:review',
+          'compliance:override',
+          'sanctions:search'
+        ])
+          await this.pool.execute(
+            'INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)',
+            [groupId, key]
+          )
+        await this.setSetting('migration_compliance_group_v1', '1')
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -10547,13 +10633,17 @@ export class MySQLAdapter {
   }
 
   // --- Compliance Check Logs ---
-  async createComplianceCheckLog(log: { totalChecked: number; status: string }): Promise<string> {
+  async createComplianceCheckLog(log: {
+    totalChecked: number
+    status: string
+    source?: 'weekly' | 'screening'
+  }): Promise<string> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     await this.pool.execute(
-      `INSERT INTO compliance_check_logs (id, run_at, total_checked, matches_found, status)
-             VALUES (?, NOW(), ?, 0, ?)`,
-      [id, log.totalChecked, log.status]
+      `INSERT INTO compliance_check_logs (id, run_at, total_checked, matches_found, status, source)
+             VALUES (?, NOW(), ?, 0, ?, ?)`,
+      [id, log.totalChecked, log.status, log.source || 'weekly']
     )
     return id
   }
@@ -10600,7 +10690,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
              status, error, created_at as createdAt
-             FROM compliance_check_logs ORDER BY run_at DESC LIMIT ?`,
+             FROM compliance_check_logs WHERE source = 'weekly' ORDER BY run_at DESC LIMIT ?`,
       [limit]
     )
     return rows as Row<ComplianceCheckLog>[]
@@ -10611,7 +10701,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query<Row<ComplianceCheckLog>[]>(
       `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
              status, error, created_at as createdAt
-             FROM compliance_check_logs ORDER BY run_at DESC LIMIT 1`
+             FROM compliance_check_logs WHERE source = 'weekly' ORDER BY run_at DESC LIMIT 1`
     )
     return rows.length > 0 ? rows[0] : null
   }
@@ -10619,7 +10709,7 @@ export class MySQLAdapter {
   // --- Compliance Check Results ---
   async addComplianceCheckResult(result: {
     logId: string
-    entityType: 'entity' | 'vessel'
+    entityType: 'entity' | 'vessel' | 'name'
     entityId: string
     entityName: string
     matchScore: number
@@ -10772,7 +10862,17 @@ export class MySQLAdapter {
     )
   }
 
-  /** subject ("entity:<id>" / "vessel:<id>") -> list entries a reviewer cleared for it */
+  /** A screened subject's kind as stored with results and cleared hits */
+  static sanctionsSubjectType(t: string): 'vessel' | 'entity' | 'name' {
+    return t === 'vessel' || t === 'name' ? t : 'entity'
+  }
+
+  /** The table holding a screened subject's sanctions status */
+  static sanctionsSubjectTable(t: string): 'vessels' | 'entities' | 'sanctions_screened_names' {
+    return t === 'vessel' ? 'vessels' : t === 'name' ? 'sanctions_screened_names' : 'entities'
+  }
+
+  /** subject ("entity:<id>" / "vessel:<id>" / "name:<id>") -> list entries a reviewer cleared for it */
   async getSanctionsClearedHits(): Promise<Map<string, Set<string>>> {
     const map = new Map<string, Set<string>>()
     if (!this.pool) return map
@@ -10824,7 +10924,7 @@ export class MySQLAdapter {
            VALUES (?, ?, ?, ?, NOW(), ?)
            ON DUPLICATE KEY UPDATE cleared_by = VALUES(cleared_by), cleared_at = NOW(), note = VALUES(note)`,
           [
-            entityType === 'vessel' ? 'vessel' : 'entity',
+            MySQLAdapter.sanctionsSubjectType(entityType),
             entityId,
             MySQLAdapter.sanctionsHitKey(h),
             reviewedBy,
@@ -10833,9 +10933,9 @@ export class MySQLAdapter {
         )
     }
 
-    // 3. Update the related vessel or entity
+    // 3. Update the related vessel, entity or typed name
     if (decision === 'sanctioned') {
-      const table = entityType === 'vessel' ? 'vessels' : 'entities'
+      const table = MySQLAdapter.sanctionsSubjectTable(entityType)
       await this.pool.execute(
         `UPDATE ${table} SET ofac_status = 'SANCTIONED', ofac_match_found = 1 WHERE id = ?`,
         [entityId]
@@ -10851,7 +10951,7 @@ export class MySQLAdapter {
       )
 
       if (otherMatches.length === 0) {
-        const table = entityType === 'vessel' ? 'vessels' : 'entities'
+        const table = MySQLAdapter.sanctionsSubjectTable(entityType)
         await this.pool.execute(
           `UPDATE ${table} SET ofac_status = 'CLEARED', ofac_match_found = 0 WHERE id = ?`,
           [entityId]
@@ -10867,7 +10967,7 @@ export class MySQLAdapter {
    * as cleared. Either way the subject ends with the chosen status.
    */
   async decideSanctionsSubject(
-    subjectType: 'entity' | 'vessel',
+    subjectType: 'entity' | 'vessel' | 'name',
     subjectId: string,
     decision: 'sanctioned' | 'cleared',
     reviewedBy: string,
@@ -10895,12 +10995,275 @@ export class MySQLAdapter {
             note?.trim() || null
           ]
         )
-    const table = subjectType === 'vessel' ? 'vessels' : 'entities'
+    const table = MySQLAdapter.sanctionsSubjectTable(subjectType)
     await this.pool.execute(
       `UPDATE ${table} SET ofac_status = ?, ofac_match_found = ?, ofac_checked_at = NOW() WHERE id = ?`,
       decision === 'sanctioned' ? ['SANCTIONED', 1, subjectId] : ['CLEARED', 0, subjectId]
     )
     return { resultsDecided: pending.length }
+  }
+
+  // --- Party screening ---
+
+  /** A typed name's key: case and spacing do not make a new subject */
+  static screeningNameKey(name: string): string {
+    return name.trim().replace(/\s+/g, ' ').toLowerCase().slice(0, 255)
+  }
+
+  /** The screened-name subject for a name typed by hand (made on first use) */
+  async upsertScreenedName(name: string): Promise<string> {
+    if (!this.pool) throw new Error('DB not connected')
+    const clean = name.trim().replace(/\s+/g, ' ').slice(0, 255)
+    const key = MySQLAdapter.screeningNameKey(clean)
+    const [rows] = await this.pool.query(
+      'SELECT id FROM sanctions_screened_names WHERE name_key = ?',
+      [key]
+    )
+    const found = (rows as RowDataPacket[])[0]?.id as string | undefined
+    if (found) return found
+    const id = uuidv4()
+    await this.pool.execute(
+      'INSERT IGNORE INTO sanctions_screened_names (id, name, name_key) VALUES (?, ?, ?)',
+      [id, clean, key]
+    )
+    const [again] = await this.pool.query(
+      'SELECT id FROM sanctions_screened_names WHERE name_key = ?',
+      [key]
+    )
+    return ((again as RowDataPacket[])[0]?.id as string) || id
+  }
+
+  /** Current sanctions status of screened subjects, keyed "kind:id" */
+  async getSanctionsSubjects(
+    refs: { kind: 'vessel' | 'entity' | 'name'; id: string }[]
+  ): Promise<Map<string, { name: string; status: string | null; checkedAt: Date | null }>> {
+    const out = new Map<string, { name: string; status: string | null; checkedAt: Date | null }>()
+    if (!this.pool) return out
+    for (const kind of ['vessel', 'entity', 'name'] as const) {
+      const ids = [...new Set(refs.filter((r) => r.kind === kind).map((r) => r.id))]
+      if (ids.length === 0) continue
+      const [rows] = await this.pool.query(
+        `SELECT id, name, ofac_status, ofac_checked_at FROM ${MySQLAdapter.sanctionsSubjectTable(kind)} WHERE id IN (?)`,
+        [ids]
+      )
+      for (const r of rows as RowDataPacket[])
+        out.set(`${kind}:${r.id}`, {
+          name: r.name,
+          status: r.ofac_status ?? null,
+          checkedAt: r.ofac_checked_at ? new Date(r.ofac_checked_at) : null
+        })
+    }
+    return out
+  }
+
+  /** Stores a screening result on the subject (as the weekly check does) */
+  async setSanctionsSubjectStatus(
+    kind: 'vessel' | 'entity' | 'name',
+    id: string,
+    fields: { status?: string; matchFound?: boolean }
+  ): Promise<void> {
+    if (!this.pool) return
+    const sets = ['ofac_checked_at = NOW()']
+    const vals: SqlValue[] = []
+    if (fields.status !== undefined) {
+      sets.push('ofac_status = ?')
+      vals.push(fields.status)
+    }
+    if (fields.matchFound !== undefined) {
+      sets.push('ofac_match_found = ?')
+      vals.push(fields.matchFound ? 1 : 0)
+    }
+    vals.push(id)
+    await this.pool.execute(
+      `UPDATE ${MySQLAdapter.sanctionsSubjectTable(kind)} SET ${sets.join(', ')} WHERE id = ?`,
+      vals
+    )
+  }
+
+  private mapScreening(r: RowDataPacket): SanctionsScreening {
+    let parties: ScreenedParty[] = []
+    try {
+      const p = JSON.parse(r.parties || '[]')
+      if (Array.isArray(p)) parties = p
+    } catch {
+      /* unreadable parties: shown as none */
+    }
+    const iso = (d: unknown): string | null => (d ? new Date(d as string).toISOString() : null)
+    return {
+      id: r.id,
+      trigger: r.trigger_type,
+      contextType: r.context_type,
+      contextId: r.context_id,
+      contextLabel: r.context_label ?? null,
+      parties,
+      outcome: r.outcome,
+      error: r.error ?? null,
+      overrideBy: r.override_by ?? null,
+      overrideReason: r.override_reason ?? null,
+      overrideAt: iso(r.override_at),
+      createdBy: r.created_by ?? null,
+      createdAt: iso(r.created_at) || ''
+    }
+  }
+
+  async createScreening(s: {
+    trigger: ScreeningTrigger
+    contextType: ScreeningContextType
+    contextId: string
+    contextLabel: string | null
+    parties: ScreenedParty[]
+    outcome: PartyScreeningStatus
+    error: string | null
+    createdBy: string | null
+  }): Promise<SanctionsScreening> {
+    if (!this.pool) throw new Error('DB not connected')
+    const id = uuidv4()
+    await this.pool.execute(
+      `INSERT INTO sanctions_screenings
+         (id, trigger_type, context_type, context_id, context_label, parties, outcome, error, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        s.trigger,
+        s.contextType,
+        s.contextId,
+        s.contextLabel ? s.contextLabel.slice(0, 255) : null,
+        JSON.stringify(s.parties),
+        s.outcome,
+        s.error,
+        s.createdBy
+      ]
+    )
+    return (await this.getScreening(id)) as SanctionsScreening
+  }
+
+  async getScreening(id: string): Promise<SanctionsScreening | null> {
+    if (!this.pool) return null
+    const [rows] = await this.pool.query('SELECT * FROM sanctions_screenings WHERE id = ?', [id])
+    const r = (rows as RowDataPacket[])[0]
+    return r ? this.mapScreening(r) : null
+  }
+
+  /** Screenings of a quotation / policy / endorsement / receipt, newest first */
+  async getScreenings(
+    contextType: ScreeningContextType,
+    contextIds: string[],
+    limit = 20
+  ): Promise<SanctionsScreening[]> {
+    if (!this.pool || contextIds.length === 0) return []
+    const [rows] = await this.pool.query(
+      `SELECT * FROM sanctions_screenings WHERE context_type = ? AND context_id IN (?)
+        ORDER BY created_at DESC LIMIT ?`,
+      [contextType, contextIds, limit]
+    )
+    return (rows as RowDataPacket[]).map((r) => this.mapScreening(r))
+  }
+
+  async overrideScreening(id: string, by: string, reason: string): Promise<SanctionsScreening> {
+    if (!this.pool) throw new Error('DB not connected')
+    await this.pool.execute(
+      `UPDATE sanctions_screenings SET override_by = ?, override_reason = ?, override_at = NOW()
+        WHERE id = ? AND override_at IS NULL`,
+      [by, reason, id]
+    )
+    const s = await this.getScreening(id)
+    if (!s) throw new Error('Screening not found')
+    return s
+  }
+
+  /** Links the screening a conversion passed to the policies it made */
+  async setPoliciesScreening(policyIds: string[], screeningId: string): Promise<void> {
+    if (!this.pool || policyIds.length === 0) return
+    await this.pool.query('UPDATE policy_documents SET screening_id = ? WHERE id IN (?)', [
+      screeningId,
+      policyIds
+    ])
+  }
+
+  /**
+   * A quotation's parties: its vessels, its assureds (owners, managers, operators...; typed
+   * ones by name) and the customer / broker. `vesselIds` limits vessels and per-vessel
+   * assureds to those vessels (a policy is one vessel)
+   */
+  async getQuotationScreeningParties(
+    quotationId: string,
+    vesselIds?: string[]
+  ): Promise<{ parties: ScreeningPartyInput[]; label: string }> {
+    if (!this.pool) return { parties: [], label: '' }
+    const [[q]] = (await this.pool.query(
+      `SELECT q.reference_number, q.customer_entity_id, q.customer_type, e.name AS customer_name
+         FROM quotations q LEFT JOIN entities e ON e.id = q.customer_entity_id WHERE q.id = ?`,
+      [quotationId]
+    )) as QueryRows
+    if (!q) throw new Error('Quotation not found')
+    const [vRows] = await this.pool.query(
+      `SELECT qv.id, qv.vessel_id, qv.vessel_label, COALESCE(v.name, qv.name) AS name
+         FROM quotation_vessels qv LEFT JOIN vessels v ON v.id = qv.vessel_id
+        WHERE qv.quotation_id = ? ORDER BY qv.order_index`,
+      [quotationId]
+    )
+    let vessels = vRows as RowDataPacket[]
+    // A vessel by its registry id or its quotation_vessels id (as the converter sends them)
+    if (vesselIds)
+      vessels = vessels.filter(
+        (v) => (v.vessel_id && vesselIds.includes(v.vessel_id)) || vesselIds.includes(v.id)
+      )
+    const labels = new Set(vessels.map((v) => v.vessel_label as string))
+    const parties: ScreeningPartyInput[] = []
+    for (const v of vessels)
+      if ((v.name || '').trim())
+        parties.push({
+          kind: v.vessel_id ? 'vessel' : 'name',
+          id: v.vessel_id || null,
+          name: v.name,
+          role: 'Vessel'
+        })
+    const [aRows] = await this.pool.query(
+      `SELECT qa.entity_id, COALESCE(e.name, qa.name) AS name, qa.role, qa.vessel_label
+         FROM quotation_assureds qa LEFT JOIN entities e ON e.id = qa.entity_id
+        WHERE qa.quotation_id = ? ORDER BY qa.order_index`,
+      [quotationId]
+    )
+    for (const a of aRows as RowDataPacket[]) {
+      if (vesselIds && a.vessel_label && !labels.has(a.vessel_label)) continue
+      if (!(a.name || '').trim()) continue
+      parties.push({
+        kind: a.entity_id ? 'entity' : 'name',
+        id: a.entity_id || null,
+        name: a.name,
+        role: a.role || 'Assured'
+      })
+    }
+    if (q.customer_entity_id && q.customer_name)
+      parties.push({
+        kind: 'entity',
+        id: q.customer_entity_id,
+        name: q.customer_name,
+        role: q.customer_type === 'broker' ? 'Broker' : 'Customer'
+      })
+    return { parties, label: q.reference_number || '' }
+  }
+
+  /** A policy's parties: its vessel, the insureds printed on it and the quotation's others */
+  async getPolicyScreeningParties(
+    policyId: string
+  ): Promise<{ parties: ScreeningPartyInput[]; label: string }> {
+    if (!this.pool) return { parties: [], label: '' }
+    const [[p]] = (await this.pool.query(
+      'SELECT quotation_id, vessel_id, policy_number FROM policy_documents WHERE id = ?',
+      [policyId]
+    )) as QueryRows
+    if (!p) throw new Error('Policy not found')
+    const { parties } = await this.getQuotationScreeningParties(p.quotation_id, [p.vessel_id])
+    // Insureds chosen in the converter (they may differ from the quotation's)
+    const [ins] = await this.pool.query(
+      `SELECT a.entity_id, e.name, a.role FROM policy_doc_addresses a
+         JOIN entities e ON e.id = a.entity_id WHERE a.policy_doc_id = ?`,
+      [policyId]
+    )
+    for (const r of ins as RowDataPacket[])
+      parties.push({ kind: 'entity', id: r.entity_id, name: r.name, role: r.role || 'Assured' })
+    return { parties, label: p.policy_number || '' }
   }
 
   // --- Policy Types ---
@@ -25689,11 +26052,24 @@ export class MySQLAdapter {
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
-                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt
+                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt,
+                    screen_parties AS screenParties
              FROM policy_endorsements WHERE policy_doc_id = ? ORDER BY endorsement_number ASC`,
       [policyDocId]
     )
-    return rows as Row<PolicyEndorsement>[]
+    return (rows as RowDataPacket[]).map((r) => MySQLAdapter.mapEndorsementRow(r))
+  }
+
+  /** screen_parties is JSON: the parties the endorsement names, screened before it is issued */
+  private static mapEndorsementRow(r: RowDataPacket): PolicyEndorsement {
+    let screenParties: ScreeningPartyInput[] = []
+    try {
+      const v = r.screenParties ? JSON.parse(r.screenParties) : []
+      if (Array.isArray(v)) screenParties = v
+    } catch {
+      /* unreadable: none */
+    }
+    return { ...(r as PolicyEndorsement), screenParties }
   }
 
   async getEndorsement(id: string): Promise<PolicyEndorsement | null> {
@@ -25705,12 +26081,13 @@ export class MySQLAdapter {
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
-                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt
+                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt,
+                    screen_parties AS screenParties
              FROM policy_endorsements WHERE id = ?`,
       [id]
     )
-    const arr = rows as Row<PolicyEndorsement>[]
-    return arr.length > 0 ? arr[0] : null
+    const arr = rows as RowDataPacket[]
+    return arr.length > 0 ? MySQLAdapter.mapEndorsementRow(arr[0]) : null
   }
 
   async getNextEndorsementNumber(policyDocId: string): Promise<number> {
@@ -25773,11 +26150,16 @@ export class MySQLAdapter {
       exportedAt: string | null
       signedBy: string | null
       signedAt: string | null
+      screenParties: ScreeningPartyInput[] | null
     }>
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
     const values: SqlValue[] = []
+    if (updates.screenParties !== undefined) {
+      fields.push('screen_parties = ?')
+      values.push(updates.screenParties?.length ? JSON.stringify(updates.screenParties) : null)
+    }
     if (updates.effectiveDate !== undefined) {
       fields.push('effective_date = ?')
       values.push(updates.effectiveDate)

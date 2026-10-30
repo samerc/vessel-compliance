@@ -313,6 +313,10 @@ export const PERMISSION_CATEGORIES = [
       { key: 'compliance:view', label: 'View compliance alerts' },
       { key: 'compliance:run', label: 'Run compliance checks' },
       { key: 'compliance:review', label: 'Review sanctions results' },
+      {
+        key: 'compliance:override',
+        label: 'Override a sanctions block (conversion, endorsements) with a reason'
+      },
       { key: 'sanctions:search', label: 'Search sanctions' }
     ]
   },
@@ -539,7 +543,7 @@ export interface ComplianceCheckLog {
 export interface ComplianceCheckResult {
   id: string
   logId: string
-  entityType: 'entity' | 'vessel'
+  entityType: 'entity' | 'vessel' | 'name'
   entityId: string
   entityName: string
   matchScore: number
@@ -1803,6 +1807,8 @@ export interface PolicyEndorsement {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  /** Parties the endorsement names (new owners, managers...), screened before it is issued */
+  screenParties?: ScreeningPartyInput[]
 }
 
 export interface EndorsementSection {
@@ -1848,6 +1854,60 @@ export const ENDORSEMENT_PRESET_SECTIONS = [
   { key: 'deductibles', title: 'Deductibles' },
   { key: 'general', title: 'General' }
 ] as const
+
+// Party screening: the sanctions check run when a quotation, conversion, endorsement or receipt
+// names its parties (vessel, owners, managers, operators, customer / broker, payer)
+export type ScreeningTrigger =
+  'quotation' | 'approval' | 'conversion' | 'endorsement' | 'receipt' | 'manual'
+export type ScreeningContextType = 'quotation' | 'policy' | 'endorsement' | 'receipt'
+/** CLEAR = screened within 30 days (after the last list update) without a hit */
+export type PartyScreeningStatus = 'CLEAR' | 'REVIEW' | 'MATCH' | 'NOT_SCREENED' | 'ERROR'
+
+/** A party to screen: a registry vessel, a Directory entity, or a name typed by hand */
+export interface ScreeningPartyInput {
+  kind: 'vessel' | 'entity' | 'name'
+  id?: string | null
+  name: string
+  role: string
+}
+
+export interface ScreenedParty {
+  kind: 'vessel' | 'entity' | 'name'
+  /** vessel / entity id, or the sanctions_screened_names id of a typed name */
+  id: string
+  name: string
+  role: string
+  status: PartyScreeningStatus
+  checkedAt: string | null
+  /** true when a recent clear check was reused instead of searching again */
+  reused: boolean
+  bestScore?: number | null
+  hitCount?: number
+}
+
+export interface SanctionsScreening {
+  id: string
+  trigger: ScreeningTrigger
+  contextType: ScreeningContextType
+  contextId: string
+  contextLabel: string | null
+  parties: ScreenedParty[]
+  /** Worst party status */
+  outcome: PartyScreeningStatus
+  error: string | null
+  overrideBy: string | null
+  overrideReason: string | null
+  overrideAt: string | null
+  createdBy: string | null
+  createdAt: string
+}
+
+/** Current sanctions picture of a quotation / policy without screening (the badge) */
+export interface ScreeningStatus {
+  parties: ScreenedParty[]
+  outcome: PartyScreeningStatus
+  latest: SanctionsScreening | null
+}
 
 // Sanctions Report Check — ad-hoc named screening report saved for audit
 export interface SanctionsReportListResult {

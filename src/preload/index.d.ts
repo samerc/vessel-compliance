@@ -537,13 +537,40 @@ export interface Api {
   /** A sanctions decision on the subject itself: decides its pending check results (or
    *  remembers the shown entries as cleared) and sets its status */
   complianceDecideSubject: (data: {
-    subjectType: 'entity' | 'vessel'
+    subjectType: 'entity' | 'vessel' | 'name'
     subjectId: string
     decision: 'sanctioned' | 'cleared'
     note?: string | null
     matches?: { source?: string; source_id?: string; names?: string[] }[]
   }) => Promise<{ resultsDecided: number }>
   complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
+  /** Screens the parties of a quotation / policy / endorsement / receipt (see partyScreening) */
+  screeningCreate: (req: {
+    trigger: import('../shared/types').ScreeningTrigger
+    contextType: import('../shared/types').ScreeningContextType
+    contextId: string
+    vesselIds?: string[]
+    extraParties?: import('../shared/types').ScreeningPartyInput[]
+  }) => Promise<import('../shared/types').SanctionsScreening>
+  /** A quotation's / policy's parties and their current status, without screening */
+  screeningGetStatus: (
+    contextType: 'quotation' | 'policy',
+    contextId: string
+  ) => Promise<import('../shared/types').ScreeningStatus | { error: true; message: string }>
+  screeningList: (
+    contextType: import('../shared/types').ScreeningContextType,
+    contextIds: string[]
+  ) => Promise<import('../shared/types').SanctionsScreening[] | { error: true; message: string }>
+  screeningGet: (
+    id: string
+  ) => Promise<
+    import('../shared/types').SanctionsScreening | null | { error: true; message: string }
+  >
+  /** compliance:override only; reason required */
+  screeningSetOverride: (
+    id: string,
+    reason: string
+  ) => Promise<import('../shared/types').SanctionsScreening>
   onComplianceCheckProgress: (
     callback: (data: { current: number; total: number; entityName: string }) => void
   ) => () => void
@@ -2072,6 +2099,8 @@ export interface Api {
   policyConvertFromQuotation: (
     quotationId: string,
     options: {
+      /** The converter's sanctions check (screening:create, trigger conversion): required */
+      screeningId: string
       vesselIds: string[]
       inceptionDate: string
       inceptionTime: string

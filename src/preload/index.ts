@@ -336,6 +336,13 @@ const api: Api = {
     note?: string | null
   ) => ipcRenderer.invoke('compliance:decideResult', resultId, decision, note),
   complianceDecideSubject: (data) => ipcRenderer.invoke('compliance:decideSubject', data),
+  screeningCreate: (req) => ipcRenderer.invoke('screening:create', req),
+  screeningGetStatus: (contextType, contextId) =>
+    ipcRenderer.invoke('screening:getStatus', contextType, contextId),
+  screeningList: (contextType, contextIds) =>
+    ipcRenderer.invoke('screening:list', contextType, contextIds),
+  screeningGet: (id) => ipcRenderer.invoke('screening:get', id),
+  screeningSetOverride: (id, reason) => ipcRenderer.invoke('screening:setOverride', id, reason),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
   onComplianceCheckProgress: (
     callback: (data: { current: number; total: number; entityName: string }) => void

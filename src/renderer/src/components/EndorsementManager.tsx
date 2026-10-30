@@ -25,8 +25,12 @@ import type {
   PolicyEndorsement,
   EndorsementInstalment,
   EndorsementTemplate,
-  PolicyDocInstalment
+  PolicyDocInstalment,
+  SanctionsScreening,
+  ScreeningPartyInput
 } from '../../../shared/types'
+import { Modal } from './ui'
+import { ScreeningPanel } from './ScreeningPanel'
 import { ENDORSEMENT_PRESET_SECTIONS } from '../../../shared/types'
 import {
   countDays,
@@ -69,7 +73,11 @@ interface EditState {
     premiumAmount: string
     commissionAmount: string
   }>
+  /** New owners, managers... the endorsement names: screened before it is exported or signed */
+  screenParties: ScreeningPartyInput[]
 }
+
+const PARTY_ROLES = ['Registered Owners', 'Managers', 'Operators', 'Co-Assured', 'Other']
 
 const EMPTY_EDIT: EditState = {
   id: null,
@@ -88,7 +96,8 @@ const EMPTY_EDIT: EditState = {
     isFullWidth: false,
     orderIndex: i
   })),
-  instalments: []
+  instalments: [],
+  screenParties: []
 }
 
 /** Calculate pro-rata premium using shared DST-safe day counting */
@@ -168,6 +177,8 @@ export default function EndorsementManager({
   const [templates, setTemplates] = useState<EndorsementTemplate[]>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [showInstalments, setShowInstalments] = useState(false)
+  // Directory names offered when adding a party the endorsement names
+  const [partyEntities, setPartyEntities] = useState<{ id: string; name: string }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string; number: number }>(
     { show: false, id: '', number: 0 }
   )
@@ -315,7 +326,8 @@ export default function EndorsementManager({
           dueDate: inst.dueDate?.slice(0, 10) || '',
           premiumAmount: String(inst.premiumAmount),
           commissionAmount: String(inst.commissionAmount)
-        }))
+        })),
+        screenParties: endorsement.screenParties || []
       })
       setIsEditing(true)
       setShowInstalments(instArr.length > 0)
@@ -368,6 +380,11 @@ export default function EndorsementManager({
             : null
         })
       }
+      await window.api.endorsementUpdate(endorsementId, {
+        screenParties: editState.screenParties
+          .map((p) => ({ ...p, name: p.name.trim() }))
+          .filter((p) => p.name)
+      })
       // Save sections
       await window.api.endorsementSetSections(
         endorsementId,
@@ -415,7 +432,43 @@ export default function EndorsementManager({
     }
   }
 
+  // An endorsement naming parties is screened before it is exported or signed: the action
+  // goes ahead when every party is clear, or once a Compliance user overrides the block
+  const [blocked, setBlocked] = useState<{
+    screening: SanctionsScreening
+    proceed: () => void
+  } | null>(null)
+  const [rescreening, setRescreening] = useState(false)
+  const passesScreening = async (
+    endorsement: PolicyEndorsement,
+    proceed: () => void
+  ): Promise<boolean> => {
+    if (!endorsement.screenParties?.length) return true
+    try {
+      // A clear (or overridden) check made since the endorsement was last changed still counts
+      const prev = await window.api.screeningList('endorsement', [endorsement.id])
+      const last = Array.isArray(prev) ? prev[0] : undefined
+      if (
+        last &&
+        (last.outcome === 'CLEAR' || last.overrideAt) &&
+        new Date(last.createdAt) >= new Date(endorsement.updatedAt)
+      )
+        return true
+      const s = await window.api.screeningCreate({
+        trigger: 'endorsement',
+        contextType: 'endorsement',
+        contextId: endorsement.id
+      })
+      if (s.outcome === 'CLEAR') return true
+      setBlocked({ screening: s, proceed })
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'The sanctions check failed')
+    }
+    return false
+  }
+
   const handleExport = async (endorsement: PolicyEndorsement): Promise<void> => {
+    if (!(await passesScreening(endorsement, () => void handleExport(endorsement)))) return
     setExporting(endorsement.id)
     try {
       const { exportEndorsementDocx } = await import('../services/PolicyExportService')
@@ -434,6 +487,7 @@ export default function EndorsementManager({
   }
 
   const handleExportDA = async (endorsement: PolicyEndorsement): Promise<void> => {
+    if (!(await passesScreening(endorsement, () => void handleExportDA(endorsement)))) return
     setExporting(endorsement.id + '_da')
     try {
       const { exportEndorsementDADocx } = await import('../services/PolicyExportService')
@@ -446,6 +500,7 @@ export default function EndorsementManager({
   }
 
   const handleExportCA = async (endorsement: PolicyEndorsement): Promise<void> => {
+    if (!(await passesScreening(endorsement, () => void handleExportCA(endorsement)))) return
     setExporting(endorsement.id + '_ca')
     try {
       const { exportEndorsementCADocx } = await import('../services/PolicyExportService')
@@ -458,6 +513,7 @@ export default function EndorsementManager({
   }
 
   const handleSign = async (endorsement: PolicyEndorsement): Promise<void> => {
+    if (!(await passesScreening(endorsement, () => void handleSign(endorsement)))) return
     try {
       await window.api.endorsementSign(endorsement.id)
       showSuccess('Endorsement signed')
@@ -1141,6 +1197,107 @@ export default function EndorsementManager({
               )
             })}
 
+          {/* Parties the endorsement names: screened before export / signing */}
+          <div
+            style={{
+              marginTop: '16px',
+              borderTop: '1px solid var(--glass-border-color)',
+              paddingTop: '12px'
+            }}
+          >
+            <div className="field-label">Parties named in this endorsement</div>
+            <p style={{ margin: '4px 0 8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              New owners, managers, operators or co-assureds. They are screened for sanctions before
+              the endorsement is exported or signed, with the policy&apos;s own parties.
+            </p>
+            <datalist id="endorsement-party-entities">
+              {partyEntities.map((e) => (
+                <option key={e.id} value={e.name} />
+              ))}
+            </datalist>
+            {editState.screenParties.map((p, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                <input
+                  type="text"
+                  list="endorsement-party-entities"
+                  value={p.name}
+                  placeholder="Name (from the Directory or typed)"
+                  aria-label="Party name"
+                  style={{ flex: 2, minWidth: 0 }}
+                  onChange={(e) => {
+                    const name = e.target.value
+                    const hit = partyEntities.find(
+                      (en) => en.name.trim().toLowerCase() === name.trim().toLowerCase()
+                    )
+                    setEditState((prev) => ({
+                      ...prev,
+                      screenParties: prev.screenParties.map((x, j) =>
+                        j === i
+                          ? hit
+                            ? { ...x, kind: 'entity', id: hit.id, name }
+                            : { ...x, kind: 'name', id: null, name }
+                          : x
+                      )
+                    }))
+                  }}
+                />
+                <select
+                  value={p.role}
+                  aria-label="Role"
+                  style={{ flex: 1, minWidth: 0 }}
+                  onChange={(e) =>
+                    setEditState((prev) => ({
+                      ...prev,
+                      screenParties: prev.screenParties.map((x, j) =>
+                        j === i ? { ...x, role: e.target.value } : x
+                      )
+                    }))
+                  }
+                >
+                  {PARTY_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  title="Remove"
+                  aria-label="Remove the party"
+                  onClick={() =>
+                    setEditState((prev) => ({
+                      ...prev,
+                      screenParties: prev.screenParties.filter((_, j) => j !== i)
+                    }))
+                  }
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                if (partyEntities.length === 0)
+                  void window.api.getEntities().then((list) => {
+                    if (Array.isArray(list))
+                      setPartyEntities(list.map((e) => ({ id: e.id, name: e.name })))
+                  })
+                setEditState((prev) => ({
+                  ...prev,
+                  screenParties: [
+                    ...prev.screenParties,
+                    { kind: 'name', id: null, name: '', role: 'Registered Owners' }
+                  ]
+                }))
+              }}
+            >
+              <Plus size={14} /> Add a party
+            </button>
+          </div>
+
           {/* Instalments */}
           <div
             style={{
@@ -1512,6 +1669,55 @@ export default function EndorsementManager({
             </div>
           ))}
         </div>
+      )}
+
+      {blocked && (
+        <Modal
+          title="Sanctions check"
+          onClose={() => setBlocked(null)}
+          width={760}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setBlocked(null)}>
+                Close
+              </button>
+              <button
+                className="btn-primary"
+                disabled={!blocked.screening.overrideAt && blocked.screening.outcome !== 'CLEAR'}
+                onClick={() => {
+                  const go = blocked.proceed
+                  setBlocked(null)
+                  go()
+                }}
+              >
+                Continue
+              </button>
+            </>
+          }
+        >
+          <ScreeningPanel
+            screening={blocked.screening}
+            running={rescreening}
+            blockingText="Exporting or signing this endorsement"
+            onChange={(s) => setBlocked((b) => (b ? { ...b, screening: s } : b))}
+            onRun={() => {
+              const id = blocked.screening.contextId
+              setRescreening(true)
+              window.api
+                .screeningCreate({
+                  trigger: 'endorsement',
+                  contextType: 'endorsement',
+                  contextId: id
+                })
+                .then((s) => setBlocked((b) => (b ? { ...b, screening: s } : b)))
+                .catch((err) =>
+                  showError((err instanceof Error && err.message) || 'The sanctions check failed')
+                )
+                .finally(() => setRescreening(false))
+            }}
+          />
+        </Modal>
       )}
 
       {deleteConfirm.show && (

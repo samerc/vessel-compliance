@@ -51,6 +51,12 @@ export interface NavTarget {
   action?: AppAction
 }
 
+/** Opens a page from a component that has no onNavigate prop (App listens) */
+export const NAVIGATE_EVENT = 'vc-navigate'
+export function requestNavigate(target: NavTarget): void {
+  window.dispatchEvent(new CustomEvent<NavTarget>(NAVIGATE_EVENT, { detail: target }))
+}
+
 // Same areas, in the same order, as the sidebar menu
 export type FeatureArea =
   'Underwriting' | 'Fleet' | 'Compliance' | 'Insights' | 'Tools' | 'Settings' | 'Personal'

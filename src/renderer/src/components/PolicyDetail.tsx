@@ -77,6 +77,7 @@ import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { Modal, Field, Tabs } from './ui'
+import { ScreeningBadge } from './ScreeningPanel'
 import { confirmDialog } from './DialogHost'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
@@ -1769,6 +1770,7 @@ export default function PolicyDetail({
             >
               {policy.status}
             </span>
+            <ScreeningBadge contextType="policy" contextId={policy.id} />
             {policy.revisionNumber > 0 && (
               <span
                 style={{
