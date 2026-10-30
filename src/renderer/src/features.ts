@@ -475,6 +475,15 @@ export const FEATURES: Feature[] = [
     description: 'Net due on war breaches, with saved history and Excel export.',
     keywords: 'calculator war breach'
   },
+  {
+    id: 'calc-transit',
+    title: 'Sea transit calculator',
+    area: 'Tools',
+    kind: 'view',
+    target: { tab: 'calculators', sub: 'transit' },
+    description: 'Days at sea between two ports at a given speed, with arrival date.',
+    keywords: 'calculator voyage distance port days eta cargo transit sea route'
+  },
 
   // ── Insights ──
   {

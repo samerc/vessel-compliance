@@ -194,6 +194,12 @@ Extensible calculator section with sub-navigation for insurance calculation tool
   - Calculates adjusted Total Loss Only premium when vessel value changes
   - **6-step calculation**: Current rate, rate/3, value difference, additional premium, new premium, new rate
   - **Pure calculator**: No database persistence, instant reactive computation via `useMemo`
+- **Sea Transit Calculator** (`src/renderer/src/components/SeaTransitCalculator.tsx`, added 2026-10-30 for cargo transits):
+  - From / To port pickers (search by name, country or UN/LOCODE; swap button), speed in knots (default 10, used when empty), optional departure date -> estimated arrival, and route options Avoid Suez Canal / Avoid Red Sea (Bab-el-Mandeb) / Avoid Panama Canal. The Northwest Passage is always avoided
+  - Shows days at sea (decimal + days/hours), distance in nm, arrival date and the passages sailed; Copy gives the figures as text
+  - **Offline routing** (`utils/seaRoute.ts`): Dijkstra over the searoute sea lane network, each port snapped to the nearest network node; lanes crossing the 180th meridian are folded so both sides join. Distances run within about 1-5% of published tables (Beirut-Singapore via Suez 5,336 nm)
+  - **Data** `assets/sea-routes.json` (3,924 ports, ~520 KB) loads as its own chunk on first use (ships in hot-updates). Rebuilt by `scripts/build-sea-routes.js` from the Python searoute package's data folder (Apache-2.0; network from Eurostat SeaRoute, EUPL-1.2); attribution in `assets/sea-routes.LICENSE.txt`
+  - **Pure calculator**: nothing saved
 - **War Breach Calculator** (`src/renderer/src/components/WarBreachCalculator.tsx`):
   - Calculates net due on war breach scenarios
   - **Persistent history**: Saves each calculation to DB with date, cover note, breach details, net due
