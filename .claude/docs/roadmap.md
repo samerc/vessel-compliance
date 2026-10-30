@@ -63,27 +63,72 @@ the document or recording the survey. One "My work" inbox across modules.
 Screening runs automatically at quotation creation, conversion, endorsements that change
 owners / managers, and receipts. One compliance badge (result, date, trigger) on every vessel,
 entity and case. Conversion blocked on an unresolved hit, with a recorded override.
+Next: a short plan covering when screening runs, what a hit blocks and who may override, and the
+badge on vessels / entities / quotations / policies. The engine exists; this wires it to those moments.
 
 ## 6. One managed document store
 Files stored in one managed place (or the DB) with versions, linked to case / vessel / entity /
 claim. Exports land there automatically; Windows folders become a browsable mirror. Ends the
 remap / missing-path problems.
+PROPOSED PLAN (2026-10-30, not approved): users keep working in their Windows folders; the app takes
+over the files gradually, 4 phases, each reversible and piloted with one user first:
+1. Track, don't move: one register of every file the app knows (vessel docs, exports, attachments)
+   with path, size, fingerprint; a check warns when a file goes missing / changes and re-finds moved
+   files. Invisible to users.
+2. Safe copy of exports: exports still go to the policy folder, the app also keeps its own copy (as
+   signed policies already do in policy_export_files).
+3. Copy uploads in, optional per area: on upload a copy goes to the app's store (a server folder only
+   the app writes to); the original stays.
+4. Store becomes the main copy only when everyone is comfortable; Windows folders become a mirror the
+   app keeps up to date.
+Storage: a server FOLDER, not the database (DB, backups and dumps would balloon).
+Needed from the user: size of today's document folders, how the server is backed up, how many VPN users.
 
 ## 7. One wording library, quotation to policy
 Clause / warranty / standard-text library with versions; quotations and policies point to a
 version and record any wording changed for that risk. "What changed since the quotation" before
 issuing. Wording updates as "new version from 1 Jan" with the live policies affected.
+TODAY (checked 2026-10-30): quotation items point to settings rows by id (e.g. quotation_warranties.
+pi_warranty_id, quotation_clauses.pi_clause_id) with ON DELETE CASCADE. Editing a wording in settings
+changes every quotation using it, approved ones included; policies freeze only on first export; no
+"where used". URGENT side finding: Delete on a settings warranty (QuotationSettings piDeleteWarranty)
+has NO confirmation and the cascade removes it from every quotation. Proposed quick fix (asked, not yet
+answered): confirm, and when in use show "used by N quotations" and offer RETIRE (hidden from new
+quotations, kept in old ones).
+PROPOSAL: editing makes a new version; a quotation keeps its version; drafts show "newer wording
+available" with a diff and one-click update; conversion carries exact versions; "what changed since the
+quotation" before issuing; where-used per wording incl. live policies.
+Open questions: drafts follow changes automatically or ask? Who may edit wordings?
 
 ## 8. Shared UI building blocks
 One combobox, sortable list, document picker, money input, date range used everywhere (the
 flag-field and arrows-vs-drag fixes of 2026-10-29 came from tabs building their own), with a
 lint rule against hand-built copies.
+Mostly code: users see the same keyboard behaviour everywhere, drag-to-sort instead of arrows,
+fewer "works on my screen" bugs. Done screen by screen alongside other work. Question for the user:
+drag-to-sort everywhere?
 
 ## 9. A small server between the app and the database
 Holds the DB login, enforces permissions server-side, runs migrations once. Opens the door to
 a broker portal (policies, documents, subjectivity uploads), email in/out linked to cases, a
 phone view.
+TODAY: every PC connects straight to MySQL with the DB password stored on the PC; permissions are
+checked inside the app, so anyone with the password can bypass them.
+With a server: users never hold a DB password, permissions checked server-side, migrations once.
+Base for point 6 over VPN, broker portal, email linked to quotations/policies, phone view.
+Cost: the biggest technical change (~820 adapter methods go through the server), movable area by area.
+Needed from the user: what the server runs (Windows? always on?), do remote users reach it only via VPN.
 
 ## 10. Quality safety net
 Golden copies of every export type compared on each change (with Word renders of differences),
 and a recorded end-to-end test run before each deploy.
+DETAIL (given 2026-10-30):
+A. Reference copies: a fixed set of real cases (P&I quotation, Hull fleet quotation, War policy,
+   endorsement, DA, ...). On every change every export is regenerated, text + layout compared with the
+   approved copy, differences rendered in Word page by page before/after. Intended changes: approve the
+   new copy as the reference.
+B. Pre-deploy run: a script drives the real app on a DB copy (temp test user): every page, create / edit
+   / export quotations, calculators, error check. Approval, registry numbering, Create Policy stay
+   manual. One-page report; a failure stops the deploy.
+Effort ~2-3 days (Word on the dev PC). User's part: pick 10-15 real quotations/policies covering every
+cover type and the awkward cases.
