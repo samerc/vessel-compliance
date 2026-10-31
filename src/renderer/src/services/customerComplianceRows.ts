@@ -6,8 +6,8 @@ import type {
   VesselDocument
 } from '../../../shared/types'
 
-// vessels:getAssureds returns no names today, so the assured column reads '—' (see report)
-type AssuredWithName = VesselAssured & { entityName?: string; name?: string }
+// getVesselAssureds carries the entity name (entityName); `name` is an older field
+type AssuredWithName = VesselAssured & { name?: string }
 
 // Customer compliance rows (no PDF code, so pages can build rows without loading jspdf).
 // The per-customer PDF lives in CustomerComplianceExport, which re-exports these.
