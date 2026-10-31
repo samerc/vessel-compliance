@@ -20,7 +20,7 @@ export function DocTypeCodeInput({
     setValue(code || '')
   }
   const save = (): void => {
-    const next = value.trim().toUpperCase() || null
+    const next = value.trim() || null
     if (next === (code || null)) return
     void onSave(next)
   }
@@ -28,7 +28,7 @@ export function DocTypeCodeInput({
     <input
       type="text"
       value={value}
-      onChange={(e) => setValue(e.target.value.toUpperCase())}
+      onChange={(e) => setValue(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()

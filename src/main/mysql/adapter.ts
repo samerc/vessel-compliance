@@ -6093,6 +6093,43 @@ export class MySQLAdapter {
       const [vdfCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'documents_folder'")
       if ((vdfCols as RowDataPacket[]).length === 0)
         await this.pool.query('ALTER TABLE vessels ADD COLUMN documents_folder TEXT NULL')
+      // File codes agreed with the user (2026-10-31), set once by type name; a code already
+      // entered in Settings is kept
+      if ((await this.getSetting('migration_doc_short_codes_v1')) !== '1') {
+        const vesselCodes: [string, string][] = [
+          ['Certificate of Registry', 'COR'],
+          ['Class Certificate', 'Class'],
+          ['ISM Certificate - SMC', 'SMC'],
+          ['ISM Certificate - DOC', 'DOC'],
+          ['Salaries Letter', 'Salaries Letter'],
+          ['Medical Examination Letter', 'Medical Letter'],
+          ['Crew Lists evidencing Nationalities', 'Crew List Nat'],
+          ['Crew Lists evidencing Salaries', 'Crew List Sal'],
+          ['Sample of Crew Contracts', 'Crew Contract'],
+          ['P&I Application', 'PI App'],
+          ['Hull Application', 'Hull App'],
+          ['Latest Dry-Dock Report', 'DD Report'],
+          ['Latest UTM Report', 'UTM']
+        ]
+        const entityCodes: [string, string][] = [
+          ['KYC', 'KYC'],
+          ['Certificate of Good Standing', 'Good Standing'],
+          ['Certificate of Incorporation', 'Incorporation'],
+          ['ID / Passport', 'Passport'],
+          ['Certificate of Incumbency', 'Incumbency'],
+          ['Articles of Association', 'Articles']
+        ]
+        for (const [table, codes] of [
+          ['document_types', vesselCodes],
+          ['entity_document_types', entityCodes]
+        ] as const)
+          for (const [name, code] of codes)
+            await this.pool.query(
+              `UPDATE ${table} SET short_code = ? WHERE name = ? AND (short_code IS NULL OR short_code = '')`,
+              [code, name]
+            )
+        await this.setSetting('migration_doc_short_codes_v1', '1')
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -6380,13 +6417,12 @@ export class MySQLAdapter {
   }
 
   // --- Document Types ---
-  /** A document type's short code as stored: trimmed, upper case, file-name safe, empty = null */
+  /** A document type's short code as stored: trimmed, file-name safe, case kept, empty = null */
   static cleanShortCode(code: string | null | undefined): string | null {
     const c = String(code ?? '')
       // eslint-disable-next-line no-control-regex -- Windows file names cannot hold control characters
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
       .trim()
-      .toUpperCase()
       .slice(0, 20)
     return c || null
   }
