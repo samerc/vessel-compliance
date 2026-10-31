@@ -8,6 +8,8 @@ import {
 } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 import { masterData } from './masterDataCache'
+import { HiddenInSettingsBadge } from './shared'
+import { isOffered, offeredItems } from '../../utils/settingsItems'
 
 export default function WarConditionsTab({
   quotation,
@@ -53,7 +55,8 @@ export default function WarConditionsTab({
         safeConds.length > 0
       ) {
         defaultsApplied.current = true
-        const defaults = safeConds.filter((c) => c.defaultSelected)
+        // Conditions hidden in settings are never auto-applied
+        const defaults = safeConds.filter((c) => c.defaultSelected && isOffered(c))
         if (defaults.length > 0) {
           try {
             await window.api.warSetQuotationWarConditions(
@@ -186,7 +189,7 @@ export default function WarConditionsTab({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {allConditions.map((cond) => {
+          {offeredItems(allConditions, selectedIds).map((cond) => {
             const isSelected = selectedIds.has(cond.id)
             const displayText = resolveText(overrides[cond.id] || cond.text)
             return (
@@ -207,7 +210,8 @@ export default function WarConditionsTab({
                     style={{ marginTop: '3px', accentColor: 'var(--accent-primary)' }}
                   />
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '0.84rem' }}>{displayText}</span>
+                    <span style={{ fontSize: '0.84rem' }}>{displayText}</span>{' '}
+                    <HiddenInSettingsBadge item={cond} />
                     {isSelected && (
                       <textarea
                         value={overrides[cond.id] || ''}

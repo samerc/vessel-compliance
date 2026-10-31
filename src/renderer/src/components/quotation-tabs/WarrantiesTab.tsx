@@ -24,12 +24,13 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips } from './shared'
+import { AlternativeScopeChips, HiddenInSettingsBadge } from './shared'
 import { ALT_COLORS, confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { Modal, Field } from '../ui'
 import { masterData } from './masterDataCache'
+import { isOffered, withoutHiddenIds } from '../../utils/settingsItems'
 
 export default function WarrantiesTab({
   quotation,
@@ -133,10 +134,11 @@ export default function WarrantiesTab({
         safeSets.length > 0
       ) {
         defaultsApplied.current = true
-        // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
+        // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations,
+        // and never auto-apply warranties hidden in settings
         const scopeValid = new Set(
           safeAll
-            .filter((w) => inTypeScope(w.typeScope, quotation.quotationTypeCode))
+            .filter((w) => isOffered(w) && inTypeScope(w.typeScope, quotation.quotationTypeCode))
             .map((w) => w.id)
         )
         const defaultIds: string[] = []
@@ -198,7 +200,8 @@ export default function WarrantiesTab({
     const ws = warrantySets.find((s) => s.id === setId)
     if (!ws?.warrantyIds) return
     const newIds = [...selectedIds]
-    for (const wid of ws.warrantyIds) {
+    // A set never adds warranties hidden in settings
+    for (const wid of withoutHiddenIds(ws.warrantyIds, allWarranties)) {
       if (!newIds.includes(wid)) newIds.push(wid)
     }
     await saveSelected(sortByMasterOrder(newIds))
@@ -363,6 +366,8 @@ export default function WarrantiesTab({
     }
   }, [fddLivestock, allWarranties, selectedIds, quotation.id, showSuccess])
   const visibleWarranties = allWarranties.filter((w) => {
+    // Hidden in settings: only listed while selected in this quotation
+    if (!isOffered(w, selectedIds.includes(w.id))) return false
     // Exclude cargo-related warranties unless cargo type or cargo clause selected
     if (!showCargoWarranties && w.isCargoRelated) return false
     return inTypeScope(w.typeScope, quotation.quotationTypeCode)
@@ -449,9 +454,14 @@ export default function WarrantiesTab({
   // Loose items: selected but not in any applied set
   const looseSelectedIds = selectedIds.filter((id) => !appliedSetWarrantyIds.has(id))
 
+  // The warranties a set adds (those hidden in settings are left out)
+  const setOfferedIds = (ws: PIWarrantySet): string[] =>
+    withoutHiddenIds(ws.warrantyIds || [], allWarranties)
+
   const isSetFullyApplied = (ws: PIWarrantySet): boolean => {
-    if (!ws.warrantyIds?.length) return false
-    return ws.warrantyIds.every((wid) => selectedIds.includes(wid))
+    const ids = setOfferedIds(ws)
+    if (!ids.length) return false
+    return ids.every((wid) => selectedIds.includes(wid))
   }
 
   const removeSetWarranties = async (setId: string): Promise<void> => {
@@ -633,7 +643,7 @@ export default function WarrantiesTab({
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          {ws.warrantyIds?.length || 0}
+                          {setOfferedIds(ws).length}
                         </span>
                         {fullyApplied ? (
                           <span
@@ -832,7 +842,8 @@ export default function WarrantiesTab({
                         style={{ fontSize: '0.78rem', whiteSpace: 'pre-wrap', lineHeight: 1.3 }}
                       >
                         {w.text}
-                      </span>
+                      </span>{' '}
+                      <HiddenInSettingsBadge item={w} />
                       {activeTab === 'all' && (
                         <div
                           style={{
@@ -1107,7 +1118,7 @@ export default function WarrantiesTab({
                                 ⠿
                               </span>
                               <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>
-                                {w.text}
+                                {w.text} <HiddenInSettingsBadge item={w} />
                               </span>
                               <button
                                 onClick={() => toggle(wid)}
@@ -1219,7 +1230,7 @@ export default function WarrantiesTab({
                               ⠿
                             </span>
                             <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>
-                              {w.text}
+                              {w.text} <HiddenInSettingsBadge item={w} />
                             </span>
                             <button
                               onClick={() => toggle(id)}

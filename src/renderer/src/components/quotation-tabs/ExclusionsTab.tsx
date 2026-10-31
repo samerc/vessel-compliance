@@ -12,11 +12,12 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { Modal } from '../ui'
-import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
+import { AlternativeScopeChips, AlternativeMultiScopeChips, HiddenInSettingsBadge } from './shared'
 import { confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
+import { isOffered } from '../../utils/settingsItems'
 
 // A quotation_exclusions row (the IPC type omits alternativeId, which the adapter returns)
 type ExclusionRow = Awaited<ReturnType<typeof window.api.getQuotationExclusions>>[number] & {
@@ -123,8 +124,10 @@ export default function ExclusionsTab({
               .filter((vt) => vesselTypeNames.has(vt.name.toLowerCase()))
               .map((vt) => vt.id)
           )
+          // Exclusions hidden in settings are never auto-selected
           const toAutoSelect = safeAll.filter(
             (ex) =>
+              isOffered(ex) &&
               !currentIds.has(ex.id) &&
               (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
           )
@@ -170,7 +173,9 @@ export default function ExclusionsTab({
   }, [fddLivestock, allExclusions, selectedRows])
 
   // Filter: hide cargo-related exclusions from non-cargo quotations
+  // and those hidden in settings unless already selected here
   const visibleExclusions = allExclusions.filter((e) => {
+    if (!isOffered(e, selectedIds.has(e.id))) return false
     if (e.isCargoRelated && !isCargo && !hasCargoClause) return false
     return true
   })
@@ -341,7 +346,9 @@ export default function ExclusionsTab({
   }
 
   // Count hidden cargo exclusions
-  const hiddenCargoCount = allExclusions.filter((e) => e.isCargoRelated && !hasCargoClause).length
+  const hiddenCargoCount = allExclusions.filter(
+    (e) => e.isCargoRelated && !hasCargoClause && isOffered(e, selectedIds.has(e.id))
+  ).length
 
   return (
     <div>
@@ -437,6 +444,7 @@ export default function ExclusionsTab({
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{e.text}</span>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                    <HiddenInSettingsBadge item={e} />
                     {e.isCargoRelated && (
                       <span
                         style={{

@@ -13,6 +13,8 @@ import { ok } from '../../utils/ipc'
 import { Field } from '../ui'
 import { cachedIpc, masterData } from './masterDataCache'
 import { confirmDelete } from './sharedUtils'
+import { HiddenInSettingsBadge } from './shared'
+import { offeredItems, withoutHiddenIds } from '../../utils/settingsItems'
 
 const SECTION_LABELS: Record<string, string> = {
   conditions: 'Conditions',
@@ -99,7 +101,8 @@ function InstituteClauseDropdown({
           <span>
             {selected
               ? `${selected.code ? selected.code + ' — ' : ''}${selected.name}`
-              : 'Select an institute cargo clause...'}
+              : 'Select an institute cargo clause...'}{' '}
+            <HiddenInSettingsBadge item={selected} />
           </span>
           <ChevronDown
             size={16}
@@ -168,6 +171,7 @@ function InstituteClauseDropdown({
                       </span>
                     )}
                     <span>{ic.name}</span>
+                    <HiddenInSettingsBadge item={ic} />
                   </div>
                   {ic.description && (
                     <p
@@ -260,7 +264,8 @@ export default function CargoClausesTab({
         amount: c.amount ?? null
       }))
       const existingIds = new Set(existing.map((e) => e.cargoClauseId))
-      const additions = set.clauseIds
+      // A set never adds clauses hidden in settings (inactive)
+      const additions = withoutHiddenIds(set.clauseIds, allClauses)
         .filter((id) => !existingIds.has(id))
         .map((id) => ({ cargoClauseId: id }))
       setShowSetPicker(false)
@@ -288,7 +293,8 @@ export default function CargoClausesTab({
       if (section !== 'conditions') return
       try {
         const result = await masterData('cargoGetInstituteClauses')
-        setInstituteClauses(Array.isArray(result) ? result.filter((c) => c.active !== false) : [])
+        // All of them: an inactive one stays an option while this quotation uses it
+        setInstituteClauses(Array.isArray(result) ? result : [])
       } catch {
         setInstituteClauses([])
       }
@@ -381,7 +387,9 @@ export default function CargoClausesTab({
     setEditingCustom(null)
   }
 
-  const availableClauses = allClauses.filter((c) => c.active !== false)
+  // Inactive (hidden) clauses are only listed while selected in this quotation
+  const availableClauses = offeredItems(allClauses, selectedIds)
+  const offeredInstituteClauses = offeredItems(instituteClauses, [quotation.cargoClauseId])
 
   const handleInstituteClauseChange = (id: string): void => {
     if (updateField) {
@@ -392,9 +400,9 @@ export default function CargoClausesTab({
   return (
     <div>
       {/* Institute Cargo Clause selector (conditions section only) */}
-      {section === 'conditions' && instituteClauses.length > 0 && (
+      {section === 'conditions' && offeredInstituteClauses.length > 0 && (
         <InstituteClauseDropdown
-          clauses={instituteClauses}
+          clauses={offeredInstituteClauses}
           selectedId={quotation.cargoClauseId || ''}
           onChange={handleInstituteClauseChange}
         />
@@ -478,7 +486,7 @@ export default function CargoClausesTab({
                           marginLeft: '6px'
                         }}
                       >
-                        ({s.clauseIds.length})
+                        ({withoutHiddenIds(s.clauseIds, allClauses).length})
                       </span>
                     </div>
                   ))}
@@ -540,7 +548,7 @@ export default function CargoClausesTab({
               />
               <span>
                 {clause.code && <strong style={{ marginRight: '6px' }}>{clause.code}</strong>}
-                {clause.title}
+                {clause.title} <HiddenInSettingsBadge item={clause} />
               </span>
             </label>
           ))}
@@ -570,7 +578,7 @@ export default function CargoClausesTab({
                 >
                   <span style={{ fontSize: '0.84rem', flex: 1 }}>
                     {def?.code && <strong style={{ marginRight: '6px' }}>{def.code}</strong>}
-                    {def?.title || sc.title || 'Unknown'}
+                    {def?.title || sc.title || 'Unknown'} <HiddenInSettingsBadge item={def} />
                   </span>
                   <button
                     title="Delete"

@@ -28,7 +28,9 @@ import {
   DollarSign,
   ClipboardCheck,
   GripVertical,
-  Layers
+  Layers,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import {
   PIClause,
@@ -67,7 +69,8 @@ import {
   TradingCustomText,
   CargoClause,
   CargoClauseSet,
-  CargoInstituteClause
+  CargoInstituteClause,
+  SettingsItemUsage
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { sanitizeHtml } from '../utils/sanitize'
@@ -77,9 +80,161 @@ import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
 import DeductibleValueInputs from './quotation-tabs/DeductibleValueInputs'
 import { confirmDialog } from './DialogHost'
-import { Modal, Field } from './ui'
+import { Modal, Field, Badge } from './ui'
+import {
+  useSettingsItemUsage,
+  isHiddenItem,
+  confirmWordingEdit,
+  moveAmongVisible,
+  hiddenRowStyle,
+  plural,
+  OLDER_WORDING_EDIT_TITLE,
+  OLDER_WORDING_TITLE,
+  type LifecycleFields
+} from './settings/SettingsItemUsage'
 
 import { StickyNote } from 'lucide-react'
+
+// ---- Settings items quotations use: usage pill, hidden / older wording, hide or delete ----
+
+/** "Used in N" pill. Nothing when unused */
+function UsageBadge({ usage }: { usage?: SettingsItemUsage }): React.JSX.Element | null {
+  const n = usage ? usage.drafts + usage.sent : 0
+  if (n <= 0 || !usage) return null
+  return (
+    <Badge
+      tone="neutral"
+      title={`${plural(usage.drafts, 'draft', 'drafts')}, ${plural(usage.sent, 'sent quotation', 'sent quotations')}`}
+      style={{ marginLeft: '6px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}
+    >
+      Used in {n}
+    </Badge>
+  )
+}
+
+/** Hidden / Older wording pills for a row */
+function ItemStateBadges({
+  item,
+  hidden
+}: {
+  item: LifecycleFields
+  /** Override for tables whose hide flag is not isHidden (cargo: !active) */
+  hidden?: boolean
+}): React.JSX.Element | null {
+  const isHid = hidden ?? isHiddenItem(item)
+  if (!isHid && !item.replacedBy) return null
+  return (
+    <>
+      {isHid && (
+        <Badge
+          tone="neutral"
+          title="Not offered for new quotations; kept in the quotations that use it"
+          style={{ marginLeft: '6px', verticalAlign: 'middle' }}
+        >
+          Hidden
+        </Badge>
+      )}
+      {item.replacedBy && (
+        <Badge
+          tone="neutral"
+          title={OLDER_WORDING_TITLE}
+          style={{ marginLeft: '6px', verticalAlign: 'middle' }}
+        >
+          Older wording
+        </Badge>
+      )}
+    </>
+  )
+}
+
+/** "Show hidden (n)" chip, only when there are hidden items */
+function ShowHiddenToggle({
+  count,
+  shown,
+  onChange
+}: {
+  count: number
+  shown: boolean
+  onChange: (v: boolean) => void
+}): React.JSX.Element | null {
+  if (count <= 0) return null
+  return (
+    <button
+      type="button"
+      className={`chip${shown ? ' active' : ''}`}
+      onClick={() => onChange(!shown)}
+      title="Hidden items are no longer offered for new quotations"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+    >
+      {shown ? <EyeOff size={12} /> : <Eye size={12} />}
+      {shown ? 'Hide hidden' : 'Show hidden'} ({count})
+    </button>
+  )
+}
+
+const usageIconBtn: React.CSSProperties = { padding: '4px', fontSize: '0.75rem' }
+
+/**
+ * Delete when unused; Hide when used; Show for a hidden row (plus Delete if it is unused).
+ * `toggle={false}` for tables with their own hide / show control (cargo active toggle).
+ */
+function HideOrDeleteButtons({
+  used,
+  hidden,
+  onDelete,
+  onHide,
+  toggle = true,
+  style
+}: {
+  used: number
+  hidden: boolean
+  onDelete: () => void
+  onHide: (hidden: boolean) => void
+  toggle?: boolean
+  style?: React.CSSProperties
+}): React.JSX.Element {
+  const s = { ...usageIconBtn, ...style }
+  return (
+    <>
+      {toggle && hidden && (
+        <button
+          type="button"
+          title="Show: offer it again for new quotations"
+          aria-label="Show"
+          onClick={() => onHide(false)}
+          className="btn-secondary"
+          style={s}
+        >
+          <Eye size={12} />
+        </button>
+      )}
+      {toggle && !hidden && used > 0 && (
+        <button
+          type="button"
+          title={`Hide: no longer offered for new quotations, kept in the ${plural(used, 'quotation that uses', 'quotations that use')} it`}
+          aria-label="Hide"
+          onClick={() => onHide(true)}
+          className="btn-secondary"
+          style={s}
+        >
+          <EyeOff size={12} />
+        </button>
+      )}
+      {used === 0 && (
+        <button
+          type="button"
+          title="Delete"
+          aria-label="Delete"
+          onClick={onDelete}
+          className="btn-secondary"
+          style={{ ...s, color: 'var(--danger)' }}
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+    </>
+  )
+}
 
 type SettingsTab =
   | 'quotationTypes'
@@ -1021,6 +1176,9 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
     setClauses(c)
     setClauseSets(s)
   }, [])
+  const usage = useSettingsItemUsage('pi_clause', loadData, showError)
+  const hiddenCount = clauses.filter(isHiddenItem).length
+  const visibleClauses = usage.showHidden ? clauses : clauses.filter((c) => !isHiddenItem(c))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -1059,6 +1217,13 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   }
 
   const saveEdit = async (id: string): Promise<void> => {
+    const orig = clauses.find((c) => c.id === id)
+    const wordingChanged =
+      !!orig &&
+      (String(orig.clauseNumber) !== editNumber.trim() ||
+        orig.name !== editName ||
+        (orig.description || '') !== editDesc)
+    if (!(await confirmWordingEdit(usage.sentOf(id), wordingChanged))) return
     try {
       await window.api.piUpdateClause(id, {
         clauseNumber: parseInt(editNumber),
@@ -1068,23 +1233,28 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
       })
       setEditingId(null)
       showSuccess('Clause updated')
-      loadData()
+      await loadData()
+      void usage.reload()
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleDelete = async (id: string): Promise<void> => {
-    await window.api.piDeleteClause(id)
-    showSuccess('Clause deleted')
-    loadData()
+  const handleDelete = async (c: PIClause): Promise<void> => {
+    if (!(await confirmDialog(`Delete clause ${c.clauseNumber} "${c.name}"?`))) return
+    try {
+      await window.api.piDeleteClause(c.id)
+      showSuccess('Clause deleted')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete clause')
+    }
+    await loadData()
+    void usage.reload()
   }
 
   const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...clauses]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+    if (!newOrder) return
     setClauses(newOrder)
     await window.api.piReorderClauses(newOrder.map((c) => c.id))
   }
@@ -1195,7 +1365,16 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
           </button>
         </form>
 
-        {clauses.length > 0 && (
+        {hiddenCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <ShowHiddenToggle
+              count={hiddenCount}
+              shown={usage.showHidden}
+              onChange={usage.setShowHidden}
+            />
+          </div>
+        )}
+        {visibleClauses.length > 0 && (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -1208,8 +1387,8 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {clauses.map((c, i) => (
-                  <tr key={c.id}>
+                {visibleClauses.map((c, i) => (
+                  <tr key={c.id} style={hiddenRowStyle(isHiddenItem(c))}>
                     {editingId === c.id ? (
                       <>
                         <td>
@@ -1274,7 +1453,11 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
                     ) : (
                       <>
                         <td style={{ fontWeight: 600 }}>{c.clauseNumber}</td>
-                        <td>{c.name}</td>
+                        <td>
+                          {c.name}
+                          <UsageBadge usage={usage.usage[c.id]} />
+                          <ItemStateBadges item={c} />
+                        </td>
                         <td className="muted">{c.description || '-'}</td>
                         <td style={{ textAlign: 'center' }}>
                           {c.isCargoRelated && (
@@ -1327,40 +1510,34 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
                               title="Move down"
                               aria-label="Move down"
                               onClick={() => handleMove(i, 'down')}
-                              disabled={i === clauses.length - 1}
+                              disabled={i === visibleClauses.length - 1}
                               style={{
                                 background: 'transparent',
                                 border: 'none',
                                 cursor: 'pointer',
                                 padding: '2px',
                                 color: 'var(--text-secondary)',
-                                opacity: i === clauses.length - 1 ? 0.3 : 1
+                                opacity: i === visibleClauses.length - 1 ? 0.3 : 1
                               }}
                             >
                               <ChevronDown size={14} />
                             </button>
                             <button
-                              title="Edit"
+                              title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                               aria-label="Edit"
                               onClick={() => startEdit(c)}
+                              disabled={!!c.replacedBy}
                               className="btn-secondary"
                               style={{ padding: '4px', fontSize: '0.75rem' }}
                             >
                               <Pencil size={12} />
                             </button>
-                            <button
-                              title="Delete"
-                              aria-label="Delete"
-                              onClick={() => handleDelete(c.id)}
-                              className="btn-secondary"
-                              style={{
-                                padding: '4px',
-                                fontSize: '0.75rem',
-                                color: 'var(--danger)'
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <HideOrDeleteButtons
+                              used={usage.countOf(c.id)}
+                              hidden={isHiddenItem(c)}
+                              onDelete={() => handleDelete(c)}
+                              onHide={(h) => usage.setHidden(c.id, h)}
+                            />
                           </div>
                         </td>
                       </>
@@ -1500,34 +1677,36 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
               Select which clauses to include in this set:
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-              {clauses.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    const next = new Set(setClauseIds)
-                    if (next.has(c.id)) next.delete(c.id)
-                    else next.add(c.id)
-                    setSetClauseIds(next)
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    border: setClauseIds.has(c.id)
-                      ? '1px solid var(--accent-primary)'
-                      : '1px solid var(--glass-border-color)',
-                    background: setClauseIds.has(c.id)
-                      ? 'rgba(var(--accent-primary-rgb), 0.15)'
-                      : 'transparent',
-                    color: setClauseIds.has(c.id)
-                      ? 'var(--accent-primary)'
-                      : 'var(--text-secondary)'
-                  }}
-                >
-                  Cl. {c.clauseNumber}
-                </button>
-              ))}
+              {clauses
+                .filter((c) => !isHiddenItem(c) || setClauseIds.has(c.id))
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      const next = new Set(setClauseIds)
+                      if (next.has(c.id)) next.delete(c.id)
+                      else next.add(c.id)
+                      setSetClauseIds(next)
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      border: setClauseIds.has(c.id)
+                        ? '1px solid var(--accent-primary)'
+                        : '1px solid var(--glass-border-color)',
+                      background: setClauseIds.has(c.id)
+                        ? 'rgba(var(--accent-primary-rgb), 0.15)'
+                        : 'transparent',
+                      color: setClauseIds.has(c.id)
+                        ? 'var(--accent-primary)'
+                        : 'var(--text-secondary)'
+                    }}
+                  >
+                    Cl. {c.clauseNumber}
+                  </button>
+                ))}
             </div>
             {/* Description overrides for selected clauses */}
             {clauses.filter((c) => setClauseIds.has(c.id)).length > 0 && (
@@ -1667,6 +1846,8 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
     setTags(Array.isArray(t) ? t : [])
     setWarrantySets(Array.isArray(s) ? s : [])
   }, [])
+  const usage = useSettingsItemUsage('pi_warranty', loadData, showError)
+  const hiddenCount = warranties.filter(isHiddenItem).length
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -1695,6 +1876,8 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
   }
 
   const saveEdit = async (id: string): Promise<void> => {
+    const orig = warranties.find((w) => w.id === id)
+    if (!(await confirmWordingEdit(usage.sentOf(id), !!orig && orig.text !== editText))) return
     await window.api.piUpdateWarranty(id, {
       text: editText,
       isCargoRelated: editCargoRelated,
@@ -1704,7 +1887,8 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
     })
     setEditingId(null)
     showSuccess('Warranty updated')
-    loadData()
+    await loadData()
+    void usage.reload()
   }
 
   const dragWarrantySettingsRef = useRef<string | null>(null)
@@ -1825,7 +2009,7 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
     n.has(id) ? n.delete(id) : n.add(id)
     setBulkSelected(n)
   }
-  const bulkSelectAll = (): void => setBulkSelected(new Set(warranties.map((w) => w.id)))
+  const bulkSelectAll = (): void => setBulkSelected(new Set(filteredWarranties.map((w) => w.id)))
   const bulkDeselectAll = (): void => setBulkSelected(new Set())
   const bulkAssignTag = async (tagId: string): Promise<void> => {
     const toUpdate = warranties.filter(
@@ -1894,15 +2078,15 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
 
   const ckStyle = { width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }
 
-  const filteredWarranties =
-    warrantyTypeFilter === 'show_all'
-      ? warranties
-      : warranties.filter(
-          (w) =>
-            !w.typeScope ||
-            w.typeScope === 'all' ||
-            w.typeScope.split(',').includes(warrantyTypeFilter)
-        )
+  const filteredWarranties = (
+    usage.showHidden ? warranties : warranties.filter((w) => !isHiddenItem(w))
+  ).filter(
+    (w) =>
+      warrantyTypeFilter === 'show_all' ||
+      !w.typeScope ||
+      w.typeScope === 'all' ||
+      w.typeScope.split(',').includes(warrantyTypeFilter)
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2103,31 +2287,33 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
               style={{ width: '100%', marginBottom: '8px', padding: '6px 10px' }}
             />
             <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '8px' }}>
-              {warranties.map((w) => (
-                <label
-                  key={w.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                    padding: '4px 0',
-                    fontSize: '0.82rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={setWarrantyIds.has(w.id)}
-                    onChange={() => {
-                      const n = new Set(setWarrantyIds)
-                      n.has(w.id) ? n.delete(w.id) : n.add(w.id)
-                      setSetWarrantyIds(n)
+              {warranties
+                .filter((w) => !isHiddenItem(w) || setWarrantyIds.has(w.id))
+                .map((w) => (
+                  <label
+                    key={w.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      padding: '4px 0',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
                     }}
-                    style={ckStyle}
-                  />
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{w.text}</span>
-                </label>
-              ))}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={setWarrantyIds.has(w.id)}
+                      onChange={() => {
+                        const n = new Set(setWarrantyIds)
+                        n.has(w.id) ? n.delete(w.id) : n.add(w.id)
+                        setSetWarrantyIds(n)
+                      }}
+                      style={ckStyle}
+                    />
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{w.text}</span>
+                  </label>
+                ))}
             </div>
             <div
               style={{
@@ -2569,6 +2755,15 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
           </div>
         </form>
 
+        {hiddenCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <ShowHiddenToggle
+              count={hiddenCount}
+              shown={usage.showHidden}
+              onChange={usage.setShowHidden}
+            />
+          </div>
+        )}
         {filteredWarranties.map((w) => (
           <div
             key={w.id}
@@ -2577,6 +2772,7 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleWarrantySettingsDrop(w.id)}
             style={{
+              ...hiddenRowStyle(isHiddenItem(w)),
               padding: '10px 14px',
               borderRadius: '8px',
               border:
@@ -2726,6 +2922,8 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{w.text}</div>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <UsageBadge usage={usage.usage[w.id]} />
+                    <ItemStateBadges item={w} />
                     {w.defaultSelected && (
                       <span
                         style={{
@@ -2815,8 +3013,9 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
                     ⠿
                   </span>
                   <button
-                    title="Edit"
+                    title={w.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                     aria-label="Edit"
+                    disabled={!!w.replacedBy}
                     onClick={() => {
                       setEditingId(w.id)
                       setEditText(w.text)
@@ -2830,19 +3029,22 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
                   >
                     <Pencil size={12} />
                   </button>
-                  <button
-                    title="Delete"
-                    aria-label="Delete"
-                    onClick={async () => {
-                      await window.api.piDeleteWarranty(w.id)
-                      showSuccess('Deleted')
-                      loadData()
+                  <HideOrDeleteButtons
+                    used={usage.countOf(w.id)}
+                    hidden={isHiddenItem(w)}
+                    onHide={(h) => usage.setHidden(w.id, h)}
+                    onDelete={async () => {
+                      if (!(await confirmDialog('Delete this warranty?'))) return
+                      try {
+                        await window.api.piDeleteWarranty(w.id)
+                        showSuccess('Deleted')
+                      } catch (err) {
+                        showError((err instanceof Error && err.message) || 'Failed to delete')
+                      }
+                      await loadData()
+                      void usage.reload()
                     }}
-                    className="btn-secondary"
-                    style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  />
                 </div>
               </>
             )}
@@ -3605,7 +3807,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
 
 // ==================== Exclusions Tab ====================
 
-function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
+function ExclusionsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [exclusions, setExclusions] = useState<PIExclusion[]>([])
   const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
   const [newText, setNewText] = useState('')
@@ -3631,6 +3833,11 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
     setExclusions(Array.isArray(ex) ? ex : [])
     setVesselTypes(Array.isArray(vt) ? vt : [])
   }, [])
+  const usage = useSettingsItemUsage('pi_exclusion', loadData, showError)
+  const hiddenCount = exclusions.filter(isHiddenItem).length
+  const visibleExclusions = usage.showHidden
+    ? exclusions
+    : exclusions.filter((x) => !isHiddenItem(x))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -3654,6 +3861,8 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
   }
 
   const saveEdit = async (id: string): Promise<void> => {
+    const orig = exclusions.find((x) => x.id === id)
+    if (!(await confirmWordingEdit(usage.sentOf(id), !!orig && orig.text !== editText))) return
     await window.api.piUpdateExclusion(id, {
       text: editText,
       isCargoRelated: editCargoRelated,
@@ -3661,14 +3870,13 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
     })
     setEditingId(null)
     showSuccess('Updated')
-    loadData()
+    await loadData()
+    void usage.reload()
   }
 
   const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...exclusions]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(exclusions, visibleExclusions, index, direction)
+    if (!newOrder) return
     setExclusions(newOrder)
     await window.api.piReorderExclusions(newOrder.map((e) => e.id))
   }
@@ -3683,7 +3891,7 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
     else n.add(id)
     setBulkSelected(n)
   }
-  const bulkSelectAll = (): void => setBulkSelected(new Set(exclusions.map((e) => e.id)))
+  const bulkSelectAll = (): void => setBulkSelected(new Set(visibleExclusions.map((e) => e.id)))
   const bulkDeselectAll = (): void => setBulkSelected(new Set())
 
   const bulkToggleCargo = async (value: boolean): Promise<void> => {
@@ -3965,10 +4173,20 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
         </button>
       </form>
 
-      {exclusions.map((ex, i) => (
+      {hiddenCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <ShowHiddenToggle
+            count={hiddenCount}
+            shown={usage.showHidden}
+            onChange={usage.setShowHidden}
+          />
+        </div>
+      )}
+      {visibleExclusions.map((ex, i) => (
         <div
           key={ex.id}
           style={{
+            ...hiddenRowStyle(isHiddenItem(ex)),
             padding: '10px 14px',
             borderRadius: '8px',
             border:
@@ -4050,6 +4268,8 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{ex.text}</div>
                 <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <UsageBadge usage={usage.usage[ex.id]} />
+                  <ItemStateBadges item={ex} />
                   {ex.isCargoRelated && (
                     <span
                       style={{
@@ -4110,21 +4330,22 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
                   title="Move down"
                   aria-label="Move down"
                   onClick={() => handleMove(i, 'down')}
-                  disabled={i === exclusions.length - 1}
+                  disabled={i === visibleExclusions.length - 1}
                   style={{
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
                     padding: '2px',
                     color: 'var(--text-secondary)',
-                    opacity: i === exclusions.length - 1 ? 0.3 : 1
+                    opacity: i === visibleExclusions.length - 1 ? 0.3 : 1
                   }}
                 >
                   <ChevronDown size={14} />
                 </button>
                 <button
-                  title="Edit"
+                  title={ex.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                   aria-label="Edit"
+                  disabled={!!ex.replacedBy}
                   onClick={() => {
                     setEditingId(ex.id)
                     setEditText(ex.text)
@@ -4136,19 +4357,22 @@ function ExclusionsTab({ showSuccess }: TabProps): React.JSX.Element {
                 >
                   <Pencil size={12} />
                 </button>
-                <button
-                  title="Delete"
-                  aria-label="Delete"
-                  onClick={async () => {
-                    await window.api.piDeleteExclusion(ex.id)
-                    showSuccess('Deleted')
-                    loadData()
+                <HideOrDeleteButtons
+                  used={usage.countOf(ex.id)}
+                  hidden={isHiddenItem(ex)}
+                  onHide={(h) => usage.setHidden(ex.id, h)}
+                  onDelete={async () => {
+                    if (!(await confirmDialog('Delete this exclusion?'))) return
+                    try {
+                      await window.api.piDeleteExclusion(ex.id)
+                      showSuccess('Deleted')
+                    } catch (err) {
+                      showError((err instanceof Error && err.message) || 'Failed to delete')
+                    }
+                    await loadData()
+                    void usage.reload()
                   }}
-                  className="btn-secondary"
-                  style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                >
-                  <Trash2 size={12} />
-                </button>
+                />
               </div>
             </>
           )}
@@ -4470,6 +4694,9 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
     if (Array.isArray(c)) setClauses(c)
     if (Array.isArray(s)) setSets(s)
   }, [])
+  const usage = useSettingsItemUsage('pi_additional_clause', loadData, showError)
+  const hiddenCount = clauses.filter(isHiddenItem).length
+  const visibleClauses = usage.showHidden ? clauses : clauses.filter((c) => !isHiddenItem(c))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -4497,10 +4724,8 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
   }
 
   const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...clauses]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+    if (!newOrder) return
     setClauses(newOrder)
     await window.api.piReorderAdditionalClauses(newOrder.map((c) => c.id))
   }
@@ -4586,10 +4811,20 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
           </button>
         </form>
 
-        {clauses.map((c, i) => (
+        {hiddenCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <ShowHiddenToggle
+              count={hiddenCount}
+              shown={usage.showHidden}
+              onChange={usage.setShowHidden}
+            />
+          </div>
+        )}
+        {visibleClauses.map((c, i) => (
           <div
             key={c.id}
             style={{
+              ...hiddenRowStyle(isHiddenItem(c)),
               padding: '10px 14px',
               borderRadius: '8px',
               border: '1px solid var(--table-border)',
@@ -4628,6 +4863,11 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                 />
                 <button
                   onClick={async () => {
+                    const wordingChanged =
+                      (c.title || '') !== editTitle.trim() ||
+                      (c.code || '') !== editCode.trim() ||
+                      c.text !== editText.trim()
+                    if (!(await confirmWordingEdit(usage.sentOf(c.id), wordingChanged))) return
                     await window.api.piUpdateAdditionalClause(
                       c.id,
                       editTitle.trim() || null,
@@ -4636,7 +4876,8 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                     )
                     setEditingId(null)
                     showSuccess('Updated')
-                    loadData()
+                    await loadData()
+                    void usage.reload()
                   }}
                   className="btn-primary"
                   style={{ padding: '4px 10px', fontSize: '0.78rem' }}
@@ -4675,6 +4916,8 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                     </span>
                   )}
                   <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
+                  <UsageBadge usage={usage.usage[c.id]} />
+                  <ItemStateBadges item={c} />
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
                   <TypeScopeToggle
@@ -4731,21 +4974,22 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                     title="Move down"
                     aria-label="Move down"
                     onClick={() => handleMove(i, 'down')}
-                    disabled={i === clauses.length - 1}
+                    disabled={i === visibleClauses.length - 1}
                     style={{
                       background: 'transparent',
                       border: 'none',
                       cursor: 'pointer',
                       padding: '2px',
                       color: 'var(--text-secondary)',
-                      opacity: i === clauses.length - 1 ? 0.3 : 1
+                      opacity: i === visibleClauses.length - 1 ? 0.3 : 1
                     }}
                   >
                     <ChevronDown size={14} />
                   </button>
                   <button
-                    title="Edit"
+                    title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                     aria-label="Edit"
+                    disabled={!!c.replacedBy}
                     onClick={() => {
                       setEditingId(c.id)
                       setEditTitle(c.title || '')
@@ -4757,19 +5001,22 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                   >
                     <Pencil size={12} />
                   </button>
-                  <button
-                    title="Delete"
-                    aria-label="Delete"
-                    onClick={async () => {
-                      await window.api.piDeleteAdditionalClause(c.id)
-                      showSuccess('Deleted')
-                      loadData()
+                  <HideOrDeleteButtons
+                    used={usage.countOf(c.id)}
+                    hidden={isHiddenItem(c)}
+                    onHide={(h) => usage.setHidden(c.id, h)}
+                    onDelete={async () => {
+                      if (!(await confirmDialog('Delete this additional clause?'))) return
+                      try {
+                        await window.api.piDeleteAdditionalClause(c.id)
+                        showSuccess('Deleted')
+                      } catch (err) {
+                        showError((err instanceof Error && err.message) || 'Failed to delete')
+                      }
+                      await loadData()
+                      void usage.reload()
                     }}
-                    className="btn-secondary"
-                    style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  />
                 </div>
               </>
             )}
@@ -4994,7 +5241,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                   }}
                 >
                   {clauses
-                    .filter((c) => !editSetOrder.includes(c.id))
+                    .filter((c) => !editSetOrder.includes(c.id) && !isHiddenItem(c))
                     .map((c) => (
                       <div
                         key={c.id}
@@ -8591,10 +8838,15 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
   const [editCondHasAmount, setEditCondHasAmount] = useState(false)
   const [editCondPlaceholder, setEditCondPlaceholder] = useState('')
 
-  const loadData = useCallback(async (): Promise<void> => {
+  const loadData = useCallback(async (): Promise<HullClause[]> => {
     const cls = await window.api.hullGetClauses()
-    if (Array.isArray(cls)) setClauses(cls)
+    if (!Array.isArray(cls)) return []
+    setClauses(cls)
+    return cls
   }, [])
+  const clauseUsage = useSettingsItemUsage('hull_clause', loadData, showError)
+  const hiddenClauseCount = clauses.filter(isHiddenItem).length
+  const visibleClauses = clauseUsage.showHidden ? clauses : clauses.filter((c) => !isHiddenItem(c))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -8606,6 +8858,16 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     const conds = await window.api.hullGetClauseConditions(clauseId)
     if (Array.isArray(conds)) setConditions(conds)
   }, [])
+  const reloadConditions = useCallback(
+    (): Promise<void> | undefined =>
+      selectedClauseId ? loadConditions(selectedClauseId) : undefined,
+    [selectedClauseId, loadConditions]
+  )
+  const condUsage = useSettingsItemUsage('hull_condition', reloadConditions, showError)
+  const hiddenCondCount = conditions.filter(isHiddenItem).length
+  const visibleConditions = condUsage.showHidden
+    ? conditions
+    : conditions.filter((c) => !isHiddenItem(c))
 
   useEffect(() => {
     if (!selectedClauseId) return
@@ -8642,6 +8904,13 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
 
   const handleSaveClause = async (): Promise<void> => {
     if (!editingId) return
+    const orig = clauses.find((c) => c.id === editingId)
+    const wordingChanged =
+      !!orig &&
+      (orig.name !== editName.trim() ||
+        orig.code !== editCode.trim() ||
+        (orig.description || '') !== editDesc.trim())
+    if (!(await confirmWordingEdit(clauseUsage.sentOf(editingId), wordingChanged))) return
     try {
       await window.api.hullUpdateClause(editingId, {
         name: editName.trim(),
@@ -8653,9 +8922,14 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
       showError((err instanceof Error && err.message) || 'Failed to update clause')
       return
     }
+    const editedId = editingId
     setEditingId(null)
     showSuccess('Clause updated')
-    loadData()
+    const fresh = await loadData()
+    void clauseUsage.reload()
+    // A wording edit of a sent clause made a new version: follow it
+    const replacedBy = fresh.find((c) => c.id === editedId)?.replacedBy
+    if (replacedBy && selectedClauseId === editedId) setSelectedClauseId(replacedBy)
   }
 
   const handleDuplicateClause = async (clause: HullClause): Promise<void> => {
@@ -8673,7 +8947,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
       // Copy all conditions from original clause
       const srcConds = await window.api.hullGetClauseConditions(clause.id)
       if (Array.isArray(srcConds)) {
-        for (const cond of srcConds) {
+        for (const cond of srcConds.filter((sc) => !isHiddenItem(sc))) {
           await window.api.hullAddClauseCondition(
             result.id,
             cond.conditionNumber,
@@ -8694,21 +8968,25 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     }
   }
 
-  const handleDeleteClause = async (id: string): Promise<void> => {
-    await window.api.hullDeleteClause(id)
-    if (selectedClauseId === id) {
-      setSelectedClauseId(null)
-      setConditions([])
+  const handleDeleteClause = async (c: HullClause): Promise<void> => {
+    if (!(await confirmDialog(`Delete hull clause CL.${c.code} "${c.name}"?`))) return
+    try {
+      await window.api.hullDeleteClause(c.id)
+      if (selectedClauseId === c.id) {
+        setSelectedClauseId(null)
+        setConditions([])
+      }
+      showSuccess('Clause deleted')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete clause')
     }
-    showSuccess('Clause deleted')
-    loadData()
+    await loadData()
+    void clauseUsage.reload()
   }
 
   const handleMoveClause = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...clauses]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+    if (!newOrder) return
     setClauses(newOrder)
     await window.api.hullReorderClauses(newOrder.map((c) => c.id))
   }
@@ -8737,6 +9015,13 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
 
   const handleSaveCondition = async (): Promise<void> => {
     if (!editCondId || !selectedClauseId) return
+    const orig = conditions.find((c) => c.id === editCondId)
+    const wordingChanged =
+      !!orig &&
+      (orig.conditionNumber !== editCondNum.trim() ||
+        orig.text !== editCondText.trim() ||
+        (orig.amountPlaceholder || '') !== editCondPlaceholder.trim())
+    if (!(await confirmWordingEdit(condUsage.sentOf(editCondId), wordingChanged))) return
     await window.api.hullUpdateClauseCondition(editCondId, {
       conditionNumber: editCondNum.trim(),
       text: editCondText.trim(),
@@ -8745,7 +9030,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     })
     setEditCondId(null)
     showSuccess('Condition updated')
-    loadConditions(selectedClauseId)
+    await loadConditions(selectedClauseId)
+    void condUsage.reload()
   }
 
   const handleToggleCondDefault = async (id: string, current: boolean): Promise<void> => {
@@ -8754,19 +9040,23 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     loadConditions(selectedClauseId)
   }
 
-  const handleDeleteCondition = async (id: string): Promise<void> => {
+  const handleDeleteCondition = async (cond: HullClauseCondition): Promise<void> => {
     if (!selectedClauseId) return
-    await window.api.hullDeleteClauseCondition(id)
-    showSuccess('Condition deleted')
-    loadConditions(selectedClauseId)
+    if (!(await confirmDialog(`Delete condition Cl.${cond.conditionNumber}?`))) return
+    try {
+      await window.api.hullDeleteClauseCondition(cond.id)
+      showSuccess('Condition deleted')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete condition')
+    }
+    await loadConditions(selectedClauseId)
+    void condUsage.reload()
   }
 
   const handleMoveCondition = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     if (!selectedClauseId) return
-    const newOrder = [...conditions]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(conditions, visibleConditions, index, direction)
+    if (!newOrder) return
     setConditions(newOrder)
     await window.api.hullReorderClauseConditions(newOrder.map((c) => c.id))
   }
@@ -8849,10 +9139,20 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
           />
         </form>
 
-        {clauses.map((c, i) => (
+        {hiddenClauseCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <ShowHiddenToggle
+              count={hiddenClauseCount}
+              shown={clauseUsage.showHidden}
+              onChange={clauseUsage.setShowHidden}
+            />
+          </div>
+        )}
+        {visibleClauses.map((c, i) => (
           <div
             key={c.id}
             style={{
+              ...hiddenRowStyle(isHiddenItem(c)),
               padding: '10px 14px',
               borderRadius: '8px',
               marginBottom: '6px',
@@ -8893,14 +9193,14 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                 title="Move down"
                 aria-label="Move down"
                 onClick={() => handleMoveClause(i, 'down')}
-                disabled={i === clauses.length - 1}
+                disabled={i === visibleClauses.length - 1}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   padding: '2px',
                   color: 'var(--text-secondary)',
-                  opacity: i === clauses.length - 1 ? 0.3 : 1
+                  opacity: i === visibleClauses.length - 1 ? 0.3 : 1
                 }}
               >
                 <ChevronDown size={14} />
@@ -8986,7 +9286,11 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                   >
                     CL.{c.code}
                   </span>
-                  <span style={{ fontSize: '0.82rem', flex: 1 }}>{c.name}</span>
+                  <span style={{ fontSize: '0.82rem', flex: 1 }}>
+                    {c.name}
+                    <UsageBadge usage={clauseUsage.usage[c.id]} />
+                    <ItemStateBadges item={c} />
+                  </span>
                   <span
                     style={{
                       fontSize: '0.68rem',
@@ -9011,8 +9315,9 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                       <Copy size={12} />
                     </button>
                     <button
-                      title="Edit"
+                      title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                       aria-label="Edit"
+                      disabled={!!c.replacedBy}
                       onClick={() => {
                         setEditingId(c.id)
                         setEditCode(c.code)
@@ -9025,15 +9330,13 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                     >
                       <Pencil size={12} />
                     </button>
-                    <button
-                      title="Delete"
-                      aria-label="Delete"
-                      onClick={() => handleDeleteClause(c.id)}
-                      className="btn-secondary"
-                      style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <HideOrDeleteButtons
+                      used={clauseUsage.countOf(c.id)}
+                      hidden={isHiddenItem(c)}
+                      onHide={(h) => clauseUsage.setHidden(c.id, h)}
+                      onDelete={() => handleDeleteClause(c)}
+                      style={{ padding: '4px 8px' }}
+                    />
                   </div>
                 </div>
                 {c.description && (
@@ -9150,10 +9453,20 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
             </button>
           </form>
 
-          {conditions.map((cond, i) => (
+          {hiddenCondCount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <ShowHiddenToggle
+                count={hiddenCondCount}
+                shown={condUsage.showHidden}
+                onChange={condUsage.setShowHidden}
+              />
+            </div>
+          )}
+          {visibleConditions.map((cond, i) => (
             <div
               key={cond.id}
               style={{
+                ...hiddenRowStyle(isHiddenItem(cond)),
                 padding: '8px 12px',
                 borderRadius: '6px',
                 border: '1px solid var(--table-border)',
@@ -9184,14 +9497,14 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                   title="Move down"
                   aria-label="Move down"
                   onClick={() => handleMoveCondition(i, 'down')}
-                  disabled={i === conditions.length - 1}
+                  disabled={i === visibleConditions.length - 1}
                   style={{
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
                     padding: '2px',
                     color: 'var(--text-secondary)',
-                    opacity: i === conditions.length - 1 ? 0.3 : 1
+                    opacity: i === visibleConditions.length - 1 ? 0.3 : 1
                   }}
                 >
                   <ChevronDown size={12} />
@@ -9277,7 +9590,11 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                   >
                     Cl.{cond.conditionNumber}
                   </span>
-                  <span style={{ fontSize: '0.82rem', flex: 1 }}>{cond.text}</span>
+                  <span style={{ fontSize: '0.82rem', flex: 1 }}>
+                    {cond.text}
+                    <UsageBadge usage={condUsage.usage[cond.id]} />
+                    <ItemStateBadges item={cond} />
+                  </span>
                   {cond.hasAmount && (
                     <span
                       style={{
@@ -9313,8 +9630,9 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                     Default
                   </label>
                   <button
-                    title="Edit"
+                    title={cond.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                     aria-label="Edit"
+                    disabled={!!cond.replacedBy}
                     onClick={() => {
                       setEditCondId(cond.id)
                       setEditCondNum(cond.conditionNumber)
@@ -9327,15 +9645,13 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                   >
                     <Pencil size={12} />
                   </button>
-                  <button
-                    title="Delete"
-                    aria-label="Delete"
-                    onClick={() => handleDeleteCondition(cond.id)}
-                    className="btn-secondary"
-                    style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  <HideOrDeleteButtons
+                    used={condUsage.countOf(cond.id)}
+                    hidden={isHiddenItem(cond)}
+                    onHide={(h) => condUsage.setHidden(cond.id, h)}
+                    onDelete={() => handleDeleteCondition(cond)}
+                    style={{ padding: '4px 8px' }}
+                  />
                 </>
               )}
             </div>
@@ -9381,8 +9697,14 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
       window.api.hullGetClauses()
     ])
     if (Array.isArray(result)) setConditions(result)
-    if (Array.isArray(clauses)) setHullClauses(clauses)
+    // Hidden hull clauses are not offered for new quotations: not offered for links either
+    if (Array.isArray(clauses)) setHullClauses(clauses.filter((hc) => !isHiddenItem(hc)))
   }, [])
+  const usage = useSettingsItemUsage('hull_additional_condition', loadData, showError)
+  const hiddenCount = conditions.filter(isHiddenItem).length
+  const visibleConditions = usage.showHidden
+    ? conditions
+    : conditions.filter((c) => !isHiddenItem(c))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -9416,6 +9738,13 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
   }
 
   const handleSaveEdit = async (id: string): Promise<void> => {
+    const orig = conditions.find((c) => c.id === id)
+    const wordingChanged =
+      !!orig &&
+      ((orig.title || '') !== editTitle.trim() ||
+        orig.text !== editText.trim() ||
+        (orig.amountPlaceholder || '') !== editAmountPlaceholder.trim())
+    if (!(await confirmWordingEdit(usage.sentOf(id), wordingChanged))) return
     await window.api.hullUpdateAdditionalCondition(id, {
       title: editTitle.trim() || null,
       text: editText.trim(),
@@ -9424,7 +9753,8 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
     })
     setEditingId(null)
     showSuccess('Condition updated')
-    loadData()
+    await loadData()
+    void usage.reload()
   }
 
   const toggleClauseLink = async (conditionId: string, clauseId: string): Promise<void> => {
@@ -9443,10 +9773,16 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
     loadData()
   }
 
-  const handleDelete = async (id: string): Promise<void> => {
-    await window.api.hullDeleteAdditionalCondition(id)
-    showSuccess('Condition deleted')
-    loadData()
+  const handleDelete = async (c: HullAdditionalCondition): Promise<void> => {
+    if (!(await confirmDialog(`Delete "${c.title || 'Untitled Condition'}"?`))) return
+    try {
+      await window.api.hullDeleteAdditionalCondition(c.id)
+      showSuccess('Condition deleted')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete condition')
+    }
+    await loadData()
+    void usage.reload()
   }
 
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -9468,12 +9804,16 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
       setDragOverIndex(null)
       return
     }
+    // Indexes are of the shown rows (hidden ones may be filtered out)
     const newOrder = [...conditions]
-    const [moved] = newOrder.splice(dragIndex, 1)
-    newOrder.splice(index, 0, moved)
-    setConditions(newOrder)
+    const from = newOrder.findIndex((c) => c.id === visibleConditions[dragIndex]?.id)
+    const to = newOrder.findIndex((c) => c.id === visibleConditions[index]?.id)
     setDragIndex(null)
     setDragOverIndex(null)
+    if (from === -1 || to === -1) return
+    const [moved] = newOrder.splice(from, 1)
+    newOrder.splice(to, 0, moved)
+    setConditions(newOrder)
     await window.api.hullReorderAdditionalConditions(newOrder.map((c) => c.id))
   }
 
@@ -9651,7 +9991,16 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
         </div>
       </form>
 
-      {conditions.map((c, i) => (
+      {hiddenCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <ShowHiddenToggle
+            count={hiddenCount}
+            shown={usage.showHidden}
+            onChange={usage.setShowHidden}
+          />
+        </div>
+      )}
+      {visibleConditions.map((c, i) => (
         <div
           key={c.id}
           draggable
@@ -9667,7 +10016,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
                 : '1px solid rgba(255,255,255,0.15)',
             marginBottom: '10px',
             overflow: 'hidden',
-            opacity: dragIndex === i ? 0.5 : 1,
+            opacity: dragIndex === i ? 0.5 : isHiddenItem(c) ? 0.55 : 1,
             transition: 'border-color 0.15s, opacity 0.15s'
           }}
         >
@@ -9702,6 +10051,8 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
               }}
             >
               {c.title || 'Untitled Condition'}
+              <UsageBadge usage={usage.usage[c.id]} />
+              <ItemStateBadges item={c} />
             </span>
             {c.hasAmount && (
               <span
@@ -9738,8 +10089,9 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
               Default
             </label>
             <button
-              title="Edit"
+              title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
               aria-label="Edit"
+              disabled={!!c.replacedBy}
               onClick={() => {
                 setEditingId(c.id)
                 setEditTitle(c.title || '')
@@ -9752,15 +10104,13 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
             >
               <Pencil size={12} />
             </button>
-            <button
-              title="Delete"
-              aria-label="Delete"
-              onClick={() => handleDelete(c.id)}
-              className="btn-secondary"
-              style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}
-            >
-              <Trash2 size={12} />
-            </button>
+            <HideOrDeleteButtons
+              used={usage.countOf(c.id)}
+              hidden={isHiddenItem(c)}
+              onHide={(h) => usage.setHidden(c.id, h)}
+              onDelete={() => handleDelete(c)}
+              style={{ padding: '4px 8px' }}
+            />
           </div>
           {/* Body: text or edit form */}
           <div style={{ padding: '10px 14px 10px 42px' }}>
@@ -9943,6 +10293,11 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
     const result = await window.api.warGetConditions()
     if (Array.isArray(result)) setConditions(result)
   }, [])
+  const usage = useSettingsItemUsage('war_condition', loadData, showError)
+  const hiddenCount = conditions.filter(isHiddenItem).length
+  const visibleConditions = usage.showHidden
+    ? conditions
+    : conditions.filter((c) => !isHiddenItem(c))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -9989,10 +10344,14 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
   }
 
   const handleSaveEdit = async (id: string): Promise<void> => {
+    const orig = conditions.find((c) => c.id === id)
+    const wordingChanged = !!orig && orig.text !== editText.trim()
+    if (!(await confirmWordingEdit(usage.sentOf(id), wordingChanged))) return
     await window.api.warUpdateCondition(id, { text: editText.trim() })
     setEditingId(null)
     showSuccess('Condition updated')
-    loadData()
+    await loadData()
+    void usage.reload()
   }
 
   const handleToggleDefault = async (id: string, current: boolean): Promise<void> => {
@@ -10001,16 +10360,20 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
   }
 
   const handleDelete = async (id: string): Promise<void> => {
-    await window.api.warDeleteCondition(id)
-    showSuccess('Condition deleted')
-    loadData()
+    if (!(await confirmDialog('Delete this war condition?'))) return
+    try {
+      await window.api.warDeleteCondition(id)
+      showSuccess('Condition deleted')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete condition')
+    }
+    await loadData()
+    void usage.reload()
   }
 
   const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...conditions]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(conditions, visibleConditions, index, direction)
+    if (!newOrder) return
     setConditions(newOrder)
     await window.api.warReorderConditions(newOrder.map((c) => c.id))
   }
@@ -10113,10 +10476,20 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
         </button>
       </form>
 
-      {conditions.map((c, i) => (
+      {hiddenCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <ShowHiddenToggle
+            count={hiddenCount}
+            shown={usage.showHidden}
+            onChange={usage.setShowHidden}
+          />
+        </div>
+      )}
+      {visibleConditions.map((c, i) => (
         <div
           key={c.id}
           style={{
+            ...hiddenRowStyle(isHiddenItem(c)),
             padding: '10px 14px',
             borderRadius: '8px',
             border: '1px solid var(--table-border)',
@@ -10147,14 +10520,14 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
               title="Move down"
               aria-label="Move down"
               onClick={() => handleMove(i, 'down')}
-              disabled={i === conditions.length - 1}
+              disabled={i === visibleConditions.length - 1}
               style={{
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 padding: '2px',
                 color: 'var(--text-secondary)',
-                opacity: i === conditions.length - 1 ? 0.3 : 1
+                opacity: i === visibleConditions.length - 1 ? 0.3 : 1
               }}
             >
               <ChevronDown size={14} />
@@ -10188,7 +10561,11 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
                 </button>
               </div>
             ) : (
-              <span style={{ fontSize: '0.82rem' }}>{c.text}</span>
+              <span style={{ fontSize: '0.82rem' }}>
+                {c.text}
+                <UsageBadge usage={usage.usage[c.id]} />
+                <ItemStateBadges item={c} />
+              </span>
             )}
           </div>
           <label
@@ -10210,8 +10587,9 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
             Default
           </label>
           <button
-            title="Edit"
+            title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
             aria-label="Edit"
+            disabled={!!c.replacedBy}
             onClick={() => {
               setEditingId(c.id)
               setEditText(c.text)
@@ -10219,27 +10597,21 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
             style={{
               background: 'transparent',
               border: 'none',
-              cursor: 'pointer',
+              cursor: c.replacedBy ? 'not-allowed' : 'pointer',
               padding: '4px',
-              color: 'var(--text-secondary)'
+              color: 'var(--text-secondary)',
+              opacity: c.replacedBy ? 0.4 : 1
             }}
           >
             <Pencil size={14} />
           </button>
-          <button
-            title="Delete"
-            aria-label="Delete"
-            onClick={() => handleDelete(c.id)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-              color: 'var(--danger)'
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
+          <HideOrDeleteButtons
+            used={usage.countOf(c.id)}
+            hidden={isHiddenItem(c)}
+            onHide={(h) => usage.setHidden(c.id, h)}
+            onDelete={() => handleDelete(c.id)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)' }}
+          />
         </div>
       ))}
       {conditions.length === 0 && (
@@ -12059,7 +12431,7 @@ function CargoClauseSetsManager({
   isLight: boolean
 }): React.JSX.Element {
   const [sets, setSets] = useState<CargoClauseSet[]>([])
-  const [clauses, setClauses] = useState<CargoClause[]>([])
+  const [allClauses, setAllClauses] = useState<CargoClause[]>([])
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null) // set id, or 'new'
   const [name, setName] = useState('')
@@ -12072,12 +12444,15 @@ function CargoClauseSetsManager({
         window.api.cargoGetClauses(section)
       ])
       setSets(Array.isArray(sts) ? sts : [])
-      setClauses((Array.isArray(cls) ? cls : []).filter((c) => c.active !== false))
+      setAllClauses(Array.isArray(cls) ? cls : [])
     } catch {
       setSets([])
-      setClauses([])
+      setAllClauses([])
     }
   }, [section])
+  // Hidden (inactive) clauses are not offered, but stay in the set being edited if already in it
+  const clauses = allClauses.filter((c) => c.active !== false)
+  const pickable = allClauses.filter((c) => c.active !== false || selectedIds.has(c.id))
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -12113,7 +12488,7 @@ function CargoClauseSetsManager({
       return
     }
     // Preserve clause order from the master list
-    const ordered = clauses.filter((c) => selectedIds.has(c.id)).map((c) => c.id)
+    const ordered = allClauses.filter((c) => selectedIds.has(c.id)).map((c) => c.id)
     try {
       if (editingId === 'new') await window.api.cargoAddClauseSet(section, name.trim(), ordered)
       else if (editingId) await window.api.cargoUpdateClauseSet(editingId, name.trim(), ordered)
@@ -12196,7 +12571,7 @@ function CargoClauseSetsManager({
                     }}
                   />
                   <ClausePicker
-                    clauses={clauses}
+                    clauses={pickable}
                     selectedIds={selectedIds}
                     toggle={toggle}
                     isLight={isLight}
@@ -12302,7 +12677,7 @@ function CargoClauseSetsManager({
                 }}
               />
               <ClausePicker
-                clauses={clauses}
+                clauses={pickable}
                 selectedIds={selectedIds}
                 toggle={toggle}
                 isLight={isLight}
@@ -12457,6 +12832,12 @@ function CargoClausesTab({
     }
     void run()
   }, [loadInstituteClauses])
+  // Cargo clauses keep their `active` column as the hide flag (hidden = not active)
+  const icUsage = useSettingsItemUsage('cargo_institute_clause', loadInstituteClauses, showError)
+  const icHiddenCount = instituteClauses.filter((c) => c.active === false).length
+  const visibleInstituteClauses = icUsage.showHidden
+    ? instituteClauses
+    : instituteClauses.filter((c) => c.active !== false)
 
   const handleIcAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -12482,6 +12863,13 @@ function CargoClausesTab({
   }
 
   const handleIcSaveEdit = async (id: string): Promise<void> => {
+    const orig = instituteClauses.find((c) => c.id === id)
+    const wordingChanged =
+      !!orig &&
+      ((orig.name || '') !== icEditName.trim() ||
+        (orig.code || '') !== icEditCode.trim() ||
+        (orig.description || '') !== icEditDesc.trim())
+    if (!(await confirmWordingEdit(icUsage.sentOf(id), wordingChanged))) return
     try {
       await window.api.cargoUpdateInstituteClause(id, {
         name: icEditName.trim(),
@@ -12490,7 +12878,8 @@ function CargoClausesTab({
       })
       setIcEditingId(null)
       showSuccess('Institute clause updated')
-      loadInstituteClauses()
+      await loadInstituteClauses()
+      void icUsage.reload()
     } catch {
       showError('Failed to update institute clause')
     }
@@ -12506,20 +12895,20 @@ function CargoClausesTab({
   }
 
   const handleIcDelete = async (id: string): Promise<void> => {
+    if (!(await confirmDialog('Delete this institute clause?'))) return
     try {
       await window.api.cargoDeleteInstituteClause(id)
       showSuccess('Institute clause deleted')
-      loadInstituteClauses()
-    } catch {
-      showError('Failed to delete clause')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete clause')
     }
+    await loadInstituteClauses()
+    void icUsage.reload()
   }
 
   const handleIcMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...instituteClauses]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(instituteClauses, visibleInstituteClauses, index, direction)
+    if (!newOrder) return
     setInstituteClauses(newOrder)
     await window.api.cargoReorderInstituteClauses(newOrder.map((c) => c.id))
   }
@@ -12571,6 +12960,9 @@ function CargoClausesTab({
       setClauses([])
     }
   }, [section])
+  const usage = useSettingsItemUsage('cargo_clause', loadData, showError)
+  const hiddenCount = clauses.filter((c) => c.active === false).length
+  const visibleClauses = usage.showHidden ? clauses : clauses.filter((c) => c.active !== false)
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -12607,6 +12999,14 @@ function CargoClausesTab({
   }
 
   const handleSaveEdit = async (id: string): Promise<void> => {
+    const orig = clauses.find((c) => c.id === id)
+    const wordingChanged =
+      !!orig &&
+      ((orig.title || '') !== editTitle.trim() ||
+        (orig.code || '') !== editCode.trim() ||
+        (orig.text || '') !== editText.trim() ||
+        (orig.amountPlaceholder || '') !== editAmountPlaceholder.trim())
+    if (!(await confirmWordingEdit(usage.sentOf(id), wordingChanged))) return
     try {
       await window.api.cargoUpdateClause(id, {
         title: editTitle.trim(),
@@ -12617,7 +13017,8 @@ function CargoClausesTab({
       })
       setEditingId(null)
       showSuccess('Clause updated')
-      loadData()
+      await loadData()
+      void usage.reload()
     } catch {
       showError('Failed to update clause')
     }
@@ -12633,20 +13034,20 @@ function CargoClausesTab({
   }
 
   const handleDelete = async (id: string): Promise<void> => {
+    if (!(await confirmDialog('Delete this clause?'))) return
     try {
       await window.api.cargoDeleteClause(id)
       showSuccess('Clause deleted')
-      loadData()
-    } catch {
-      showError('Failed to delete clause')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete clause')
     }
+    await loadData()
+    void usage.reload()
   }
 
   const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...clauses]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+    if (!newOrder) return
     setClauses(newOrder)
     await window.api.cargoReorderClauses(newOrder.map((c) => c.id))
   }
@@ -12740,7 +13141,16 @@ function CargoClausesTab({
             </button>
           </form>
 
-          {instituteClauses.map((c, i) => (
+          {icHiddenCount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <ShowHiddenToggle
+                count={icHiddenCount}
+                shown={icUsage.showHidden}
+                onChange={icUsage.setShowHidden}
+              />
+            </div>
+          )}
+          {visibleInstituteClauses.map((c, i) => (
             <div
               key={c.id}
               style={{
@@ -12776,14 +13186,14 @@ function CargoClausesTab({
                   title="Move down"
                   aria-label="Move down"
                   onClick={() => handleIcMove(i, 'down')}
-                  disabled={i === instituteClauses.length - 1}
+                  disabled={i === visibleInstituteClauses.length - 1}
                   style={{
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
                     padding: '2px',
                     color: 'var(--text-secondary)',
-                    opacity: i === instituteClauses.length - 1 ? 0.3 : 1
+                    opacity: i === visibleInstituteClauses.length - 1 ? 0.3 : 1
                   }}
                 >
                   <ChevronDown size={14} />
@@ -12881,6 +13291,8 @@ function CargoClausesTab({
                         </span>
                       )}
                       <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.name}</span>
+                      <UsageBadge usage={icUsage.usage[c.id]} />
+                      <ItemStateBadges item={c} hidden={c.active === false} />
                     </div>
                     {c.description && (
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
@@ -12902,13 +13314,18 @@ function CargoClausesTab({
                   color: c.active === false ? 'var(--danger)' : 'var(--text-secondary)',
                   whiteSpace: 'nowrap'
                 }}
-                title={c.active === false ? 'Enable clause' : 'Disable clause'}
+                title={
+                  c.active === false
+                    ? 'Hidden. Click to show: offer it again for new quotations'
+                    : 'Shown. Click to hide: no longer offered for new quotations, kept in the quotations that use it'
+                }
               >
                 {c.active === false ? 'OFF' : 'ON'}
               </button>
               <button
-                title="Edit"
+                title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                 aria-label="Edit"
+                disabled={!!c.replacedBy}
                 onClick={() => {
                   setIcEditingId(c.id)
                   setIcEditName(c.name || '')
@@ -12918,27 +13335,22 @@ function CargoClausesTab({
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: c.replacedBy ? 'not-allowed' : 'pointer',
                   padding: '4px',
-                  color: 'var(--text-secondary)'
+                  color: 'var(--text-secondary)',
+                  opacity: c.replacedBy ? 0.4 : 1
                 }}
               >
                 <Pencil size={14} />
               </button>
-              <button
-                title="Delete"
-                aria-label="Delete"
-                onClick={() => handleIcDelete(c.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  color: 'var(--danger)'
-                }}
-              >
-                <Trash2 size={14} />
-              </button>
+              <HideOrDeleteButtons
+                toggle={false}
+                used={icUsage.countOf(c.id)}
+                hidden={c.active === false}
+                onHide={(h) => icUsage.setHidden(c.id, h)}
+                onDelete={() => handleIcDelete(c.id)}
+                style={{ background: 'transparent', border: 'none' }}
+              />
             </div>
           ))}
           {instituteClauses.length === 0 && (
@@ -13200,7 +13612,16 @@ function CargoClausesTab({
           </Modal>
         )}
 
-        {clauses.map((c, i) => (
+        {hiddenCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <ShowHiddenToggle
+              count={hiddenCount}
+              shown={usage.showHidden}
+              onChange={usage.setShowHidden}
+            />
+          </div>
+        )}
+        {visibleClauses.map((c, i) => (
           <div
             key={c.id}
             style={{
@@ -13236,14 +13657,14 @@ function CargoClausesTab({
                 title="Move down"
                 aria-label="Move down"
                 onClick={() => handleMove(i, 'down')}
-                disabled={i === clauses.length - 1}
+                disabled={i === visibleClauses.length - 1}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   padding: '2px',
                   color: 'var(--text-secondary)',
-                  opacity: i === clauses.length - 1 ? 0.3 : 1
+                  opacity: i === visibleClauses.length - 1 ? 0.3 : 1
                 }}
               >
                 <ChevronDown size={14} />
@@ -13376,6 +13797,8 @@ function CargoClausesTab({
                       </span>
                     )}
                     <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{c.title}</span>
+                    <UsageBadge usage={usage.usage[c.id]} />
+                    <ItemStateBadges item={c} hidden={c.active === false} />
                     {c.hasAmount && (
                       <span
                         style={{
@@ -13418,13 +13841,18 @@ function CargoClausesTab({
                 color: c.active === false ? 'var(--danger)' : 'var(--text-secondary)',
                 whiteSpace: 'nowrap'
               }}
-              title={c.active === false ? 'Enable clause' : 'Disable clause'}
+              title={
+                c.active === false
+                  ? 'Hidden. Click to show: offer it again for new quotations'
+                  : 'Shown. Click to hide: no longer offered for new quotations, kept in the quotations that use it'
+              }
             >
               {c.active === false ? 'OFF' : 'ON'}
             </button>
             <button
-              title="Edit"
+              title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
               aria-label="Edit"
+              disabled={!!c.replacedBy}
               onClick={() => {
                 setEditingId(c.id)
                 setEditTitle(c.title || '')
@@ -13436,27 +13864,22 @@ function CargoClausesTab({
               style={{
                 background: 'transparent',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: c.replacedBy ? 'not-allowed' : 'pointer',
                 padding: '4px',
-                color: 'var(--text-secondary)'
+                color: 'var(--text-secondary)',
+                opacity: c.replacedBy ? 0.4 : 1
               }}
             >
               <Pencil size={14} />
             </button>
-            <button
-              title="Delete"
-              aria-label="Delete"
-              onClick={() => handleDelete(c.id)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                color: 'var(--danger)'
-              }}
-            >
-              <Trash2 size={14} />
-            </button>
+            <HideOrDeleteButtons
+              toggle={false}
+              used={usage.countOf(c.id)}
+              hidden={c.active === false}
+              onHide={(h) => usage.setHidden(c.id, h)}
+              onDelete={() => handleDelete(c.id)}
+              style={{ background: 'transparent', border: 'none' }}
+            />
           </div>
         ))}
         {clauses.length === 0 && (

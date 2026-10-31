@@ -1,4 +1,5 @@
 import { saveFile } from '../utils/saveFile'
+import { latestIdResolver } from '../utils/settingsItems'
 import {
   Document,
   Packer,
@@ -1156,11 +1157,55 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
   }
 
+  // A settings item whose wording changed while in use gets a new version (new id, the old row
+  // points to it with replacedBy). The renewal then holds the new id and the original the old
+  // one, so ids are compared by their latest version. Live lists are read too: the original's
+  // lists may be a frozen export snapshot taken before the new version existed.
+  let liveLists: { id: string; replacedBy?: string | null }[][] = []
+  if (origData) {
+    try {
+      liveLists = (
+        await Promise.all([
+          window.api.piGetClauses(),
+          window.api.piGetAdditionalClauses(),
+          window.api.piGetWarranties(),
+          window.api.piGetExclusions(),
+          window.api.hullGetClauseConditions(),
+          window.api.hullGetAdditionalConditions(),
+          window.api.warGetConditions()
+        ])
+      ).filter(Array.isArray)
+    } catch {
+      /* compare with the lists already loaded */
+    }
+  }
+  const latestId = latestIdResolver(
+    ...liveLists,
+    ...[data, origData].flatMap((d) =>
+      d
+        ? [
+            d.allClauses,
+            d.allAdditionalClauses,
+            d.allWarranties,
+            d.allExclusions,
+            d.allHullConditions,
+            d.allHullAdditionalConditions,
+            d.allWarConditions
+          ]
+        : []
+    )
+  )
+  /** A set of master ids that matches any version of an item (identical to a Set otherwise) */
+  const idSet = (ids: (string | null | undefined)[]): { has: (id: string) => boolean } => {
+    const s = new Set(ids.map((id) => latestId(id)))
+    return { has: (id: string) => s.has(latestId(id)) }
+  }
+
   // Build sets from original data for quick lookups
-  const origWarrantyIds = new Set(origData?.selectedWarrantyIds || [])
+  const origWarrantyIds = idSet(origData?.selectedWarrantyIds || [])
   const origCustomWarrantyTexts = new Set((origData?.customWarranties || []).map((cw) => cw.text))
-  const origClauseIds = new Set(origData?.selectedClauseIds || [])
-  const origExclusionPiIds = new Set(
+  const origClauseIds = idSet(origData?.selectedClauseIds || [])
+  const origExclusionPiIds = idSet(
     (origData?.selectedExclusions || []).filter((e) => e.piExclusionId).map((e) => e.piExclusionId!)
   )
   const origCustomExclusionTexts = new Set((origData?.customExclusions || []).map((ce) => ce.text))
@@ -1171,21 +1216,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const origSubjectivityPiIds = new Set(
     (origData?.subjectivities || []).map((s) => s.piSubjectivityId).filter(Boolean)
   )
-  const origAdditionalClauseIds = new Set(
+  const origAdditionalClauseIds = idSet(
     (origData?.additionalClauses || [])
       .filter((ac) => ac.piAdditionalClauseId)
       .map((ac) => ac.piAdditionalClauseId!)
   )
   const origSurveyWarrantyTexts = new Set((origData?.surveyWarranties || []).map((sw) => sw.text))
-  const origHullConditionIds = new Set(
+  const origHullConditionIds = idSet(
     (origData?.hullConditions || []).map((hc) => hc.hullConditionId)
   )
-  const origHullAdditionalConditionIds = new Set(
+  const origHullAdditionalConditionIds = idSet(
     (origData?.hullAdditionalConditions || []).map((ha) => ha.hullAdditionalConditionId)
   )
-  const origWarConditionIds = new Set(
-    (origData?.warConditions || []).map((wc) => wc.warConditionId)
-  )
+  const origWarConditionIds = idSet((origData?.warConditions || []).map((wc) => wc.warConditionId))
   const RED = 'FF0000'
 
   // Paragraph helpers - 11pt Arial black, line spacing 1.0 (with optional color for change highlighting)
@@ -3634,7 +3677,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const renderRemovedWarranties = (): Paragraph[] => {
       if (!origData) return []
       const paras: Paragraph[] = []
-      const currentWarIds = new Set(data.selectedWarrantyIds)
+      const currentWarIds = idSet(data.selectedWarrantyIds)
       for (const wid of origData.selectedWarrantyIds) {
         if (currentWarIds.has(wid)) continue
         const w = origData.allWarranties.find((ww) => ww.id === wid)
@@ -4129,7 +4172,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       // Render removed exclusions from original
       if (origData) {
-        const currentExclPiIds = new Set(
+        const currentExclPiIds = idSet(
           data.selectedExclusions.filter((e) => e.piExclusionId).map((e) => e.piExclusionId!)
         )
         const currentCustomExclTexts = new Set(data.customExclusions.map((ce) => ce.text))

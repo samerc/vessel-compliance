@@ -12,10 +12,11 @@ import {
   QuotationVessel
 } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips } from './shared'
+import { AlternativeScopeChips, HiddenInSettingsBadge } from './shared'
 import { ok } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
 import { masterData } from './masterDataCache'
+import { isHiddenItem, offeredItems, withoutHiddenIds } from '../../utils/settingsItems'
 
 type QuotationAdditionalClauseRow = Awaited<
   ReturnType<typeof window.api.getQuotationAdditionalClauses>
@@ -148,8 +149,8 @@ export default function ConditionsTab({
     setAdditionalClauseSets(Array.isArray(addSets) ? addSets : [])
     setQVessels(Array.isArray(qv) ? qv : [])
 
-    // Auto-select all active clauses on first load if none are selected
-    const safeClauses = scopedClauses
+    // Auto-select all active clauses on first load if none are selected (never hidden ones)
+    const safeClauses = scopedClauses.filter((c) => !isHiddenItem(c))
     // FD&D starts with no conditions selected (custom ones are picked by hand)
     if (
       !clauseDefaultsApplied.current &&
@@ -184,12 +185,14 @@ export default function ConditionsTab({
       // Collect clause IDs from default sets + individually default-selected clauses
       const defaultSetClauseIds = new Set<string>()
       const safeAddSets = Array.isArray(addSets) ? addSets : []
+      // Hidden clauses are never auto-added
+      const offeredAdd = safeAllAdd.filter((c) => !isHiddenItem(c))
       for (const s of safeAddSets) {
         if (s.defaultSelected && s.clauseIds) {
           for (const cid of s.clauseIds) defaultSetClauseIds.add(cid)
         }
       }
-      const defaults = safeAllAdd.filter((c) => c.defaultSelected || defaultSetClauseIds.has(c.id))
+      const defaults = offeredAdd.filter((c) => c.defaultSelected || defaultSetClauseIds.has(c.id))
       // Deduplicate (set clauses first, then individually selected)
       const seen = new Set<string>()
       const ordered: typeof defaults = []
@@ -199,7 +202,7 @@ export default function ConditionsTab({
           for (const cid of s.clauseIds) {
             if (!seen.has(cid)) {
               seen.add(cid)
-              const c = safeAllAdd.find((x) => x.id === cid)
+              const c = offeredAdd.find((x) => x.id === cid)
               if (c) ordered.push(c)
             }
           }
@@ -342,8 +345,10 @@ export default function ConditionsTab({
   }
 
   const applySet = async (setId: string): Promise<void> => {
-    const cs = clauseSets.find((s) => s.id === setId)
-    if (!cs?.clauseIds) return
+    const found = clauseSets.find((s) => s.id === setId)
+    if (!found?.clauseIds) return
+    // A preset never adds clauses hidden in settings
+    const cs = { ...found, clauseIds: withoutHiddenIds(found.clauseIds, allClauses) }
     const hasPIAlts = piAlternatives.length >= 2
     const altId = hasPIAlts ? selectedPIAltId : null
 
@@ -467,7 +472,7 @@ export default function ConditionsTab({
     const set = additionalClauseSets.find((s) => s.id === setId)
     if (!set?.clauseIds) return
     const alreadyIds = new Set(additionalClauses.map((ac) => ac.piAdditionalClauseId))
-    const toAdd = set.clauseIds.filter((id) => !alreadyIds.has(id))
+    const toAdd = withoutHiddenIds(set.clauseIds, allAdditional).filter((id) => !alreadyIds.has(id))
     for (let i = 0; i < toAdd.length; i++) {
       await window.api.addQuotationAdditionalClause({
         quotationId: quotation.id,
@@ -597,7 +602,7 @@ export default function ConditionsTab({
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {allClauses.map((c) => {
+            {offeredItems(allClauses, selectedIds).map((c) => {
               const checked = isClauseCheckedForAlt(c.id)
               return (
                 <div
@@ -626,6 +631,7 @@ export default function ConditionsTab({
                       Cl. {c.clauseNumber}
                     </span>
                     <span style={{ fontSize: '0.85rem' }}>{c.name}</span>
+                    <HiddenInSettingsBadge item={c} />
                     {c.isCargoRelated && (
                       <span
                         style={{
@@ -739,7 +745,7 @@ export default function ConditionsTab({
                     value=""
                   >
                     <option value="">Add individual clause…</option>
-                    {allAdditional.map((ac) => {
+                    {offeredItems(allAdditional, alreadyIds).map((ac) => {
                       const added = alreadyIds.has(ac.id)
                       return (
                         <option
@@ -810,7 +816,7 @@ export default function ConditionsTab({
                         {code}
                       </span>
                     )}
-                    {text}
+                    {text} <HiddenInSettingsBadge item={def} />
                   </span>
                   <button
                     title="Delete"

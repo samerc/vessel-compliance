@@ -27,6 +27,8 @@ import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
 import { masterData } from './masterDataCache'
+import { HiddenInSettingsBadge } from './shared'
+import { isHiddenItem, isOffered, offeredItems } from '../../utils/settingsItems'
 
 function HullClauseDropdown({
   clauses,
@@ -47,6 +49,8 @@ function HullClauseDropdown({
   const isLight = theme === 'light' || theme === 'aurora'
   const bg = 'var(--bg-primary)'
   const selected = clauses.find((c) => c.id === selectedId)
+  // Clauses hidden in settings are only offered while this one is using them
+  const shown = offeredItems(clauses, [selectedId])
 
   useEffect(() => {
     if (!open) return
@@ -85,7 +89,8 @@ function HullClauseDropdown({
           }}
         >
           <span>
-            {selected ? `${selected.code} — ${selected.name}` : 'Select a hull clause...'}
+            {selected ? `${selected.code} — ${selected.name}` : 'Select a hull clause...'}{' '}
+            <HiddenInSettingsBadge item={selected} />
           </span>
           <ChevronDown
             size={16}
@@ -96,7 +101,7 @@ function HullClauseDropdown({
             }}
           />
         </button>
-        {open && clauses.length > 0 && (
+        {open && shown.length > 0 && (
           <div
             style={{
               position: 'absolute',
@@ -113,7 +118,7 @@ function HullClauseDropdown({
               boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
             }}
           >
-            {clauses.map((hc) => {
+            {shown.map((hc) => {
               const active = hc.id === selectedId
               return (
                 <div
@@ -143,7 +148,8 @@ function HullClauseDropdown({
                       : 'transparent'
                   }}
                 >
-                  <span style={{ fontWeight: 600 }}>{hc.code}</span> — {hc.name}
+                  <span style={{ fontWeight: 600 }}>{hc.code}</span> — {hc.name}{' '}
+                  <HiddenInSettingsBadge item={hc} />
                   {hc.description && (
                     <div
                       style={{
@@ -205,6 +211,8 @@ interface HullPickerItem {
   text: string
   hasAmount?: boolean
   amountPlaceholder?: string
+  /** Hidden in settings: offered only while selected */
+  hidden?: boolean
 }
 
 // ==================== Hull Condition Picker (shared) ====================
@@ -235,13 +243,7 @@ function HullConditionPicker({
   onVesselAmountBlur
 }: {
   label: string
-  items: {
-    id: string
-    label: string
-    text: string
-    hasAmount?: boolean
-    amountPlaceholder?: string
-  }[]
+  items: HullPickerItem[]
   selectedIds: Set<string>
   onToggle: (id: string) => void
   overrides: Record<string, string>
@@ -266,6 +268,8 @@ function HullConditionPicker({
   const bg = 'var(--bg-primary)'
   const selectedItems = items.filter((i) => selectedIds.has(i.id))
   const selectedCount = selectedItems.length
+  // What the dropdown offers: items hidden in settings only while selected
+  const offered = items.filter((i) => !i.hidden || selectedIds.has(i.id))
 
   return (
     <div>
@@ -275,7 +279,7 @@ function HullConditionPicker({
         </label>
       )}
 
-      {items.length === 0 ? (
+      {offered.length === 0 ? (
         <div
           style={{
             padding: '10px',
@@ -311,7 +315,7 @@ function HullConditionPicker({
               }}
             >
               <span>
-                {selectedCount} of {items.length} selected
+                {selectedCount} of {offered.length} selected
               </span>
               <ChevronDown
                 size={14}
@@ -359,7 +363,7 @@ function HullConditionPicker({
                     <button
                       type="button"
                       onClick={() => {
-                        items.forEach((i) => {
+                        offered.forEach((i) => {
                           if (!selectedIds.has(i.id)) onToggle(i.id)
                         })
                       }}
@@ -395,7 +399,7 @@ function HullConditionPicker({
                       Deselect All
                     </button>
                   </div>
-                  {items.map((item) => {
+                  {offered.map((item) => {
                     const checked = selectedIds.has(item.id)
                     return (
                       <div
@@ -435,7 +439,8 @@ function HullConditionPicker({
                               const t = stripTags(item.text)
                               return t.length > 100 ? t.slice(0, 100) + '...' : t
                             })()}
-                          </span>
+                          </span>{' '}
+                          <HiddenInSettingsBadge item={{ id: item.id, isHidden: item.hidden }} />
                         </div>
                       </div>
                     )
@@ -504,6 +509,7 @@ function HullConditionPicker({
                   >
                     {stripTags(overrides[item.id] || item.text)}
                   </span>
+                  <HiddenInSettingsBadge item={{ id: item.id, isHidden: item.hidden }} />
                   {item.hasAmount && amounts && amounts[item.id] != null && (
                     <span
                       style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', flexShrink: 0 }}
@@ -804,8 +810,9 @@ export default function HullConditionsTab({
       }
     }
 
-    // Auto-select IV clause
-    const ivClauses = safeClauses.filter((c) => c.conditionSection === 'iv')
+    // Auto-select IV clause. The quotation's own clause is looked up in the FULL list, so one
+    // hidden in settings is kept; only a replacement pick skips hidden clauses
+    const ivClauses = safeClauses.filter((c) => c.conditionSection === 'iv' && isOffered(c))
     if (quotation.ivClauseId && safeClauses.some((c) => c.id === quotation.ivClauseId)) {
       setSelectedIvClauseId(quotation.ivClauseId)
     } else if (ivClauses.length > 0 && quotation.ivEnabled) {
@@ -826,7 +833,8 @@ export default function HullConditionsTab({
       safeAlts.length > 0
     ) {
       condDefaultsApplied.current = true
-      const defaults = safeConds.filter((c) => c.defaultSelected)
+      // Conditions hidden in settings are never auto-applied
+      const defaults = safeConds.filter((c) => c.defaultSelected && isOffered(c))
       if (defaults.length > 0) {
         // Assign defaults to the first alternative instead of null scope
         const firstAlt = safeAlts[0]
@@ -854,7 +862,7 @@ export default function HullConditionsTab({
     // Auto-apply default additional conditions on first load
     if (!addDefaultsApplied.current && safeExistAdd.length === 0 && safeAdd.length > 0) {
       addDefaultsApplied.current = true
-      const defaults = safeAdd.filter((c) => c.defaultSelected)
+      const defaults = safeAdd.filter((c) => c.defaultSelected && isOffered(c))
       if (defaults.length > 0) {
         try {
           ok(
@@ -955,7 +963,7 @@ export default function HullConditionsTab({
 
   // Start fresh: create an empty alternative for a vessel
   const handleStartFresh = async (vesselId: string): Promise<void> => {
-    const hmClauses = hullClauses.filter((c) => c.conditionSection !== 'iv')
+    const hmClauses = hullClauses.filter((c) => c.conditionSection !== 'iv' && isOffered(c))
     if (hmClauses.length === 0) return
     try {
       const newAlt = await window.api.hullAddQuotationAlternative(
@@ -1073,7 +1081,7 @@ export default function HullConditionsTab({
       }
       // Auto-select default conditions for the new clause
       const clauseConds = allConditions.filter((c) => c.hullClauseId === clauseId)
-      const defaults = clauseConds.filter((c) => c.defaultSelected)
+      const defaults = clauseConds.filter((c) => c.defaultSelected && isOffered(c))
       if (defaults.length > 0) {
         const existingForAlt = qConditions.filter((c) => c.alternativeId === altId)
         const existingCondIds = new Set(existingForAlt.map((c) => c.hullConditionId))
@@ -1530,7 +1538,8 @@ export default function HullConditionsTab({
       label: `Cl. ${c.conditionNumber}`,
       text: c.text,
       hasAmount: c.hasAmount,
-      amountPlaceholder: c.amountPlaceholder
+      amountPlaceholder: c.amountPlaceholder,
+      hidden: isHiddenItem(c)
     }))
 
   // Get all alternative clause IDs + IV for filtering additional conditions
@@ -1550,8 +1559,13 @@ export default function HullConditionsTab({
     // Add new default conditions/additional from settings that aren't already in this quotation
     const existingCondIds = new Set(qConditions.map((c) => c.hullConditionId))
     const existingAddIds = new Set(qAdditional.map((a) => a.hullAdditionalConditionId))
-    const newConds = allConditions.filter((c) => c.defaultSelected && !existingCondIds.has(c.id))
-    const newAdds = allAdditional.filter((a) => a.defaultSelected && !existingAddIds.has(a.id))
+    // Items hidden in settings are not synced in
+    const newConds = allConditions.filter(
+      (c) => c.defaultSelected && isOffered(c) && !existingCondIds.has(c.id)
+    )
+    const newAdds = allAdditional.filter(
+      (a) => a.defaultSelected && isOffered(a) && !existingAddIds.has(a.id)
+    )
     if (newConds.length === 0 && newAdds.length === 0) {
       showError('No new default items to add from settings')
       return
@@ -2241,7 +2255,7 @@ export default function HullConditionsTab({
                       // Auto-select default conditions for this clause, scoped to the new alternative
                       // Replace any existing null-scoped conditions (from prior auto-apply) with alt-scoped ones
                       const clauseConds = allConditions.filter(
-                        (c) => c.hullClauseId === clauseId && c.defaultSelected
+                        (c) => c.hullClauseId === clauseId && c.defaultSelected && isOffered(c)
                       )
                       const newConds = clauseConds.map((c) => ({
                         hullConditionId: c.id,
@@ -2471,7 +2485,8 @@ export default function HullConditionsTab({
                 label: ac.title || '',
                 text: ac.text,
                 hasAmount: ac.hasAmount,
-                amountPlaceholder: ac.amountPlaceholder
+                amountPlaceholder: ac.amountPlaceholder,
+                hidden: isHiddenItem(ac)
               }))}
               selectedIds={selectedAddIds}
               onToggle={toggleAdditional}

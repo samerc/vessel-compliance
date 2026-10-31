@@ -3,6 +3,8 @@ import { ChevronDown } from 'lucide-react'
 import { QuotationPIAlternative } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ALT_COLORS, fmtMoney, parseMoney } from './sharedUtils'
+import { Badge } from '../ui'
+import { isHiddenItem } from '../../utils/settingsItems'
 
 /** Number input that shows commas when not focused, raw number while editing */
 export function MoneyInput({
@@ -80,6 +82,24 @@ export function StrMoneyInput({
       showZero
       onChange={(v) => onChange(v != null ? String(v) : '')}
     />
+  )
+}
+
+/** Muted marker on a selected settings item that is hidden in settings (no longer offered) */
+export function HiddenInSettingsBadge({
+  item
+}: {
+  item: Parameters<typeof isHiddenItem>[0]
+}): React.JSX.Element | null {
+  if (!isHiddenItem(item)) return null
+  return (
+    <Badge
+      tone="neutral"
+      title="No longer offered for new quotations; kept here"
+      style={{ fontSize: '0.66rem', opacity: 0.8, flexShrink: 0 }}
+    >
+      Hidden in settings
+    </Badge>
   )
 }
 
