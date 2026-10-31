@@ -21,7 +21,7 @@ of a risk, so every screen is a view of the same story.
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
 - 8 shared UI building blocks: to DISCUSS.
-- 9 server: DISCUSSED 2026-10-31 (everyone works on the Windows server via RDP): recommended to PARK, see point 9.
+- 9 server: ON HOLD (user 2026-10-31; everyone works on the Windows server via RDP, see point 9). Revisit for a broker portal / phone view.
 - 10 safety net: detailed to the user 2026-10-30, to agree.
 
 ## 1. The risk case as the backbone (discussing first)
@@ -150,7 +150,7 @@ background jobs already run once (DB named locks: vc_daily_alerts, weekly check,
 are already local. What is left: security (the DB password sits in db-config.json on that machine)
 and the base for a broker portal / phone view / the CEO laptop. Cost: a Windows service (admin, IT
 once) + a firewall port for the CEO, plus the biggest code change on the roadmap.
-RECOMMENDATION (given, awaiting decision): park point 9; revisit when a broker portal or phone view
+DECISION (user 2026-10-31): ON HOLD. Recommendation was: park point 9; revisit when a broker portal or phone view
 becomes a goal. Meanwhile a no-admin hardening check: where db-config.json lives and which MariaDB
 account the app uses (a limited app account instead of root).
 
