@@ -360,6 +360,7 @@ Excel registry file for quotation numbering and logging:
 - **Status badges**: Colored badges in QuotationList (draft=gray, approved=green, exported=teal, converted=purple)
 - **Locked quotations**: Blocked from opening entirely (not read-only, error toast)
 
+- **Every quotation has a step** (2026-10-31): revisions and copies start at the initial (Draft) step (`initialWorkflowStepId`; before, they had none). One-time `migration_quotation_steps_v1`: a quotation with a policy -> converted + Converted step; no step -> Draft (draft) / Approved (approved, exported) / Converted (converted); a draft sitting at Approved -> Draft
 ### Quotation Export Enhancements
 
 - **Revision display**: Centered "Rev.N" below title (not in title text)

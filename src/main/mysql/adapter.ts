@@ -6132,6 +6132,48 @@ export class MySQLAdapter {
             )
         await this.setSetting('migration_doc_short_codes_v1', '1')
       }
+      // Workflow steps out of line with the status (user 2026-10-31, run once): revisions and
+      // copies were made without a step; a quotation converted before conversions marked it
+      if ((await this.getSetting('migration_quotation_steps_v1')) !== '1') {
+        const [stepRows] = await this.pool.query<RowDataPacket[]>(
+          'SELECT id, LOWER(name) AS name, is_initial FROM quotation_workflow_steps'
+        )
+        const draftStep = stepRows.find((r) => Number(r.is_initial) === 1)?.id
+        const stepNamed = (n: string): string | undefined => stepRows.find((r) => r.name === n)?.id
+        const approvedStep = stepNamed('approved')
+        const convertedStep = stepNamed('converted')
+        // A quotation that has a policy is converted
+        if (convertedStep)
+          await this.pool.query(
+            `UPDATE quotations q SET q.status = 'converted', q.workflow_step_id = ?
+              WHERE q.status IN ('approved', 'exported')
+                AND EXISTS (SELECT 1 FROM policy_documents pd WHERE pd.quotation_id = q.id)`,
+            [convertedStep]
+          )
+        if (draftStep) {
+          await this.pool.query(
+            "UPDATE quotations SET workflow_step_id = ? WHERE workflow_step_id IS NULL AND status = 'draft'",
+            [draftStep]
+          )
+          // A draft cannot sit at Approved (approving sets the status, leaving it resets it)
+          if (approvedStep)
+            await this.pool.query(
+              "UPDATE quotations SET workflow_step_id = ? WHERE workflow_step_id = ? AND status = 'draft'",
+              [draftStep, approvedStep]
+            )
+        }
+        if (approvedStep)
+          await this.pool.query(
+            "UPDATE quotations SET workflow_step_id = ? WHERE workflow_step_id IS NULL AND status IN ('approved', 'exported')",
+            [approvedStep]
+          )
+        if (convertedStep)
+          await this.pool.query(
+            "UPDATE quotations SET workflow_step_id = ? WHERE workflow_step_id IS NULL AND status = 'converted'",
+            [convertedStep]
+          )
+        await this.setSetting('migration_quotation_steps_v1', '1')
+      }
       // Settings items in use are hidden, not deleted; a wording change while in use makes a
       // new version (replaced_by). Cargo tables use their existing active column to hide
       for (const siTable of [
@@ -15761,6 +15803,19 @@ export class MySQLAdapter {
     }
   }
 
+  /** The workflow step a new quotation (also a revision or a copy) starts at: Draft */
+  async initialWorkflowStepId(): Promise<string | null> {
+    if (!this.pool) return null
+    try {
+      const [rows] = await this.pool.query<RowDataPacket[]>(
+        'SELECT id FROM quotation_workflow_steps WHERE is_initial = TRUE ORDER BY order_index LIMIT 1'
+      )
+      return rows[0]?.id || null
+    } catch {
+      return null
+    }
+  }
+
   async createQuotationRevision(sourceId: string): Promise<Quotation> {
     if (!this.pool) throw new Error('DB not connected')
 
@@ -15798,15 +15853,22 @@ export class MySQLAdapter {
                 INSERT INTO quotations (
                     id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
-                    ${revCols}
+                    workflow_step_id, ${revCols}
                 )
                 SELECT
                     ?, ?, quotation_date, 'draft', title,
                     ?, ?, FALSE, NULL, created_by,
-                    ${revCols}
+                    ?, ${revCols}
                 FROM quotations WHERE id = ?
             `,
-        [newId, newRef, newRevisionNumber, revisionGroupId, sourceId]
+        [
+          newId,
+          newRef,
+          newRevisionNumber,
+          revisionGroupId,
+          await this.initialWorkflowStepId(),
+          sourceId
+        ]
       )
 
       try {
@@ -15904,15 +15966,15 @@ export class MySQLAdapter {
                 INSERT INTO quotations (
                     id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
-                    ${dupCols}
+                    workflow_step_id, ${dupCols}
                 )
                 SELECT
                     ?, ?, CURDATE(), 'draft', NULL,
                     0, ?, FALSE, NULL, created_by,
-                    ${dupCols}
+                    ?, ${dupCols}
                 FROM quotations WHERE id = ?
             `,
-        [newId, newRef, newId, sourceId]
+        [newId, newRef, newId, await this.initialWorkflowStepId(), sourceId]
       )
 
       try {
