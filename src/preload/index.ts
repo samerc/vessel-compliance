@@ -60,6 +60,9 @@ const api: Api = {
 
   getVesselDocuments: (vesselId) => ipcRenderer.invoke('db:getVesselDocuments', vesselId),
   upsertVesselDocument: (doc) => ipcRenderer.invoke('db:upsertVesselDocument', doc),
+  settingsItemsUsage: (kind) => ipcRenderer.invoke('settingsItems:usage', kind),
+  settingsItemsSetHidden: (kind, id: string, hidden: boolean) =>
+    ipcRenderer.invoke('settingsItems:setHidden', kind, id, hidden),
   docFilingStage: (name: string, data: Uint8Array) =>
     ipcRenderer.invoke('docFiling:stage', name, data),
   docFilingVesselInfo: (vesselId: string) => ipcRenderer.invoke('docFiling:vesselInfo', vesselId),

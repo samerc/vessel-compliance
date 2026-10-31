@@ -8,6 +8,8 @@ import {
   DocFilingItem,
   DocFilingResult,
   DocFilingVesselInfo,
+  SettingsItemKind,
+  SettingsItemUsage,
   Entity,
   AssuredRole,
   VesselAssured,
@@ -257,6 +259,10 @@ export interface Api {
   upsertVesselDocument: (
     doc: VesselDocument
   ) => Promise<{ filePath?: string; renameError?: string } | undefined>
+  /** Quotations using each settings item of a kind (id -> drafts / sent) */
+  settingsItemsUsage: (kind: SettingsItemKind) => Promise<Record<string, SettingsItemUsage>>
+  /** Hide an item from the pickers (kept where quotations use it), or show it again */
+  settingsItemsSetHidden: (kind: SettingsItemKind, id: string, hidden: boolean) => Promise<void>
   /** Filing several dropped files: an Outlook attachment (no file on disk) is saved to temp first */
   docFilingStage: (name: string, data: Uint8Array) => Promise<string>
   /** Guesses each file's document type (and its vessel when `vesselId` is null) */

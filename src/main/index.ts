@@ -48,7 +48,8 @@ import type {
   DocFilingCandidate,
   DocFilingItem,
   DocFilingResult,
-  DocFilingVesselInfo
+  DocFilingVesselInfo,
+  SettingsItemKind
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { cleanCompanyName, documentFileBase, renameToDocumentName } from './documentNaming'
@@ -4497,12 +4498,25 @@ app.whenReady().then(() => {
       return db.setPIItemTypeScope(kind, id, scope)
     }
   )
+  // Settings items in use: hidden instead of deleted, usage counts for the settings lists
+  safeHandle('settingsItems:usage', async (event, kind: SettingsItemKind) => {
+    await requirePermission(event, 'quotations:settings')
+    return db.getSettingsItemUsage(kind)
+  })
+  safeHandle(
+    'settingsItems:setHidden',
+    async (event, kind: SettingsItemKind, id: string, hidden: boolean) => {
+      await requirePermission(event, 'quotations:settings')
+      return db.setSettingsItemHidden(kind, id, !!hidden)
+    }
+  )
   safeHandle('pi:updateClause', async (event, id: string, updates: Partial<PIClause>) => {
     await requirePermission(event, 'quotations:settings')
-    return db.updatePIClause(id, updates)
+    return db.updatePIClause(await db.settingsItemEditTarget('pi_clause', id, updates), updates)
   })
   safeHandle('pi:deleteClause', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('pi_clause', id)
     return db.deletePIClause(id)
   })
   safeHandle('pi:reorderClauses', async (event, orderedIds: string[]) => {
@@ -4595,11 +4609,15 @@ app.whenReady().then(() => {
     'hull:updateClause',
     async (event, id: string, updates: Parameters<typeof db.updateHullClause>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateHullClause(id, updates)
+      return db.updateHullClause(
+        await db.settingsItemEditTarget('hull_clause', id, updates),
+        updates
+      )
     }
   )
   safeHandle('hull:deleteClause', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('hull_clause', id)
     return db.deleteHullClause(id)
   })
   safeHandle('hull:reorderClauses', async (event, ids: string[]) => {
@@ -4640,11 +4658,15 @@ app.whenReady().then(() => {
     'hull:updateClauseCondition',
     async (event, id: string, updates: Parameters<typeof db.updateHullClauseCondition>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateHullClauseCondition(id, updates)
+      return db.updateHullClauseCondition(
+        await db.settingsItemEditTarget('hull_condition', id, updates),
+        updates
+      )
     }
   )
   safeHandle('hull:deleteClauseCondition', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('hull_condition', id)
     return db.deleteHullClauseCondition(id)
   })
   safeHandle('hull:reorderClauseConditions', async (event, ids: string[]) => {
@@ -4683,11 +4705,15 @@ app.whenReady().then(() => {
     'hull:updateAdditionalCondition',
     async (event, id: string, updates: Parameters<typeof db.updateHullAdditionalCondition>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateHullAdditionalCondition(id, updates)
+      return db.updateHullAdditionalCondition(
+        await db.settingsItemEditTarget('hull_additional_condition', id, updates),
+        updates
+      )
     }
   )
   safeHandle('hull:deleteAdditionalCondition', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('hull_additional_condition', id)
     return db.deleteHullAdditionalCondition(id)
   })
   safeHandle('hull:reorderAdditionalConditions', async (event, ids: string[]) => {
@@ -4982,11 +5008,15 @@ app.whenReady().then(() => {
     'war:updateCondition',
     async (event, id: string, updates: Parameters<typeof db.updateWarCondition>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateWarCondition(id, updates)
+      return db.updateWarCondition(
+        await db.settingsItemEditTarget('war_condition', id, updates),
+        updates
+      )
     }
   )
   safeHandle('war:deleteCondition', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('war_condition', id)
     return db.deleteWarCondition(id)
   })
   safeHandle('war:reorderConditions', async (event, ids: string[]) => {
@@ -5046,11 +5076,15 @@ app.whenReady().then(() => {
     'cargo:updateClause',
     async (event, id: string, updates: Parameters<typeof db.updateCargoClause>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateCargoClause(id, updates)
+      return db.updateCargoClause(
+        await db.settingsItemEditTarget('cargo_clause', id, updates),
+        updates
+      )
     }
   )
   safeHandle('cargo:deleteClause', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('cargo_clause', id)
     return db.deleteCargoClause(id)
   })
   safeHandle('cargo:reorderClauses', async (event, ids: string[]) => {
@@ -5144,11 +5178,15 @@ app.whenReady().then(() => {
     'cargo:updateInstituteClause',
     async (event, id: string, updates: Parameters<typeof db.updateCargoInstituteClause>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updateCargoInstituteClause(id, updates)
+      return db.updateCargoInstituteClause(
+        await db.settingsItemEditTarget('cargo_institute_clause', id, updates),
+        updates
+      )
     }
   )
   safeHandle('cargo:deleteInstituteClause', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('cargo_institute_clause', id)
     return db.deleteCargoInstituteClause(id)
   })
   safeHandle('cargo:reorderInstituteClauses', async (event, ids: string[]) => {
@@ -5189,10 +5227,11 @@ app.whenReady().then(() => {
   })
   safeHandle('pi:updateWarranty', async (event, id: string, updates: Partial<PIWarranty>) => {
     await requirePermission(event, 'quotations:settings')
-    return db.updatePIWarranty(id, updates)
+    return db.updatePIWarranty(await db.settingsItemEditTarget('pi_warranty', id, updates), updates)
   })
   safeHandle('pi:deleteWarranty', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('pi_warranty', id)
     return db.deletePIWarranty(id)
   })
   safeHandle('pi:reorderWarranties', async (event, orderedIds: string[]) => {
@@ -5329,11 +5368,15 @@ app.whenReady().then(() => {
     'pi:updateExclusion',
     async (event, id: string, updates: Parameters<typeof db.updatePIExclusion>[1]) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updatePIExclusion(id, updates)
+      return db.updatePIExclusion(
+        await db.settingsItemEditTarget('pi_exclusion', id, updates),
+        updates
+      )
     }
   )
   safeHandle('pi:deleteExclusion', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('pi_exclusion', id)
     return db.deletePIExclusion(id)
   })
   safeHandle('pi:reorderExclusions', async (event, orderedIds: string[]) => {
@@ -5382,11 +5425,17 @@ app.whenReady().then(() => {
     'pi:updateAdditionalClause',
     async (event, id: string, title: string | null, code: string | null, text: string) => {
       await requirePermission(event, 'quotations:settings')
-      return db.updatePIAdditionalClause(id, title, code, text)
+      const target = await db.settingsItemEditTarget('pi_additional_clause', id, {
+        title,
+        code,
+        text
+      })
+      return db.updatePIAdditionalClause(target, title, code, text)
     }
   )
   safeHandle('pi:deleteAdditionalClause', async (event, id: string) => {
     await requirePermission(event, 'quotations:settings')
+    await db.assertSettingsItemDeletable('pi_additional_clause', id)
     return db.deletePIAdditionalClause(id)
   })
   safeHandle('pi:reorderAdditionalClauses', async (event, orderedIds: string[]) => {

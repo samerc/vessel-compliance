@@ -641,6 +641,10 @@ export interface DABQueryCriteria {
 // ==================== P&I Quotation Settings ====================
 
 export interface PIClause {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   clauseNumber: number
   name: string
@@ -668,6 +672,10 @@ export interface PIWarrantyTag {
 export type QuotationTypeScope = 'pi' | 'hull' | 'war' | 'cargo' | 'all' | string
 
 export interface PIWarranty {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   text: string
   isCargoRelated: boolean
@@ -725,6 +733,10 @@ export interface PIDeductibleSetItem {
 }
 
 export interface PIExclusion {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   text: string
   isCargoRelated: boolean
@@ -781,6 +793,10 @@ export interface PISubLimitTemplate {
 }
 
 export interface PIAdditionalClause {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   title?: string
   code?: string
@@ -862,6 +878,10 @@ export interface HullAgreedValueText {
 }
 
 export interface HullClause {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   name: string
   code: string
@@ -873,6 +893,10 @@ export interface HullClause {
 export type HullConditionSection = 'hm' | 'iv' | 'both'
 
 export interface HullClauseCondition {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   hullClauseId: string
   conditionNumber: string
@@ -885,6 +909,10 @@ export interface HullClauseCondition {
 }
 
 export interface HullAdditionalCondition {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   title?: string
   text: string
@@ -992,6 +1020,10 @@ export interface QuotationHullAdditionalCondition {
 // ==================== War Risk ====================
 
 export interface WarCondition {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   text: string
   defaultSelected: boolean
@@ -1022,6 +1054,10 @@ export interface WarSettings {
 // ==================== Cargo ====================
 
 export interface CargoClause {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   section: 'conditions' | 'special' | 'law'
   title: string
@@ -1034,6 +1070,10 @@ export interface CargoClause {
 }
 
 export interface CargoInstituteClause {
+  /** Hidden from the pickers (still shown where a quotation uses it) */
+  isHidden?: boolean | number
+  /** Replaced by this newer version (its wording was changed while in use) */
+  replacedBy?: string | null
   id: string
   name: string
   code?: string
@@ -2873,4 +2913,24 @@ export interface DocFilingResult {
   filePath?: string
   renameError?: string
   error?: string
+}
+
+// --- Settings items quotations link to (warranties, clauses, exclusions, conditions...) ---
+
+export type SettingsItemKind =
+  | 'pi_clause'
+  | 'pi_warranty'
+  | 'pi_exclusion'
+  | 'pi_additional_clause'
+  | 'hull_clause'
+  | 'hull_condition'
+  | 'hull_additional_condition'
+  | 'war_condition'
+  | 'cargo_clause'
+  | 'cargo_institute_clause'
+
+/** Quotations using a settings item: open drafts, and the others (sent, superseded, bin) */
+export interface SettingsItemUsage {
+  drafts: number
+  sent: number
 }

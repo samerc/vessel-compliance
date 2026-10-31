@@ -214,7 +214,9 @@ import {
   WarCondition,
   WarSettings,
   WorkflowStep,
-  WorkflowTransition
+  WorkflowTransition,
+  SettingsItemKind,
+  SettingsItemUsage
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
@@ -6130,6 +6132,29 @@ export class MySQLAdapter {
             )
         await this.setSetting('migration_doc_short_codes_v1', '1')
       }
+      // Settings items in use are hidden, not deleted; a wording change while in use makes a
+      // new version (replaced_by). Cargo tables use their existing active column to hide
+      for (const siTable of [
+        'pi_clauses',
+        'pi_warranties',
+        'pi_exclusions',
+        'pi_additional_clauses',
+        'hull_clauses',
+        'hull_clause_conditions',
+        'hull_additional_conditions',
+        'war_conditions',
+        'cargo_clauses',
+        'cargo_institute_clauses'
+      ]) {
+        const [siCols] = await this.pool.query<RowDataPacket[]>(`SHOW COLUMNS FROM ${siTable}`)
+        const siHas = new Set(siCols.map((c) => String(c.Field)))
+        if (!siTable.startsWith('cargo_') && !siHas.has('is_hidden'))
+          await this.pool.query(
+            `ALTER TABLE ${siTable} ADD COLUMN is_hidden TINYINT(1) NOT NULL DEFAULT 0`
+          )
+        if (!siHas.has('replaced_by'))
+          await this.pool.query(`ALTER TABLE ${siTable} ADD COLUMN replaced_by VARCHAR(36) NULL`)
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -11632,10 +11657,358 @@ export class MySQLAdapter {
 
   // ==================== P&I Clauses ====================
 
+  // --- Settings items in use (warranties, clauses, exclusions, conditions...) ---
+  // Quotations LINK to these rows and show their wording live. So an item a quotation uses is
+  // never deleted (it is hidden: gone from the pickers, kept where it is used), and a WORDING
+  // change to an item used by quotations that went out (approved / exported / converted, or
+  // superseded / in the bin) makes a new version: the old row is hidden with `replaced_by`, the
+  // new one takes its place in the settings sets and in the draft quotations (their export
+  // snapshot is cleared so the next export reads the new wording). User decision 2026-10-31.
+
+  static readonly SETTINGS_ITEM_KINDS: Record<
+    SettingsItemKind,
+    {
+      table: string
+      /** Update keys (camelCase) -> columns: a change to one of these is a wording change */
+      wording: Record<string, string>
+      /** 'active' = the cargo tables' existing on/off column (hidden = not active) */
+      hidden: 'is_hidden' | 'active'
+      /** quotation_* rows pointing at the item (quotation_id + this column) */
+      links: { table: string; column: string }[]
+      /** Columns of the quotations table pointing at the item */
+      quotationColumns?: string[]
+      /** Set / default-list rows: moved to the new version */
+      sets?: { table: string; column: string }[]
+      /** Side rows copied for the new version (tags, vessel types, clause links) */
+      copies?: { table: string; column: string }[]
+    }
+  > = {
+    pi_clause: {
+      table: 'pi_clauses',
+      wording: { clauseNumber: 'clause_number', name: 'name', description: 'description' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_clauses', column: 'pi_clause_id' }],
+      sets: [{ table: 'pi_clause_set_items', column: 'clause_id' }]
+    },
+    pi_warranty: {
+      table: 'pi_warranties',
+      wording: { text: 'text' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_warranties', column: 'pi_warranty_id' }],
+      sets: [{ table: 'pi_warranty_set_items', column: 'warranty_id' }],
+      copies: [{ table: 'pi_warranty_tag_assignments', column: 'warranty_id' }]
+    },
+    pi_exclusion: {
+      table: 'pi_exclusions',
+      wording: { text: 'text' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_exclusions', column: 'pi_exclusion_id' }],
+      copies: [{ table: 'pi_exclusion_vessel_type_map', column: 'exclusion_id' }]
+    },
+    pi_additional_clause: {
+      table: 'pi_additional_clauses',
+      wording: { title: 'title', code: 'code', text: 'text' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_additional_clauses', column: 'pi_additional_clause_id' }],
+      sets: [{ table: 'pi_additional_clause_set_items', column: 'clause_id' }]
+    },
+    hull_clause: {
+      table: 'hull_clauses',
+      wording: { name: 'name', code: 'code', description: 'description' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_hull_alternatives', column: 'hull_clause_id' }],
+      quotationColumns: ['hull_clause_id', 'iv_clause_id'],
+      copies: [{ table: 'hull_additional_condition_clauses', column: 'hull_clause_id' }]
+    },
+    hull_condition: {
+      table: 'hull_clause_conditions',
+      wording: {
+        conditionNumber: 'condition_number',
+        text: 'text',
+        amountPlaceholder: 'amount_placeholder'
+      },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_hull_conditions', column: 'hull_condition_id' }]
+    },
+    hull_additional_condition: {
+      table: 'hull_additional_conditions',
+      wording: { title: 'title', text: 'text', amountPlaceholder: 'amount_placeholder' },
+      hidden: 'is_hidden',
+      links: [
+        {
+          table: 'quotation_hull_additional_conditions',
+          column: 'hull_additional_condition_id'
+        }
+      ],
+      copies: [{ table: 'hull_additional_condition_clauses', column: 'additional_condition_id' }]
+    },
+    war_condition: {
+      table: 'war_conditions',
+      wording: { text: 'text' },
+      hidden: 'is_hidden',
+      links: [{ table: 'quotation_war_conditions', column: 'war_condition_id' }]
+    },
+    cargo_clause: {
+      table: 'cargo_clauses',
+      wording: {
+        title: 'title',
+        text: 'text',
+        code: 'code',
+        amountPlaceholder: 'amount_placeholder'
+      },
+      hidden: 'active',
+      links: [{ table: 'quotation_cargo_clauses', column: 'cargo_clause_id' }],
+      sets: [{ table: 'cargo_clause_set_items', column: 'cargo_clause_id' }]
+    },
+    cargo_institute_clause: {
+      table: 'cargo_institute_clauses',
+      wording: { name: 'name', code: 'code', description: 'description' },
+      hidden: 'active',
+      links: [],
+      quotationColumns: ['cargo_clause_id']
+    }
+  }
+
+  /** A draft that may follow new wording: not superseded (locked) and not in the bin */
+  private static readonly OPEN_DRAFT_SQL =
+    "q.status = 'draft' AND q.deleted_at IS NULL AND COALESCE(q.is_locked, 0) = 0"
+
+  private settingsKind(
+    kind: SettingsItemKind
+  ): (typeof MySQLAdapter.SETTINGS_ITEM_KINDS)[SettingsItemKind] {
+    const def = MySQLAdapter.SETTINGS_ITEM_KINDS[kind]
+    if (!def) throw new Error('Unknown settings item')
+    return def
+  }
+
+  /** Quotations using each item of a kind: open drafts and the others (sent, superseded, bin) */
+  async getSettingsItemUsage(
+    kind: SettingsItemKind,
+    onlyId?: string
+  ): Promise<Record<string, SettingsItemUsage>> {
+    if (!this.pool) return {}
+    const def = this.settingsKind(kind)
+    const parts: string[] = []
+    const params: SqlValue[] = []
+    for (const l of def.links) {
+      parts.push(
+        `SELECT l.${l.column} AS item, q.id AS qid, (${MySQLAdapter.OPEN_DRAFT_SQL}) AS draft
+           FROM ${l.table} l JOIN quotations q ON q.id = l.quotation_id
+          WHERE l.${l.column} IS NOT NULL${onlyId ? ` AND l.${l.column} = ?` : ''}`
+      )
+      if (onlyId) params.push(onlyId)
+    }
+    for (const c of def.quotationColumns || []) {
+      parts.push(
+        `SELECT q.${c} AS item, q.id AS qid, (${MySQLAdapter.OPEN_DRAFT_SQL}) AS draft
+           FROM quotations q WHERE q.${c} IS NOT NULL${onlyId ? ` AND q.${c} = ?` : ''}`
+      )
+      if (onlyId) params.push(onlyId)
+    }
+    if (parts.length === 0) return {}
+    const [rows] = await this.pool.query<RowDataPacket[]>(parts.join(' UNION ALL '), params)
+    const seen = new Map<string, Map<string, boolean>>()
+    for (const r of rows) {
+      const m = seen.get(r.item) || new Map<string, boolean>()
+      m.set(r.qid, Boolean(Number(r.draft)))
+      seen.set(r.item, m)
+    }
+    const out: Record<string, SettingsItemUsage> = {}
+    for (const [item, qs] of seen) {
+      const drafts = [...qs.values()].filter(Boolean).length
+      out[item] = { drafts, sent: qs.size - drafts }
+    }
+    return out
+  }
+
+  /** Hide (or show again) an item: hidden items stay in the lists, the pickers leave them out */
+  async setSettingsItemHidden(kind: SettingsItemKind, id: string, hidden: boolean): Promise<void> {
+    if (!this.pool) return
+    const def = this.settingsKind(kind)
+    const value = def.hidden === 'active' ? (hidden ? 0 : 1) : hidden ? 1 : 0
+    await this.pool.execute(`UPDATE ${def.table} SET ${def.hidden} = ? WHERE id = ?`, [value, id])
+  }
+
+  /** Deleting an item a quotation uses is refused: it is hidden instead */
+  async assertSettingsItemDeletable(kind: SettingsItemKind, id: string): Promise<void> {
+    const n = (u?: SettingsItemUsage): number => (u ? u.drafts + u.sent : 0)
+    let used = n((await this.getSettingsItemUsage(kind, id))[id])
+    // A hull clause takes its conditions with it
+    if (kind === 'hull_clause' && this.pool) {
+      const [conds] = await this.pool.query<RowDataPacket[]>(
+        'SELECT id FROM hull_clause_conditions WHERE hull_clause_id = ?',
+        [id]
+      )
+      const usage = await this.getSettingsItemUsage('hull_condition')
+      used += conds.reduce((s, c) => s + n(usage[c.id]), 0)
+    }
+    if (used > 0)
+      throw new Error(
+        `Used in ${used} quotation${used === 1 ? '' : 's'}: it cannot be deleted. Hide it instead (it stays in those quotations).`
+      )
+  }
+
+  /**
+   * The row an update must be applied to. A wording change to an item used by quotations that
+   * went out makes a new version first (see above) and returns its id; anything else (tags,
+   * default, order, scope, an item used only by drafts or not at all) updates the item itself.
+   */
+  async settingsItemEditTarget(
+    kind: SettingsItemKind,
+    id: string,
+    updates: Record<string, unknown>
+  ): Promise<string> {
+    if (!this.pool) return id
+    const def = this.settingsKind(kind)
+    const [[row]] = await this.pool.query<RowDataPacket[]>(
+      `SELECT * FROM ${def.table} WHERE id = ?`,
+      [id]
+    )
+    if (!row) return id
+    const changed = Object.entries(def.wording).some(
+      ([key, col]) => key in updates && String(updates[key] ?? '') !== String(row[col] ?? '')
+    )
+    if (!changed) return id
+    const usage = (await this.getSettingsItemUsage(kind, id))[id]
+    if (!usage || usage.sent === 0) return id
+    return this.newSettingsItemVersion(kind, id)
+  }
+
+  /** Copies the item (and, for a hull clause, its conditions); see settingsItemEditTarget */
+  private async newSettingsItemVersion(kind: SettingsItemKind, id: string): Promise<string> {
+    if (!this.pool) return id
+    const def = this.settingsKind(kind)
+    const conn = await this.pool.getConnection()
+    const columnsOf = async (table: string): Promise<string[]> => {
+      const [cols] = await conn.query<RowDataPacket[]>(`SHOW COLUMNS FROM ${table}`)
+      return cols.map((c) => String(c.Field))
+    }
+    // Copies the row(s) of `table` where `key` = `from`, with `key` = `to` and fresh ids
+    const copyRows = async (
+      table: string,
+      key: string,
+      from: string,
+      to: string,
+      reset: Record<string, string> = {}
+    ): Promise<void> => {
+      const cols = await columnsOf(table)
+      const select = cols.map((c) =>
+        c === key ? '?' : c === 'id' ? 'UUID()' : c in reset ? reset[c] : `\`${c}\``
+      )
+      await conn.query(
+        `INSERT INTO ${table} (${cols.map((c) => `\`${c}\``).join(', ')})
+         SELECT ${select.join(', ')} FROM ${table} WHERE \`${key}\` = ?`,
+        [to, from]
+      )
+    }
+    const newId = uuidv4()
+    const shown = def.hidden === 'active' ? '1' : '0'
+    try {
+      await conn.beginTransaction()
+      await conn.query('SET FOREIGN_KEY_CHECKS=0')
+      // The new version: same row, new id, shown, not replaced
+      const cols = await columnsOf(def.table)
+      const select = cols.map((c) =>
+        c === 'id' ? '?' : c === 'replaced_by' ? 'NULL' : c === def.hidden ? shown : `\`${c}\``
+      )
+      await conn.query(
+        `INSERT INTO ${def.table} (${cols.map((c) => `\`${c}\``).join(', ')})
+         SELECT ${select.join(', ')} FROM ${def.table} WHERE id = ?`,
+        [newId, id]
+      )
+      await conn.query(`UPDATE ${def.table} SET ${def.hidden} = ?, replaced_by = ? WHERE id = ?`, [
+        def.hidden === 'active' ? 0 : 1,
+        newId,
+        id
+      ])
+      for (const c of def.copies || []) await copyRows(c.table, c.column, id, newId)
+      for (const s of def.sets || [])
+        await conn.query(`UPDATE ${s.table} SET ${s.column} = ? WHERE ${s.column} = ?`, [newId, id])
+
+      // Open drafts move to the new version; their snapshot is cleared
+      const drafts = new Set<string>()
+      const moves: { table: string; column: string; from: string; to: string }[] = def.links.map(
+        (l) => ({ ...l, from: id, to: newId })
+      )
+      // A hull clause's conditions get new versions too (under the new clause)
+      if (kind === 'hull_clause') {
+        const [conds] = await conn.query<RowDataPacket[]>(
+          'SELECT id FROM hull_clause_conditions WHERE hull_clause_id = ?',
+          [id]
+        )
+        const condCols = await columnsOf('hull_clause_conditions')
+        for (const c of conds) {
+          const cid = uuidv4()
+          const sel = condCols.map((k) =>
+            k === 'id'
+              ? '?'
+              : k === 'hull_clause_id'
+                ? '?'
+                : k === 'replaced_by'
+                  ? 'NULL'
+                  : `\`${k}\``
+          )
+          await conn.query(
+            `INSERT INTO hull_clause_conditions (${condCols.map((k) => `\`${k}\``).join(', ')})
+             SELECT ${sel.join(', ')} FROM hull_clause_conditions WHERE id = ?`,
+            [cid, newId, c.id]
+          )
+          await conn.query('UPDATE hull_clause_conditions SET replaced_by = ? WHERE id = ?', [
+            cid,
+            c.id
+          ])
+          moves.push({
+            table: 'quotation_hull_conditions',
+            column: 'hull_condition_id',
+            from: c.id,
+            to: cid
+          })
+        }
+      }
+      for (const m of moves) {
+        const [hit] = await conn.query<RowDataPacket[]>(
+          `SELECT DISTINCT l.quotation_id AS qid FROM ${m.table} l JOIN quotations q ON q.id = l.quotation_id
+            WHERE l.${m.column} = ? AND ${MySQLAdapter.OPEN_DRAFT_SQL}`,
+          [m.from]
+        )
+        hit.forEach((h) => drafts.add(h.qid))
+        await conn.query(
+          `UPDATE ${m.table} l JOIN quotations q ON q.id = l.quotation_id SET l.${m.column} = ?
+            WHERE l.${m.column} = ? AND ${MySQLAdapter.OPEN_DRAFT_SQL}`,
+          [m.to, m.from]
+        )
+      }
+      for (const c of def.quotationColumns || []) {
+        const [hit] = await conn.query<RowDataPacket[]>(
+          `SELECT q.id AS qid FROM quotations q WHERE q.${c} = ? AND ${MySQLAdapter.OPEN_DRAFT_SQL}`,
+          [id]
+        )
+        hit.forEach((h) => drafts.add(h.qid))
+        await conn.query(
+          `UPDATE quotations q SET q.${c} = ? WHERE q.${c} = ? AND ${MySQLAdapter.OPEN_DRAFT_SQL}`,
+          [newId, id]
+        )
+      }
+      if (drafts.size > 0)
+        await conn.query('UPDATE quotations SET export_snapshot = NULL WHERE id IN (?)', [
+          [...drafts]
+        ])
+      await conn.query('SET FOREIGN_KEY_CHECKS=1')
+      await conn.commit()
+      return newId
+    } catch (e) {
+      await conn.rollback().catch(() => {})
+      await conn.query('SET FOREIGN_KEY_CHECKS=1').catch(() => {})
+      throw e
+    } finally {
+      conn.release()
+    }
+  }
+
   async getPIClauses(): Promise<PIClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, clause_number as clauseNumber, name, description, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'pi') as typeScope, order_index as `order` FROM pi_clauses ORDER BY order_index ASC"
+      "SELECT id, clause_number as clauseNumber, name, description, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'pi') as typeScope, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM pi_clauses ORDER BY order_index ASC"
     )
     return (rows as Row<PIClause>[]).map((r) => ({
       ...r,
@@ -11772,7 +12145,7 @@ export class MySQLAdapter {
   async getPIWarranties(): Promise<PIWarranty[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, text, is_cargo_related as isCargoRelated, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_warranties ORDER BY order_index ASC"
+      "SELECT id, text, is_cargo_related as isCargoRelated, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM pi_warranties ORDER BY order_index ASC"
     )
     const warranties = (rows as Row<PIWarranty>[]).map((r) => ({
       ...r,
@@ -12242,7 +12615,7 @@ export class MySQLAdapter {
   async getPIExclusions(): Promise<PIExclusion[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, text, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_exclusions ORDER BY order_index ASC"
+      "SELECT id, text, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'all') as typeScope, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM pi_exclusions ORDER BY order_index ASC"
     )
     // Fetch vessel type mappings
     const [vtRows] = (await this.pool.query(
@@ -12410,7 +12783,7 @@ export class MySQLAdapter {
   async getPIAdditionalClauses(): Promise<PIAdditionalClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      "SELECT id, title, code, text, order_index as `order`, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope FROM pi_additional_clauses ORDER BY order_index ASC"
+      "SELECT id, title, code, text, order_index as `order`, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM pi_additional_clauses ORDER BY order_index ASC"
     )
     return rows as PIAdditionalClause[]
   }
@@ -21208,7 +21581,7 @@ export class MySQLAdapter {
   async getHullClauses(): Promise<HullClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, name, code, description, condition_section as conditionSection, order_index as `order` FROM hull_clauses ORDER BY order_index ASC'
+      'SELECT id, name, code, description, condition_section as conditionSection, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM hull_clauses ORDER BY order_index ASC'
     )
     return (rows as Row<HullClause>[]).map((r) => ({
       ...r,
@@ -21292,7 +21665,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     if (hullClauseId) {
       const [rows] = await this.pool.query(
-        'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions WHERE hull_clause_id = ? ORDER BY order_index ASC',
+        'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM hull_clause_conditions WHERE hull_clause_id = ? ORDER BY order_index ASC',
         [hullClauseId]
       )
       return (rows as Row<HullClauseCondition>[]).map((r) => ({
@@ -21303,7 +21676,7 @@ export class MySQLAdapter {
       }))
     }
     const [rows] = await this.pool.query(
-      'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions ORDER BY order_index ASC'
+      'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM hull_clause_conditions ORDER BY order_index ASC'
     )
     return (rows as Row<HullClauseCondition>[]).map((r) => ({
       ...r,
@@ -21422,7 +21795,7 @@ export class MySQLAdapter {
   async getHullAdditionalConditions(): Promise<HullAdditionalCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, title, text, default_selected as defaultSelected, order_index as `order`, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM hull_additional_conditions ORDER BY order_index ASC'
+      'SELECT id, title, text, default_selected as defaultSelected, order_index as `order`, has_amount as hasAmount, amount_placeholder as amountPlaceholder, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM hull_additional_conditions ORDER BY order_index ASC'
     )
     const [links] = await this.pool.query(
       'SELECT additional_condition_id, hull_clause_id FROM hull_additional_condition_clauses'
@@ -22521,7 +22894,7 @@ export class MySQLAdapter {
   async getWarConditions(): Promise<WarCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, text, default_selected as defaultSelected, order_index as `order` FROM war_conditions ORDER BY order_index ASC'
+      'SELECT id, text, default_selected as defaultSelected, order_index as `order`, COALESCE(is_hidden, 0) as isHidden, replaced_by as replacedBy FROM war_conditions ORDER BY order_index ASC'
     )
     return (rows as Row<WarCondition>[]).map((r) => ({
       ...r,
@@ -25684,7 +26057,7 @@ export class MySQLAdapter {
   async getCargoClausesBySection(section: string): Promise<CargoClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
+      'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder, replaced_by as replacedBy FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
       [section]
     )
     return (rows as Row<CargoClause>[]).map((r) => ({
@@ -25697,7 +26070,7 @@ export class MySQLAdapter {
   async getAllCargoClauses(): Promise<CargoClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
+      'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder, replaced_by as replacedBy FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
     )
     return (rows as Row<CargoClause>[]).map((r) => ({
       ...r,
@@ -25984,7 +26357,7 @@ export class MySQLAdapter {
   async getCargoInstituteClauses(): Promise<CargoInstituteClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, name, code, description, order_index as `order`, active FROM cargo_institute_clauses ORDER BY order_index ASC'
+      'SELECT id, name, code, description, order_index as `order`, active, replaced_by as replacedBy FROM cargo_institute_clauses ORDER BY order_index ASC'
     )
     return (rows as Row<CargoInstituteClause>[]).map((r) => ({ ...r, active: Boolean(r.active) }))
   }
