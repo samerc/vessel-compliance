@@ -148,7 +148,7 @@ export default function VesselDetail({
   }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const { theme } = useTheme()
   const { user, hasPermission } = useAuth()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showToast } = useToast()
   const isLight = theme === 'light' || theme === 'aurora'
 
   // Endorsement prompt state
@@ -311,7 +311,8 @@ export default function VesselDetail({
       return
     }
 
-    await window.api.upsertVesselDocument(newDoc)
+    const linked = await window.api.upsertVesselDocument(newDoc)
+    if (linked?.renameError) showToast(linked.renameError, 'warning')
     await loadDocuments()
     askDocDates(docTypeId)
   }
@@ -345,7 +346,8 @@ export default function VesselDetail({
       receivedDate: new Date().toISOString().split('T')[0]
     }
 
-    await window.api.upsertVesselDocument(newDoc)
+    const linked = await window.api.upsertVesselDocument(newDoc)
+    if (linked?.renameError) showToast(linked.renameError, 'warning')
     await loadDocuments()
     askDocDates(docTypeId)
   }

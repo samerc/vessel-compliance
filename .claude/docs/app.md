@@ -313,3 +313,6 @@ Bootstrap + overlay architecture for code-only deployments without full installe
 - **Admin visibility**: Admin Panel → File Paths → Hot Updates section shows source/build/status
 - **Worker threads**: Worker thread loads parser from ASAR (not hot-update cache) to ensure `node_modules` access
 - **Isolation**: `electron-updater` configured with `allowPrerelease = false` + error handler ignores `code-latest`, so hot-updates and full updates do not interfere
+
+### Export Save dialog remembers the folder
+`file:save` (every export with a Save dialog, e.g. quotations) opens in the last folder used, kept per Windows user in electron-store (`lastExportDir`, survives restarts); a folder that no longer exists falls back to Downloads. Policy exports with a policy folder skip the dialog.

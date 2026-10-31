@@ -6083,6 +6083,12 @@ export class MySQLAdapter {
         )
         await this.setSetting('migration_compliance_clear_v1', '1')
       }
+      // Document type short codes, used to rename linked files (BARON - COR - 2026-10-31.pdf)
+      for (const scTable of ['document_types', 'entity_document_types']) {
+        const [scCols] = await this.pool.query(`SHOW COLUMNS FROM ${scTable} LIKE 'short_code'`)
+        if ((scCols as RowDataPacket[]).length === 0)
+          await this.pool.query(`ALTER TABLE ${scTable} ADD COLUMN short_code VARCHAR(20) NULL`)
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -6370,10 +6376,21 @@ export class MySQLAdapter {
   }
 
   // --- Document Types ---
+  /** A document type's short code as stored: trimmed, upper case, file-name safe, empty = null */
+  static cleanShortCode(code: string | null | undefined): string | null {
+    const c = String(code ?? '')
+      // eslint-disable-next-line no-control-regex -- Windows file names cannot hold control characters
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+      .trim()
+      .toUpperCase()
+      .slice(0, 20)
+    return c || null
+  }
+
   async getDocumentTypes(): Promise<DocumentType[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, name, description, required, annual_renewal as annualRenewal, order_index as `order` FROM document_types ORDER BY order_index ASC'
+      'SELECT id, name, description, required, annual_renewal as annualRenewal, order_index as `order`, short_code as shortCode FROM document_types ORDER BY order_index ASC'
     )
     const docs = (rows as Row<DocumentType>[]).map((r) => ({
       ...r,
@@ -6402,14 +6419,15 @@ export class MySQLAdapter {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     await this.pool.execute(
-      'INSERT INTO document_types (id, name, description, required, annual_renewal, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO document_types (id, name, description, required, annual_renewal, order_index, short_code) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         id,
         docType.name,
         docType.description || null,
         docType.required,
         docType.annualRenewal || false,
-        docType.order
+        docType.order,
+        MySQLAdapter.cleanShortCode(docType.shortCode)
       ]
     )
     // Save policy type tags
@@ -6448,6 +6466,10 @@ export class MySQLAdapter {
     if (updates.order !== undefined) {
       fields.push('order_index = ?')
       values.push(updates.order)
+    }
+    if (updates.shortCode !== undefined) {
+      fields.push('short_code = ?')
+      values.push(MySQLAdapter.cleanShortCode(updates.shortCode))
     }
 
     if (fields.length > 0) {
@@ -8264,7 +8286,7 @@ export class MySQLAdapter {
   async getEntityDocumentTypes(): Promise<EntityDocumentType[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, name, description, entity_scope as entityScope, is_required as isRequired, order_index as orderIndex, is_active as isActive FROM entity_document_types ORDER BY order_index'
+      'SELECT id, name, description, entity_scope as entityScope, is_required as isRequired, order_index as orderIndex, is_active as isActive, short_code as shortCode FROM entity_document_types ORDER BY order_index'
     )
     return (rows as Row<EntityDocumentType>[]).map((r) => ({
       ...r,
@@ -8277,7 +8299,7 @@ export class MySQLAdapter {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     await this.pool.execute(
-      'INSERT INTO entity_document_types (id, name, description, entity_scope, is_required, order_index, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO entity_document_types (id, name, description, entity_scope, is_required, order_index, is_active, short_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
         dt.name,
@@ -8285,7 +8307,8 @@ export class MySQLAdapter {
         dt.entityScope || 'both',
         dt.isRequired ? 1 : 0,
         dt.orderIndex || 0,
-        dt.isActive !== false ? 1 : 0
+        dt.isActive !== false ? 1 : 0,
+        MySQLAdapter.cleanShortCode(dt.shortCode)
       ]
     )
     return { ...dt, id }
@@ -8314,6 +8337,10 @@ export class MySQLAdapter {
     if (updates.orderIndex !== undefined) {
       fields.push('order_index = ?')
       values.push(updates.orderIndex)
+    }
+    if (updates.shortCode !== undefined) {
+      fields.push('short_code = ?')
+      values.push(MySQLAdapter.cleanShortCode(updates.shortCode))
     }
     if (updates.isActive !== undefined) {
       fields.push('is_active = ?')

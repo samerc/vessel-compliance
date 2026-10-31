@@ -15,6 +15,8 @@ export interface DocumentType {
   order: number
   description?: string
   policyTypeIds?: string[]
+  /** Short code used in linked file names (e.g. COR): `BARON - COR - 2026-10-31.pdf` */
+  shortCode?: string | null
 }
 
 export interface VesselCustomDocType {
@@ -123,6 +125,8 @@ export interface EntityDocumentType {
   isRequired: boolean
   orderIndex: number
   isActive: boolean
+  /** Short code used in linked file names (e.g. KYC) */
+  shortCode?: string | null
 }
 
 export interface EntityDocument {

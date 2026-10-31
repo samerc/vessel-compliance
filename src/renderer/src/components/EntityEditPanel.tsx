@@ -81,7 +81,7 @@ export default function EntityEditPanel({
   onEditingChange,
   hideBusiness = false
 }: EntityEditPanelProps): React.JSX.Element | null {
-  const { showError, showSuccess } = useToast()
+  const { showError, showSuccess, showToast } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { hasPermission } = useAuth()
@@ -411,8 +411,13 @@ export default function EntityEditPanel({
         showError(`File rejected: ${validation.reason}`)
         return
       }
-      await window.api.upsertEntityDocument({ entityId: eId, documentTypeId, filePath })
-      showSuccess(`${label} uploaded successfully`)
+      const linked = await window.api.upsertEntityDocument({
+        entityId: eId,
+        documentTypeId,
+        filePath
+      })
+      if (linked?.renameError) showToast(linked.renameError, 'warning')
+      else showSuccess(`${label} uploaded successfully`)
       refresh()
     } catch (error) {
       showError((error instanceof Error && error.message) || `Failed to upload ${label}`)
@@ -438,8 +443,13 @@ export default function EntityEditPanel({
       showError(`File rejected: ${validation.reason}`)
       return
     }
-    await window.api.upsertEntityDocument({ entityId: eId, documentTypeId, filePath })
-    showSuccess('Document uploaded successfully')
+    const linked = await window.api.upsertEntityDocument({
+      entityId: eId,
+      documentTypeId,
+      filePath
+    })
+    if (linked?.renameError) showToast(linked.renameError, 'warning')
+    else showSuccess('Document uploaded successfully')
     refresh()
   }
 

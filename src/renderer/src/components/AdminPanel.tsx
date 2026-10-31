@@ -120,6 +120,7 @@ import { confirmDialog, alertDialog, promptDialog } from './DialogHost'
 import { PageHeader, Modal, Field, SaveStatus } from './ui'
 import type { SubTabProps } from '../utils/useRequestedSubTab'
 import type { NavTarget } from '../features'
+import { DocTypeCodeInput } from './DocTypeCodeInput'
 import { ok } from '../utils/ipc'
 import { confirmLeave, useUnsavedGuard } from '../utils/useUnsavedGuard'
 
@@ -2419,6 +2420,9 @@ export default function AdminPanel({
                         #
                       </th>
                       <th scope="col">Document Type</th>
+                      <th scope="col" title="Short code used in linked file names">
+                        File code
+                      </th>
                       <th scope="col">Status</th>
                       <th scope="col" style={{ textAlign: 'right' }}>
                         Actions
@@ -2645,6 +2649,16 @@ export default function AdminPanel({
                           )}
                         </td>
                         <td>
+                          <DocTypeCodeInput
+                            code={doc.shortCode}
+                            typeName={doc.name}
+                            onSave={async (code) => {
+                              ok(await window.api.updateDocumentType(doc.id, { shortCode: code }))
+                              await loadDocTypes()
+                            }}
+                          />
+                        </td>
+                        <td>
                           <button
                             type="button"
                             onClick={() => handleToggleDocRequired(doc)}
@@ -2842,6 +2856,9 @@ export default function AdminPanel({
                         #
                       </th>
                       <th scope="col">Document Type</th>
+                      <th scope="col" title="Short code used in linked file names">
+                        File code
+                      </th>
                       <th scope="col">Scope</th>
                       <th scope="col">Status</th>
                       <th scope="col" style={{ textAlign: 'right' }}>
@@ -3005,6 +3022,20 @@ export default function AdminPanel({
                               )}
                             </div>
                           )}
+                        </td>
+                        <td>
+                          <DocTypeCodeInput
+                            code={edt.shortCode}
+                            typeName={edt.name}
+                            onSave={async (code) => {
+                              ok(
+                                await window.api.updateEntityDocumentType(edt.id, {
+                                  shortCode: code
+                                })
+                              )
+                              await loadEntityDocTypes()
+                            }}
+                          />
                         </td>
                         <td>
                           <span

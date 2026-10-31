@@ -249,7 +249,10 @@ export interface Api {
   deleteVessel: (id: string) => Promise<{ success: boolean; message?: string }>
 
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>
-  upsertVesselDocument: (doc: VesselDocument) => Promise<void>
+  /** The file is renamed in place first (BARON - COR - date); renameError when it could not be */
+  upsertVesselDocument: (
+    doc: VesselDocument
+  ) => Promise<{ filePath?: string; renameError?: string } | undefined>
   updateVesselDocumentExpiry: (
     vesselId: string,
     docTypeId: string,
@@ -346,7 +349,7 @@ export interface Api {
     filePath: string
     expiryDate?: string
     receivedDate?: string
-  }) => Promise<EntityDocument>
+  }) => Promise<EntityDocument & { renameError?: string }>
   updateEntityDocumentExpiry: (
     entityId: string,
     documentTypeId: string,

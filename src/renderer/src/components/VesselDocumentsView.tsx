@@ -68,7 +68,7 @@ export default function VesselDocumentsView({
 }: Props): React.JSX.Element {
   const { theme } = useTheme()
   const { user, hasPermission } = useAuth()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showToast } = useToast()
   const isLight = theme === 'light' || theme === 'aurora'
 
   // Multi-P&I policy support: if multiple P&I policies exist, let user pick
@@ -153,7 +153,7 @@ export default function VesselDocumentsView({
       }
       const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
       const isCustom = customDocTypes.some((c) => c.id === docTypeId)
-      await window.api.upsertVesselDocument({
+      const linked = await window.api.upsertVesselDocument({
         vesselId: vessel.id,
         documentTypeId: docTypeId,
         filePath,
@@ -168,6 +168,7 @@ export default function VesselDocumentsView({
         uploadedBy: user?.username || 'Unknown',
         receivedDate: new Date().toISOString().split('T')[0]
       })
+      if (linked?.renameError) showToast(linked.renameError, 'warning')
       loadData()
       const type = docTypes.find((t) => t.id === docTypeId)
       // Annual documents expire with the policy: no date to ask (received = today already)

@@ -46,6 +46,7 @@ import type {
   ScreeningTrigger
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
+import { cleanCompanyName, documentFileBase, renameToDocumentName } from './documentNaming'
 import { tmpdir } from 'os'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs'
 import { access as fsAccess, readdir } from 'fs/promises'
@@ -359,6 +360,70 @@ async function keepConfirmedSanctions(
   } catch {
     delete updates.ofacStatus
     delete updates.ofacMatchFound
+  }
+}
+
+/**
+ * A file being linked to a vessel / entity document is renamed in place first:
+ * `BARON - COR - 2026-10-31.pdf` (entity names without Ltd / SA / SARL...; the type's short code,
+ * else its name; the upload date). A file the app already links anywhere (another document, the
+ * history) keeps its name, so no other link breaks. A failed rename (file open, read-only) links
+ * the file under its own name and says why.
+ */
+async function nameLinkedDocument(
+  ownerType: 'vessel' | 'entity',
+  ownerId: string,
+  docTypeId: string,
+  filePath: string
+): Promise<{ filePath: string; renameError?: string }> {
+  if (!filePath) return { filePath }
+  const onDisk = resolveFilePath(filePath)
+  if (!existsSync(onDisk)) return { filePath }
+  const [linked] = await db.pool!.query<RowDataPacket[]>(
+    `SELECT 1 FROM vessel_documents WHERE file_path = ?
+     UNION ALL SELECT 1 FROM entity_documents WHERE file_path = ?
+     UNION ALL SELECT 1 FROM document_history WHERE file_path = ? LIMIT 1`,
+    [filePath, filePath, filePath]
+  )
+  if (linked.length > 0) return { filePath }
+  let owner: string
+  let code: string
+  if (ownerType === 'vessel') {
+    const [[v]] = await db.pool!.query<RowDataPacket[]>('SELECT name FROM vessels WHERE id = ?', [
+      ownerId
+    ])
+    owner = String(v?.name || '').toUpperCase()
+    const [[t]] = await db.pool!.query<RowDataPacket[]>(
+      `SELECT short_code AS code, name FROM document_types WHERE id = ?
+       UNION ALL SELECT NULL AS code, name FROM vessel_custom_doc_types WHERE id = ?`,
+      [docTypeId, docTypeId]
+    )
+    code = String(t?.code || t?.name || '')
+  } else {
+    const [[e]] = await db.pool!.query<RowDataPacket[]>('SELECT name FROM entities WHERE id = ?', [
+      ownerId
+    ])
+    owner = cleanCompanyName(String(e?.name || ''))
+    const [[t]] = await db.pool!.query<RowDataPacket[]>(
+      'SELECT short_code AS code, name FROM entity_document_types WHERE id = ?',
+      [docTypeId]
+    )
+    code = String(t?.code || t?.name || '')
+  }
+  if (!owner || !code) return { filePath }
+  try {
+    const renamed = await renameToDocumentName(onDisk, documentFileBase(owner, code))
+    // Same folder form as given (network path for a remote user, local otherwise)
+    return { filePath: join(dirname(filePath), basename(renamed)) }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    return {
+      filePath,
+      renameError:
+        code === 'EBUSY' || code === 'EPERM' || code === 'EACCES'
+          ? `${basename(filePath)} was linked but not renamed: it is open in another program or the folder is read-only`
+          : `${basename(filePath)} was linked but not renamed: ${(err as Error).message || code}`
+    }
   }
 }
 
@@ -1646,8 +1711,15 @@ app.whenReady().then(() => {
   })
   safeHandle(
     'db:upsertVesselDocument',
-    async (event, doc: VesselDocument & { docTypeId?: string }) => {
+    async (event, input: VesselDocument & { docTypeId?: string }) => {
       const user = await requirePermission(event, 'documents:upload')
+      const named = await nameLinkedDocument(
+        'vessel',
+        input.vesselId,
+        input.documentTypeId || input.docTypeId || '',
+        input.filePath || ''
+      )
+      const doc = { ...input, filePath: input.filePath ? named.filePath : input.filePath }
       const replaced = await db.upsertVesselDocument(doc, user.username)
       const [vDocRows] = await db.pool!.query<RowDataPacket[]>(
         'SELECT name FROM vessels WHERE id = ?',
@@ -1678,6 +1750,7 @@ app.whenReady().then(() => {
           doc.filePath ? basename(doc.filePath) : 'unlinked',
           user.username
         ).catch(() => {})
+      return { filePath: doc.filePath, renameError: named.renameError }
     }
   )
   safeHandle(
@@ -2177,9 +2250,19 @@ app.whenReady().then(() => {
   })
   safeHandle(
     'entityDocs:upsert',
-    async (event, doc: Parameters<typeof db.upsertEntityDocument>[0]) => {
+    async (event, input: Parameters<typeof db.upsertEntityDocument>[0]) => {
       const user = await requirePermission(event, 'entities:edit')
-      return db.upsertEntityDocument(doc, user.username)
+      const named = await nameLinkedDocument(
+        'entity',
+        input.entityId,
+        input.documentTypeId,
+        input.filePath || ''
+      )
+      const saved = await db.upsertEntityDocument(
+        { ...input, filePath: input.filePath ? named.filePath : input.filePath },
+        user.username
+      )
+      return { ...saved, renameError: named.renameError }
     }
   )
   safeHandle(
@@ -7321,8 +7404,12 @@ app.whenReady().then(() => {
     return { success: true, filePath: result.filePath }
   })
 
-  // Export save: the renderer learns whether the file was really written (cancel / file open in Word)
-  let lastExportDir = ''
+  // Export save: the renderer learns whether the file was really written (cancel / file open in Word).
+  // The dialog opens in the last folder used; kept per Windows user (electron-store) across restarts
+  const startExportDir = (): string => {
+    const dir = store.get('lastExportDir')
+    return typeof dir === 'string' && dir && existsSync(dir) ? dir : app.getPath('downloads')
+  }
   const SAVE_FILTERS: Record<string, string> = {
     docx: 'Word Documents',
     pdf: 'PDF Documents',
@@ -7335,7 +7422,7 @@ app.whenReady().then(() => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const options = {
       title: 'Save',
-      defaultPath: join(lastExportDir || app.getPath('downloads'), basename(defaultName)),
+      defaultPath: join(startExportDir(), basename(defaultName)),
       filters: ext ? [{ name: SAVE_FILTERS[ext] || ext.toUpperCase(), extensions: [ext] }] : []
     }
     const result = win
@@ -7356,7 +7443,7 @@ app.whenReady().then(() => {
         { cause: err }
       )
     }
-    lastExportDir = dirname(result.filePath)
+    store.set('lastExportDir', dirname(result.filePath))
     return { saved: true, filePath: result.filePath }
   })
 

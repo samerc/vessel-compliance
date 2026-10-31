@@ -33,6 +33,15 @@ From the former Vessel Timeline notes:
 - **Filters**: Type chips + date range (default last 12 months)
 - **Layout**: Vertical timeline with month+year headers, colored icons per type
 
+### Renaming linked files (2026-10-31)
+
+A file linked to a vessel / entity document is renamed IN PLACE first (`nameLinkedDocument` in main/index.ts, helpers in `src/main/documentNaming.ts`), in `db:upsertVesselDocument` and `entityDocs:upsert`, so every upload screen gets it:
+- Name: `OWNER - CODE - YYYY-MM-DD` + the original extension. OWNER = vessel name (upper case) or the entity name without company status words (Ltd, Co, SA, SAL, SARL, LLC, DMCC, FZE... `cleanCompanyName`); CODE = the type's **file code** (`document_types.short_code` / `entity_document_types.short_code`, edited in Settings > Document Types / Entity Document Types, column "File code", `DocTypeCodeInput`), else the type name (custom vessel types always use the name); date = the UPLOAD date. Name taken -> ` (2)`, ` (3)`...; never overwrites
+- Not renamed: a file the app already links anywhere (vessel_documents, entity_documents, document_history: e.g. one letter linked to two types), so no other link breaks; a missing file; a file already carrying the name. Only NEW uploads (existing files were not renamed, user choice)
+- A failed rename (file open in another program, read-only folder) links the file under its own name; the handler returns `renameError` and the upload screens show it as a warning toast
+- Because names now differ per upload, a newer file no longer replaces the old one on disk, so Document History keeps real earlier files
+- Point 6 of the roadmap: next = drop several files on a documents page (type guessed, review list, then moved into the vessel folder, renamed, linked), then one drop area anywhere
+
 ### Document History (earlier files)
 
 Vessel and entity documents keep their earlier files as LINKS (never copies; a file saved over on disk is gone):
