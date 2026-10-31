@@ -16,7 +16,7 @@ of a risk, so every screen is a view of the same story.
 - 3 claims: WAITING for management feedback.
 - 4 tracked tasks: NOT NEEDED now (more work for the team), kept as a note.
 - 5 compliance at every step: BUILT 2026-10-30 (undeployed), see compliance.md Party Screening.
-- 6 document store: to PLAN CAREFULLY (major change for users).
+- 6 document store: PLANNED 2026-10-31 (steps 1 + revised 2, vessel/entity document renaming), see point 6.
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
@@ -106,6 +106,22 @@ over the files gradually, 4 phases, each reversible and piloted with one user fi
    app keeps up to date.
 Storage: a server FOLDER, not the database (DB, backups and dumps would balloon).
 Needed from the user: size of today's document folders, how the server is backed up, how many VPN users.
+DECISIONS (user, 2026-10-31):
+- Step 1 (track, don't move): OK.
+- Step 2 revised: NO second copy of exports. The policy folder (built 2026-10-23) is the one home of a
+  policy's exports; unsigned exports can be recreated from the frozen snapshot and signed ones are stored
+  byte for byte, so tracking + "restore" replaces a copy. Steps 3-4 dropped for now.
+- Quotation exports keep the Save dialog, but it must REMEMBER the last folder (today only in memory,
+  lost on restart, shared by every export kind).
+- Policies without a folder: nothing to do now (all exported policies are test data, to be deleted).
+- MAIN CONCERN = vessel / entity documents (COR, class, ...). Rename on upload, IN PLACE (no move):
+  vessel `BARON - COR - 2026-10-31.pdf`, entity `Safe Sea Services - Incorporation - 2026-10-31.pdf`
+  (company suffixes Ltd / Co / SA / SAL / SARL / LLC / ... removed); date = UPLOAD date; type = a new
+  optional SHORT CODE per document type, edited in Settings next to the doc types (falls back to the
+  name); existing name -> " (2)", never overwrite; other records linking the same file are updated.
+  NEW uploads only (no bulk rename of existing files). History then keeps real earlier files.
+- Idea under discussion: drag files IN from Outlook / Downloads; the app matches vessel + type, moves,
+  renames and links; unmatched ones are flagged for the user to complete.
 
 ## 7. One wording library, quotation to policy
 Clause / warranty / standard-text library with versions; quotations and policies point to a
