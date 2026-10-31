@@ -18,8 +18,10 @@ import {
   Square,
   Download,
   GitCompareArrows,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Inbox
 } from 'lucide-react'
+import { OPEN_FILING_EVENT } from './DocumentFiling'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import { decideSanctionsSubject, recheckUpdate } from '../utils/sanctionsDecision'
@@ -672,13 +674,24 @@ export default function VesselManager({
         title="Vessels"
         subtitle="Search, filter, and manage all vessels across your fleets."
         actions={
-          hasPermission('vessels:create') &&
-          !showQuickAdd && (
-            <button onClick={() => setShowQuickAdd(true)} className="btn-primary">
-              <Plus size={18} />
-              Add Vessel
-            </button>
-          )
+          <>
+            {hasPermission('documents:upload') && (
+              <button
+                onClick={() => window.dispatchEvent(new Event(OPEN_FILING_EVENT))}
+                className="btn-secondary"
+                title="Drop files from Outlook or Downloads: the vessel and document type are suggested, then they are moved, renamed and linked"
+              >
+                <Inbox size={18} />
+                File documents
+              </button>
+            )}
+            {hasPermission('vessels:create') && !showQuickAdd && (
+              <button onClick={() => setShowQuickAdd(true)} className="btn-primary">
+                <Plus size={18} />
+                Add Vessel
+              </button>
+            )}
+          </>
         }
       />
 

@@ -66,7 +66,7 @@ import { effectiveDocExpiry, getDocStatus, type DocStatus } from '../utils/docSt
 import 'flag-icons/css/flag-icons.min.css'
 
 import VesselDocumentsView from './VesselDocumentsView'
-import DocumentFiling from './DocumentFiling'
+import DocumentFiling, { DOCUMENTS_FILED_EVENT } from './DocumentFiling'
 import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
 import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
@@ -718,6 +718,16 @@ export default function VesselDetail({
       /* unknown = shown as present */
     }
   }, [vessel.id, ensureReference])
+
+  // Documents filed from anywhere in the app for this vessel: reload them
+  useEffect(() => {
+    const onFiled = (e: Event): void => {
+      const ids = (e as CustomEvent<string[]>).detail
+      if (Array.isArray(ids) && ids.includes(vessel.id)) void loadDocuments()
+    }
+    window.addEventListener(DOCUMENTS_FILED_EVENT, onFiled)
+    return () => window.removeEventListener(DOCUMENTS_FILED_EVENT, onFiled)
+  }, [vessel.id, loadDocuments])
 
   const loadData = useCallback(async (): Promise<void> => {
     const settle = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null)
@@ -2791,13 +2801,7 @@ export default function VesselDetail({
             />
           )}
           {detailView === 'documents' && hasPermission('documents:upload') && (
-            <DocumentFiling
-              vessel={vessel}
-              docTypes={docTypes}
-              customDocTypes={customDocTypes}
-              vesselDocs={vesselDocs}
-              onFiled={loadDocuments}
-            />
+            <DocumentFiling vessel={vessel} onFiled={loadDocuments} />
           )}
           {detailView === 'documents' && useCardDocs && (
             <VesselDocumentsView

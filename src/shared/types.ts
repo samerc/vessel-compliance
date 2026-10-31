@@ -2835,16 +2835,29 @@ export interface DocFilingCandidate {
   /** How the type was recognised: from the file name, from its text, or not at all */
   source: 'name' | 'content' | null
   matched?: string
+  /** The vessel: given (dropped on its page) or guessed (IMO / name in the file name or text) */
+  vesselId: string | null
+  vesselSource: 'given' | 'name' | 'content' | null
+  vesselMatched?: string
   /** The file cannot be filed (type of file not allowed) */
   error?: string
 }
 
-export interface DocFilingAnalysis {
+/** What the filing window needs about a vessel */
+export interface DocFilingVesselInfo {
   /** The vessel's documents folder, chosen before */
   folder: string | null
   /** No folder chosen yet: where its documents already are, else its policy folder */
   suggestedFolder: string | null
+  customTypes: { id: string; name: string }[]
+  /** Its linked files per document type (to show what a new file replaces) */
+  current: { documentTypeId: string; fileName: string }[]
+}
+
+export interface DocFilingAnalysis {
   files: DocFilingCandidate[]
+  /** Info of every vessel the files were matched to */
+  vessels: Record<string, DocFilingVesselInfo>
 }
 
 export interface DocFilingItem {

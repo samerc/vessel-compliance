@@ -64,6 +64,11 @@ import { leaveThen } from './utils/useUnsavedGuard'
 import { PAGE_HELP_EVENT } from './utils/pageHelp'
 import { useToast } from './contexts/ToastContext'
 import { AppTab, AppAction, NavTarget, NAVIGATE_EVENT, visibleFeatures, FEATURES } from './features'
+import {
+  GlobalDocumentFiling,
+  OPEN_FILING_EVENT,
+  UNHANDLED_DROP_EVENT
+} from './components/DocumentFiling'
 import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
@@ -349,6 +354,8 @@ function App(): React.JSX.Element {
           return startCreate('quotation')
         case 'new-entity':
           return startCreate('entity')
+        case 'file-documents':
+          return void window.dispatchEvent(new Event(OPEN_FILING_EVENT))
         case 'whats-new':
           return setShowWhatsNew(true)
         case 'release-history':
@@ -632,11 +639,18 @@ function App(): React.JSX.Element {
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     }
+    // A dropped file never opens as a page; files no drop area took go to document filing
+    const onDrop = (e: DragEvent): void => {
+      const files = [...(e.dataTransfer?.files || [])]
+      if (!e.defaultPrevented && files.length > 0)
+        window.dispatchEvent(new CustomEvent(UNHANDLED_DROP_EVENT, { detail: files }))
+      e.preventDefault()
+    }
     window.addEventListener('dragover', preventDefault, false)
-    window.addEventListener('drop', preventDefault, false)
+    window.addEventListener('drop', onDrop, false)
     return () => {
       window.removeEventListener('dragover', preventDefault)
-      window.removeEventListener('drop', preventDefault)
+      window.removeEventListener('drop', onDrop)
     }
   }, [])
 
@@ -1636,6 +1650,7 @@ function App(): React.JSX.Element {
               </div>
             </div>
           )}
+          <GlobalDocumentFiling />
           <ErrorBoundary key={activeTab} variant="page">
             {activeTab === 'dashboard' && (
               <HomePage

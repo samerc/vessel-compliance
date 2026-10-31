@@ -117,3 +117,85 @@ export function guessDocumentType(
   if (!best || tie) return { typeId: null, source: null }
   return { typeId: best.id, source: best.source, matched: best.matched }
 }
+
+export interface MatchableVessel {
+  id: string
+  name: string
+  imoNumber?: string | null
+  isActive?: boolean
+}
+
+export interface VesselGuess {
+  vesselId: string | null
+  source: 'name' | 'content' | null
+  /** What matched, shown to the user (IMO 9255062 / the vessel name) */
+  matched?: string
+}
+
+/** A real IMO number: the 7th digit is the check digit of the first six (weights 7..2) */
+export function isValidImo(imo: string): boolean {
+  if (!/^\d{7}$/.test(imo)) return false
+  const sum = [...imo.slice(0, 6)].reduce((s, d, i) => s + Number(d) * (7 - i), 0)
+  return sum % 10 === Number(imo[6])
+}
+
+/** One vessel among several with the same name or IMO: the active one, else none */
+function single(vs: MatchableVessel[]): MatchableVessel | null {
+  if (vs.length === 1) return vs[0]
+  const active = vs.filter((v) => v.isActive !== false)
+  return active.length === 1 ? active[0] : null
+}
+
+/**
+ * The vessel a file is about. An IMO number (checked by its check digit) wins; else the vessel
+ * name, the longest one found. In the file name any name of 3+ letters counts; in the text only
+ * names of 6+ letters or two words (short names like STAR appear in ordinary text). Two vessels
+ * found = no guess.
+ */
+export function guessVessel(
+  fileName: string,
+  text: string,
+  vessels: MatchableVessel[]
+): VesselGuess {
+  const sources: ['name' | 'content', string][] = [
+    ['name', fileName.replace(/\.[a-z0-9]+$/i, '')],
+    ['content', text]
+  ]
+  for (const [source, raw] of sources) {
+    if (!raw) continue
+    const imos = new Set((raw.match(/(?<!\d)\d{7}(?!\d)/g) || []).filter(isValidImo))
+    const byImo = new Map<string, MatchableVessel[]>()
+    for (const v of vessels) {
+      const imo = String(v.imoNumber || '').replace(/\D/g, '')
+      if (imos.has(imo)) byImo.set(imo, [...(byImo.get(imo) || []), v])
+    }
+    if (byImo.size === 1) {
+      const [imo, vs] = [...byImo.entries()][0]
+      const v = single(vs)
+      if (v) return { vesselId: v.id, source, matched: `IMO ${imo}` }
+    }
+    if (byImo.size > 1) return { vesselId: null, source: null }
+  }
+  for (const [source, raw] of sources) {
+    if (!raw) continue
+    const hay = normalise(raw)
+    let best: MatchableVessel[] = []
+    let bestLen = 0
+    for (const v of vessels) {
+      const name = normalise(v.name).trim()
+      const long = name.length >= 6 || name.includes(' ')
+      if (name.length < 3 || (source === 'content' && !long)) continue
+      if (!hay.includes(` ${name} `)) continue
+      if (name.length > bestLen) {
+        best = [v]
+        bestLen = name.length
+      } else if (name.length === bestLen) best.push(v)
+    }
+    if (best.length > 0) {
+      const names = new Set(best.map((v) => normalise(v.name).trim()))
+      const v = names.size === 1 ? single(best) : null
+      return v ? { vesselId: v.id, source, matched: v.name } : { vesselId: null, source: null }
+    }
+  }
+  return { vesselId: null, source: null }
+}

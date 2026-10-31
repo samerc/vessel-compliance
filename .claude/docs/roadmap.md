@@ -120,7 +120,7 @@ DECISIONS (user, 2026-10-31):
   optional SHORT CODE per document type, edited in Settings next to the doc types (falls back to the
   name); existing name -> " (2)", never overwrite; other records linking the same file are updated.
   NEW uploads only (no bulk rename of existing files). History then keeps real earlier files.
-- BUILT 2026-10-31 (undeployed): A = renaming on upload + file codes + Save dialog folder; B = filing several files on a vessel's Documents tab (vessels.md). NEXT: C = one drop area anywhere, vessel guessed too (IMO / name). Entities: rename in place only (their files are spread across vessel folders, user).
+- BUILT 2026-10-31 (undeployed): A = renaming on upload + file codes + Save dialog folder; B = filing several files on a vessel's Documents tab (vessels.md). C = drop anywhere / Vessels page button / Ctrl+K, vessel guessed too (IMO / name): BUILT 2026-10-31. To test after deploy: a real Outlook drag. Entities: rename in place only (their files are spread across vessel folders, user).
 - Idea (agreed, A then B then C): drag files IN from Outlook / Downloads; the app matches vessel + type, moves,
   renames and links; unmatched ones are flagged for the user to complete.
 

@@ -47,11 +47,17 @@ import type {
   DocFilingAnalysis,
   DocFilingCandidate,
   DocFilingItem,
-  DocFilingResult
+  DocFilingResult,
+  DocFilingVesselInfo
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { cleanCompanyName, documentFileBase, renameToDocumentName } from './documentNaming'
-import { guessDocumentType } from './documentMatching'
+import {
+  guessDocumentType,
+  guessVessel,
+  type MatchableType,
+  type VesselGuess
+} from './documentMatching'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs'
@@ -1849,50 +1855,107 @@ app.whenReady().then(() => {
     return path
   })
 
+  // Folder, custom types and linked files of a vessel, for the filing window
+  const filingVesselInfo = async (vesselId: string): Promise<DocFilingVesselInfo> => {
+    const [place, custom, docs] = await Promise.all([
+      db.getVesselDocumentsFolder(vesselId),
+      db.getVesselCustomDocTypes(vesselId),
+      db.getVesselDocuments(vesselId)
+    ])
+    return {
+      folder: place.folder,
+      suggestedFolder: place.folder
+        ? null
+        : place.candidates.find((dir) => existsSync(resolveFilePath(dir))) || null,
+      customTypes: (Array.isArray(custom) ? custom : []).map((t) => ({ id: t.id, name: t.name })),
+      current: docs
+        .filter((d) => d.filePath)
+        .map((d) => ({ documentTypeId: d.documentTypeId, fileName: basename(String(d.filePath)) }))
+    }
+  }
+
+  safeHandle('docFiling:vesselInfo', async (event, vesselId: string) => {
+    await requirePermission(event, 'documents:upload')
+    return filingVesselInfo(vesselId)
+  })
+
+  // Each file's document type and, when it was not dropped on a vessel's page, its vessel
   safeHandle(
     'docFiling:analyze',
-    async (event, vesselId: string, paths: string[]): Promise<DocFilingAnalysis> => {
+    async (event, vesselId: string | null, paths: string[]): Promise<DocFilingAnalysis> => {
       await requirePermission(event, 'documents:upload')
-      const [docTypes, customTypes, place] = await Promise.all([
-        db.getDocumentTypes(),
-        db.getVesselCustomDocTypes(vesselId),
-        db.getVesselDocumentsFolder(vesselId)
-      ])
-      const types = [
-        ...docTypes.map((t) => ({ id: t.id, name: t.name, shortCode: t.shortCode })),
-        ...(Array.isArray(customTypes) ? customTypes : []).map((t) => ({ id: t.id, name: t.name }))
-      ]
+      const docTypes = await db.getDocumentTypes()
+      const vessels = vesselId ? [] : await db.getVessels()
+      const customByVessel = new Map<string, { id: string; name: string }[]>()
+      const typesFor = async (vid: string | null): Promise<MatchableType[]> => {
+        const base = docTypes.map((t) => ({ id: t.id, name: t.name, shortCode: t.shortCode }))
+        if (!vid) return base
+        if (!customByVessel.has(vid)) {
+          const custom = await db.getVesselCustomDocTypes(vid)
+          customByVessel.set(
+            vid,
+            (Array.isArray(custom) ? custom : []).map((t) => ({ id: t.id, name: t.name }))
+          )
+        }
+        return [...base, ...(customByVessel.get(vid) || [])]
+      }
+      const readText = async (path: string): Promise<string> => {
+        const ext = extname(path).toLowerCase()
+        if (ext !== '.pdf' && ext !== '.docx') return ''
+        const size = await fsStat(resolveFilePath(path)).then(
+          (st) => st.size,
+          () => 0
+        )
+        if (size <= 0 || size >= 30 * 1024 * 1024) return ''
+        const read = await runFileReader<{ success: boolean; text?: string; error?: string }>(
+          { filePath: resolveFilePath(path), mode: 'text' },
+          'Document filing',
+          20000
+        )
+        return read.success ? read.text || '' : ''
+      }
+
       const files: DocFilingCandidate[] = []
       for (const path of (Array.isArray(paths) ? paths : []).slice(0, 50)) {
         const name = basename(path)
         const allowed = await db.validateFileExtension(path)
         if (!allowed.valid) {
-          files.push({ path, name, typeId: null, source: null, error: allowed.reason })
+          files.push({
+            path,
+            name,
+            typeId: null,
+            source: null,
+            vesselId,
+            vesselSource: vesselId ? 'given' : null,
+            error: allowed.reason
+          })
           continue
         }
-        const ext = extname(path).toLowerCase()
-        // The text is read only when the name says nothing (it takes a second per file)
-        let guess = guessDocumentType(name, '', types)
-        if (!guess.typeId && (ext === '.pdf' || ext === '.docx')) {
-          const size = await fsStat(resolveFilePath(path)).then(
-            (st) => st.size,
-            () => 0
-          )
-          if (size > 0 && size < 30 * 1024 * 1024) {
-            const read = await runFileReader<{ success: boolean; text?: string; error?: string }>(
-              { filePath: resolveFilePath(path), mode: 'text' },
-              'Document filing',
-              20000
-            )
-            guess = guessDocumentType(name, read.success ? read.text || '' : '', types)
+        // The text is read only when the name does not say it all (a second per file)
+        let vessel: VesselGuess = vesselId
+          ? { vesselId, source: null }
+          : guessVessel(name, '', vessels)
+        let type = guessDocumentType(name, '', await typesFor(vessel.vesselId))
+        if (!type.typeId || !vessel.vesselId) {
+          const text = await readText(path)
+          if (text) {
+            if (!vessel.vesselId) vessel = guessVessel(name, text, vessels)
+            if (!type.typeId) type = guessDocumentType(name, text, await typesFor(vessel.vesselId))
           }
         }
-        files.push({ path, name, ...guess })
+        files.push({
+          path,
+          name,
+          ...type,
+          vesselId: vessel.vesselId,
+          vesselSource: vesselId ? 'given' : vessel.source,
+          vesselMatched: vessel.matched
+        })
       }
-      const suggestedFolder = place.folder
-        ? null
-        : place.candidates.find((dir) => existsSync(resolveFilePath(dir))) || null
-      return { folder: place.folder, suggestedFolder, files }
+      const info: Record<string, DocFilingVesselInfo> = {}
+      for (const vid of new Set(files.map((f) => f.vesselId).filter(Boolean) as string[]))
+        info[vid] = await filingVesselInfo(vid)
+      return { files, vessels: info }
     }
   )
 

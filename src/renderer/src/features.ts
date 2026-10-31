@@ -34,6 +34,7 @@ export type AppAction =
   | 'new-vessel'
   | 'new-quotation'
   | 'new-entity'
+  | 'file-documents'
   | 'whats-new'
   | 'release-history'
   | 'profile'
@@ -146,9 +147,9 @@ export const FEATURES: Feature[] = [
     area: 'Fleet',
     kind: 'action',
     permission: 'documents:upload',
-    target: { tab: 'vessels' },
+    target: { action: 'file-documents' },
     description:
-      "On a vessel's Documents tab, drop files from Outlook, Downloads or a folder: the app suggests each document type, you check, then they are moved to the vessel folder, renamed (VESSEL - CODE - date) and linked.",
+      "Drop files from Outlook, Downloads or a folder anywhere in the app (or on a vessel's Documents tab): the app suggests the vessel (IMO or name) and the document type of each, you check, then they are moved to the vessel folders, renamed (VESSEL - CODE - date) and linked.",
     keywords: 'drop drag outlook attachments downloads file documents rename move COR class inbox'
   },
   {

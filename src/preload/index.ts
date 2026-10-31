@@ -62,7 +62,8 @@ const api: Api = {
   upsertVesselDocument: (doc) => ipcRenderer.invoke('db:upsertVesselDocument', doc),
   docFilingStage: (name: string, data: Uint8Array) =>
     ipcRenderer.invoke('docFiling:stage', name, data),
-  docFilingAnalyze: (vesselId: string, paths: string[]) =>
+  docFilingVesselInfo: (vesselId: string) => ipcRenderer.invoke('docFiling:vesselInfo', vesselId),
+  docFilingAnalyze: (vesselId: string | null, paths: string[]) =>
     ipcRenderer.invoke('docFiling:analyze', vesselId, paths),
   docFilingFile: (vesselId: string, folder: string, items) =>
     ipcRenderer.invoke('docFiling:file', vesselId, folder, items),

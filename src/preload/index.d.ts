@@ -7,6 +7,7 @@ import {
   DocFilingAnalysis,
   DocFilingItem,
   DocFilingResult,
+  DocFilingVesselInfo,
   Entity,
   AssuredRole,
   VesselAssured,
@@ -258,8 +259,10 @@ export interface Api {
   ) => Promise<{ filePath?: string; renameError?: string } | undefined>
   /** Filing several dropped files: an Outlook attachment (no file on disk) is saved to temp first */
   docFilingStage: (name: string, data: Uint8Array) => Promise<string>
-  /** Guesses each file's document type; the vessel folder (or a suggestion) */
-  docFilingAnalyze: (vesselId: string, paths: string[]) => Promise<DocFilingAnalysis>
+  /** Guesses each file's document type (and its vessel when `vesselId` is null) */
+  docFilingAnalyze: (vesselId: string | null, paths: string[]) => Promise<DocFilingAnalysis>
+  /** A vessel's folder (or a suggestion), custom types and linked files */
+  docFilingVesselInfo: (vesselId: string) => Promise<DocFilingVesselInfo>
   /** Moves each file into the folder, renames and links it (the folder is remembered) */
   docFilingFile: (
     vesselId: string,
