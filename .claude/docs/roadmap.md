@@ -139,6 +139,7 @@ PROPOSAL: editing makes a new version; a quotation keeps its version; drafts sho
 available" with a diff and one-click update; conversion carries exact versions; "what changed since the
 quotation" before issuing; where-used per wording incl. live policies.
 Open questions: drafts follow changes automatically or ask? Who may edit wordings?
+BUILT 2026-10-31 (undeployed), the core of this point, see quotations.md "Settings Items in Use": items in use are hidden, never deleted; a wording change to an item in sent quotations makes a new version (sent keep the old one, DRAFTS FOLLOW - user), no "correct everywhere" option (user). Not built: "what changed since the quotation" before issuing, wording versions dated "from 1 Jan", who may edit wordings.
 
 ## 8. Shared UI building blocks
 One combobox, sortable list, document picker, money input, date range used everywhere (the
