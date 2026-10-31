@@ -20,9 +20,9 @@ of a risk, so every screen is a view of the same story.
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
-- 8 shared UI building blocks: to DISCUSS.
+- 8 shared UI building blocks: ON HOLD (user 2026-10-31), do later; drag-to-sort question still open.
 - 9 server: ON HOLD (user 2026-10-31; everyone works on the Windows server via RDP, see point 9). Revisit for a broker portal / phone view.
-- 10 safety net: detailed to the user 2026-10-30, to agree.
+- 10 safety net: ON HOLD (user 2026-10-31), do later; detailed 2026-10-30, the user picks the 10-15 cases.
 
 ## 1. The risk case as the backbone (discussing first)
 - One CASE per vessel + cover + year: quotation -> approval -> policy -> endorsements ->
