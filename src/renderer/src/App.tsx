@@ -64,6 +64,7 @@ import { leaveThen } from './utils/useUnsavedGuard'
 import { PAGE_HELP_EVENT } from './utils/pageHelp'
 import { useToast } from './contexts/ToastContext'
 import { AppTab, AppAction, NavTarget, NAVIGATE_EVENT, visibleFeatures, FEATURES } from './features'
+import { whatsNewSeenKey } from './whatsNew'
 import {
   GlobalDocumentFiling,
   OPEN_FILING_EVENT,
@@ -538,7 +539,7 @@ function App(): React.JSX.Element {
   // Show What's New once per version per user (700ms delay so Dashboard is visible first)
   useEffect(() => {
     if (!isAuthenticated || !appVersion || !userId) return
-    const key = `whatsNew_seen_v${appVersion}_u${userId}`
+    const key = whatsNewSeenKey(appVersion, userId)
     if (!localStorage.getItem(key)) {
       const timer = setTimeout(() => setShowWhatsNew(true), 700)
       return () => clearTimeout(timer)
@@ -2042,7 +2043,7 @@ function App(): React.JSX.Element {
             }}
             onClose={() => {
               if (user && appVersion)
-                localStorage.setItem(`whatsNew_seen_v${appVersion}_u${user.id}`, '1')
+                localStorage.setItem(whatsNewSeenKey(appVersion, user.id), '1')
               setShowWhatsNew(false)
             }}
             onViewChangelog={() => setShowChangelog(true)}

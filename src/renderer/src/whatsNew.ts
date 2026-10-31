@@ -9,15 +9,41 @@ export interface WhatsNewItem {
 
 export interface WhatsNewEntry {
   version: string
+  /**
+   * A hot-update (same version, new build): a short id of its own. The newest entry of the
+   * installed version is shown once per user; an update entry is shown from here, not GitHub
+   */
+  update?: string
   date: string
   items: WhatsNewItem[]
 }
 
 /**
- * Add a new entry at the TOP whenever you ship a new version.
- * The version string must match package.json exactly.
+ * Add a new entry at the TOP whenever you ship a new version (the version string must match
+ * package.json exactly), or a hot-update worth telling users about (same version + `update`).
+ * Only what users notice and use: no bug fixes or small changes.
  */
 export const WHATS_NEW: WhatsNewEntry[] = [
+  {
+    version: '8.1.0',
+    update: 'documents-sanctions',
+    date: '2026-10-31',
+    items: [
+      {
+        tag: 'New',
+        text: "File documents straight from Outlook or Downloads: drop them anywhere in the app (or on a vessel's Documents tab), the vessel and document type are suggested, then the files are moved to the vessel folder, renamed and linked",
+        featureId: 'document-filing'
+      },
+      {
+        tag: 'New',
+        text: 'Linked documents are renamed for you, e.g. BARON - COR - 2026-11-02.pdf, so the folders are easy to read; the short codes are in Settings > Document Types'
+      },
+      {
+        tag: 'New',
+        text: 'Sanctions check of every party at each step: a warning on quotations, and Create Policy (or an endorsement naming new parties) waits until the parties are clear or Underwriting / Compliance overrides with a reason'
+      }
+    ]
+  },
   {
     version: '8.1.0',
     date: '2026-10-05',
@@ -540,3 +566,14 @@ export const WHATS_NEW: WhatsNewEntry[] = [
     ]
   }
 ]
+
+/** The entry shown for the installed version: its newest (an update entry, if any) */
+export function currentWhatsNew(appVersion: string): WhatsNewEntry | undefined {
+  return WHATS_NEW.find((e) => e.version === appVersion)
+}
+
+/** Per user: the current entry was shown (a new update entry shows again) */
+export function whatsNewSeenKey(appVersion: string, userId: string): string {
+  const update = currentWhatsNew(appVersion)?.update
+  return `whatsNew_seen_v${appVersion}${update ? `_${update}` : ''}_u${userId}`
+}

@@ -288,6 +288,8 @@ Auto-shown modal after each update displaying the changelog:
 4. Create GitHub release tagged `vX.Y.Z`, paste `RELEASE_NOTES.md` as the release body
 5. `RELEASE_NOTES.md` has a `!RELEASE_NOTES.md` exception in `.gitignore` (the file itself uses `*.md` exclusion)
 
+**Hot-updates worth announcing** (same version, new build; 2026-10-31): add a `WHATS_NEW` entry at the top with the SAME version and an `update` id (e.g. `documents-sanctions`). `currentWhatsNew(version)` = the newest entry of the installed version; the seen flag is per user + version + update id (`whatsNewSeenKey`, localStorage), so a new update entry pops up once again; an update entry is shown from `WHATS_NEW` (GitHub has only the version's release). User rule: only what users notice and use (new features), never bug fixes or small changes
+
 ### UpdateService
 
 Electron-updater configuration (`src/main/services/UpdateService.ts`):

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { Modal, Badge, type BadgeTone } from './ui'
-import { WHATS_NEW, WhatsNewTag } from '../whatsNew'
+import { WHATS_NEW, WhatsNewTag, currentWhatsNew } from '../whatsNew'
 import { changelogService } from '../services/ChangelogService'
 import { FEATURES } from '../features'
 
@@ -92,7 +92,7 @@ export default function WhatsNewModal({
 
   useEffect(() => {
     function loadFallback(): void {
-      const entry = appVersion ? WHATS_NEW.find((e) => e.version === appVersion) : WHATS_NEW[0]
+      const entry = appVersion ? currentWhatsNew(appVersion) : WHATS_NEW[0]
       if (!entry) {
         if (appVersion) setVersion(appVersion)
         return
@@ -109,8 +109,9 @@ export default function WhatsNewModal({
       )
     }
 
-    changelogService
-      .getChangelogs()
+    // A hot-update entry is only here (its GitHub release is the version's, not the update's)
+    const isUpdate = !!appVersion && !!currentWhatsNew(appVersion)?.update
+    ;(isUpdate ? Promise.resolve([]) : changelogService.getChangelogs())
       .then((data) => {
         // The release for the INSTALLED version (not just the newest one), and only
         // when its body is really about that version (a stale copy names another)
