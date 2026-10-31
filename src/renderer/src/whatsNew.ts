@@ -36,10 +36,6 @@ export const WHATS_NEW: WhatsNewEntry[] = [
       },
       {
         tag: 'New',
-        text: 'Linked documents are renamed for you, e.g. BARON - COR - 2026-11-02.pdf, so the folders are easy to read; the short codes are in Settings > Document Types'
-      },
-      {
-        tag: 'New',
         text: 'Sanctions check of every party at each step: a warning on quotations, and Create Policy (or an endorsement naming new parties) waits until the parties are clear or Underwriting / Compliance overrides with a reason'
       }
     ]
