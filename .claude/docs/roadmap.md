@@ -21,7 +21,7 @@ of a risk, so every screen is a view of the same story.
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
 - 8 shared UI building blocks: to DISCUSS.
-- 9 server: to DISCUSS / PLAN.
+- 9 server: DISCUSSED 2026-10-31 (everyone works on the Windows server via RDP): recommended to PARK, see point 9.
 - 10 safety net: detailed to the user 2026-10-30, to agree.
 
 ## 1. The risk case as the backbone (discussing first)
@@ -141,6 +141,18 @@ With a server: users never hold a DB password, permissions checked server-side, 
 Base for point 6 over VPN, broker portal, email linked to quotations/policies, phone view.
 Cost: the biggest technical change (~820 adapter methods go through the server), movable area by area.
 Needed from the user: what the server runs (Windows? always on?), do remote users reach it only via VPN.
+ANSWERS (user, 2026-10-31): one Windows Server 2019 machine, always on, backed up, holds all company
+files, the registers, Excel and Word. ~10 users all work ON that machine (in the office or VPN + RDP);
+only the CEO runs the app on a laptop. The user has no admin rights and Claude gets no access:
+anything needing admin goes through IT.
+ASSESSMENT: with everyone on the server, most gains disappear: no speed gain (the DB is local),
+background jobs already run once (DB named locks: vc_daily_alerts, weekly check, migrations), files
+are already local. What is left: security (the DB password sits in db-config.json on that machine)
+and the base for a broker portal / phone view / the CEO laptop. Cost: a Windows service (admin, IT
+once) + a firewall port for the CEO, plus the biggest code change on the roadmap.
+RECOMMENDATION (given, awaiting decision): park point 9; revisit when a broker portal or phone view
+becomes a goal. Meanwhile a no-admin hardening check: where db-config.json lives and which MariaDB
+account the app uses (a limited app account instead of root).
 
 ## 10. Quality safety net
 Golden copies of every export type compared on each change (with Word renders of differences),
