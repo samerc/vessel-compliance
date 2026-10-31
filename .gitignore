@@ -121,3 +121,7 @@ cargo/
 *.xlsx
 *.xls
 *.doc
+
+# Local test environment (test registers / folders, see test-env/setup-test-env.cjs)
+test-env/*
+!test-env/setup-test-env.cjs
