@@ -60,6 +60,12 @@ const api: Api = {
 
   getVesselDocuments: (vesselId) => ipcRenderer.invoke('db:getVesselDocuments', vesselId),
   upsertVesselDocument: (doc) => ipcRenderer.invoke('db:upsertVesselDocument', doc),
+  docFilingStage: (name: string, data: Uint8Array) =>
+    ipcRenderer.invoke('docFiling:stage', name, data),
+  docFilingAnalyze: (vesselId: string, paths: string[]) =>
+    ipcRenderer.invoke('docFiling:analyze', vesselId, paths),
+  docFilingFile: (vesselId: string, folder: string, items) =>
+    ipcRenderer.invoke('docFiling:file', vesselId, folder, items),
   updateVesselDocumentExpiry: (vesselId, docTypeId, expiryDate) =>
     ipcRenderer.invoke('db:updateVesselDocumentExpiry', vesselId, docTypeId, expiryDate),
   updateVesselDocumentReceivedDate: (vesselId, docTypeId, receivedDate) =>
@@ -1251,7 +1257,7 @@ const api: Api = {
   entityGetFilePaths: (entityId: string) => ipcRenderer.invoke('entity:getFilePaths', entityId),
   entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) =>
     ipcRenderer.invoke('entity:remapFilePaths', remaps),
-  dialogOpenFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+  dialogOpenFolder: (defaultPath?: string) => ipcRenderer.invoke('dialog:openFolder', defaultPath),
   dialogLocateFile: () => ipcRenderer.invoke('dialog:locateFile'),
   shellShowItemInFolder: (filePath: string) =>
     ipcRenderer.invoke('shell:showItemInFolder', filePath),

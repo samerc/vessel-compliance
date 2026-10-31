@@ -2823,3 +2823,41 @@ export interface WikiImportFile {
   /** Why it could not be read (then bodyHtml is empty) */
   error?: string
 }
+
+// --- Filing several documents at once (dropped on a vessel's documents page) ---
+
+/** A dropped file with the app's guess of its document type */
+export interface DocFilingCandidate {
+  /** Where the file is now (a dragged Outlook attachment is first saved to a temp folder) */
+  path: string
+  name: string
+  typeId: string | null
+  /** How the type was recognised: from the file name, from its text, or not at all */
+  source: 'name' | 'content' | null
+  matched?: string
+  /** The file cannot be filed (type of file not allowed) */
+  error?: string
+}
+
+export interface DocFilingAnalysis {
+  /** The vessel's documents folder, chosen before */
+  folder: string | null
+  /** No folder chosen yet: where its documents already are, else its policy folder */
+  suggestedFolder: string | null
+  files: DocFilingCandidate[]
+}
+
+export interface DocFilingItem {
+  path: string
+  documentTypeId: string
+  expiryDate?: string | null
+}
+
+export interface DocFilingResult {
+  path: string
+  ok: boolean
+  /** The linked file after the move and rename */
+  filePath?: string
+  renameError?: string
+  error?: string
+}

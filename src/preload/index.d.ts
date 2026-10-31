@@ -4,6 +4,9 @@ import {
   Fleet,
   Vessel,
   VesselDocument,
+  DocFilingAnalysis,
+  DocFilingItem,
+  DocFilingResult,
   Entity,
   AssuredRole,
   VesselAssured,
@@ -253,6 +256,16 @@ export interface Api {
   upsertVesselDocument: (
     doc: VesselDocument
   ) => Promise<{ filePath?: string; renameError?: string } | undefined>
+  /** Filing several dropped files: an Outlook attachment (no file on disk) is saved to temp first */
+  docFilingStage: (name: string, data: Uint8Array) => Promise<string>
+  /** Guesses each file's document type; the vessel folder (or a suggestion) */
+  docFilingAnalyze: (vesselId: string, paths: string[]) => Promise<DocFilingAnalysis>
+  /** Moves each file into the folder, renames and links it (the folder is remembered) */
+  docFilingFile: (
+    vesselId: string,
+    folder: string,
+    items: DocFilingItem[]
+  ) => Promise<DocFilingResult[]>
   updateVesselDocumentExpiry: (
     vesselId: string,
     docTypeId: string,
@@ -1874,7 +1887,8 @@ export interface Api {
     entityId: string
   ) => Promise<{ id: string; source: string; filePath: string; label: string }[]>
   entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => Promise<void>
-  dialogOpenFolder: () => Promise<string | null>
+  /** Folder picker; `defaultPath` = the folder it opens in */
+  dialogOpenFolder: (defaultPath?: string) => Promise<string | null>
   dialogLocateFile: () => Promise<string | null>
   shellShowItemInFolder: (filePath: string) => Promise<void>
   warBreachSave: (record: WarBreachRecordInput) => Promise<{ id: string }>

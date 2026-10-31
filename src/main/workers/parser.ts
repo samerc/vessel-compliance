@@ -24,7 +24,12 @@ const { PDFParse } = require('pdf-parse') as { PDFParse: typeof PDFParseType }
 
 interface ParseRequest {
   filePath: string
+  /** 'text': only the file's text (document filing guesses the type from it) */
+  mode?: 'defects' | 'text'
 }
+
+/** Text a filed document is matched on: enough for its title, not the whole file */
+const TEXT_LIMIT = 6000
 interface UtilityPort {
   on: (ev: 'message', cb: (e: { data: unknown }) => void) => void
   postMessage: (m: unknown) => void
@@ -45,11 +50,28 @@ const port = {
   }
 }
 
-port.on(async ({ filePath }) => {
+port.on(async ({ filePath, mode }) => {
   try {
     const ext = path.extname(filePath).toLowerCase()
     const buffer = fs.readFileSync(filePath)
     let defects: ParsedDefect[]
+
+    if (mode === 'text') {
+      let text = ''
+      if (ext === '.pdf') {
+        const parser = new PDFParse({ data: buffer })
+        try {
+          // The first pages carry the title; scanned pages have no text (empty result)
+          text = (await parser.getText({ first: 3 })).text
+        } finally {
+          await parser.destroy().catch(() => {})
+        }
+      } else if (ext === '.docx') text = (await mammoth.extractRawText({ buffer })).value
+      port.post({ success: true, text: text.slice(0, TEXT_LIMIT) })
+      port.close()
+      if (utilityPort) setTimeout(() => process.exit(0), 1000)
+      return
+    }
 
     if (ext === '.pdf') {
       const parser = new PDFParse({ data: buffer })

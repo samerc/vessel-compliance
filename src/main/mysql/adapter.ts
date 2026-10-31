@@ -6089,6 +6089,10 @@ export class MySQLAdapter {
         if ((scCols as RowDataPacket[]).length === 0)
           await this.pool.query(`ALTER TABLE ${scTable} ADD COLUMN short_code VARCHAR(20) NULL`)
       }
+      // The folder dropped documents of a vessel are moved into (chosen once, then remembered)
+      const [vdfCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'documents_folder'")
+      if ((vdfCols as RowDataPacket[]).length === 0)
+        await this.pool.query('ALTER TABLE vessels ADD COLUMN documents_folder TEXT NULL')
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -7178,6 +7182,40 @@ export class MySQLAdapter {
   }
 
   /** Returns the earlier file's path when a different file (or none) replaced it */
+  /**
+   * The folder a vessel's dropped documents go to: the one chosen before, else candidates for a
+   * suggestion (the folders its linked documents are in, most used first, then its policy folder)
+   */
+  async getVesselDocumentsFolder(
+    vesselId: string
+  ): Promise<{ folder: string | null; candidates: string[] }> {
+    if (!this.pool) return { folder: null, candidates: [] }
+    const [[v]] = await this.pool.query<RowDataPacket[]>(
+      'SELECT documents_folder, policy_folder FROM vessels WHERE id = ?',
+      [vesselId]
+    )
+    const [docs] = await this.pool.query<RowDataPacket[]>(
+      "SELECT file_path FROM vessel_documents WHERE vessel_id = ? AND file_path IS NOT NULL AND file_path <> ''",
+      [vesselId]
+    )
+    const counts = new Map<string, number>()
+    for (const d of docs) {
+      const dir = String(d.file_path).replace(/[\\/][^\\/]*$/, '')
+      if (dir) counts.set(dir, (counts.get(dir) || 0) + 1)
+    }
+    const candidates = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([dir]) => dir)
+    if (v?.policy_folder) candidates.push(String(v.policy_folder))
+    return { folder: v?.documents_folder || null, candidates }
+  }
+
+  async setVesselDocumentsFolder(vesselId: string, folder: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute('UPDATE vessels SET documents_folder = ? WHERE id = ?', [
+      folder,
+      vesselId
+    ])
+  }
+
   async upsertVesselDocument(doc: VesselDocument, by?: string): Promise<string | null> {
     if (!this.pool) return null
 

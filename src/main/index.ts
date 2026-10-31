@@ -43,13 +43,28 @@ import type {
   WikiTopicInput,
   ScreeningContextType,
   ScreeningPartyInput,
-  ScreeningTrigger
+  ScreeningTrigger,
+  DocFilingAnalysis,
+  DocFilingCandidate,
+  DocFilingItem,
+  DocFilingResult
 } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename, sep } from 'path'
 import { cleanCompanyName, documentFileBase, renameToDocumentName } from './documentNaming'
+import { guessDocumentType } from './documentMatching'
 import { tmpdir } from 'os'
+import { randomUUID } from 'crypto'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs'
-import { access as fsAccess, readdir } from 'fs/promises'
+import {
+  access as fsAccess,
+  readdir,
+  copyFile,
+  rename as fsRename,
+  unlink as fsUnlink,
+  writeFile as fsWriteFile,
+  mkdir as fsMkdir,
+  stat as fsStat
+} from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
@@ -76,6 +91,58 @@ import JSZip from 'jszip'
 
 /** Message from the defect-import utility process (workers/parser.ts) */
 type DefectParseResult = { success: boolean; defects?: ParsedDefect[]; error?: string }
+
+/**
+ * Runs one request in the file reader (src/main/workers/parser.ts): a separate utility PROCESS,
+ * not a worker thread - pdf.js inside a worker thread of the main process crashed the whole app
+ * (native crash) on repeated PDF imports. If it dies only that request fails. Always loaded from
+ * the ASAR so its node_modules (pdf-parse, mammoth) resolve.
+ */
+function runFileReader<T extends { success: boolean; error?: string }>(
+  message: { filePath: string; mode?: 'defects' | 'text' },
+  serviceName: string,
+  timeoutMs = 60000
+): Promise<T> {
+  const asarParserPath = join(app.getAppPath(), 'out', 'main', 'parser.js')
+  const parserPath = existsSync(asarParserPath) ? asarParserPath : join(__dirname, 'parser.js')
+  return new Promise<T>((resolve) => {
+    const child = utilityProcess.fork(parserPath, [], { serviceName, stdio: 'pipe' })
+    let stderr = ''
+    child.stderr?.on('data', (d: Buffer) => {
+      stderr = (stderr + d.toString()).slice(-2000)
+    })
+    let done = false
+    const finish = (r: T): void => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolve(r)
+      // let it exit on its own; kill only if it lingers
+      setTimeout(() => {
+        try {
+          child.kill()
+        } catch {
+          /* already gone */
+        }
+      }, 15000).unref()
+    }
+    const timer = setTimeout(
+      () => finish({ success: false, error: 'Reading the file timed out' } as T),
+      timeoutMs
+    )
+    child.on('message', (message: unknown) => finish(message as T))
+    child.on('exit', (code) => {
+      if (!done) {
+        console.error(`[${serviceName}] parser process exited`, code, stderr)
+        finish({
+          success: false,
+          error: `The file reader stopped unexpectedly (code ${code})`
+        } as T)
+      }
+    })
+    child.postMessage(message)
+  })
+}
 
 // ── File Path Resolution (local ↔ network) ────────────────────────────────────
 let filePathLocal = '' // e.g. C:\folder1
@@ -361,6 +428,54 @@ async function keepConfirmedSanctions(
     delete updates.ofacStatus
     delete updates.ofacMatchFound
   }
+}
+
+/**
+ * Links a file (or unlinks: empty path) to a vessel document: the file is renamed first
+ * (nameLinkedDocument), the earlier file goes to the document's history, activity + audit logged
+ */
+async function linkVesselDocument(
+  user: { id: string; username: string },
+  input: VesselDocument & { docTypeId?: string }
+): Promise<{ filePath?: string; renameError?: string }> {
+  const named = await nameLinkedDocument(
+    'vessel',
+    input.vesselId,
+    input.documentTypeId || input.docTypeId || '',
+    input.filePath || ''
+  )
+  const doc = { ...input, filePath: input.filePath ? named.filePath : input.filePath }
+  const replaced = await db.upsertVesselDocument(doc, user.username)
+  const [vDocRows] = await db.pool!.query<RowDataPacket[]>(
+    'SELECT name FROM vessels WHERE id = ?',
+    [doc.vesselId]
+  )
+  const vDocName = vDocRows[0]?.name || doc.vesselId
+  const [dtRows] = await db.pool!.query<RowDataPacket[]>(
+    'SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?',
+    [doc.documentTypeId || doc.docTypeId, doc.documentTypeId || doc.docTypeId]
+  )
+  const docTypeName = dtRows[0]?.name || 'document'
+  db.logActivity({
+    userId: user.id,
+    username: user.username,
+    action: 'UPLOAD',
+    module: 'Documents',
+    entityType: 'vessel_document',
+    entityId: doc.vesselId,
+    entityName: vDocName,
+    details: `Uploaded ${docTypeName} for vessel ${vDocName}`
+  }).catch(() => {})
+  // The earlier file stays in the document's history; the Activity tab shows the change
+  if (replaced)
+    db.addVesselAuditEntry(
+      doc.vesselId,
+      `${docTypeName} file`,
+      basename(replaced),
+      doc.filePath ? basename(doc.filePath) : 'unlinked',
+      user.username
+    ).catch(() => {})
+  return { filePath: doc.filePath, renameError: named.renameError }
 }
 
 /**
@@ -1713,44 +1828,130 @@ app.whenReady().then(() => {
     'db:upsertVesselDocument',
     async (event, input: VesselDocument & { docTypeId?: string }) => {
       const user = await requirePermission(event, 'documents:upload')
-      const named = await nameLinkedDocument(
-        'vessel',
-        input.vesselId,
-        input.documentTypeId || input.docTypeId || '',
-        input.filePath || ''
-      )
-      const doc = { ...input, filePath: input.filePath ? named.filePath : input.filePath }
-      const replaced = await db.upsertVesselDocument(doc, user.username)
-      const [vDocRows] = await db.pool!.query<RowDataPacket[]>(
-        'SELECT name FROM vessels WHERE id = ?',
-        [doc.vesselId]
-      )
-      const vDocName = vDocRows[0]?.name || doc.vesselId
-      const [dtRows] = await db.pool!.query<RowDataPacket[]>(
-        'SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?',
-        [doc.documentTypeId || doc.docTypeId, doc.documentTypeId || doc.docTypeId]
-      )
-      const docTypeName = dtRows[0]?.name || 'document'
-      db.logActivity({
-        userId: user.id,
-        username: user.username,
-        action: 'UPLOAD',
-        module: 'Documents',
-        entityType: 'vessel_document',
-        entityId: doc.vesselId,
-        entityName: vDocName,
-        details: `Uploaded ${docTypeName} for vessel ${vDocName}`
-      }).catch(() => {})
-      // The earlier file stays in the document's history; the Activity tab shows the change
-      if (replaced)
-        db.addVesselAuditEntry(
-          doc.vesselId,
-          `${docTypeName} file`,
-          basename(replaced),
-          doc.filePath ? basename(doc.filePath) : 'unlinked',
-          user.username
-        ).catch(() => {})
-      return { filePath: doc.filePath, renameError: named.renameError }
+      return linkVesselDocument(user, input)
+    }
+  )
+
+  // ── Filing several documents at once (dropped on a vessel's documents page) ──
+  // A dragged Outlook attachment has no file on disk: it is saved to a temp folder first
+  safeHandle('docFiling:stage', async (event, name: string, data: Uint8Array) => {
+    await requirePermission(event, 'documents:upload')
+    if (!(data instanceof Uint8Array) || data.byteLength > 100 * 1024 * 1024)
+      throw new Error('The file is too large to file')
+    const dir = join(tmpdir(), 'vc-filing', randomUUID())
+    await fsMkdir(dir, { recursive: true })
+    const safe =
+      basename(String(name || 'file'))
+        .replace(/[<>:"/\\|?*]/g, ' ')
+        .trim() || 'file'
+    const path = join(dir, safe)
+    await fsWriteFile(path, Buffer.from(data))
+    return path
+  })
+
+  safeHandle(
+    'docFiling:analyze',
+    async (event, vesselId: string, paths: string[]): Promise<DocFilingAnalysis> => {
+      await requirePermission(event, 'documents:upload')
+      const [docTypes, customTypes, place] = await Promise.all([
+        db.getDocumentTypes(),
+        db.getVesselCustomDocTypes(vesselId),
+        db.getVesselDocumentsFolder(vesselId)
+      ])
+      const types = [
+        ...docTypes.map((t) => ({ id: t.id, name: t.name, shortCode: t.shortCode })),
+        ...(Array.isArray(customTypes) ? customTypes : []).map((t) => ({ id: t.id, name: t.name }))
+      ]
+      const files: DocFilingCandidate[] = []
+      for (const path of (Array.isArray(paths) ? paths : []).slice(0, 50)) {
+        const name = basename(path)
+        const allowed = await db.validateFileExtension(path)
+        if (!allowed.valid) {
+          files.push({ path, name, typeId: null, source: null, error: allowed.reason })
+          continue
+        }
+        const ext = extname(path).toLowerCase()
+        // The text is read only when the name says nothing (it takes a second per file)
+        let guess = guessDocumentType(name, '', types)
+        if (!guess.typeId && (ext === '.pdf' || ext === '.docx')) {
+          const size = await fsStat(resolveFilePath(path)).then(
+            (st) => st.size,
+            () => 0
+          )
+          if (size > 0 && size < 30 * 1024 * 1024) {
+            const read = await runFileReader<{ success: boolean; text?: string; error?: string }>(
+              { filePath: resolveFilePath(path), mode: 'text' },
+              'Document filing',
+              20000
+            )
+            guess = guessDocumentType(name, read.success ? read.text || '' : '', types)
+          }
+        }
+        files.push({ path, name, ...guess })
+      }
+      const suggestedFolder = place.folder
+        ? null
+        : place.candidates.find((dir) => existsSync(resolveFilePath(dir))) || null
+      return { folder: place.folder, suggestedFolder, files }
+    }
+  )
+
+  safeHandle(
+    'docFiling:file',
+    async (
+      event,
+      vesselId: string,
+      folder: string,
+      items: DocFilingItem[]
+    ): Promise<DocFilingResult[]> => {
+      const user = await requirePermission(event, 'documents:upload')
+      if (typeof folder !== 'string' || !folder) throw new Error('Choose the vessel folder')
+      const dir = resolveFilePath(folder)
+      if (!existsSync(dir)) throw new Error(`The folder ${folder} was not found`)
+      await db.setVesselDocumentsFolder(vesselId, canonicalizeFilePath(folder))
+      const [docTypes, current] = await Promise.all([
+        db.getDocumentTypes(),
+        db.getVesselDocuments(vesselId)
+      ])
+      const results: DocFilingResult[] = []
+      for (const item of Array.isArray(items) ? items : []) {
+        try {
+          const source = resolveFilePath(item.path)
+          if (!existsSync(source)) throw new Error('The file is no longer there')
+          // Moved into the vessel folder (a file already there stays); renamed when linked
+          let target = source
+          if (normalize(dirname(source)).toLowerCase() !== normalize(dir).toLowerCase()) {
+            const ext = extname(source)
+            const stem = basename(source, ext)
+            target = join(dir, basename(source))
+            for (let n = 2; existsSync(target); n++) target = join(dir, `${stem} (${n})${ext}`)
+            try {
+              await fsRename(source, target)
+            } catch {
+              // Another drive, or the source cannot be removed (read-only): copy, then try to remove
+              await copyFile(source, target)
+              await fsUnlink(source).catch(() => {})
+            }
+          }
+          const existing = current.find((d) => d.documentTypeId === item.documentTypeId)
+          const type = docTypes.find((t) => t.id === item.documentTypeId)
+          const linked = await linkVesselDocument(user, {
+            vesselId,
+            documentTypeId: item.documentTypeId,
+            filePath: join(folder, basename(target)),
+            sent: existing?.sent || false,
+            required: existing ? existing.required : type ? type.required : true,
+            expiryDate: item.expiryDate || undefined,
+            receivedDate: new Date().toISOString().split('T')[0],
+            uploadedDate: new Date().toISOString(),
+            uploadedBy: user.username
+          })
+          results.push({ path: item.path, ok: true, ...linked })
+        } catch (err) {
+          results.push({ path: item.path, ok: false, error: errorMessage(err) })
+        }
+      }
+      return results
     }
   )
   safeHandle(
@@ -3011,9 +3212,16 @@ app.whenReady().then(() => {
     }
   )
 
-  safeHandle('dialog:openFolder', async (event) => {
+  safeHandle('dialog:openFolder', async (event, defaultPath?: string) => {
     requireSession(event)
-    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const start =
+      typeof defaultPath === 'string' && defaultPath && existsSync(resolveFilePath(defaultPath))
+        ? resolveFilePath(defaultPath)
+        : undefined
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      ...(start ? { defaultPath: start } : {})
+    })
     return result.canceled ? null : result.filePaths[0]
   })
 
@@ -3442,50 +3650,7 @@ app.whenReady().then(() => {
   safeHandle('word:importDefects', async (event, surveyId: string, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) throw new Error('Invalid file path')
-    // The parser runs in a separate utility PROCESS, not a worker thread: pdf.js inside a worker
-    // thread of the main process crashed the whole app (native crash) on repeated PDF imports.
-    // A utility process isolates it; if it dies only the import fails.
-    // Always load the parser from the ASAR so its node_modules (pdf-parse, mammoth) resolve.
-    const asarParserPath = join(app.getAppPath(), 'out', 'main', 'parser.js')
-    const parserPath = existsSync(asarParserPath) ? asarParserPath : join(__dirname, 'parser.js')
-
-    const parsed = await new Promise<DefectParseResult>((resolve) => {
-      const child = utilityProcess.fork(parserPath, [], {
-        serviceName: 'Survey defect import',
-        stdio: 'pipe'
-      })
-      let stderr = ''
-      child.stderr?.on('data', (d: Buffer) => {
-        stderr = (stderr + d.toString()).slice(-2000)
-      })
-      let done = false
-      const finish = (r: DefectParseResult): void => {
-        if (done) return
-        done = true
-        clearTimeout(timer)
-        resolve(r)
-        // let it exit on its own; kill only if it lingers
-        setTimeout(() => {
-          try {
-            child.kill()
-          } catch {
-            /* already gone */
-          }
-        }, 15000).unref()
-      }
-      const timer = setTimeout(
-        () => finish({ success: false, error: 'Reading the file timed out' }),
-        60000
-      )
-      child.on('message', (message: unknown) => finish(message as DefectParseResult))
-      child.on('exit', (code) => {
-        if (!done) {
-          console.error('[defect import] parser process exited', code, stderr)
-          finish({ success: false, error: `The file reader stopped unexpectedly (code ${code})` })
-        }
-      })
-      child.postMessage({ filePath })
-    })
+    const parsed = await runFileReader<DefectParseResult>({ filePath }, 'Survey defect import')
     if (!parsed.success) return { success: false, message: parsed.error, count: 0 }
 
     // Import defects into database, skipping ones already on this survey (re-import of the

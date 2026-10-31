@@ -141,6 +141,17 @@ export const FEATURES: Feature[] = [
     keywords: 'compare side by side difference'
   },
   {
+    id: 'document-filing',
+    title: 'File several documents at once',
+    area: 'Fleet',
+    kind: 'action',
+    permission: 'documents:upload',
+    target: { tab: 'vessels' },
+    description:
+      "On a vessel's Documents tab, drop files from Outlook, Downloads or a folder: the app suggests each document type, you check, then they are moved to the vessel folder, renamed (VESSEL - CODE - date) and linked.",
+    keywords: 'drop drag outlook attachments downloads file documents rename move COR class inbox'
+  },
+  {
     id: 'document-history',
     title: 'Earlier files of a document',
     area: 'Fleet',

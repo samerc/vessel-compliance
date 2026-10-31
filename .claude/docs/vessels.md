@@ -40,7 +40,16 @@ A file linked to a vessel / entity document is renamed IN PLACE first (`nameLink
 - Not renamed: a file the app already links anywhere (vessel_documents, entity_documents, document_history: e.g. one letter linked to two types), so no other link breaks; a missing file; a file already carrying the name. Only NEW uploads (existing files were not renamed, user choice)
 - A failed rename (file open in another program, read-only folder) links the file under its own name; the handler returns `renameError` and the upload screens show it as a warning toast
 - Because names now differ per upload, a newer file no longer replaces the old one on disk, so Document History keeps real earlier files
-- Point 6 of the roadmap: next = drop several files on a documents page (type guessed, review list, then moved into the vessel folder, renamed, linked), then one drop area anywhere
+- Point 6 of the roadmap: built so far = renaming + filing several files (below); next = one drop area anywhere (vessel / entity guessed too)
+
+### Filing several documents at once (2026-10-31)
+
+`DocumentFiling.tsx`, a drop bar on the vessel Documents tab (both views, `documents:upload`), + "Choose files" (multi-select):
+- Dropped files with a path are used where they are; a file without one (a dragged Outlook attachment) is saved to `%TEMP%/vc-filing/<uuid>/` first (`docFiling:stage`). NOT yet tested with a real Outlook drag: the user will try it after the deploy
+- `docFiling:analyze(vesselId, paths)`: file type rules (`validateFileExtension`, blocked = red row); type guessed by `guessDocumentType` (`src/main/documentMatching.ts`): file name first (short code, type name, built-in synonyms: registry/COR/REG, class, SMC, DOC, dry dock, UTM, P&I / Hull application, crew list / contract, salaries / wages, KYC, incorporation...); only when the name says nothing, the text of a PDF (first 3 pages) / DOCX via the file reader utility process (`runFileReader`, mode `text`; scanned PDFs have no text). One-word phrases count only in file names; in the text the earliest phrase (the title) wins; a tie = no guess
+- Review Modal: per file the type (prefilled, "Skip"), how it was recognised, "Replaces X (kept in History)", an optional expiry. File is blocked until every row has a type or Skip, one file per type, and a folder
+- Folder: `vessels.documents_folder` (chosen once, remembered). None yet -> suggested from the folder most of its linked documents are in, else its policy folder; the user must confirm it with Choose (picker opens there, `dialogOpenFolder(defaultPath)`)
+- `docFiling:file(vesselId, folder, items)`: each file is MOVED into the folder (rename; other drive / undeletable source = copy then try to delete; a file already in the folder stays; name taken -> " (2)"), then linked through `linkVesselDocument` (same as one upload: renamed VESSEL - CODE - date, earlier file to History, activity + audit). Per-file results; failed rows stay in the Modal
 
 ### Document History (earlier files)
 

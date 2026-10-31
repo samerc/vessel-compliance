@@ -66,6 +66,7 @@ import { effectiveDocExpiry, getDocStatus, type DocStatus } from '../utils/docSt
 import 'flag-icons/css/flag-icons.min.css'
 
 import VesselDocumentsView from './VesselDocumentsView'
+import DocumentFiling from './DocumentFiling'
 import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
 import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
@@ -2787,6 +2788,15 @@ export default function VesselDetail({
               canRestore={hasPermission('documents:upload')}
               onClose={() => setDocHistoryFor(null)}
               onRestored={loadDocuments}
+            />
+          )}
+          {detailView === 'documents' && hasPermission('documents:upload') && (
+            <DocumentFiling
+              vessel={vessel}
+              docTypes={docTypes}
+              customDocTypes={customDocTypes}
+              vesselDocs={vesselDocs}
+              onFiled={loadDocuments}
             />
           )}
           {detailView === 'documents' && useCardDocs && (
