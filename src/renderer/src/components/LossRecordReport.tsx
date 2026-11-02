@@ -52,6 +52,7 @@ interface VesselParticulars {
   imo: string
   owners: string[]
   managers: string[]
+  others: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ const vesselKey = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim()
 
-/** IMO, owners and managers from the app for each vessel named in the Excel */
+/** IMO and parties (owners, managers, others) from the app for each vessel named in the Excel */
 async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
   const names = [...new Set(data.flatMap((u) => u.vessels.map((v) => v.vesselName)))]
   const [vessels, assureds] = await Promise.all([
@@ -74,7 +75,7 @@ async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
     // The same name can belong to an old record: the active vessel wins
     const matches = vessels.filter((v) => vesselKey(v.name) === vesselKey(vesselName))
     const vessel = matches.find((v) => v.isActive) || matches[0]
-    if (!vessel) return { vesselName, found: false, imo: '', owners: [], managers: [] }
+    if (!vessel) return { vesselName, found: false, imo: '', owners: [], managers: [], others: [] }
     const parties = assureds.filter((a) => a.vesselId === vessel.id && a.entityName)
     // A plain role prints the name only, any other (Technical Managers, ...) adds the role
     const named = (re: RegExp, plain: RegExp): string[] => [
@@ -91,7 +92,9 @@ async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
       found: true,
       imo: vessel.imoNumber || '',
       owners: named(/owner/i, /^registered owners?$/i),
-      managers: named(/manag/i, /^managers?$/i)
+      managers: named(/manag/i, /^managers?$/i),
+      // Every other party (Co-Assured, Operators, Mortgagee, c/o, ...) with its role
+      others: named(/^(?![\s\S]*(owner|manag))/i, /^$/)
     }
   })
 }
@@ -475,12 +478,13 @@ async function exportToPDF(
   autoTable(doc, {
     startY: s.companySubtitle ? 64 : 60,
     margin,
-    head: [['Vessel', 'IMO', 'Owners', 'Managers']],
+    head: [['Vessel', 'IMO', 'Owners', 'Managers', 'Other Parties']],
     body: particulars.map((p) => [
       p.vesselName,
       p.imo || '-',
       p.owners.join('\n') || '-',
-      p.managers.join('\n') || '-'
+      p.managers.join('\n') || '-',
+      p.others.join('\n') || '-'
     ]),
     theme: 'grid',
     headStyles: {
@@ -492,10 +496,11 @@ async function exportToPDF(
       lineColor: primary
     },
     columnStyles: {
-      0: { cellWidth: 38, fontStyle: 'bold' },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 61 },
-      3: { cellWidth: 61 }
+      0: { cellWidth: 32, fontStyle: 'bold' },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 44 },
+      3: { cellWidth: 44 },
+      4: { cellWidth: 44 }
     },
     styles: {
       fontSize: 8,
@@ -811,7 +816,7 @@ export default function LossRecordReport(): React.JSX.Element {
             >
               <AlertCircle size={16} />
               <span style={{ fontSize: '0.88rem' }}>
-                Not found in the app, printed without IMO, owners and managers:{' '}
+                Not found in the app, printed without IMO and parties:{' '}
                 <strong>{missing.join(', ')}</strong>. Check the vessel names in the Excel.
               </span>
             </div>
