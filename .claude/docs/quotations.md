@@ -36,6 +36,7 @@ Quotation management system:
 - **QuotationManager** (`src/renderer/src/components/QuotationManager.tsx`): Main quotation list and management
 - **QuotationEditor** (`src/renderer/src/components/QuotationEditor.tsx`): Create/edit quotation details with tabbed sections (Conditions, Warranties, Deductibles, Exclusions, etc.)
 - **QuotationList** (`src/renderer/src/components/QuotationList.tsx`): Quotation listing view
+- **Editor header**: the first row wraps (no overflow on small windows). The quotation name (`quotations.title`, e.g. the fleet name) is an inline input there (`.inline-combo`, shown uppercase); empty = the vessel names as placeholder. The list Vessel column shows the name with "N vessels" for a fleet when one is set (user 2026-11-02)
 - **QuotationSettings** (`src/renderer/src/components/QuotationSettings.tsx`): Two-tier navigation — category selector (General / P&I / H&M) on top, filtered tab chips below. General: Quotation Types, Warranties, Subjectivities, Trading Countries, Trading Warranty, Sanctions Versions, Standard Texts, Instalment Defaults, Section Order, Logo. P&I: Conditions, Deductibles, Exclusions, Limits of Liability, Addl. Clauses. H&M: Agreed Value, Clauses, Addl. Conditions.
 - **RichTextEditor** (`src/renderer/src/components/RichTextEditor.tsx`): Rich text editing for quotation content
 - **Export**: `QuotationExportService.ts` with DOCX (`htmlToDocx.ts`) and PDF (`htmlToPdfText.ts`) export

@@ -1323,7 +1323,15 @@ export default function QuotationEditor({
         className="glass-card"
         style={{ padding: '16px 20px', marginBottom: '20px', overflow: 'visible' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px 12px',
+            marginBottom: '12px'
+          }}
+        >
           {/* Reference number */}
           <input
             type="text"
@@ -1361,20 +1369,31 @@ export default function QuotationEditor({
           {q.quotationTypeName && (
             <TypeChip code={q.quotationTypeCode} name={q.quotationTypeName} />
           )}
-          {/* Vessel/Fleet name */}
-          {qVessels.length > 0 && (
-            <span
+          {/* Quotation name (e.g. the fleet name); empty = the vessel names */}
+          {(qVessels.length > 0 || q.title) && (
+            <input
+              type="text"
+              className="inline-combo"
+              value={q.title || ''}
+              onChange={(e) => setQ((prev) => ({ ...prev, title: e.target.value }))}
+              onBlur={(e) => updateField('title', e.target.value.trim() || null)}
+              placeholder={qVessels.map((v) => v.name || v.vesselLabel).join(' / ')}
+              title="Quotation name, e.g. the fleet name. Left empty, the vessel names are shown"
+              aria-label="Quotation name"
+              disabled={isLocked || !canEdit}
               style={{
                 fontSize: '0.9rem',
                 fontWeight: 600,
                 color: 'var(--text-secondary)',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                flex: '1 1 160px',
+                minWidth: '120px',
+                maxWidth: '360px',
+                textOverflow: 'ellipsis'
               }}
-            >
-              {qVessels.length === 1
-                ? qVessels[0].name || qVessels[0].vesselLabel
-                : q.title || qVessels.map((v) => v.name || v.vesselLabel).join(' / ')}
-            </span>
+            />
           )}
           {/* Sanctions status of the vessels, assureds and customer */}
           <ScreeningBadge contextType="quotation" contextId={q.id} refreshKey={screeningVersion} />

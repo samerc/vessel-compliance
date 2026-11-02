@@ -929,7 +929,8 @@ export default function QuotationList({
           >
             {q.vesselName ? (
               <>
-                {q.vesselName}
+                {/* A fleet shows its quotation name when one is set */}
+                {((q.vesselCount || 0) > 1 && q.title) || q.vesselName}
                 {(q.vesselCount || 0) > 1 && (
                   <span
                     style={{
@@ -938,7 +939,7 @@ export default function QuotationList({
                       marginLeft: '4px'
                     }}
                   >
-                    +{q.vesselCount - 1}
+                    {q.title ? `${q.vesselCount} vessels` : `+${q.vesselCount - 1}`}
                   </span>
                 )}
               </>
