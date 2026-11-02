@@ -1219,6 +1219,7 @@ export interface Api {
   ) => Promise<void>
   premiumDeleteTextTemplate: (id: string) => Promise<void>
   premiumReorderTextTemplates: (ids: string[]) => Promise<void>
+  premiumSetTextTemplateDefault: (id: string, isDefault: boolean) => Promise<void>
 
   // P&I Section Texts
   piGetSectionTexts: () => Promise<PISectionTexts>

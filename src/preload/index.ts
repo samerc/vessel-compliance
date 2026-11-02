@@ -873,6 +873,8 @@ const api: Api = {
   premiumDeleteTextTemplate: (id: string) => ipcRenderer.invoke('premium:deleteTextTemplate', id),
   premiumReorderTextTemplates: (ids: string[]) =>
     ipcRenderer.invoke('premium:reorderTextTemplates', ids),
+  premiumSetTextTemplateDefault: (id: string, isDefault: boolean) =>
+    ipcRenderer.invoke('premium:setTextTemplateDefault', id, isDefault),
 
   // P&I Section Texts
   piGetSectionTexts: () => ipcRenderer.invoke('pi:getSectionTexts'),

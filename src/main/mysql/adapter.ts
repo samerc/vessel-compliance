@@ -6174,6 +6174,49 @@ export class MySQLAdapter {
           )
         await this.setSetting('migration_quotation_steps_v1', '1')
       }
+      // NCB / UPCC: the text filled in when the box is ticked is the template marked default
+      // (user 2026-11-02); the old Standard Texts default moves into the templates once
+      const [pttCols] = await this.pool.query<RowDataPacket[]>(
+        "SHOW COLUMNS FROM premium_text_templates LIKE 'is_default'"
+      )
+      if (pttCols.length === 0)
+        await this.pool.query(
+          'ALTER TABLE premium_text_templates ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT FALSE'
+        )
+      if ((await this.getSetting('migration_premium_default_template_v1')) !== '1') {
+        const stdTexts = await this.getPISectionTexts()
+        const oldDefaults: Record<'ncb' | 'upcc', string | undefined> = {
+          ncb:
+            stdTexts.ncbDefaultText ??
+            'Subject to {ncb_amount}, which is repayable to the insurer in case of claim.',
+          upcc: stdTexts.upccDefaultText
+        }
+        const plain = (t: string): string =>
+          t
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        for (const type of ['ncb', 'upcc'] as const) {
+          const text = oldDefaults[type]
+          if (!text || !plain(text)) continue
+          const existing = await this.getPremiumTextTemplates(type)
+          if (existing.some((t) => t.isDefault)) continue
+          const same = existing.find((t) => plain(t.text) === plain(text))
+          if (same) {
+            await this.pool.query(
+              'UPDATE premium_text_templates SET is_default = TRUE WHERE id = ?',
+              [same.id]
+            )
+          } else {
+            await this.pool.query(
+              'INSERT INTO premium_text_templates (id, name, text, type, order_index, is_default) VALUES (?, ?, ?, ?, -1, TRUE)',
+              [uuidv4(), 'Default', text, type]
+            )
+          }
+        }
+        await this.setSetting('migration_premium_default_template_v1', '1')
+      }
       // Settings items in use are hidden, not deleted; a wording change while in use makes a
       // new version (replaced_by). Cargo tables use their existing active column to hide
       for (const siTable of [
@@ -13525,15 +13568,21 @@ export class MySQLAdapter {
     if (!this.pool) return []
     if (type) {
       const [rows] = await this.pool.query(
-        'SELECT id, name, text, type, order_index AS `order` FROM premium_text_templates WHERE type = ? ORDER BY order_index ASC',
+        'SELECT id, name, text, type, order_index AS `order`, is_default AS isDefault FROM premium_text_templates WHERE type = ? ORDER BY order_index ASC',
         [type]
       )
-      return rows as PremiumTextTemplate[]
+      return (rows as RowDataPacket[]).map((r) => ({
+        ...r,
+        isDefault: !!r.isDefault
+      })) as PremiumTextTemplate[]
     }
     const [rows] = await this.pool.query(
-      'SELECT id, name, text, type, order_index AS `order` FROM premium_text_templates ORDER BY type ASC, order_index ASC'
+      'SELECT id, name, text, type, order_index AS `order`, is_default AS isDefault FROM premium_text_templates ORDER BY type ASC, order_index ASC'
     )
-    return rows as PremiumTextTemplate[]
+    return (rows as RowDataPacket[]).map((r) => ({
+      ...r,
+      isDefault: !!r.isDefault
+    })) as PremiumTextTemplate[]
   }
 
   async addPremiumTextTemplate(data: {
@@ -13557,8 +13606,23 @@ export class MySQLAdapter {
       name: data.name,
       text: data.text,
       type: data.type as 'ncb' | 'upcc',
-      order: nextOrder
+      order: nextOrder,
+      isDefault: false
     }
+  }
+
+  /** Marks a template as the default of its type (only one per type) or clears the mark */
+  async setPremiumTextTemplateDefault(id: string, isDefault: boolean): Promise<void> {
+    if (!this.pool) return
+    if (isDefault)
+      await this.pool.query(
+        'UPDATE premium_text_templates SET is_default = (id = ?) WHERE type = (SELECT type FROM (SELECT type FROM premium_text_templates WHERE id = ?) t)',
+        [id, id]
+      )
+    else
+      await this.pool.query('UPDATE premium_text_templates SET is_default = FALSE WHERE id = ?', [
+        id
+      ])
   }
 
   async updatePremiumTextTemplate(

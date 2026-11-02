@@ -5579,6 +5579,10 @@ app.whenReady().then(() => {
     await requirePermission(event, 'quotations:settings')
     return db.reorderPremiumTextTemplates(ids)
   })
+  safeHandle('premium:setTextTemplateDefault', async (event, id: string, isDefault: boolean) => {
+    await requirePermission(event, 'quotations:settings')
+    return db.setPremiumTextTemplateDefault(id, isDefault)
+  })
 
   // P&I Section Texts
   safeHandle('pi:getSectionTexts', (event) => {

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Star,
   X,
   Save,
   Globe,
@@ -6411,7 +6412,10 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
                     maxWidth: '500px'
                   }}
                 >
-                  {t.text.replace(/<[^>]*>/g, '').substring(0, 120) || '(empty)'}
+                  {t.text
+                      .replace(/<[^>]*>/g, '')
+                      .replace(/&nbsp;/g, ' ')
+                      .substring(0, 120) || '(empty)'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -6821,9 +6825,19 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
     }
   }
 
-  const handleDelete = async (id: string): Promise<void> => {
+  const toggleDefault = async (t: PremiumTextTemplate): Promise<void> => {
     try {
-      await window.api.premiumDeleteTextTemplate(id)
+      await window.api.premiumSetTextTemplateDefault(t.id, !t.isDefault)
+      loadData()
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save')
+    }
+  }
+
+  const handleDelete = async (t: PremiumTextTemplate): Promise<void> => {
+    if (!(await confirmDialog(`Delete the template "${t.name}"?`))) return
+    try {
+      await window.api.premiumDeleteTextTemplate(t.id)
       showSuccess('Template deleted')
       loadData()
     } catch (err) {
@@ -7025,8 +7039,18 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '0.88rem',
+                      marginBottom: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
                     {t.name}
+                    {t.isDefault && <span className="badge badge-success">Default</span>}
                   </div>
                   <div
                     style={{
@@ -7038,10 +7062,32 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
                       maxWidth: '500px'
                     }}
                   >
-                    {t.text.replace(/<[^>]*>/g, '').substring(0, 120) || '(empty)'}
+                    {t.text
+                      .replace(/<[^>]*>/g, '')
+                      .replace(/&nbsp;/g, ' ')
+                      .substring(0, 120) || '(empty)'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    title={
+                      t.isDefault
+                        ? 'Default: filled in when the box is ticked. Click to remove the mark'
+                        : 'Make default: filled in when the box is ticked on a quotation'
+                    }
+                    aria-label={t.isDefault ? 'Remove default' : 'Make default'}
+                    aria-pressed={!!t.isDefault}
+                    onClick={() => toggleDefault(t)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: t.isDefault ? 'var(--warning)' : 'var(--text-secondary)'
+                    }}
+                  >
+                    <Star size={14} fill={t.isDefault ? 'currentColor' : 'none'} />
+                  </button>
                   <button
                     title="Move up"
                     aria-label="Move up"
@@ -7091,7 +7137,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
                   <button
                     title="Delete"
                     aria-label="Delete"
-                    onClick={() => handleDelete(t.id)}
+                    onClick={() => handleDelete(t)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -7116,8 +7162,9 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
       <div style={{ marginBottom: '16px' }}>
         <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>NCB / UPCC Text Templates</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          Reusable templates for NCB and UPCC text fields in the Premium tab. Select one in a
-          quotation or write custom text.
+          Reusable texts for NCB and UPCC in the quotation Premium tab. The template marked with the
+          star is filled in when NCB or UPCC is ticked; the others can be picked from Load from
+          template.
         </p>
       </div>
 
@@ -7953,18 +8000,7 @@ const SECTION_TEXT_FIELDS: {
     section: 'Deductibles',
     rows: 3
   },
-  {
-    key: 'ncbDefaultText',
-    label: 'NCB Default Text ({ncb_amount}, {ncb_percent} placeholders)',
-    section: 'NCB',
-    rows: 2
-  },
-  {
-    key: 'upccDefaultText',
-    label: 'UPCC Default Text ({upcc_amount}, {upcc_percent} placeholders)',
-    section: 'UPCC',
-    rows: 2
-  },
+  // The NCB / UPCC text filled in on ticking is the default template (General > NCB / UPCC)
   {
     key: 'continuationPiClubText',
     label: 'Upfront Profit Continuity Credit (UPCC) Additional Text',

@@ -842,6 +842,8 @@ export interface PremiumTextTemplate {
   text: string
   type: 'ncb' | 'upcc'
   order: number
+  /** Filled in when NCB / UPCC is ticked on a quotation (one per type) */
+  isDefault?: boolean
 }
 
 // ==================== Fleet Analytics ====================

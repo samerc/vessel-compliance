@@ -2330,7 +2330,7 @@ export default function PremiumTab({
                 setQ((p) => ({ ...p, ncbEnabled: enabling }))
                 updateField('ncbEnabled', enabling)
                 if (enabling && !quotation.ncbText) {
-                  const def = getEffectiveText('ncbDefaultText')
+                  const def = ncbTemplates.find((t) => t.isDefault)?.text
                   if (def) {
                     setQ((p) => ({ ...p, ncbText: def }))
                     updateField('ncbText', def)
@@ -2438,7 +2438,7 @@ export default function PremiumTab({
                   <option value="">
                     {ncbTemplates.length > 0
                       ? 'Load from template...'
-                      : 'No templates — create in Quotation Settings → NCB / UPCC'}
+                      : 'No templates — create in Quotation Settings → General → NCB / UPCC'}
                   </option>
                   {ncbTemplates.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -2489,7 +2489,7 @@ export default function PremiumTab({
                 setQ((p) => ({ ...p, upccEnabled: enabling }))
                 updateField('upccEnabled', enabling)
                 if (enabling && !quotation.upccText) {
-                  const def = getEffectiveText('upccDefaultText')
+                  const def = upccTemplates.find((t) => t.isDefault)?.text
                   if (def) {
                     setQ((p) => ({ ...p, upccText: def }))
                     updateField('upccText', def)
@@ -2611,7 +2611,7 @@ export default function PremiumTab({
                   <option value="">
                     {upccTemplates.length > 0
                       ? 'Load from template...'
-                      : 'No templates — create in Quotation Settings → NCB / UPCC'}
+                      : 'No templates — create in Quotation Settings → General → NCB / UPCC'}
                   </option>
                   {upccTemplates.map((t) => (
                     <option key={t.id} value={t.id}>
