@@ -3,8 +3,9 @@ import type { RowInput, Styles } from 'jspdf-autotable'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
-import type { ReportSettings } from '../../../shared/types'
+import type { ReportSettings, Vessel, VesselAssured } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { asArray } from '../utils/ipc'
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,56 @@ interface LossUWY {
   totalIncurred: number
 }
 
+/** A vessel of the Excel with its particulars from the app (found = false when no vessel matched) */
+interface VesselParticulars {
+  vesselName: string
+  found: boolean
+  imo: string
+  owners: string[]
+  managers: string[]
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const vesselKey = (name: string): string =>
+  name
+    .toUpperCase()
+    .replace(/^(M\/[VTY]|MV|MT|MY)[\s.]+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/** IMO, owners and managers from the app for each vessel named in the Excel */
+async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
+  const names = [...new Set(data.flatMap((u) => u.vessels.map((v) => v.vesselName)))]
+  const [vessels, assureds] = await Promise.all([
+    window.api.getVessels().then((r) => asArray<Vessel>(r)),
+    window.api.getVesselAssureds().then((r) => asArray<VesselAssured>(r))
+  ])
+  return names.map((vesselName) => {
+    // The same name can belong to an old record: the active vessel wins
+    const matches = vessels.filter((v) => vesselKey(v.name) === vesselKey(vesselName))
+    const vessel = matches.find((v) => v.isActive) || matches[0]
+    if (!vessel) return { vesselName, found: false, imo: '', owners: [], managers: [] }
+    const parties = assureds.filter((a) => a.vesselId === vessel.id && a.entityName)
+    // A plain role prints the name only, any other (Technical Managers, ...) adds the role
+    const named = (re: RegExp, plain: RegExp): string[] => [
+      ...new Set(
+        parties
+          .filter((a) => re.test(a.role || ''))
+          .map((a) =>
+            plain.test((a.role || '').trim()) ? a.entityName! : `${a.entityName} (${a.role})`
+          )
+      )
+    ]
+    return {
+      vesselName,
+      found: true,
+      imo: vessel.imoNumber || '',
+      owners: named(/owner/i, /^registered owners?$/i),
+      managers: named(/manag/i, /^managers?$/i)
+    }
+  })
+}
 
 function excelSerialToDate(serial: number): string {
   // Excel date serial: days since 1900-01-01, with Lotus 123 leap-year bug correction
@@ -175,6 +225,7 @@ interface LossReportOpts {
 
 async function exportToPDF(
   data: LossUWY[],
+  particulars: VesselParticulars[],
   s: ReportSettings,
   opts: LossReportOpts
 ): Promise<void> {
@@ -419,8 +470,45 @@ async function exportToPDF(
     { content: fmtCur(grandIncurred), styles: { ...S.grandTotal, ...R } }
   ])
 
+  // ── Vessel particulars (always, even for one vessel) ──────────────────────
+  const margin = { top: 14, right: 14, bottom: 42, left: 14 }
+  autoTable(doc, {
+    startY: s.companySubtitle ? 64 : 60,
+    margin,
+    head: [['Vessel', 'IMO', 'Owners', 'Managers']],
+    body: particulars.map((p) => [
+      p.vesselName,
+      p.imo || '-',
+      p.owners.join('\n') || '-',
+      p.managers.join('\n') || '-'
+    ]),
+    theme: 'grid',
+    headStyles: {
+      fillColor: primary,
+      textColor: [255, 255, 255],
+      fontSize: 7.5,
+      fontStyle: 'bold',
+      cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
+      lineColor: primary
+    },
+    columnStyles: {
+      0: { cellWidth: 38, fontStyle: 'bold' },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 61 },
+      3: { cellWidth: 61 }
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: { top: 2, right: 3, bottom: 2, left: 3 },
+      lineColor: [210, 215, 220],
+      lineWidth: 0.3,
+      textColor: [20, 20, 20],
+      overflow: 'linebreak'
+    }
+  })
+
   // ── Render table ─────────────────────────────────────────────────────────
-  const startY = s.companySubtitle ? 64 : 60
+  const startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
   const numCol = { halign: 'right' as const, overflow: 'ellipsize' as const }
   const w: Partial<
@@ -447,7 +535,7 @@ async function exportToPDF(
 
   autoTable(doc, {
     startY,
-    margin: { top: 14, right: 14, bottom: 42, left: 14 },
+    margin,
     head: [headRow],
     body: bodyRows,
     theme: 'grid',
@@ -494,6 +582,7 @@ export default function LossRecordReport(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [data, setData] = useState<LossUWY[] | null>(null)
+  const [particulars, setParticulars] = useState<VesselParticulars[]>([])
   const [fileName, setFileName] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -523,6 +612,7 @@ export default function LossRecordReport(): React.JSX.Element {
           setData(null)
         } else {
           setData(parsed)
+          setParticulars(await loadParticulars(parsed))
         }
       } catch {
         setError('Failed to parse the file. Make sure it matches the expected format.')
@@ -550,7 +640,11 @@ export default function LossRecordReport(): React.JSX.Element {
     setExporting(true)
     try {
       const settings = await getReportSettings()
-      await exportToPDF(data, settings, { currency, showReserves, showClaimSubtotals })
+      await exportToPDF(data, particulars, settings, {
+        currency,
+        showReserves,
+        showClaimSubtotals
+      })
       showSuccess('Loss record exported')
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to export the loss record')
@@ -561,9 +655,13 @@ export default function LossRecordReport(): React.JSX.Element {
 
   const clearData = (): void => {
     setData(null)
+    setParticulars([])
     setFileName('')
     setError(null)
   }
+
+  const missing = particulars.filter((p) => !p.found).map((p) => p.vesselName)
+  const particularsOf = new Map(particulars.map((p) => [p.vesselName, p]))
 
   // Summary stats derived from parsed data
   const stats = data
@@ -698,6 +796,27 @@ export default function LossRecordReport(): React.JSX.Element {
             </div>
           )}
 
+          {missing.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <AlertCircle size={16} />
+              <span style={{ fontSize: '0.88rem' }}>
+                Not found in the app, printed without IMO, owners and managers:{' '}
+                <strong>{missing.join(', ')}</strong>. Check the vessel names in the Excel.
+              </span>
+            </div>
+          )}
+
           {/* UWY breakdown preview */}
           <div className="table-wrap">
             <div
@@ -717,13 +836,14 @@ export default function LossRecordReport(): React.JSX.Element {
                   {[
                     'UWY',
                     'Vessel',
+                    'IMO',
                     'Policy',
                     'Claims',
                     `Total Paid (${currency})`,
                     `Reserves (${currency})`,
                     `Total Incurred (${currency})`
                   ].map((h, i) => (
-                    <th key={h} className={i >= 4 ? 'num' : undefined}>
+                    <th key={h} className={i >= 5 ? 'num' : undefined}>
                       {h}
                     </th>
                   ))}
@@ -735,6 +855,9 @@ export default function LossRecordReport(): React.JSX.Element {
                     <tr key={`${uwy.year}-${v.vesselName}`}>
                       <td className="muted">{vi === 0 ? uwy.year : ''}</td>
                       <td style={{ fontWeight: '600' }}>{v.vesselName}</td>
+                      <td className="muted">
+                        <span className="mono">{particularsOf.get(v.vesselName)?.imo || '-'}</span>
+                      </td>
                       <td className="muted">
                         <span className="mono">{v.policyId}</span>
                       </td>
