@@ -1171,6 +1171,8 @@ export interface Quotation {
   policyTypeName?: string
   vesselId?: string
   vesselName?: string
+  /** Every vessel of the quotation (list loads only), for searching */
+  vesselNames?: string[]
   isRenewal: boolean
   status: QuotationStatus
   periodText?: string

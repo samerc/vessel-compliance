@@ -13705,16 +13705,20 @@ export class MySQLAdapter {
       qIds
     )
     const vesselMap = new Map<string, string>()
-    const vesselCountMap = new Map<string, number>()
+    const vesselNamesMap = new Map<string, string[]>()
     for (const v of vesselRows as RowDataPacket[]) {
       if (!vesselMap.has(v.quotation_id)) vesselMap.set(v.quotation_id, v.vesselName)
-      vesselCountMap.set(v.quotation_id, (vesselCountMap.get(v.quotation_id) || 0) + 1)
+      vesselNamesMap.set(v.quotation_id, [
+        ...(vesselNamesMap.get(v.quotation_id) || []),
+        v.vesselName
+      ])
     }
 
     return filtered.map((r) => ({
       ...r,
       vesselName: vesselMap.get(r.id) || null,
-      vesselCount: vesselCountMap.get(r.id) || 0,
+      vesselNames: vesselNamesMap.get(r.id) || [],
+      vesselCount: vesselNamesMap.get(r.id)?.length || 0,
       piClauseNames: null,
       hullClauseCodes: null,
       isRenewal: Boolean(r.isRenewal),
@@ -13865,7 +13869,9 @@ export class MySQLAdapter {
     if (params.search) {
       conditions.push(
         `(q.reference_number LIKE ? OR q.co_name LIKE ? OR q.title LIKE ? OR q.created_by LIKE ?
-                  OR q.created_by IN (SELECT id FROM users WHERE username LIKE ? OR full_name LIKE ?) OR qv_agg.vessel_name LIKE ?
+                  OR q.created_by IN (SELECT id FROM users WHERE username LIKE ? OR full_name LIKE ?)
+                  OR EXISTS (SELECT 1 FROM quotation_vessels qvs LEFT JOIN vessels vs ON vs.id = qvs.vessel_id
+                             WHERE qvs.quotation_id = q.id AND COALESCE(vs.name, qvs.name) LIKE ?)
                   OR q.customer_entity_id IN (SELECT id FROM entities WHERE name LIKE ?))`
       )
       const s = `%${params.search}%`

@@ -2793,7 +2793,9 @@ function CopyFromQuotationModal({
     const s = searchText.toLowerCase()
     return (
       (q.referenceNumber || '').toLowerCase().includes(s) ||
-      (q.vesselName || '').toLowerCase().includes(s) ||
+      (q.vesselNames?.length ? q.vesselNames : [q.vesselName || '']).some((n) =>
+        (n || '').toLowerCase().includes(s)
+      ) ||
       (q.quotationTypeName || '').toLowerCase().includes(s)
     )
   })
