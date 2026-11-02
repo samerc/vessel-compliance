@@ -76,7 +76,13 @@ async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
     const matches = vessels.filter((v) => vesselKey(v.name) === vesselKey(vesselName))
     const vessel = matches.find((v) => v.isActive) || matches[0]
     if (!vessel) return { vesselName, found: false, imo: '', owners: [], managers: [], others: [] }
-    const parties = assureds.filter((a) => a.vesselId === vessel.id && a.entityName)
+    // The c/o broker is left out (user 2026-11-02)
+    const parties = assureds.filter(
+      (a) =>
+        a.vesselId === vessel.id &&
+        a.entityName &&
+        (a.role || '').toLowerCase().replace(/[^a-z]/g, '') !== 'co'
+    )
     // A plain role prints the name only, any other (Technical Managers, ...) adds the role
     const named = (re: RegExp, plain: RegExp): string[] => [
       ...new Set(
@@ -93,7 +99,7 @@ async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
       imo: vessel.imoNumber || '',
       owners: named(/owner/i, /^registered owners?$/i),
       managers: named(/manag/i, /^managers?$/i),
-      // Every other party (Co-Assured, Operators, Mortgagee, c/o, ...) with its role
+      // Every other party (Co-Assured, Operators, Mortgagee, ...) with its role
       others: named(/^(?![\s\S]*(owner|manag))/i, /^$/)
     }
   })
