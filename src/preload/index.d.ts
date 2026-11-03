@@ -2080,8 +2080,8 @@ export interface Api {
   policyGetById: (id: string) => Promise<PolicyDocument | null>
   policyGetInstalments: (policyId: string) => Promise<PolicyDocInstalment[]>
   policyGetAddresses: (policyId: string) => Promise<PolicyDocAddress[]>
-  /** Pages of the type's default Word T&C (null = none, or written in the app) */
-  tcPageCount: (typeCode: string) => Promise<number | null>
+  /** Pages of the type's default T&C (null = none); a rich-text one is counted from sectionDocx */
+  tcPageCount: (typeCode: string, sectionDocx?: number[]) => Promise<number | null>
   policyGetForQuotation: (quotationId: string) => Promise<QuotationPolicySummary[]>
   policyGetConvertedVesselIds: (quotationId: string) => Promise<string[]>
   policyGetBlueCards: (policyId: string) => Promise<PolicyBlueCard[]>

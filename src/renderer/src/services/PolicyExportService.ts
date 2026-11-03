@@ -2153,13 +2153,14 @@ async function polAddDraftWatermark(zip: JSZip): Promise<boolean> {
  * either side of it, are removed. Spacer gaps (polSpacerPts, no space after) and the empty
  * paragraph a table cell needs after a nested table are left as they are.
  */
-async function polPack(document: Document, draft = false, tcExtraPages = 0): Promise<Blob> {
+async function polPack(document: Document, draft = false, tcExtraPages?: number): Promise<Blob> {
   const blob = await Packer.toBlob(document)
   const zip = await JSZip.loadAsync(blob)
   const file = zip.file('word/document.xml')
   if (!file) return blob
   const watermarked = draft && (await polAddDraftWatermark(zip))
-  const totalled = tcExtraPages > 0 && (await polAddTcToPageTotal(zip, tcExtraPages))
+  // undefined = no total marker in the footer; 0 = a T&C that could not be counted
+  const totalled = tcExtraPages !== undefined && (await polAddTcToPageTotal(zip, tcExtraPages))
   const xml = await file.async('string')
   const paras = [...xml.matchAll(/<w:p\b[^>]*\/>|<w:p\b[\s\S]*?<\/w:p>/g)]
   const spaceOf = (p: string, attr: 'after' | 'before'): number =>
@@ -4286,28 +4287,37 @@ export async function exportPolicyDocx(
   applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
-  // Resolve rich-text (html) T&C to append inline as a new section (docx T&C is handled by the merge path)
+  // The policy on its own still counts its T&C: "Page X of {policy pages + T&C pages}"
+  const countTc = !totalPages && !includeTC
+
+  // Resolve rich-text (html) T&C to append inline as a new section (docx T&C is handled by the
+  // merge path). Left out of the export, it is still built, on its own, to count its pages
   let tcHtml: string | null = null
-  if (includeTC) {
+  let tcKind: string | null = null
+  if (includeTC || countTc) {
     try {
       const tcTpl = await window.api.tcGetTemplate(typeCode)
-      if (tcTpl && !isIpcError(tcTpl) && tcTpl.kind === 'html' && tcTpl.contentHtml)
-        tcHtml = tcTpl.contentHtml
+      if (tcTpl && !isIpcError(tcTpl)) {
+        tcKind = tcTpl.kind || 'docx'
+        if (tcTpl.kind === 'html' && tcTpl.contentHtml) tcHtml = tcTpl.contentHtml
+      }
     } catch {
       /* no T&C */
     }
   }
+  const tcCountHtml = countTc && !!tcHtml
 
-  // The policy on its own still counts its T&C: "Page X of {policy pages + T&C pages}"
   let tcExtraPages = 0
-  if (!totalPages && !includeTC) {
+  if (countTc && tcKind === 'docx') {
     try {
       const n = await window.api.tcPageCount(typeCode)
       if (typeof n === 'number' && n > 0) tcExtraPages = n
     } catch {
-      /* no Word T&C, or it could not be counted: the policy's own total */
+      /* the Word T&C could not be counted: the policy's own total */
     }
   }
+  // The footer's total is a marker, made a field by polPack once the T&C's pages are known
+  const tcTotalMarker = tcExtraPages > 0 || tcCountHtml
 
   const children: (Paragraph | Table)[] = []
 
@@ -5153,7 +5163,7 @@ export async function exportPolicyDocx(
       new TextRun({ text: ' of ', ...pnStyle }),
       ...(configTotalPages
         ? [new TextRun({ text: String(configTotalPages), ...pnStyle })]
-        : tcExtraPages > 0
+        : tcTotalMarker
           ? [new TextRun({ text: POL_TOTAL_MARKER, ...pnStyle })]
           : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])
     ]
@@ -5322,12 +5332,33 @@ export async function exportPolicyDocx(
     })
   }
 
+  // A rich-text T&C left out of the export: Word counts its section on its own
+  if (tcCountHtml) {
+    const tcSection = docSections.pop()!
+    try {
+      const tcBlob = await Packer.toBlob(
+        new Document({ numbering: polMakeDocxNumbering(), sections: [tcSection] })
+      )
+      const n = await window.api.tcPageCount(
+        typeCode,
+        Array.from(new Uint8Array(await tcBlob.arrayBuffer()))
+      )
+      if (typeof n === 'number' && n > 0) tcExtraPages = n
+    } catch {
+      /* not counted: the policy's own total */
+    }
+  }
+
   const document = new Document({
     numbering: polMakeDocxNumbering(),
     sections: docSections
   })
 
-  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber), tcExtraPages)
+  const blob = await polPack(
+    document,
+    polIsDraftNumber(data.policy.policyNumber),
+    tcTotalMarker ? tcExtraPages : undefined
+  )
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`

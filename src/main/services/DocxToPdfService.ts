@@ -584,6 +584,25 @@ export async function tcTemplatePageCount(
   }
 }
 
+/** Pages of a Word document as is (cached by content, cleans up its temp files) */
+export async function docxPageCount(
+  docxBuffer: Buffer,
+  outputDir: string,
+  name: string
+): Promise<number> {
+  const key = 'plain:' + createHash('sha1').update(docxBuffer).digest('hex')
+  const known = tcPageCounts.get(key)
+  if (known) return known
+  const tempFiles: string[] = []
+  try {
+    const n = await countPdfPages(await convertBuffer(docxBuffer, outputDir, name, tempFiles))
+    if (n > 0) tcPageCounts.set(key, n)
+    return n
+  } finally {
+    removeTempFiles(tempFiles)
+  }
+}
+
 /** Removes temp files, ignoring the ones already gone */
 export function removeTempFiles(files: string[]): void {
   for (const f of files) {
