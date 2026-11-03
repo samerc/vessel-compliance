@@ -346,6 +346,7 @@ Excel registry file for quotation numbering and logging:
 
 ### Quotation Workflow Enforcement
 
+- **One move at a time** (user 2026-11-03: a double click on Confirm reserved two registry numbers): `workflow:moveQuotation` and `workflow:assignQuotationNumber` run under the DB named lock `vc_qmove_<quotationId>` (60 s wait), so a second call waits and then finds the new step and is refused ("Cannot transition"). The step dialog Confirm, Approve & Export and Create Policy are disabled with a spinner while working (ref guards against a fast double click)
 - **Initial step**: New quotations auto-assigned the `isInitial` workflow step
 - **canEdit**: Step constraint enforced — `canEdit=false` disables editing with blue banner
 - **Approve & Export**: Gated by `hasPermission('quotations:approve')`, not by workflow step's `canExport` (dead column removed from workflow settings)

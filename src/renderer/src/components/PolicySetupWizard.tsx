@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -279,6 +279,8 @@ export default function PolicySetupWizard({
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [converting, setConverting] = useState(false)
+  // A double click on Create Policy must not create two policies
+  const convertingRef = useRef(false)
 
   // Loaded data
   const [quotation, setQuotation] = useState<Quotation | null>(null)
@@ -978,7 +980,7 @@ export default function PolicySetupWizard({
   }
 
   const handleConvert = async (): Promise<void> => {
-    if (!quotation) return
+    if (!quotation || convertingRef.current) return
     // Validate all steps
     for (const step of steps.slice(0, -1)) {
       const error = validateStep(step)
@@ -1002,6 +1004,7 @@ export default function PolicySetupWizard({
       return
     }
 
+    convertingRef.current = true
     setConverting(true)
     try {
       const commPct =
@@ -1132,6 +1135,7 @@ export default function PolicySetupWizard({
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to convert to policy')
     } finally {
+      convertingRef.current = false
       setConverting(false)
     }
   }

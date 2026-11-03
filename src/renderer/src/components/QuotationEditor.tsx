@@ -20,7 +20,8 @@ import {
   Layers,
   LayoutList,
   ClipboardCheck,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react'
 import {
   Quotation,
@@ -312,6 +313,8 @@ export default function QuotationEditor({
   const [screeningVersion, setScreeningVersion] = useState(0)
   const [approving, setApproving] = useState(false)
   const approvingRef = useRef(false)
+  const [moving, setMoving] = useState(false)
+  const movingRef = useRef(false)
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -575,6 +578,10 @@ export default function QuotationEditor({
   }
 
   const handleMoveToStep = async (stepId: string, comment?: string): Promise<void> => {
+    // One move at a time: a double click on Confirm reserved two registry numbers
+    if (movingRef.current) return
+    movingRef.current = true
+    setMoving(true)
     try {
       const result = await window.api.workflowMoveQuotation(q.id, stepId, comment)
       if (hasIpcError(result) || result?.success === false) {
@@ -597,6 +604,9 @@ export default function QuotationEditor({
       }
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to move to step')
+    } finally {
+      movingRef.current = false
+      setMoving(false)
     }
   }
 
@@ -1986,6 +1996,7 @@ export default function QuotationEditor({
           title={`Move to ${reachableSteps.find((s) => s.id === showStepCommentModal)?.name ?? ''}`}
           icon={<GitBranch size={18} />}
           onClose={() => {
+            if (moving) return
             setShowStepCommentModal(null)
             setStepComment('')
           }}
@@ -1995,6 +2006,7 @@ export default function QuotationEditor({
             <>
               <button
                 className="btn-secondary"
+                disabled={moving}
                 onClick={() => {
                   setShowStepCommentModal(null)
                   setStepComment('')
@@ -2004,9 +2016,13 @@ export default function QuotationEditor({
               </button>
               <button
                 className="btn-primary"
+                disabled={moving}
+                aria-busy={moving}
                 onClick={() => handleMoveToStep(showStepCommentModal, stepComment || undefined)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                Confirm
+                {moving && <Loader2 size={14} className="spin" />}
+                {moving ? 'Working…' : 'Confirm'}
               </button>
             </>
           }
@@ -2028,16 +2044,21 @@ export default function QuotationEditor({
         <Modal
           title="Quotation Not Approved"
           icon={<AlertTriangle size={18} />}
-          onClose={() => setShowDraftExportModal(null)}
+          onClose={() => !approving && setShowDraftExportModal(null)}
           width={440}
           closeOnOverlay={false}
           footer={
             <>
-              <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>
+              <button
+                className="btn-secondary"
+                disabled={approving}
+                onClick={() => setShowDraftExportModal(null)}
+              >
                 Cancel
               </button>
               <button
                 className="btn-secondary"
+                disabled={approving}
                 onClick={() => handleExportAsDraft(showDraftExportModal)}
               >
                 Export as Draft
@@ -2046,8 +2067,11 @@ export default function QuotationEditor({
                 <button
                   className="btn-primary"
                   disabled={approving}
+                  aria-busy={approving}
                   onClick={() => handleApproveAndExport(showDraftExportModal)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
+                  {approving && <Loader2 size={14} className="spin" />}
                   {approving ? 'Approving…' : <>Approve &amp; Export</>}
                 </button>
               )}

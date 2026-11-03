@@ -7980,172 +7980,186 @@ app.whenReady().then(() => {
     'workflow:moveQuotation',
     async (event, quotationId: string, toStepId: string, comment?: string) => {
       const user = requireSession(event)
-      // Get current step
-      const transitions = await db.getWorkflowTransitions()
-      const [qRows] = await db.pool!.query<RowDataPacket[]>(
-        'SELECT workflow_step_id FROM quotations WHERE id = ?',
-        [quotationId]
+      // One move per quotation at a time (user 2026-11-03: a double click on Confirm reserved two
+      // registry numbers). The second call waits, then sees the new step and is refused
+      return db.withNamedLock(
+        `vc_qmove_${quotationId}`,
+        () => moveQuotationLocked(user, quotationId, toStepId, comment),
+        60
       )
-      const currentStepId = qRows[0]?.workflow_step_id
-      // Find valid path (BFS)
-      const userPerms = await db.resolveUserPermissions(user.id)
-      const reachable = await db.getReachableSteps(currentStepId, userPerms)
-      if (!reachable.some((s) => s.id === toStepId))
-        throw new Error('Cannot transition to this step')
-      // Check if any transition in the path requires auto-revision
-      const directTransition = transitions.find(
-        (t) => t.fromStepId === currentStepId && t.toStepId === toStepId
-      )
-      if (directTransition?.autoCreateRevision) {
-        await db.createQuotationRevision(quotationId)
-      }
-      const steps = await db.getWorkflowSteps()
-      const toStep = steps.find((s) => s.id === toStepId)
-      const toApproved = !!toStep && toStep.name.toLowerCase() === 'approved'
-
-      // Moving TO "Approved": assign the real quotation number FIRST. If the registry write fails
-      // (e.g. the Excel file is open) the quotation must stay where it is, not sit in Approved
-      // with a draft number.
-      let assignedRef: string | undefined
-      if (toApproved) {
-        try {
-          assignedRef = await assignQuotationNumberViaRegistry(quotationId)
-        } catch (e) {
-          throw new Error(errorMessage(e) || 'Failed to assign quotation number', { cause: e })
-        }
-      }
-      try {
-        await db.moveQuotationToStep(quotationId, toStepId, user.id, user.username, comment)
-        if (toApproved) await db.updateQuotation(quotationId, { status: 'approved' })
-      } catch (e) {
-        // Step move failed after the number was assigned: give the number back
-        if (toApproved && assignedRef) {
-          try {
-            await db.releaseQuotationNumber(quotationId)
-          } catch {
-            /* best effort */
-          }
-        }
-        throw e
-      }
-
-      // Get the current step info to check if we're moving FROM "Approved"
-      const fromStep = steps.find((s) => s.id === currentStepId)
-      if (
-        fromStep &&
-        fromStep.name.toLowerCase() === 'approved' &&
-        toStep &&
-        toStep.name.toLowerCase() !== 'approved'
-      ) {
-        // Moving away from Approved — release the number, mark cancelled in registry, revert status
-        try {
-          // Get reference before releasing
-          const qData = await db.getQuotation(quotationId)
-          const releasedRef = qData?.referenceNumber
-          await db.releaseQuotationNumber(quotationId)
-          await db.updateQuotation(quotationId, { status: 'draft' })
-          // Mark as cancelled in registry
-          if (releasedRef && !releasedRef.startsWith('DRAFT-')) {
-            const registryPath = await db.getSetting('quotationRegistryPath')
-            if (registryPath) {
-              try {
-                // Same lock as approvals: two Excel writes to the file at once would fail
-                await db.withNamedLock('vc_quotation_registry', () =>
-                  markRegistryCancelled(resolveFilePath(registryPath), releasedRef)
-                )
-              } catch {
-                /* registry file locked or missing: the DB release already happened */
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Failed to release quotation number:', e)
-        }
-      }
-
-      db.logActivity({
-        userId: user.id,
-        username: user.username,
-        action: 'WORKFLOW',
-        module: 'Quotations',
-        entityType: 'quotation',
-        entityId: quotationId,
-        entityName: assignedRef || '',
-        details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}`
-      }).catch(() => {})
-      // Notify users with relevant permissions about workflow transitions
-      try {
-        const toStepName = toStep?.name || 'unknown'
-        // Resolve the quotation's reference so notifications identify WHICH quotation moved
-        let quotationRef = assignedRef
-        if (!quotationRef) {
-          try {
-            const [refRows] = await db.pool!.query<RowDataPacket[]>(
-              'SELECT reference_number FROM quotations WHERE id = ?',
-              [quotationId]
-            )
-            quotationRef = refRows[0]?.reference_number || ''
-          } catch {
-            quotationRef = ''
-          }
-        }
-        // "Quotation Q/N/P/26/1896 (MV NAME) moved to Approved by Samer": which quotation, for
-        // which vessel / fleet, and who moved it
-        const subject = await db.quotationSubjectLabel(quotationId).catch(() => '')
-        const who = user.fullName?.trim() || user.username
-        const movedTitle =
-          `Quotation${quotationRef ? ` ${quotationRef}` : ''}${subject ? ` (${subject})` : ''}` +
-          ` moved to ${toStepName} by ${who}`
-        // One notification per person: approvers, then the groups subscribed to workflow moves,
-        // then (for a move that needs approval rights) the approval groups not told yet
-        const notified = new Set<string>()
-        const transitionsToStep = transitions.filter((t) => t.toStepId === toStepId)
-        const needsApproval = transitionsToStep.some(
-          (t) => t.permissionKey === 'quotations:approve'
-        )
-        void (async () => {
-          await db.notifyUsersWithPermission(
-            'quotations:approve',
-            'workflow_action_needed',
-            movedTitle,
-            comment || undefined,
-            'quotation',
-            quotationId,
-            user.id,
-            notified
-          )
-          await db.notifyGroupsForEvent(
-            'quotation_workflow',
-            movedTitle,
-            comment || undefined,
-            'quotation',
-            quotationId,
-            user.id,
-            notified
-          )
-          if (needsApproval)
-            await db.notifyGroupsForEvent(
-              'quotation_approval_needed',
-              movedTitle,
-              comment || undefined,
-              'quotation',
-              quotationId,
-              user.id,
-              notified
-            )
-        })().catch(() => {})
-      } catch (err) {
-        console.error('Workflow notification error:', err)
-      }
-      return { success: true }
     }
   )
 
+  const moveQuotationLocked = async (
+    user: ReturnType<typeof requireSession>,
+    quotationId: string,
+    toStepId: string,
+    comment?: string
+  ): Promise<{ success: true }> => {
+    // Get current step
+    const transitions = await db.getWorkflowTransitions()
+    const [qRows] = await db.pool!.query<RowDataPacket[]>(
+      'SELECT workflow_step_id FROM quotations WHERE id = ?',
+      [quotationId]
+    )
+    const currentStepId = qRows[0]?.workflow_step_id
+    // Find valid path (BFS)
+    const userPerms = await db.resolveUserPermissions(user.id)
+    const reachable = await db.getReachableSteps(currentStepId, userPerms)
+    if (!reachable.some((s) => s.id === toStepId)) throw new Error('Cannot transition to this step')
+    // Check if any transition in the path requires auto-revision
+    const directTransition = transitions.find(
+      (t) => t.fromStepId === currentStepId && t.toStepId === toStepId
+    )
+    if (directTransition?.autoCreateRevision) {
+      await db.createQuotationRevision(quotationId)
+    }
+    const steps = await db.getWorkflowSteps()
+    const toStep = steps.find((s) => s.id === toStepId)
+    const toApproved = !!toStep && toStep.name.toLowerCase() === 'approved'
+
+    // Moving TO "Approved": assign the real quotation number FIRST. If the registry write fails
+    // (e.g. the Excel file is open) the quotation must stay where it is, not sit in Approved
+    // with a draft number.
+    let assignedRef: string | undefined
+    if (toApproved) {
+      try {
+        assignedRef = await assignQuotationNumberViaRegistry(quotationId)
+      } catch (e) {
+        throw new Error(errorMessage(e) || 'Failed to assign quotation number', { cause: e })
+      }
+    }
+    try {
+      await db.moveQuotationToStep(quotationId, toStepId, user.id, user.username, comment)
+      if (toApproved) await db.updateQuotation(quotationId, { status: 'approved' })
+    } catch (e) {
+      // Step move failed after the number was assigned: give the number back
+      if (toApproved && assignedRef) {
+        try {
+          await db.releaseQuotationNumber(quotationId)
+        } catch {
+          /* best effort */
+        }
+      }
+      throw e
+    }
+
+    // Get the current step info to check if we're moving FROM "Approved"
+    const fromStep = steps.find((s) => s.id === currentStepId)
+    if (
+      fromStep &&
+      fromStep.name.toLowerCase() === 'approved' &&
+      toStep &&
+      toStep.name.toLowerCase() !== 'approved'
+    ) {
+      // Moving away from Approved — release the number, mark cancelled in registry, revert status
+      try {
+        // Get reference before releasing
+        const qData = await db.getQuotation(quotationId)
+        const releasedRef = qData?.referenceNumber
+        await db.releaseQuotationNumber(quotationId)
+        await db.updateQuotation(quotationId, { status: 'draft' })
+        // Mark as cancelled in registry
+        if (releasedRef && !releasedRef.startsWith('DRAFT-')) {
+          const registryPath = await db.getSetting('quotationRegistryPath')
+          if (registryPath) {
+            try {
+              // Same lock as approvals: two Excel writes to the file at once would fail
+              await db.withNamedLock('vc_quotation_registry', () =>
+                markRegistryCancelled(resolveFilePath(registryPath), releasedRef)
+              )
+            } catch {
+              /* registry file locked or missing: the DB release already happened */
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to release quotation number:', e)
+      }
+    }
+
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'WORKFLOW',
+      module: 'Quotations',
+      entityType: 'quotation',
+      entityId: quotationId,
+      entityName: assignedRef || '',
+      details: `Moved to ${toStep?.name || 'unknown'}${comment ? ': ' + comment : ''}`
+    }).catch(() => {})
+    // Notify users with relevant permissions about workflow transitions
+    try {
+      const toStepName = toStep?.name || 'unknown'
+      // Resolve the quotation's reference so notifications identify WHICH quotation moved
+      let quotationRef = assignedRef
+      if (!quotationRef) {
+        try {
+          const [refRows] = await db.pool!.query<RowDataPacket[]>(
+            'SELECT reference_number FROM quotations WHERE id = ?',
+            [quotationId]
+          )
+          quotationRef = refRows[0]?.reference_number || ''
+        } catch {
+          quotationRef = ''
+        }
+      }
+      // "Quotation Q/N/P/26/1896 (MV NAME) moved to Approved by Samer": which quotation, for
+      // which vessel / fleet, and who moved it
+      const subject = await db.quotationSubjectLabel(quotationId).catch(() => '')
+      const who = user.fullName?.trim() || user.username
+      const movedTitle =
+        `Quotation${quotationRef ? ` ${quotationRef}` : ''}${subject ? ` (${subject})` : ''}` +
+        ` moved to ${toStepName} by ${who}`
+      // One notification per person: approvers, then the groups subscribed to workflow moves,
+      // then (for a move that needs approval rights) the approval groups not told yet
+      const notified = new Set<string>()
+      const transitionsToStep = transitions.filter((t) => t.toStepId === toStepId)
+      const needsApproval = transitionsToStep.some((t) => t.permissionKey === 'quotations:approve')
+      void (async () => {
+        await db.notifyUsersWithPermission(
+          'quotations:approve',
+          'workflow_action_needed',
+          movedTitle,
+          comment || undefined,
+          'quotation',
+          quotationId,
+          user.id,
+          notified
+        )
+        await db.notifyGroupsForEvent(
+          'quotation_workflow',
+          movedTitle,
+          comment || undefined,
+          'quotation',
+          quotationId,
+          user.id,
+          notified
+        )
+        if (needsApproval)
+          await db.notifyGroupsForEvent(
+            'quotation_approval_needed',
+            movedTitle,
+            comment || undefined,
+            'quotation',
+            quotationId,
+            user.id,
+            notified
+          )
+      })().catch(() => {})
+    } catch (err) {
+      console.error('Workflow notification error:', err)
+    }
+    return { success: true }
+  }
+
   safeHandle('workflow:assignQuotationNumber', async (event, quotationId: string) => {
     await requirePermission(event, 'quotations:approve')
-    const ref = await assignQuotationNumberViaRegistry(quotationId)
-    await db.updateQuotation(quotationId, { status: 'approved' })
-    return { referenceNumber: ref }
+    return db.withNamedLock(`vc_qmove_${quotationId}`, async () => {
+      const ref = await assignQuotationNumberViaRegistry(quotationId)
+      await db.updateQuotation(quotationId, { status: 'approved' })
+      return { referenceNumber: ref }
+    })
   })
 
   safeHandle('quotationRegistry:getPath', async (event) => {
