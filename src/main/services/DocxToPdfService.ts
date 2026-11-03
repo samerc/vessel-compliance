@@ -570,6 +570,20 @@ async function countTcPages(
   return n
 }
 
+/** Pages of a Word T&C template on its own (cleans up its temp files) */
+export async function tcTemplatePageCount(
+  tcDocxBuffer: Buffer,
+  outputDir: string,
+  name: string
+): Promise<number> {
+  const tempFiles: string[] = []
+  try {
+    return await countTcPages(tcDocxBuffer, { startPage: 2 }, outputDir, name, tempFiles)
+  } finally {
+    removeTempFiles(tempFiles)
+  }
+}
+
 /** Removes temp files, ignoring the ones already gone */
 export function removeTempFiles(files: string[]): void {
   for (const f of files) {

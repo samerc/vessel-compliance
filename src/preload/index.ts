@@ -1402,6 +1402,7 @@ const api: Api = {
   policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
+  tcPageCount: (typeCode: string) => ipcRenderer.invoke('tc:pageCount', typeCode),
   policyGetForQuotation: (quotationId: string) =>
     ipcRenderer.invoke('policy:getForQuotation', quotationId),
   policyGetConvertedVesselIds: (quotationId: string) =>

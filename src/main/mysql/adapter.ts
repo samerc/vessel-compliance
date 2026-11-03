@@ -6475,6 +6475,8 @@ export class MySQLAdapter {
     if (updates.fileData !== undefined) {
       fields.push('file_data = ?')
       vals.push(updates.fileData ?? null)
+      // A new file has its own number of pages: counted again on the next export
+      fields.push('page_count = 0')
     }
     if (updates.fileName !== undefined) {
       fields.push('file_name = ?')
@@ -6548,6 +6550,14 @@ export class MySQLAdapter {
       `SELECT ${this.tcMetaCols} FROM policy_tc_templates ORDER BY type_code, is_default DESC, order_index ASC`
     )
     return (rows as Row<TcTemplateMeta>[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
+  }
+
+  async setTcTemplatePageCount(id: string, pageCount: number): Promise<void> {
+    if (!this.pool) return
+    await this.pool.query('UPDATE policy_tc_templates SET page_count = ? WHERE id = ?', [
+      pageCount,
+      id
+    ])
   }
 
   async updateTcTemplatePageCount(typeCode: string, pageCount: number): Promise<void> {

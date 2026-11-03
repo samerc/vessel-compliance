@@ -2048,6 +2048,48 @@ function polEmptyP(): Paragraph {
   return p
 }
 
+// Stands in the footer for the page total until polPack writes the field
+const POL_TOTAL_MARKER = 'VCPOLTOTALPAGES'
+
+/**
+ * "Page X of Y" of a policy exported without its T&C, Y = the policy's pages + the T&C's:
+ * Word's formula field { = { NUMPAGES } + n }, worked out by Word, so an edit that changes the
+ * policy's length keeps the right total
+ */
+async function polAddTcToPageTotal(zip: JSZip, tcPages: number): Promise<boolean> {
+  let done = false
+  const footers = Object.keys(zip.files).filter((f) => /^word\/footer\d*\.xml$/.test(f))
+  for (const name of footers) {
+    const xml = await zip.file(name)!.async('string')
+    const runRe = new RegExp(
+      `<w:r>(<w:rPr>(?:(?!<\\/w:rPr>)[\\s\\S])*<\\/w:rPr>)?<w:t[^>]*>${POL_TOTAL_MARKER}<\\/w:t><\\/w:r>`,
+      'g'
+    )
+    if (!runRe.test(xml)) continue
+    const out = xml.replace(runRe, (_m, rPr: string | undefined) => {
+      const r = (inner: string): string => `<w:r>${rPr || ''}${inner}</w:r>`
+      const fld = (type: string): string => r(`<w:fldChar w:fldCharType="${type}"/>`)
+      const instr = (t: string): string => r(`<w:instrText xml:space="preserve">${t}</w:instrText>`)
+      return (
+        fld('begin') +
+        instr(' = ') +
+        fld('begin') +
+        instr(' NUMPAGES ') +
+        fld('separate') +
+        r('<w:t>1</w:t>') +
+        fld('end') +
+        instr(` + ${tcPages} `) +
+        fld('separate') +
+        r(`<w:t>${tcPages + 1}</w:t>`) +
+        fld('end')
+      )
+    })
+    zip.file(name, out)
+    done = true
+  }
+  return done
+}
+
 /** A policy still on a draft number: its documents carry the DRAFT watermark */
 function polIsDraftNumber(policyNumber: string | null | undefined): boolean {
   return String(policyNumber || '').startsWith('POL-DRAFT-')
@@ -2111,12 +2153,13 @@ async function polAddDraftWatermark(zip: JSZip): Promise<boolean> {
  * either side of it, are removed. Spacer gaps (polSpacerPts, no space after) and the empty
  * paragraph a table cell needs after a nested table are left as they are.
  */
-async function polPack(document: Document, draft = false): Promise<Blob> {
+async function polPack(document: Document, draft = false, tcExtraPages = 0): Promise<Blob> {
   const blob = await Packer.toBlob(document)
   const zip = await JSZip.loadAsync(blob)
   const file = zip.file('word/document.xml')
   if (!file) return blob
   const watermarked = draft && (await polAddDraftWatermark(zip))
+  const totalled = tcExtraPages > 0 && (await polAddTcToPageTotal(zip, tcExtraPages))
   const xml = await file.async('string')
   const paras = [...xml.matchAll(/<w:p\b[^>]*\/>|<w:p\b[\s\S]*?<\/w:p>/g)]
   const spaceOf = (p: string, attr: 'after' | 'before'): number =>
@@ -2139,7 +2182,7 @@ async function polPack(document: Document, draft = false): Promise<Blob> {
     if (i > 0 && adjacent(i - 1, i)) out[i - 1] = zero(out[i - 1], 'after')
     if (i + 1 < paras.length && adjacent(i, i + 1)) out[i + 1] = zero(out[i + 1], 'before')
   })
-  if (!changed && !watermarked) return blob
+  if (!changed && !watermarked && !totalled) return blob
   let rebuilt = ''
   let pos = 0
   paras.forEach((m, i) => {
@@ -4255,6 +4298,17 @@ export async function exportPolicyDocx(
     }
   }
 
+  // The policy on its own still counts its T&C: "Page X of {policy pages + T&C pages}"
+  let tcExtraPages = 0
+  if (!totalPages && !includeTC) {
+    try {
+      const n = await window.api.tcPageCount(typeCode)
+      if (typeof n === 'number' && n > 0) tcExtraPages = n
+    } catch {
+      /* no Word T&C, or it could not be counted: the policy's own total */
+    }
+  }
+
   const children: (Paragraph | Table)[] = []
 
   // Logo — frozen path from the snapshot (falls back to live if an older snapshot lacks it)
@@ -5099,7 +5153,9 @@ export async function exportPolicyDocx(
       new TextRun({ text: ' of ', ...pnStyle }),
       ...(configTotalPages
         ? [new TextRun({ text: String(configTotalPages), ...pnStyle })]
-        : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])
+        : tcExtraPages > 0
+          ? [new TextRun({ text: POL_TOTAL_MARKER, ...pnStyle })]
+          : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])
     ]
   })
 
@@ -5271,7 +5327,7 @@ export async function exportPolicyDocx(
     sections: docSections
   })
 
-  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber), tcExtraPages)
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`

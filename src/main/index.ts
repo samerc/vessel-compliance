@@ -9048,6 +9048,20 @@ app.whenReady().then(() => {
     }
   )
 
+  // Pages of the type's default Word T&C: a policy exported on its own still counts them in
+  // "Page X of Y". Counted once (a Word conversion) and kept on the template; null = no Word T&C
+  safeHandle('tc:pageCount', async (event, typeCode: string) => {
+    requireSession(event)
+    const tpl = await db.getDefaultTcTemplate(String(typeCode))
+    if (!tpl || !tpl.hasFile) return null
+    if (Number(tpl.pageCount) > 0) return Number(tpl.pageCount)
+    const buf = await db.getTcTemplateFileById(tpl.id)
+    if (!buf) return null
+    const { tcTemplatePageCount } = await import('./services/DocxToPdfService')
+    const n = await tcTemplatePageCount(buf as Buffer, tmpdir(), `tc_count_${Date.now()}`)
+    if (n > 0) await db.setTcTemplatePageCount(tpl.id, n)
+    return n > 0 ? n : null
+  })
   safeHandle(
     'convert:buildPolicyWithTC',
     async (
