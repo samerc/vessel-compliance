@@ -81,6 +81,12 @@ import { ScreeningBadge } from './ScreeningPanel'
 import { confirmDialog, alertDialog } from './DialogHost'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
+import {
+  findQuotationChanges,
+  applyQuotationChanges,
+  type QuotationChanges,
+  type QuotationChangeKey
+} from '../utils/policyQuotationSync'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -300,6 +306,11 @@ export default function PolicyDetail({
   const [, setRenewing] = useState(false)
   const [signing, setSigning] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
+  // Changes of the quotation since the policy was made / last updated from it (unsigned only)
+  const [quotationChanges, setQuotationChanges] = useState<QuotationChanges | null>(null)
+  const [showQuotationChanges, setShowQuotationChanges] = useState(false)
+  const [pickedChanges, setPickedChanges] = useState<QuotationChangeKey[]>([])
+  const [applyingChanges, setApplyingChanges] = useState(false)
   const [assigningNumber, setAssigningNumber] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelMode, setCancelMode] = useState<'instalment' | 'date'>('instalment')
@@ -541,6 +552,37 @@ export default function PolicyDetail({
       alive = false
     }
   }, [policyId, applyPolicyBundle, showError])
+
+  // An unsigned policy follows its quotation: look for quotation changes after each load
+  useEffect(() => {
+    if (!policy || policy.signedAt || policy.status !== 'active' || isEditing) return
+    let alive = true
+    findQuotationChanges(policy, instalments, addresses)
+      .then((r) => {
+        if (alive) setQuotationChanges(r && r.changes.length > 0 ? r : null)
+      })
+      .catch(() => {
+        if (alive) setQuotationChanges(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [policy, instalments, addresses, isEditing])
+
+  const handleApplyQuotationChanges = async (keys: QuotationChangeKey[]): Promise<void> => {
+    if (!policy || !quotationChanges || applyingChanges) return
+    setApplyingChanges(true)
+    try {
+      await applyQuotationChanges(policy, instalments, quotationChanges, keys)
+      setShowQuotationChanges(false)
+      showSuccess(keys.length ? 'Policy updated from the quotation' : 'Quotation changes dismissed')
+      await loadData()
+    } catch (err) {
+      showError(errMessage(err, 'Failed to update the policy from the quotation'))
+    } finally {
+      setApplyingChanges(false)
+    }
+  }
 
   // Track recent item view when policy loads
   const recentPolicyId = policy?.id
@@ -3035,7 +3077,7 @@ export default function PolicyDetail({
                 >
                   Read-only — sourced from linked quotation
                 </span>
-                {onNavigateToQuotation && policy.quotationId && (
+                {onNavigateToQuotation && policy.quotationId && !isSigned && (
                   <button
                     className="btn-secondary"
                     style={{
@@ -3049,80 +3091,32 @@ export default function PolicyDetail({
                     }}
                     onClick={async () => {
                       try {
-                        // Auto-create quotation revision and navigate to it
-                        const newRevision: (Quotation & { error?: unknown }) | string =
-                          await window.api.createQuotationRevision(policy.quotationId)
-                        if (
-                          newRevision &&
-                          !(typeof newRevision === 'object' && newRevision.error)
-                        ) {
-                          const revId =
-                            typeof newRevision === 'string'
-                              ? newRevision
-                              : newRevision.id || policy.quotationId
-                          // Find the new alternative ID that corresponds to the selected one
-                          let newSelectedAltId: string | null = null
-                          if (policy.selectedAlternativeId) {
-                            // Get old alternatives to find the hull_clause_id of the selected one
-                            const oldAlts = await window.api.hullGetQuotationAlternatives(
-                              policy.quotationId
-                            )
-                            const selectedOldAlt = Array.isArray(oldAlts)
-                              ? oldAlts.find((a) => a.id === policy.selectedAlternativeId)
-                              : null
-                            if (selectedOldAlt) {
-                              // Get new alternatives and match by hull_clause_id
-                              const newAlts = await window.api.hullGetQuotationAlternatives(revId)
-                              const matchingNewAlt = Array.isArray(newAlts)
-                                ? newAlts.find(
-                                    (a) => a.hullClauseId === selectedOldAlt.hullClauseId
-                                  )
-                                : null
-                              if (matchingNewAlt) {
-                                newSelectedAltId = matchingNewAlt.id
-                                // Strip the non-selected alternative using the NEW ID
-                                await window.api.stripNonSelectedAlternative(
-                                  revId,
-                                  matchingNewAlt.id
-                                )
-                              }
-                            } else {
-                              // P&I / FD&D alternative: the revision copies them in the same order
-                              const oldPi = asArray(
-                                await window.api.piGetQuotationAlternatives(policy.quotationId)
-                              )
-                              const oldIdx = oldPi.findIndex(
-                                (a) => a.id === policy.selectedAlternativeId
-                              )
-                              if (oldIdx >= 0) {
-                                const newPi = asArray(
-                                  await window.api.piGetQuotationAlternatives(revId)
-                                )
-                                const sameLabel = (x?: { label?: string | null }): boolean =>
-                                  (x?.label || '') === (oldPi[oldIdx].label || '')
-                                const match = sameLabel(newPi[oldIdx])
-                                  ? newPi[oldIdx]
-                                  : newPi.find(sameLabel) || newPi[oldIdx]
-                                if (match) {
-                                  newSelectedAltId = match.id
-                                  await window.api.stripNonSelectedAlternative(revId, match.id)
-                                }
-                              }
-                            }
-                          }
-                          // Update the policy to reference the new quotation revision + new alt ID
-                          const updateFields: Record<string, unknown> = { quotationId: revId }
-                          if (newSelectedAltId)
-                            updateFields.selectedAlternativeId = newSelectedAltId
-                          ok(await window.api.policyUpdate(policy.id, updateFields))
-                          showSuccess('Quotation revision created. Navigating to editor...')
-                          onNavigateToQuotation(revId, {
+                        // Already on a draft revision: open it, no new revision
+                        const cur = await window.api.getQuotation(policy.quotationId)
+                        if (cur && cur.status === 'draft' && !cur.isLocked) {
+                          onNavigateToQuotation(cur.id, {
                             policyId: policy.id,
                             policyNumber: policy.policyNumber || ''
                           })
-                        } else {
-                          showError('Failed to create quotation revision')
+                          return
                         }
+                        const go = await confirmDialog(
+                          'A revision of the quotation is created and opened. This policy (and any other unsigned policy of the quotation) moves to it, so the changes you make there reach the policy.',
+                          {
+                            title: 'Edit coverage in the quotation',
+                            confirmLabel: 'Create revision',
+                            isDangerous: false
+                          }
+                        )
+                        if (!go) return
+                        const rev = await window.api.createQuotationRevision(policy.quotationId, {
+                          movePolicies: true
+                        })
+                        showSuccess('Quotation revision created. Opening it...')
+                        onNavigateToQuotation(rev.id, {
+                          policyId: policy.id,
+                          policyNumber: policy.policyNumber || ''
+                        })
                       } catch (err) {
                         showError(errMessage(err, 'Failed to create revision'))
                       }
@@ -3833,6 +3827,40 @@ export default function PolicyDetail({
       {/* ─── READ-ONLY VIEW ─── */}
       {!isEditing && (
         <>
+          {quotationChanges &&
+            quotationChanges.view.policyId === policy.id &&
+            !isSigned &&
+            hasPermission('policies:manage') && (
+              <div
+                role="status"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  flexWrap: 'wrap',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 176, 32, 0.10)',
+                  border: '1px solid rgba(255, 176, 32, 0.35)'
+                }}
+              >
+                <RefreshCw size={16} style={{ color: 'var(--warning)' }} />
+                <span style={{ flex: '1 1 240px', fontSize: '0.85rem' }}>
+                  <strong>The quotation has changed:</strong>{' '}
+                  {quotationChanges.changes.map((c) => c.label.toLowerCase()).join(', ')}
+                </span>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setPickedChanges(quotationChanges.changes.map((c) => c.key))
+                    setShowQuotationChanges(true)
+                  }}
+                >
+                  Update from quotation
+                </button>
+              </div>
+            )}
           <Tabs
             style={{ marginBottom: '16px' }}
             value={readTab}
@@ -5216,6 +5244,74 @@ export default function PolicyDetail({
             </div>
           )}
         </>
+      )}
+
+      {showQuotationChanges && quotationChanges && (
+        <Modal
+          title="Update from quotation"
+          icon={<RefreshCw size={18} />}
+          onClose={() => setShowQuotationChanges(false)}
+          width={640}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button
+                className="btn-secondary"
+                disabled={applyingChanges}
+                onClick={() => void handleApplyQuotationChanges([])}
+                title="Keep the policy as it is and stop showing these changes"
+              >
+                Dismiss
+              </button>
+              <button
+                className="btn-primary"
+                disabled={applyingChanges || pickedChanges.length === 0}
+                onClick={() => void handleApplyQuotationChanges(pickedChanges)}
+              >
+                {applyingChanges ? <Loader2 size={14} className="spin" /> : <Check size={14} />}{' '}
+                {applyingChanges ? 'Updating...' : 'Update policy'}
+              </button>
+            </>
+          }
+        >
+          <p className="muted" style={{ marginTop: 0, fontSize: '0.85rem' }}>
+            These changed in the quotation after the policy was made. Tick the ones the policy
+            should take; a new premium is split again over the instalments.
+          </p>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 32 }} />
+                  <th>Item</th>
+                  <th>On the policy</th>
+                  <th>In the quotation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotationChanges.changes.map((c) => (
+                  <tr key={c.key}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={c.label}
+                        checked={pickedChanges.includes(c.key)}
+                        onChange={(e) =>
+                          setPickedChanges((prev) =>
+                            e.target.checked ? [...prev, c.key] : prev.filter((k) => k !== c.key)
+                          )
+                        }
+                      />
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{c.label}</td>
+                    <td className="muted">{c.policyValue}</td>
+                    <td>{c.quotationValue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Modal>
       )}
 
       {showSignModal && (

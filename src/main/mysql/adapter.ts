@@ -118,6 +118,7 @@ import {
   BlueCardOwner,
   PolicyDocAddress,
   PolicyDocInstalment,
+  QuotationPolicySummary,
   PolicyDocument,
   PolicyEndorsement,
   PolicyExpiryRow,
@@ -5582,6 +5583,21 @@ export class MySQLAdapter {
         /* idempotent migration: already applied or not applicable */
       }
 
+      // What the quotation said when the policy was made or last updated from it (JSON): a
+      // quotation change since then is offered on the unsigned policy ("Update from quotation")
+      try {
+        const [qbCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM policy_documents LIKE 'quotation_baseline'"
+        )) as QueryRows
+        if ((qbCol as RowDataPacket[]).length === 0) {
+          await this.pool.query(
+            'ALTER TABLE policy_documents ADD COLUMN quotation_baseline MEDIUMTEXT NULL'
+          )
+        }
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
+
       // How the policy was signed: 'app' (signature image) or 'hand' (wet ink, scan); NULL = app
       try {
         const [smCol] = (await this.pool.query(
@@ -5771,7 +5787,11 @@ export class MySQLAdapter {
             await this.pool.query(
               `UPDATE quotations SET workflow_step_id = ?
                              WHERE workflow_step_id = ?
-                               AND NOT EXISTS (SELECT 1 FROM policy_documents pd WHERE pd.quotation_id = quotations.id)`,
+                               AND NOT EXISTS (SELECT 1 FROM policy_documents pd WHERE pd.quotation_id = quotations.id)
+                               AND id NOT IN (SELECT id FROM (
+                                 SELECT o.id FROM quotations o JOIN quotations r
+                                   ON r.revision_group_id = o.revision_group_id
+                                  AND r.revision_number > o.revision_number) revised)`,
               [target.id, convStep.id]
             )
           }
@@ -15124,6 +15144,16 @@ export class MySQLAdapter {
 
   async deleteQuotation(id: string, userId?: string): Promise<void> {
     if (!this.pool) return
+    // An unsigned policy follows its quotation (a revision takes them over): not into the bin
+    const [pol] = await this.pool.query<RowDataPacket[]>(
+      `SELECT policy_number FROM policy_documents
+        WHERE quotation_id = ? AND status = 'active' AND signed_at IS NULL`,
+      [id]
+    )
+    if (pol.length > 0)
+      throw new Error(
+        `This quotation has unsigned policies that follow it (${pol.map((p) => p.policy_number).join(', ')}). Delete the policies first.`
+      )
     // Soft delete — move to recycle bin
     await this.pool.execute(
       'UPDATE quotations SET deleted_at = NOW(), deleted_by = ?, is_locked = FALSE, locked_by = NULL WHERE id = ?',
@@ -15487,8 +15517,14 @@ export class MySQLAdapter {
   // ==================== Quotation Revisions & Duplication ====================
 
   /** Deep-clone all junction tables from sourceId to newId, remapping vessel/alternative IDs */
-  private async cloneQuotationJunctions(sourceId: string, newId: string): Promise<void> {
-    if (!this.pool) return
+  /** Copies every quotation item to newId; returns old id -> new id for the items a policy
+   *  points at (alternatives, subjectivities, LOL and agreed-value options) */
+  private async cloneQuotationJunctions(
+    sourceId: string,
+    newId: string
+  ): Promise<Record<string, string>> {
+    if (!this.pool) return {}
+    const itemIdMap: Record<string, string> = {}
 
     // Clone quotation_vessels first (need ID mapping for vessel_scope)
     const vesselIdMap: Record<string, string> = {}
@@ -15722,6 +15758,7 @@ export class MySQLAdapter {
       ])
       for (const row of srcRows as RowDataPacket[]) {
         const newRowId = uuidv4()
+        if (table === 'quotation_subjectivities') itemIdMap[row.id] = newRowId
         const values = colArr.map((c) => {
           if (c === 'quotation_id') return newId
           if (c === 'vessel_scope') return remapScope(row[c])
@@ -15878,6 +15915,8 @@ export class MySQLAdapter {
       ])
       for (const row of srcRows as RowDataPacket[]) {
         const newRowId = uuidv4()
+        if (table === 'quotation_lol_options' || table === 'quotation_agreed_value_options')
+          itemIdMap[row.id] = newRowId
         const values = colArr.map((c) => (c === 'quotation_id' ? newId : row[c]))
         await this.pool.execute(
           `INSERT INTO ${table} (id, ${cols}) VALUES (?, ${colArr.map(() => '?').join(', ')})`,
@@ -15885,6 +15924,8 @@ export class MySQLAdapter {
         )
       }
     }
+    for (const [oldId, newAltId] of Object.entries(combinedAltMap)) itemIdMap[oldId] = newAltId
+    return itemIdMap
   }
 
   /** The workflow step a new quotation (also a revision or a copy) starts at: Draft */
@@ -15900,7 +15941,15 @@ export class MySQLAdapter {
     }
   }
 
-  async createQuotationRevision(sourceId: string): Promise<Quotation> {
+  /**
+   * movePolicies: the source's active UNSIGNED policies follow the revision (their quotation
+   * and the items they chose are re-pointed to the copies), so a change made in the revision
+   * reaches them. Signed policies stay on the source.
+   */
+  async createQuotationRevision(
+    sourceId: string,
+    opts: { movePolicies?: boolean } = {}
+  ): Promise<Quotation & { movedPolicies?: number }> {
     if (!this.pool) throw new Error('DB not connected')
 
     const source = await this.getQuotation(sourceId)
@@ -15922,6 +15971,7 @@ export class MySQLAdapter {
       newRef = `${baseRef}-R${newRevisionNumber}`
     }
 
+    let moved = 0
     const fk = await this.fkOff()
     try {
       // Lock the source quotation and ensure it has the revision_group_id set
@@ -15955,8 +16005,9 @@ export class MySQLAdapter {
         ]
       )
 
+      let itemIdMap: Record<string, string>
       try {
-        await this.cloneQuotationJunctions(sourceId, newId)
+        itemIdMap = await this.cloneQuotationJunctions(sourceId, newId)
       } catch (e) {
         // Half-copied quotation is worse than none: remove it, then report the error
         try {
@@ -15966,11 +16017,54 @@ export class MySQLAdapter {
         }
         throw e
       }
+      if (opts.movePolicies) moved = await this.movePoliciesToRevision(sourceId, newId, itemIdMap)
     } finally {
       await fk.done()
     }
 
-    return (await this.getQuotation(newId))!
+    return { ...(await this.getQuotation(newId))!, movedPolicies: moved }
+  }
+
+  /** Active unsigned policies of a quotation, re-pointed to its revision (see createQuotationRevision) */
+  private async movePoliciesToRevision(
+    sourceId: string,
+    newId: string,
+    itemIdMap: Record<string, string>
+  ): Promise<number> {
+    const [rows] = await this.pool!.query<RowDataPacket[]>(
+      `SELECT id, selected_alternative_id, selected_lol_option_id, selected_agreed_value_option_id,
+              selected_subjectivity_ids
+         FROM policy_documents
+        WHERE quotation_id = ? AND status = 'active' AND signed_at IS NULL`,
+      [sourceId]
+    )
+    const remap = (id: string | null): string | null => (id ? itemIdMap[id] || id : null)
+    for (const r of rows) {
+      let subjIds: string | null = r.selected_subjectivity_ids ?? null
+      if (subjIds) {
+        try {
+          const ids = JSON.parse(subjIds)
+          if (Array.isArray(ids)) subjIds = JSON.stringify(ids.map((x: string) => remap(x)))
+        } catch {
+          /* keep as stored */
+        }
+      }
+      await this.pool!.execute(
+        `UPDATE policy_documents SET quotation_id = ?, selected_alternative_id = ?,
+                selected_lol_option_id = ?, selected_agreed_value_option_id = ?,
+                selected_subjectivity_ids = ?, export_snapshot = NULL
+          WHERE id = ?`,
+        [
+          newId,
+          remap(r.selected_alternative_id),
+          remap(r.selected_lol_option_id),
+          remap(r.selected_agreed_value_option_id),
+          subjIds,
+          r.id
+        ]
+      )
+    }
+    return rows.length
   }
 
   async stripNonSelectedAlternative(quotationId: string, keepAlternativeId: string): Promise<void> {
@@ -16560,6 +16654,19 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT id FROM quotations WHERE revision_group_id = ?', [
       revisionGroupId
     ])
+    // Refuse before binning any revision (deleteQuotation refuses one with unsigned policies)
+    const ids = (rows as RowDataPacket[]).map((r) => r.id)
+    if (ids.length > 0) {
+      const [pol] = await this.pool.query<RowDataPacket[]>(
+        `SELECT policy_number FROM policy_documents
+          WHERE quotation_id IN (?) AND status = 'active' AND signed_at IS NULL`,
+        [ids]
+      )
+      if (pol.length > 0)
+        throw new Error(
+          `This quotation has unsigned policies that follow it (${pol.map((p) => p.policy_number).join(', ')}). Delete the policies first.`
+        )
+    }
     for (const row of rows as RowDataPacket[]) {
       await this.deleteQuotation(row.id)
     }
@@ -19440,6 +19547,7 @@ export class MySQLAdapter {
       signedBy: r.signed_by || null,
       signedAt: r.signed_at || null,
       signedMethod: r.signed_method === 'hand' ? 'hand' : r.signed_at ? 'app' : null,
+      quotationBaseline: r.quotation_baseline ?? null,
       signedByName: r.signedByName || null,
       exportSnapshot: r.export_snapshot || null,
       sectionOrder: r.section_order
@@ -19723,7 +19831,8 @@ export class MySQLAdapter {
       upccTitle: 'upcc_title',
       surveyWarrantyTexts: 'survey_warranty_texts',
       signingPages: 'signing_pages',
-      signingTotal: 'signing_total'
+      signingTotal: 'signing_total',
+      quotationBaseline: 'quotation_baseline'
     }
     const sets: string[] = []
     const vals: SqlValue[] = []
@@ -20850,7 +20959,19 @@ export class MySQLAdapter {
 
     // Auto-move quotation to "Converted" workflow step — only once EVERY vessel has a policy
     // (multi-vessel quotations can be converted one vessel at a time).
+    await this.markQuotationConvertedIfCovered(quotationId)
+
+    return createdPolicies
+  }
+
+  /**
+   * The quotation becomes 'converted' (Converted step) once every vessel has a policy: after a
+   * conversion, and when a revision that took over the policies is approved.
+   */
+  async markQuotationConvertedIfCovered(quotationId: string): Promise<boolean> {
+    if (!this.pool) return false
     try {
+      const vessels = await this.getQuotationVessels(quotationId)
       const [convertedRows] = await this.pool.query(
         'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?',
         [quotationId]
@@ -20873,14 +20994,28 @@ export class MySQLAdapter {
           quotationId
         ])
       }
+      return allConverted
     } catch {
       /* ignore if step doesn't exist */
+      return false
     }
-
-    return createdPolicies
   }
 
   // Vessel IDs of a quotation that already have at least one policy document (for the conversion wizard)
+  /** The quotation's active policies (New Revision says which follow the revision) */
+  async getPoliciesForQuotation(quotationId: string): Promise<QuotationPolicySummary[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT pd.id, pd.policy_number AS policyNumber, v.name AS vesselName, pd.status,
+              pd.signed_at AS signedAt
+         FROM policy_documents pd LEFT JOIN vessels v ON v.id = pd.vessel_id
+        WHERE pd.quotation_id = ? AND pd.status = 'active'
+        ORDER BY v.name`,
+      [quotationId]
+    )
+    return rows as QuotationPolicySummary[]
+  }
+
   async getConvertedVesselIdsForQuotation(quotationId: string): Promise<string[]> {
     if (!this.pool) return []
     try {

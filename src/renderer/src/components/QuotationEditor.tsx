@@ -82,7 +82,7 @@ import {
 import { Modal, Field, SaveStatus, Badge, TypeChip } from './ui'
 import { ScreeningBadge } from './ScreeningPanel'
 import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
-import { ok } from '../utils/ipc'
+import { ok, asArray } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
@@ -563,12 +563,42 @@ export default function QuotationEditor({
 
   const handleCreateRevision = async (): Promise<void> => {
     try {
-      const newRev = await window.api.createQuotationRevision(q.id)
+      // A converted quotation: its unsigned policies follow the revision, so the change made
+      // there reaches them; signed ones stay (they change by policy revision or endorsement)
+      const policies = asArray(await window.api.policyGetForQuotation(q.id))
+      const label = (p: (typeof policies)[number]): string =>
+        `${p.policyNumber}${p.vesselName ? ` (${p.vesselName})` : ''}`
+      const unsigned = policies.filter((p) => !p.signedAt)
+      const signed = policies.filter((p) => p.signedAt)
+      if (policies.length > 0) {
+        const parts: string[] = []
+        if (unsigned.length)
+          parts.push(
+            `${unsigned.length === 1 ? 'This policy moves' : 'These policies move'} to the revision, so your changes reach ${unsigned.length === 1 ? 'it' : 'them'}: ${unsigned.map(label).join(', ')}.`
+          )
+        if (signed.length)
+          parts.push(
+            `Signed, ${signed.length === 1 ? 'stays' : 'stay'} on this quotation (change ${signed.length === 1 ? 'it' : 'them'} with a policy revision or an endorsement): ${signed.map(label).join(', ')}.`
+          )
+        const go = await confirmDialog(parts.join('\n\n'), {
+          title: 'This quotation has policies',
+          confirmLabel: 'Create revision',
+          isDangerous: false
+        })
+        if (!go) return
+      }
+      const newRev = await window.api.createQuotationRevision(q.id, {
+        movePolicies: unsigned.length > 0
+      })
       if (hasIpcError(newRev)) {
         showError(ipcMessage(newRev) || 'Failed to create revision')
         return
       }
-      showSuccess(`Revision R${newRev.revisionNumber} created`)
+      showSuccess(
+        newRev.movedPolicies
+          ? `Revision R${newRev.revisionNumber} created, ${newRev.movedPolicies} polic${newRev.movedPolicies === 1 ? 'y' : 'ies'} moved to it`
+          : `Revision R${newRev.revisionNumber} created`
+      )
       // Load full quotation data and switch to it
       const fullRev = await window.api.getQuotation(newRev.id)
       if (fullRev && onOpenQuotation) onOpenQuotation(fullRev)

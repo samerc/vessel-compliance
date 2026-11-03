@@ -1051,8 +1051,8 @@ const api: Api = {
     ipcRenderer.invoke('db:getQuotationRevisionCount', revisionGroupId),
   deleteQuotationGroup: (revisionGroupId: string) =>
     ipcRenderer.invoke('db:deleteQuotationGroup', revisionGroupId),
-  createQuotationRevision: (sourceId: string) =>
-    ipcRenderer.invoke('db:createQuotationRevision', sourceId),
+  createQuotationRevision: (sourceId: string, opts?: { movePolicies?: boolean }) =>
+    ipcRenderer.invoke('db:createQuotationRevision', sourceId, opts),
   stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) =>
     ipcRenderer.invoke('db:stripNonSelectedAlternative', quotationId, keepAlternativeId),
   duplicateQuotation: (sourceId: string) => ipcRenderer.invoke('db:duplicateQuotation', sourceId),
@@ -1402,6 +1402,8 @@ const api: Api = {
   policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
+  policyGetForQuotation: (quotationId: string) =>
+    ipcRenderer.invoke('policy:getForQuotation', quotationId),
   policyGetConvertedVesselIds: (quotationId: string) =>
     ipcRenderer.invoke('policy:getConvertedVesselIds', quotationId),
   policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),

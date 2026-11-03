@@ -160,6 +160,7 @@ import {
   AnalyticsPolicyCoverage,
   PolicyDocument,
   PolicyDocInstalment,
+  QuotationPolicySummary,
   PolicyDocAddress,
   PolicyBlueCard,
   PolicyBlueCardInput,
@@ -1447,7 +1448,11 @@ export interface Api {
   getDeletedQuotations: () => Promise<DeletedQuotationRow[]>
   getQuotationRevisionCount: (revisionGroupId: string) => Promise<number>
   deleteQuotationGroup: (revisionGroupId: string) => Promise<void>
-  createQuotationRevision: (sourceId: string) => Promise<Quotation>
+  /** movePolicies: the quotation's unsigned policies follow the revision */
+  createQuotationRevision: (
+    sourceId: string,
+    opts?: { movePolicies?: boolean }
+  ) => Promise<Quotation & { movedPolicies?: number }>
   stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => Promise<void>
   duplicateQuotation: (sourceId: string) => Promise<Quotation>
   copyQuotationSections: (targetId: string, sourceId: string, sections: string[]) => Promise<void>
@@ -2075,6 +2080,7 @@ export interface Api {
   policyGetById: (id: string) => Promise<PolicyDocument | null>
   policyGetInstalments: (policyId: string) => Promise<PolicyDocInstalment[]>
   policyGetAddresses: (policyId: string) => Promise<PolicyDocAddress[]>
+  policyGetForQuotation: (quotationId: string) => Promise<QuotationPolicySummary[]>
   policyGetConvertedVesselIds: (quotationId: string) => Promise<string[]>
   policyGetBlueCards: (policyId: string) => Promise<PolicyBlueCard[]>
   policyGetRevisions: (policyNumber: string) => Promise<

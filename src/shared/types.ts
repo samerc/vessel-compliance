@@ -2588,6 +2588,8 @@ export interface PolicyDocument {
   signedAt: string | null
   /** app = signature image, hand = signed in wet ink (scan); null = not signed */
   signedMethod?: 'app' | 'hand' | null
+  /** JSON: what the quotation said when the policy was made / last updated from it */
+  quotationBaseline?: string | null
   exportSnapshot: string | null
   sectionOrder: string[] | null
   selectedLolOptionId: string | null
@@ -2624,6 +2626,15 @@ export interface PolicyDocument {
   bankDetails: string | null
   createdByName: string | null
   signedByName: string | null
+}
+
+/** A quotation's policy, as New Revision lists them (policy:getForQuotation) */
+export interface QuotationPolicySummary {
+  id: string
+  policyNumber: string
+  vesselName: string | null
+  status: string
+  signedAt: string | null
 }
 
 /** One instalment of a policy (policy:getInstalments) */

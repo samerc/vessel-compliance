@@ -46,6 +46,7 @@ import { isIpcError } from '../utils/ipc'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { resolvePolicySurveyWarranty } from '../utils/surveyWarrantyText'
+import { captureQuotationBaseline } from '../utils/policyQuotationSync'
 import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
 import { isPiLike } from '../../../shared/quotationTypes'
@@ -1114,6 +1115,8 @@ export default function PolicySetupWizard({
           folderErrors.push((err instanceof Error && err.message) || base)
         }
       }
+      // What the quotation says now: a later change of it is offered on each policy
+      for (const p of policies) await captureQuotationBaseline(p.id).catch(() => null)
       // The sanctions check goes into each policy folder with the policy
       try {
         const pdf = new Uint8Array(await (await buildScreeningReportPdf(screening)).arrayBuffer())

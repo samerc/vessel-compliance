@@ -6002,6 +6002,10 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getPolicyAddresses(policyId)
   })
+  safeHandle('policy:getForQuotation', (event, quotationId: string) => {
+    requireSession(event)
+    return db.getPoliciesForQuotation(quotationId)
+  })
   safeHandle('policy:getConvertedVesselIds', (event, quotationId: string) => {
     requireSession(event)
     return db.getConvertedVesselIdsForQuotation(quotationId)
@@ -6133,6 +6137,8 @@ app.whenReady().then(() => {
     }
   )
 
+  // Bookkeeping writes, not user edits: left out of the activity log
+  const QUIET_POLICY_FIELDS = new Set(['exportSnapshot', 'exportedAt', 'quotationBaseline'])
   safeHandle(
     'policy:update',
     async (event, id: string, fields: Parameters<typeof db.updatePolicyDocument>[1]) => {
@@ -6149,7 +6155,7 @@ app.whenReady().then(() => {
           return t.length > 80 ? `${t.slice(0, 77)}...` : t
         }
         const changes = changedKeys
-          .filter((k) => k !== 'exportSnapshot' && k !== 'exportedAt')
+          .filter((k) => !QUIET_POLICY_FIELDS.has(k))
           .map((k) => {
             const old = before ? (before as unknown as Record<string, unknown>)[k] : undefined
             const now = fields[k]
@@ -6157,7 +6163,7 @@ app.whenReady().then(() => {
             return `${k}: ${show(old)} -> ${show(now)}`
           })
           .filter(Boolean)
-        if (changedKeys.every((k) => k === 'exportSnapshot' || k === 'exportedAt')) return result
+        if (changedKeys.every((k) => QUIET_POLICY_FIELDS.has(k))) return result
         db.logActivity({
           userId: user.id,
           username: user.username,
@@ -7022,23 +7028,30 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return result
   })
-  safeHandle('db:createQuotationRevision', async (event, sourceId: string) => {
-    const user = await requirePermission(event, 'quotations:create')
-    const source = await db.getQuotation(sourceId)
-    const sourceRef = source?.referenceNumber || sourceId
-    const result = await db.createQuotationRevision(sourceId)
-    db.logActivity({
-      userId: user.id,
-      username: user.username,
-      action: 'CREATE_REVISION',
-      module: 'Quotations',
-      entityType: 'quotation',
-      entityId: sourceId,
-      entityName: sourceRef,
-      details: `Created revision of quotation ${sourceRef}`
-    }).catch(() => {})
-    return result
-  })
+  safeHandle(
+    'db:createQuotationRevision',
+    async (event, sourceId: string, opts?: { movePolicies?: boolean }) => {
+      const user = await requirePermission(event, 'quotations:create')
+      const source = await db.getQuotation(sourceId)
+      const sourceRef = source?.referenceNumber || sourceId
+      const result = await db.createQuotationRevision(sourceId, {
+        movePolicies: !!opts?.movePolicies
+      })
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'CREATE_REVISION',
+        module: 'Quotations',
+        entityType: 'quotation',
+        entityId: sourceId,
+        entityName: sourceRef,
+        details: result.movedPolicies
+          ? `Created revision of quotation ${sourceRef}; ${result.movedPolicies} unsigned polic${result.movedPolicies === 1 ? 'y' : 'ies'} moved to it`
+          : `Created revision of quotation ${sourceRef}`
+      }).catch(() => {})
+      return result
+    }
+  )
   safeHandle(
     'db:stripNonSelectedAlternative',
     async (event, quotationId: string, keepAlternativeId: string) => {
@@ -8103,6 +8116,8 @@ app.whenReady().then(() => {
       }
       throw e
     }
+    // A revision that took over the policies of its quotation is converted once approved
+    if (toApproved) await db.markQuotationConvertedIfCovered(quotationId)
 
     // Get the current step info to check if we're moving FROM "Approved"
     const fromStep = steps.find((s) => s.id === currentStepId)
