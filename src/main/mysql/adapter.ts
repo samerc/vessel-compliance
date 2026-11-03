@@ -5582,6 +5582,20 @@ export class MySQLAdapter {
         /* idempotent migration: already applied or not applicable */
       }
 
+      // How the policy was signed: 'app' (signature image) or 'hand' (wet ink, scan); NULL = app
+      try {
+        const [smCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM policy_documents LIKE 'signed_method'"
+        )) as QueryRows
+        if ((smCol as RowDataPacket[]).length === 0) {
+          await this.pool.query(
+            'ALTER TABLE policy_documents ADD COLUMN signed_method VARCHAR(8) NULL'
+          )
+        }
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
+
       // Hide-broker toggle on policy_documents — suppress the "c/o broker" line on policy + DA/CA
       try {
         const [hbCol] = (await this.pool.query(
@@ -19425,6 +19439,7 @@ export class MySQLAdapter {
       createdByName: r.createdByName || null,
       signedBy: r.signed_by || null,
       signedAt: r.signed_at || null,
+      signedMethod: r.signed_method === 'hand' ? 'hand' : r.signed_at ? 'app' : null,
       signedByName: r.signedByName || null,
       exportSnapshot: r.export_snapshot || null,
       sectionOrder: r.section_order
@@ -26144,11 +26159,17 @@ export class MySQLAdapter {
     await this.pool.execute('DELETE FROM user_signatures WHERE user_id = ?', [userId])
   }
 
-  async signPolicy(policyId: string, userId: string): Promise<void> {
+  /** method 'hand' = signed in wet ink and scanned: no signature image is printed on it */
+  async signPolicy(
+    policyId: string,
+    userId: string,
+    method: 'app' | 'hand' = 'app'
+  ): Promise<void> {
     if (!this.pool) return
     await this.pool.execute(
-      'UPDATE policy_documents SET signed_by = ?, signed_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [userId, policyId]
+      // The snapshot of an unsigned policy is stale: the signer re-captures it right after
+      'UPDATE policy_documents SET signed_by = ?, signed_at = CURRENT_TIMESTAMP, signed_method = ?, export_snapshot = NULL WHERE id = ? AND signed_at IS NULL',
+      [userId, method, policyId]
     )
     // Files stored before this signing do not carry the signature
     await this.clearPolicyExportFiles(policyId)
@@ -26163,7 +26184,8 @@ export class MySQLAdapter {
              FROM policy_documents pd
              JOIN user_signatures us ON us.user_id = pd.signed_by
              JOIN users u ON u.id = pd.signed_by
-             WHERE pd.id = ? AND pd.signed_by IS NOT NULL`,
+             WHERE pd.id = ? AND pd.signed_by IS NOT NULL
+               AND (pd.signed_method IS NULL OR pd.signed_method <> 'hand')`,
       [policyId]
     )
     const r = (

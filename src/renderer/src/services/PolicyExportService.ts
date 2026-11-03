@@ -940,8 +940,15 @@ async function buildBlueCardBlobFresh(
             }
           }
         },
+        // A draft needs a header to carry its watermark
         headers:
-          headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
+          headerParas.length > 0 || polIsDraftNumber(data.policyNumber)
+            ? {
+                default: new Header({
+                  children: headerParas.length > 0 ? headerParas : [polEmptyP()]
+                })
+              }
+            : undefined,
         footers:
           footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
         children
@@ -949,7 +956,7 @@ async function buildBlueCardBlobFresh(
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policyNumber))
   const bcVName = data.vesselName ? ` - ${data.vesselName}` : ''
   return { blob, fileName: `${data.policyNumber}${bcVName} - ${cardType}.docx` }
 }
@@ -1244,13 +1251,17 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   if (!policyOrNull) throw new Error('This policy no longer exists')
   const policy: PolicyDocRecord = policyOrNull
 
-  // If policy has a frozen export snapshot, use it instead of live data
-  if (policy.exportSnapshot) {
+  // A SIGNED policy exports its frozen snapshot; until signing every export uses the latest
+  // data (the policy stays editable and follows its quotation), so a snapshot is ignored
+  if (policy.exportSnapshot && policy.signedAt) {
     try {
       const snapshot = JSON.parse(policy.exportSnapshot) as PolicyExportData
       // Restore the policy record from snapshot but keep current signedBy/signedAt
       if (snapshot.policy) {
         snapshot.policy.exportSnapshot = policy.exportSnapshot
+        snapshot.policy.signedBy = policy.signedBy
+        snapshot.policy.signedAt = policy.signedAt
+        snapshot.policy.signedMethod = policy.signedMethod
       }
       // Legacy snapshots (captured before the freeze-everything change) have no `frozen`
       // bundle — backfill it from current settings so footer/titles/etc. aren't blank.
@@ -1707,8 +1718,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 /**
  * Freeze the given already-loaded export data as a JSON snapshot on the policy.
  * All future exports (policy/DA/CA/BC) read from this so documents never change on
- * re-export. Called on the FIRST export of a policy and again at signing (to add the
- * signature). A new revision is a new policy row with no snapshot and re-freezes.
+ * re-export. Called at signing (with the signature) and on the first export of a signed
+ * policy without one. A new revision is a new policy row with no snapshot and re-freezes.
  */
 async function capturePolicyExportSnapshotFromData(
   policyId: string,
@@ -1754,12 +1765,12 @@ export async function capturePolicyExportSnapshot(policyId: string): Promise<voi
 }
 
 /**
- * Load export data and, if the policy has no snapshot yet, freeze one now (first export).
- * Every export entry point uses this so the very first document produced locks the content.
+ * Load export data and, if the policy is signed and has no snapshot yet, freeze one now.
+ * Every export entry point uses this; before signing exports are never frozen.
  */
 async function loadFrozenExportData(policyId: string): Promise<PolicyExportData> {
   const data = await loadPolicyExportData(policyId)
-  if (!data.policy.exportSnapshot) {
+  if (data.policy.signedAt && !data.policy.exportSnapshot) {
     try {
       await capturePolicyExportSnapshotFromData(policyId, data)
     } catch (e) {
@@ -2037,17 +2048,75 @@ function polEmptyP(): Paragraph {
   return p
 }
 
+/** A policy still on a draft number: its documents carry the DRAFT watermark */
+function polIsDraftNumber(policyNumber: string | null | undefined): boolean {
+  return String(policyNumber || '').startsWith('POL-DRAFT-')
+}
+
+// Word's own text watermark (Design > Watermark), behind the text of every page
+const DRAFT_SHAPETYPE =
+  '<v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">' +
+  '<v:formulas><v:f eqn="sum #0 0 10800"/><v:f eqn="prod #0 2 1"/><v:f eqn="sum 21600 0 @1"/>' +
+  '<v:f eqn="sum 0 0 @2"/><v:f eqn="sum 21600 0 @3"/><v:f eqn="if @0 @3 0"/><v:f eqn="if @0 21600 @1"/>' +
+  '<v:f eqn="if @0 0 @2"/><v:f eqn="if @0 @4 21600"/><v:f eqn="mid @5 @6"/><v:f eqn="mid @8 @5"/>' +
+  '<v:f eqn="mid @7 @8"/><v:f eqn="mid @6 @7"/><v:f eqn="sum @6 0 @5"/></v:formulas>' +
+  '<v:path textpathok="t" o:connecttype="custom" o:connectlocs="@9,0;@10,10800;@11,21600;@12,10800" o:connectangles="270,180,90,0"/>' +
+  '<v:textpath on="t" fitshape="t"/><v:handles><v:h position="#0,bottomRight" xrange="6629,14971"/></v:handles>' +
+  '<o:lock v:ext="edit" text="t" shapetype="t"/></v:shapetype>'
+
+function draftWatermarkRun(n: number): string {
+  return (
+    '<w:r><w:rPr><w:noProof/></w:rPr><w:pict>' +
+    DRAFT_SHAPETYPE +
+    `<v:shape id="DraftWaterMark${n}" o:spid="_x0000_s${2049 + n}" type="#_x0000_t136" ` +
+    'style="position:absolute;margin-left:0;margin-top:0;width:440pt;height:146pt;rotation:315;z-index:-251655168;' +
+    'mso-position-horizontal:center;mso-position-horizontal-relative:margin;' +
+    'mso-position-vertical:center;mso-position-vertical-relative:margin" ' +
+    'o:allowincell="f" fillcolor="silver" stroked="f"><v:fill opacity=".5"/>' +
+    '<v:textpath style="font-family:&quot;Arial&quot;;font-size:1pt" string="DRAFT"/></v:shape>' +
+    '</w:pict></w:r>'
+  )
+}
+
+/** Puts the DRAFT watermark in every header of the packed document; false when it has none */
+async function polAddDraftWatermark(zip: JSZip): Promise<boolean> {
+  const headers = Object.keys(zip.files).filter((f) => /^word\/header\d*\.xml$/.test(f))
+  let n = 0
+  for (const name of headers) {
+    let xml = await zip.file(name)!.async('string')
+    for (const [prefix, uri] of [
+      ['v', 'urn:schemas-microsoft-com:vml'],
+      ['o', 'urn:schemas-microsoft-com:office:office']
+    ]) {
+      if (!xml.includes(`xmlns:${prefix}=`))
+        xml = xml.replace(/<w:hdr\b/, `<w:hdr xmlns:${prefix}="${uri}"`)
+    }
+    const run = draftWatermarkRun(++n)
+    const first = xml.match(/<w:p\b[^>]*\/>|<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/)
+    if (first) {
+      const tag = first[0]
+      const withRun = tag.endsWith('/>') ? `${tag.slice(0, -2)}>${run}</w:p>` : tag + run
+      xml = xml.slice(0, first.index!) + withRun + xml.slice(first.index! + tag.length)
+    } else {
+      xml = xml.replace('</w:hdr>', `<w:p>${run}</w:p></w:hdr>`)
+    }
+    zip.file(name, xml)
+  }
+  return n > 0
+}
+
 /**
  * Packs a policy-family document. A blank line between two paragraphs is exactly one empty
  * line: the blank line's own space after, and the space after / before the paragraphs on
  * either side of it, are removed. Spacer gaps (polSpacerPts, no space after) and the empty
  * paragraph a table cell needs after a nested table are left as they are.
  */
-async function polPack(document: Document): Promise<Blob> {
+async function polPack(document: Document, draft = false): Promise<Blob> {
   const blob = await Packer.toBlob(document)
   const zip = await JSZip.loadAsync(blob)
   const file = zip.file('word/document.xml')
   if (!file) return blob
+  const watermarked = draft && (await polAddDraftWatermark(zip))
   const xml = await file.async('string')
   const paras = [...xml.matchAll(/<w:p\b[^>]*\/>|<w:p\b[\s\S]*?<\/w:p>/g)]
   const spaceOf = (p: string, attr: 'after' | 'before'): number =>
@@ -2070,7 +2139,7 @@ async function polPack(document: Document): Promise<Blob> {
     if (i > 0 && adjacent(i - 1, i)) out[i - 1] = zero(out[i - 1], 'after')
     if (i + 1 < paras.length && adjacent(i, i + 1)) out[i + 1] = zero(out[i + 1], 'before')
   })
-  if (!changed) return blob
+  if (!changed && !watermarked) return blob
   let rebuilt = ''
   let pos = 0
   paras.forEach((m, i) => {
@@ -5202,7 +5271,7 @@ export async function exportPolicyDocx(
     sections: docSections
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`
@@ -5409,10 +5478,31 @@ export async function exportPolicyForSigning(
   applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const tcTemplate = await window.api.tcGetTemplate(typeCode)
-  if (!tcTemplate || isIpcError(tcTemplate))
-    throw new Error(
-      'No T&C template set for this policy type. Add one in Policy Settings, T&C Templates.'
-    )
+  // Remembered to check the scan later; a user without policies:manage still gets the PDF
+  const remember = async (pages: number, total: number): Promise<void> => {
+    try {
+      const live = await window.api.policyGetById(policyId)
+      ok(
+        await window.api.policyUpdate(policyId, {
+          signingPages: pages,
+          signingTotal: total,
+          ...(live && !isIpcError(live) && live.exportedAt
+            ? {}
+            : { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })
+        })
+      )
+    } catch {
+      /* non-critical */
+    }
+  }
+  if (!tcTemplate || isIpcError(tcTemplate)) {
+    // No T&C for this policy type: the policy alone is printed and signed
+    const gen = await generatePolicyDocxBuffer(policyId)
+    const pdf = await docxToPdf(gen.buffer, gen.fileName)
+    await polDownloadBlob(pdf.blob, `${gen.fileName} (for signing).pdf`, policyId)
+    await remember(pdf.pageCount, pdf.pageCount)
+    return { policyPages: pdf.pageCount, total: pdf.pageCount }
+  }
   const policyNumber = data.policy.policyNumber
   let total: number
   let expectedPages: number | null = null
@@ -5440,21 +5530,7 @@ export async function exportPolicyForSigning(
       `The policy came out on ${pdf.pageCount} pages instead of ${expectedPages}. Please try again.`
     )
   await polDownloadBlob(pdf.blob, `${fileName} (for signing).pdf`, policyId)
-  // Remembered to check the scan later; a user without policies:manage still gets the PDF
-  try {
-    const live = await window.api.policyGetById(policyId)
-    ok(
-      await window.api.policyUpdate(policyId, {
-        signingPages: pdf.pageCount,
-        signingTotal: total,
-        ...(live && !isIpcError(live) && live.exportedAt
-          ? {}
-          : { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })
-      })
-    )
-  } catch {
-    /* non-critical */
-  }
+  await remember(pdf.pageCount, total)
   return { policyPages: pdf.pageCount, total }
 }
 
@@ -5504,7 +5580,7 @@ export async function appendTcToSignedScan(
     throw new Error((isIpcError(res) && res.message) || 'Could not add the T&C')
   await polDownloadBlob(
     new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
-    `${baseName} (signed with T&C).pdf`,
+    res.tcPages > 0 ? `${baseName} (signed with T&C).pdf` : `${baseName} (signed).pdf`,
     policyId
   )
   return { scanPages: res.scanPages, tcPages: res.tcPages, total: res.scanPages + res.tcPages }
@@ -6176,7 +6252,7 @@ async function buildDebitAdviceBlobFresh(
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const daVName = data.vesselInfo?.name || ''
   const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   return {
@@ -6597,7 +6673,7 @@ async function buildCreditAdviceBlobFresh(
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   return {
@@ -7017,7 +7093,7 @@ export async function exportDeclarationDocx(
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const vName = data.vesselInfo?.name || ''
   const declFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Declaration).docx` }
   await polStoreFile(policyId, declKey, declFile)
@@ -7315,14 +7391,18 @@ export async function exportEndorsementDocx(
     sections: [
       {
         properties: polMakePageProperties(),
-        headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+        // A draft needs a header to carry its watermark
+        headers:
+          hdrParas.length > 0 || polIsDraftNumber(data.policy.policyNumber)
+            ? { default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] }) }
+            : undefined,
         footers: adviceFooter ? { default: adviceFooter } : undefined,
         children
       }
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,
@@ -7693,7 +7773,7 @@ export async function exportEndorsementDADocx(
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,
@@ -7920,14 +8000,18 @@ export async function exportEndorsementCADocx(
     sections: [
       {
         properties: polMakePageProperties(),
-        headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+        // A draft needs a header to carry its watermark
+        headers:
+          hdrParas.length > 0 || polIsDraftNumber(data.policy.policyNumber)
+            ? { default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] }) }
+            : undefined,
         footers: adviceFooter ? { default: adviceFooter } : undefined,
         children
       }
     ]
   })
 
-  const blob = await polPack(document)
+  const blob = await polPack(document, polIsDraftNumber(data.policy.policyNumber))
   const vName = data.vesselInfo?.name || ''
   const endFile = {
     blob,

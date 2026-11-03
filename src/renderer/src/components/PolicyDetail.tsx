@@ -78,7 +78,7 @@ import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { Modal, Field, Tabs } from './ui'
 import { ScreeningBadge } from './ScreeningPanel'
-import { confirmDialog } from './DialogHost'
+import { confirmDialog, alertDialog } from './DialogHost'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
 
@@ -299,6 +299,8 @@ export default function PolicyDetail({
   }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const [, setRenewing] = useState(false)
   const [signing, setSigning] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [assigningNumber, setAssigningNumber] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelMode, setCancelMode] = useState<'instalment' | 'date'>('instalment')
   const [cancelAfterInstalment, setCancelAfterInstalment] = useState(0)
@@ -474,7 +476,7 @@ export default function PolicyDetail({
   >([])
 
   const { showError, showSuccess } = useToast()
-  const { hasPermission, user } = useAuth()
+  const { hasPermission } = useAuth()
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -1426,19 +1428,8 @@ export default function PolicyDetail({
     }
   }
 
-  // The first export of the policy document locks it (no more Edit, only New Revision or
-  // Endorsement): say so before it happens
-  const confirmFirstExport = async (): Promise<boolean> => {
-    if (!policy || policy.exportedAt || !hasPermission('policies:manage')) return true
-    return confirmDialog(
-      'This is the first export of the policy. After it the policy can no longer be edited: changes need a New Revision or an Endorsement. Export now?',
-      { title: 'First export', confirmLabel: 'Export', isDangerous: false }
-    )
-  }
-
   const handleExportBundle = async (): Promise<void> => {
     setShowActionsMenu(false)
-    if (!(await confirmFirstExport())) return
     setExportingBundle(true)
     try {
       const reportSettings = await getReportSettings()
@@ -1539,6 +1530,8 @@ export default function PolicyDetail({
 
   if (!policy) return null
 
+  const isDraftNumber = (policy.policyNumber || '').startsWith('POL-DRAFT-')
+  const isSigned = !!policy.signedAt
   const sc = statusColors[policy.status] || statusColors.inactive
   const tc = typeColors[policy.quotationTypeCode ?? ''] || typeColors.P
   const isPIType = policy.quotationTypeCode === 'P'
@@ -1551,14 +1544,94 @@ export default function PolicyDetail({
       ? Math.round((policy.premiumAmount - commissionAmount) * 100) / 100
       : null
 
-  const handleSignPolicy = async (): Promise<void> => {
+  // The office gives the number once the policy is reviewed; it stays editable until signed
+  const handleAssignNumber = async (): Promise<void> => {
+    if (assigningNumber) return
+    const go = await confirmDialog(
+      'Give this policy its policy number now? The number cannot be taken back. The policy stays editable until it is signed.',
+      { title: 'Assign policy number', confirmLabel: 'Assign number', isDangerous: false }
+    )
+    if (!go) return
+    setAssigningNumber(true)
+    try {
+      const r = await window.api.policyAssignNumber(policyId)
+      showSuccess(`Policy number ${r.policyNumber} assigned`)
+      window.dispatchEvent(
+        new CustomEvent('vc-policy-number', {
+          detail: { id: policyId, policyNumber: r.policyNumber }
+        })
+      )
+      await loadData()
+    } catch (err) {
+      showError(errMessage(err, 'Failed to assign the policy number'))
+    } finally {
+      setAssigningNumber(false)
+    }
+  }
+
+  // Signed in wet ink: the scan gets the T&C added (saved in the policy folder), then the
+  // policy is recorded as signed and locked
+  const handleSignByHand = async (): Promise<void> => {
+    setShowSignModal(false)
+    if (isDraftNumber) {
+      await alertDialog(
+        'This policy still has a draft number. Assign the policy number, export it for signing, and pick the signed scan after.',
+        { title: 'Signed by hand' }
+      )
+      return
+    }
+    setPdfBusy('Adding the T&C to the signed policy. Please wait...')
     setSigning(true)
     try {
-      const result: { success: boolean; error?: unknown; message?: string } =
-        await window.api.policySign(policyId)
+      const { appendTcToSignedScan, capturePolicyExportSnapshot } =
+        await import('../services/PolicyExportService')
+      const r = await appendTcToSignedScan(policyId, (msg) =>
+        confirmDialog(msg, {
+          title: 'Signed policy',
+          confirmLabel: 'Add the T&C',
+          isDangerous: false
+        })
+      )
+      if (!r) return
+      await window.api.policySignByHand(policyId)
+      try {
+        await capturePolicyExportSnapshot(policyId)
+      } catch (snapErr) {
+        console.error('Failed to capture export snapshot:', snapErr)
+      }
+      showSuccess(
+        r.tcPages > 0
+          ? `Policy recorded as signed. Signed copy saved with the T&C: ${r.scanPages} signed + ${r.tcPages} T&C pages`
+          : `Policy recorded as signed. Signed copy saved (${r.scanPages} page${r.scanPages === 1 ? '' : 's'})`
+      )
+      await loadData()
+    } catch (err) {
+      showError(errMessage(err, 'Failed to record the signed policy'))
+    } finally {
+      setPdfBusy(null)
+      setSigning(false)
+    }
+  }
+
+  const handleSignPolicy = async (): Promise<void> => {
+    setShowSignModal(false)
+    setSigning(true)
+    try {
+      const result: {
+        success: boolean
+        error?: unknown
+        message?: string
+        policyNumber?: string
+      } = await window.api.policySign(policyId)
       if (result?.error) {
         showError(result.message || 'Failed to sign policy')
       } else {
+        if (result.policyNumber)
+          window.dispatchEvent(
+            new CustomEvent('vc-policy-number', {
+              detail: { id: policyId, policyNumber: result.policyNumber }
+            })
+          )
         // Capture export snapshot so future exports are frozen
         try {
           const { capturePolicyExportSnapshot } = await import('../services/PolicyExportService')
@@ -1578,13 +1651,12 @@ export default function PolicyDetail({
   }
 
   const handleExportPolicy = async (): Promise<void> => {
-    if (!(await confirmFirstExport())) return
     setExportingPolicy(true)
     try {
       const { exportPolicyDocx } = await import('../services/PolicyExportService')
       await exportPolicyDocx(policyId)
       showSuccess('Policy document exported')
-      await loadData() // Reload to update exportedAt (hides Edit button)
+      await loadData() // Reload to update exportedAt
     } catch (err) {
       showError(errMessage(err, 'Failed to export policy'))
     } finally {
@@ -1593,7 +1665,6 @@ export default function PolicyDetail({
   }
 
   const handleExportPdfTC = async (): Promise<void> => {
-    if (!(await confirmFirstExport())) return
     setExportingPdfTC(true)
     try {
       const { exportPolicyPdfWithTC } = await import('../services/PolicyExportService')
@@ -1610,13 +1681,21 @@ export default function PolicyDetail({
   // Wet-ink signing: print this PDF (its footer counts the T&C pages), sign, scan, then add the
   // T&C to the scan below
   const handleExportForSigning = async (): Promise<void> => {
-    if (!(await confirmFirstExport())) return
+    if (isDraftNumber) {
+      await alertDialog(
+        'This policy still has a draft number. Assign the policy number first, so the copy that is signed carries it.',
+        { title: 'Export for signing' }
+      )
+      return
+    }
     setPdfBusy('Preparing the policy for signing. Please wait...')
     try {
       const { exportPolicyForSigning } = await import('../services/PolicyExportService')
       const r = await exportPolicyForSigning(policyId)
       showSuccess(
-        `Policy for signing exported: ${r.policyPages} page${r.policyPages === 1 ? '' : 's'}, numbered to ${r.total} with the T&C`
+        r.total > r.policyPages
+          ? `Policy for signing exported: ${r.policyPages} page${r.policyPages === 1 ? '' : 's'}, numbered to ${r.total} with the T&C`
+          : `Policy for signing exported: ${r.policyPages} page${r.policyPages === 1 ? '' : 's'} (no T&C for this policy type)`
       )
       await loadData()
     } catch (err) {
@@ -1639,7 +1718,9 @@ export default function PolicyDetail({
       )
       if (r)
         showSuccess(
-          `Signed policy saved with the T&C: ${r.scanPages} signed + ${r.tcPages} T&C pages = ${r.total}`
+          r.tcPages > 0
+            ? `Signed policy saved with the T&C: ${r.scanPages} signed + ${r.tcPages} T&C pages = ${r.total}`
+            : 'This policy type has no T&C: the signed policy was saved as it is'
         )
     } catch (err) {
       showError(errMessage(err, 'Failed to add the T&C to the signed policy'))
@@ -1817,11 +1898,28 @@ export default function PolicyDetail({
               <FileCheck size={16} /> Add Endorsement
             </button>
           )}
-          {/* Edit Policy — primary action (only before first export) */}
+          {/* Assign the policy number (after review, before signing) */}
           {!isEditing &&
             hasPermission('policies:manage') &&
             policy.status === 'active' &&
-            !policy.exportedAt && (
+            isDraftNumber &&
+            !isSigned && (
+              <button
+                className="btn-secondary"
+                style={{ ...headerBtnStyle }}
+                onClick={() => void handleAssignNumber()}
+                disabled={assigningNumber}
+                title="Give the policy its policy number (it stays editable until signed)"
+              >
+                {assigningNumber ? <Loader2 size={16} className="spin" /> : <FileCheck size={16} />}{' '}
+                {assigningNumber ? 'Assigning...' : 'Assign Number'}
+              </button>
+            )}
+          {/* Edit Policy: open until the policy is signed */}
+          {!isEditing &&
+            hasPermission('policies:manage') &&
+            policy.status === 'active' &&
+            !isSigned && (
               <button
                 className="btn-primary"
                 style={{ ...headerBtnStyle }}
@@ -1831,46 +1929,37 @@ export default function PolicyDetail({
                 <Edit3 size={16} /> Edit Policy
               </button>
             )}
-          {/* After the first export: Edit stays visible but explains the way forward */}
+          {/* Signed: Edit stays visible but explains the way forward */}
           {!isEditing &&
             hasPermission('policies:manage') &&
             policy.status === 'active' &&
-            !!policy.exportedAt && (
-              <span title="Exported: use New Revision or an Endorsement to make changes">
+            isSigned && (
+              <span title="Signed: use New Revision or an Endorsement to make changes">
                 <button
                   className="btn-secondary"
                   style={{ ...headerBtnStyle, pointerEvents: 'none' }}
                   disabled
-                  aria-label="Edit Policy (exported: use New Revision or an Endorsement)"
+                  aria-label="Edit Policy (signed: use New Revision or an Endorsement)"
                 >
                   <Edit3 size={16} /> Edit Policy
                 </button>
               </span>
             )}
 
-          {/* Sign Policy button — only for users with policies:sign AND policy not yet signed */}
+          {/* Sign: in the app (signature image, policies:sign) or by hand (any underwriter) */}
           {!isEditing &&
-            hasPermission('policies:sign') &&
+            (hasPermission('policies:sign') || hasPermission('policies:manage')) &&
             policy.status === 'active' &&
-            !policy.signedBy && (
+            !isSigned && (
               <button
                 className="btn-secondary"
                 style={{ ...headerBtnStyle }}
                 disabled={signing}
-                onClick={() => {
-                  setConfirmation({
-                    show: true,
-                    title: 'Sign Policy',
-                    message: `Sign this policy as ${user?.username || 'current user'}? This action cannot be undone.`,
-                    onConfirm: async () => {
-                      setConfirmation((prev) => ({ ...prev, show: false }))
-                      handleSignPolicy()
-                    }
-                  })
-                }}
-                title="Sign Policy"
+                onClick={() => setShowSignModal(true)}
+                title="Sign the policy in the app, or record it as signed by hand"
               >
-                <PenTool size={16} /> {signing ? 'Signing...' : 'Sign'}
+                {signing ? <Loader2 size={16} className="spin" /> : <PenTool size={16} />}{' '}
+                {signing ? 'Signing...' : 'Sign'}
               </button>
             )}
 
@@ -1889,16 +1978,22 @@ export default function PolicyDetail({
                 color: 'var(--success)',
                 border: '1px solid rgba(0, 200, 100, 0.25)'
               }}
-              title={`Signed by ${policy.signedByName || 'unknown'} on ${policy.signedAt ? formatDateShort(policy.signedAt) : 'unknown date'}`}
+              title={
+                policy.signedMethod === 'hand'
+                  ? `Signed by hand, recorded by ${policy.signedByName || 'unknown'} on ${policy.signedAt ? formatDateShort(policy.signedAt) : 'unknown date'}`
+                  : `Signed by ${policy.signedByName || 'unknown'} on ${policy.signedAt ? formatDateShort(policy.signedAt) : 'unknown date'}`
+              }
             >
               <PenTool size={14} />
-              Signed by {policy.signedByName || 'unknown'}
+              {policy.signedMethod === 'hand'
+                ? `Signed by hand (recorded by ${policy.signedByName || 'unknown'})`
+                : `Signed by ${policy.signedByName || 'unknown'}`}
               {policy.signedAt && ` · ${formatDateShort(policy.signedAt)}`}
             </span>
           )}
 
           {/* Exports frozen badge */}
-          {policy.exportSnapshot && (
+          {isSigned && policy.exportSnapshot && (
             <span
               style={{
                 display: 'inline-flex',
@@ -5121,6 +5216,64 @@ export default function PolicyDetail({
             </div>
           )}
         </>
+      )}
+
+      {showSignModal && (
+        <Modal
+          title="Sign Policy"
+          icon={<PenTool size={18} />}
+          onClose={() => setShowSignModal(false)}
+          width={480}
+          footer={
+            <button className="btn-secondary" onClick={() => setShowSignModal(false)}>
+              Cancel
+            </button>
+          }
+        >
+          <p className="muted" style={{ marginTop: 0, fontSize: '0.85rem' }}>
+            After signing the policy can no longer be edited: changes need a New Revision or an
+            Endorsement.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              className="btn-secondary"
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 14px' }}
+              disabled={!hasPermission('policies:sign')}
+              title={
+                hasPermission('policies:sign')
+                  ? undefined
+                  : 'Needs the signing permission and an uploaded signature'
+              }
+              onClick={() => void handleSignPolicy()}
+            >
+              <PenTool size={18} />
+              <span>
+                <strong>Sign in the app</strong>
+                <br />
+                <span className="muted" style={{ fontSize: '0.8rem' }}>
+                  Your signature image goes on the policy
+                  {isDraftNumber ? ' and the policy number is assigned' : ''}.
+                </span>
+              </span>
+            </button>
+            <button
+              className="btn-secondary"
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '12px 14px' }}
+              disabled={!hasPermission('policies:manage')}
+              onClick={() => void handleSignByHand()}
+            >
+              <Paperclip size={18} />
+              <span>
+                <strong>Signed by hand...</strong>
+                <br />
+                <span className="muted" style={{ fontSize: '0.8rem' }}>
+                  Pick the scan of the signed policy: the T&amp;C (if the policy type has one) are
+                  added to it and it is saved in the policy folder.
+                </span>
+              </span>
+            </button>
+          </div>
+        </Modal>
       )}
 
       {confirmation.show && (

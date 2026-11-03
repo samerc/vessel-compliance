@@ -272,6 +272,16 @@ function App(): React.JSX.Element {
     }
   }, [selectedPolicyId, activeTab])
 
+  // Policy Detail announces a new policy number (Assign Number, signing)
+  useEffect(() => {
+    const onNumber = (e: Event): void => {
+      const { id, policyNumber } = (e as CustomEvent<{ id: string; policyNumber: string }>).detail
+      setBreadcrumbPolicy((b) => (b && b.id === id ? { id, ref: policyNumber } : b))
+    }
+    window.addEventListener('vc-policy-number', onNumber)
+    return () => window.removeEventListener('vc-policy-number', onNumber)
+  }, [])
+
   // Ctrl+K global search shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {

@@ -2093,6 +2093,8 @@ export interface Api {
   policySupersedeBlueCard: (id: string) => Promise<void>
   /** camelCase policy fields to write (the adapter maps each known key to its column) */
   policyUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
+  policyAssignNumber: (id: string) => Promise<{ success: true; policyNumber: string }>
+  policySignByHand: (id: string) => Promise<{ success: true; policyNumber: string }>
   policySetInstalments: (
     policyId: string,
     instalments: {

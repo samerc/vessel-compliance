@@ -6137,11 +6137,27 @@ app.whenReady().then(() => {
     'policy:update',
     async (event, id: string, fields: Parameters<typeof db.updatePolicyDocument>[1]) => {
       const user = await requirePermission(event, 'policies:manage')
+      const before = await db.getPolicyDocumentById(id).catch(() => null)
       const result = await db.updatePolicyDocument(id, fields)
       try {
         const changedKeys = Object.keys(fields).filter((k) => fields[k] !== undefined)
-        const policyLabel =
-          fields.policyNumber || (await db.getPolicyDocumentById(id))?.policyNumber || id
+        const policyLabel = fields.policyNumber || before?.policyNumber || id
+        // Last-minute changes are made after the number is given: keep what each field was
+        const show = (v: unknown): string => {
+          if (v == null || v === '') return '(empty)'
+          const t = typeof v === 'object' ? JSON.stringify(v) : String(v)
+          return t.length > 80 ? `${t.slice(0, 77)}...` : t
+        }
+        const changes = changedKeys
+          .filter((k) => k !== 'exportSnapshot' && k !== 'exportedAt')
+          .map((k) => {
+            const old = before ? (before as unknown as Record<string, unknown>)[k] : undefined
+            const now = fields[k]
+            if (show(old) === show(now)) return null
+            return `${k}: ${show(old)} -> ${show(now)}`
+          })
+          .filter(Boolean)
+        if (changedKeys.every((k) => k === 'exportSnapshot' || k === 'exportedAt')) return result
         db.logActivity({
           userId: user.id,
           username: user.username,
@@ -6150,7 +6166,9 @@ app.whenReady().then(() => {
           entityType: 'policy_document',
           entityId: id,
           entityName: String(policyLabel),
-          details: `Updated policy fields: ${changedKeys.join(', ')}`
+          details: changes.length
+            ? `Updated policy: ${changes.join('; ')}`
+            : `Updated policy fields: ${changedKeys.join(', ')}`
         }).catch(() => {})
       } catch {
         /* do not block */
@@ -6467,6 +6485,48 @@ app.whenReady().then(() => {
       details: `Signed policy ${policyNumber}`
     }).catch(() => {})
     return { success: true, policyNumber }
+  })
+  // The real policy number, given before signing (the office reviews the numbered policy, then
+  // it is signed); signing a policy still on a draft number assigns one too
+  safeHandle('policy:assignNumber', async (event, policyId: string) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const before = await db.getPolicyDocumentById(policyId)
+    if (!before) throw new Error('Policy not found')
+    if (before.status !== 'active') throw new Error('Only an active policy can get a number')
+    const policyNumber = await db.assignPolicyNumber(policyId)
+    if (policyNumber !== before.policyNumber) {
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'UPDATE',
+        module: 'Policies',
+        entityType: 'policy_document',
+        entityId: policyId,
+        entityName: policyNumber,
+        details: `Assigned policy number ${policyNumber} (was ${before.policyNumber})`
+      }).catch(() => {})
+    }
+    return { success: true, policyNumber }
+  })
+  // Signed in wet ink: any underwriter records it (no signing permission, no signature image)
+  safeHandle('policy:signByHand', async (event, policyId: string) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const before = await db.getPolicyDocumentById(policyId)
+    if (!before) throw new Error('Policy not found')
+    if (before.signedAt) throw new Error('This policy is already signed')
+    if (String(before.policyNumber || '').startsWith('POL-DRAFT-'))
+      throw new Error('Assign the policy number before signing')
+    await db.signPolicy(policyId, user.id, 'hand')
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'SIGN',
+      module: 'Policies',
+      entityType: 'policy',
+      entityId: policyId,
+      details: `Recorded policy ${before.policyNumber} as signed by hand`
+    }).catch(() => {})
+    return { success: true, policyNumber: before.policyNumber }
   })
   // Exact exported files of signed policies (re-export returns these bytes unchanged)
   safeHandle('policy:getExportFile', async (event, policyId: string, docKey: string) => {
@@ -9070,10 +9130,19 @@ app.whenReady().then(() => {
       requireSession(event)
       if (!pickedScanPath) throw new Error('Choose the scanned policy first')
       const tpl = await db.getDefaultTcTemplate(data.tcTypeCode)
-      if (!tpl)
-        throw new Error(
-          'No T&C template set for this policy type. Add one in Policy Settings, T&C Templates.'
-        )
+      if (!tpl) {
+        // No T&C for this policy type: the signed scan is the whole document
+        const { countPdfPages } = await import('./services/DocxToPdfService')
+        try {
+          return {
+            data: Array.from(readFileSync(pickedScanPath)),
+            scanPages: await countPdfPages(pickedScanPath),
+            tcPages: 0
+          }
+        } finally {
+          pickedScanPath = ''
+        }
+      }
       const tcBuf = tpl.hasFile ? await db.getTcTemplateFileById(tpl.id) : null
       if (!tcBuf)
         throw new Error(

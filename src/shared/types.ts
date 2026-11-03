@@ -2586,6 +2586,8 @@ export interface PolicyDocument {
   exportedAt: string | null
   signedBy: string | null
   signedAt: string | null
+  /** app = signature image, hand = signed in wet ink (scan); null = not signed */
+  signedMethod?: 'app' | 'hand' | null
   exportSnapshot: string | null
   sectionOrder: string[] | null
   selectedLolOptionId: string | null

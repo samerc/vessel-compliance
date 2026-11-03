@@ -1411,6 +1411,8 @@ const api: Api = {
   policyUpdateBlueCard: (id: string, data) => ipcRenderer.invoke('policy:updateBlueCard', id, data),
   policySupersedeBlueCard: (id: string) => ipcRenderer.invoke('policy:supersedeBlueCard', id),
   policyUpdate: (id: string, fields) => ipcRenderer.invoke('policy:update', id, fields),
+  policyAssignNumber: (id: string) => ipcRenderer.invoke('policy:assignNumber', id),
+  policySignByHand: (id: string) => ipcRenderer.invoke('policy:signByHand', id),
   policySetInstalments: (policyId: string, instalments) =>
     ipcRenderer.invoke('policy:setInstalments', policyId, instalments),
   policySetAddresses: (policyId: string, addresses) =>
