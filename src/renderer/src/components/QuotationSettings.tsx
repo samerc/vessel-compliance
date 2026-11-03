@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import TypeScopeToggle from './TypeScopeToggle'
 import { TYPE_SCOPE_LABELS } from '../../../shared/quotationTypes'
 import {
   Plus,
   Trash2,
-  ChevronUp,
   ChevronDown,
   ChevronRight,
   Pencil,
@@ -28,7 +27,6 @@ import {
   Copy,
   DollarSign,
   ClipboardCheck,
-  GripVertical,
   Layers,
   Eye,
   EyeOff
@@ -81,12 +79,12 @@ import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
 import DeductibleValueInputs from './quotation-tabs/DeductibleValueInputs'
 import { confirmDialog } from './DialogHost'
-import { Modal, Field, Badge } from './ui'
+import { Modal, Field, Badge, useDragSort, DragHandle, moveInArray } from './ui'
 import {
   useSettingsItemUsage,
   isHiddenItem,
+  dragAmongVisible,
   confirmWordingEdit,
-  moveAmongVisible,
   hiddenRowStyle,
   plural,
   OLDER_WORDING_EDIT_TITLE,
@@ -98,7 +96,6 @@ import { StickyNote } from 'lucide-react'
 
 // ---- Settings items quotations use: usage pill, hidden / older wording, hide or delete ----
 
-/** "Used in N" pill. Nothing when unused */
 function UsageBadge({ usage }: { usage?: SettingsItemUsage }): React.JSX.Element | null {
   const n = usage ? usage.drafts + usage.sent : 0
   if (n <= 0 || !usage) return null
@@ -867,14 +864,12 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps): React.JSX.Elem
     }
   }
 
-  const moveType = async (index: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...types]
-    const target = index + dir
-    if (target < 0 || target >= arr.length) return
-    ;[arr[index], arr[target]] = [arr[target], arr[index]]
+  const moveType = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(types, from, to)
     setTypes(arr)
     await window.api.reorderQuotationTypes(arr.map((t) => t.id))
   }
+  const typeSort = useDragSort(types.length, (from, to) => void moveType(from, to))
 
   return (
     <div className="glass-card" style={{ padding: '20px' }}>
@@ -937,30 +932,9 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps): React.JSX.Elem
           </thead>
           <tbody>
             {types.map((t, i) => (
-              <tr key={t.id}>
+              <tr key={t.id} {...typeSort.rowProps(i)}>
                 <td>
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    <button
-                      title="Move up"
-                      aria-label="Move up"
-                      onClick={() => moveType(i, -1)}
-                      disabled={i === 0}
-                      className="btn-secondary"
-                      style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      title="Move down"
-                      aria-label="Move down"
-                      onClick={() => moveType(i, 1)}
-                      disabled={i === types.length - 1}
-                      className="btn-secondary"
-                      style={{ padding: '2px 6px', opacity: i === types.length - 1 ? 0.3 : 1 }}
-                    >
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
+                  <DragHandle {...typeSort.handleProps(i, `Move ${t.name}`)} />
                 </td>
                 <td>
                   {editId === t.id ? (
@@ -1253,12 +1227,15 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
     void usage.reload()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(clauses, visibleClauses, from, to)
     if (!newOrder) return
     setClauses(newOrder)
     await window.api.piReorderClauses(newOrder.map((c) => c.id))
   }
+  const clauseSort = useDragSort(visibleClauses.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => visibleClauses[i]?.id === editingId
+  })
 
   const handleSaveSet = async (): Promise<void> => {
     if (!setName.trim() || setClauseIds.size === 0) return
@@ -1389,7 +1366,11 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
               </thead>
               <tbody>
                 {visibleClauses.map((c, i) => (
-                  <tr key={c.id} style={hiddenRowStyle(isHiddenItem(c))}>
+                  <tr
+                    key={c.id}
+                    {...clauseSort.rowProps(i)}
+                    style={hiddenRowStyle(isHiddenItem(c))}
+                  >
                     {editingId === c.id ? (
                       <>
                         <td>
@@ -1453,7 +1434,10 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
                       </>
                     ) : (
                       <>
-                        <td style={{ fontWeight: 600 }}>{c.clauseNumber}</td>
+                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          <DragHandle {...clauseSort.handleProps(i, `Move ${c.name}`)} />{' '}
+                          {c.clauseNumber}
+                        </td>
                         <td>
                           {c.name}
                           <UsageBadge usage={usage.usage[c.id]} />
@@ -1491,38 +1475,6 @@ function ClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
                                 loadData()
                               }}
                             />
-                            <button
-                              title="Move up"
-                              aria-label="Move up"
-                              onClick={() => handleMove(i, 'up')}
-                              disabled={i === 0}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '2px',
-                                color: 'var(--text-secondary)',
-                                opacity: i === 0 ? 0.3 : 1
-                              }}
-                            >
-                              <ChevronUp size={14} />
-                            </button>
-                            <button
-                              title="Move down"
-                              aria-label="Move down"
-                              onClick={() => handleMove(i, 'down')}
-                              disabled={i === visibleClauses.length - 1}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '2px',
-                                color: 'var(--text-secondary)',
-                                opacity: i === visibleClauses.length - 1 ? 0.3 : 1
-                              }}
-                            >
-                              <ChevronDown size={14} />
-                            </button>
                             <button
                               title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                               aria-label="Edit"
@@ -1892,24 +1844,6 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
     void usage.reload()
   }
 
-  const dragWarrantySettingsRef = useRef<string | null>(null)
-  const handleWarrantySettingsDragStart = (warrantyId: string): void => {
-    dragWarrantySettingsRef.current = warrantyId
-  }
-  const handleWarrantySettingsDrop = async (targetId: string): Promise<void> => {
-    const dragId = dragWarrantySettingsRef.current
-    dragWarrantySettingsRef.current = null
-    if (!dragId || dragId === targetId) return
-    const newOrder = [...warranties]
-    const fromIdx = newOrder.findIndex((w) => w.id === dragId)
-    const toIdx = newOrder.findIndex((w) => w.id === targetId)
-    if (fromIdx === -1 || toIdx === -1) return
-    const [moved] = newOrder.splice(fromIdx, 1)
-    newOrder.splice(toIdx, 0, moved)
-    setWarranties(newOrder)
-    await window.api.piReorderWarranties(newOrder.map((w) => w.id))
-  }
-
   const handleAddTag = async (): Promise<void> => {
     if (!newTagName.trim()) return
     await window.api.piAddWarrantyTag(newTagName.trim())
@@ -2087,6 +2021,18 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
       !w.typeScope ||
       w.typeScope === 'all' ||
       w.typeScope.split(',').includes(warrantyTypeFilter)
+  )
+  // Drag a warranty by its handle: the shown ones (type filter, hidden) swap places
+  const moveWarranty = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(warranties, filteredWarranties, from, to)
+    if (!newOrder) return
+    setWarranties(newOrder)
+    await window.api.piReorderWarranties(newOrder.map((w) => w.id))
+  }
+  const warrantySort = useDragSort(
+    filteredWarranties.length,
+    (from, to) => void moveWarranty(from, to),
+    { disabled: (i) => filteredWarranties[i]?.id === editingId }
   )
 
   return (
@@ -2765,13 +2711,10 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
             />
           </div>
         )}
-        {filteredWarranties.map((w) => (
+        {filteredWarranties.map((w, wi) => (
           <div
             key={w.id}
-            draggable
-            onDragStart={() => handleWarrantySettingsDragStart(w.id)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleWarrantySettingsDrop(w.id)}
+            {...warrantySort.rowProps(wi)}
             style={{
               ...hiddenRowStyle(isHiddenItem(w)),
               padding: '10px 14px',
@@ -2787,10 +2730,12 @@ function WarrantiesTab({ showSuccess, showError }: TabProps): React.JSX.Element 
               background:
                 bulkMode && bulkSelected.has(w.id)
                   ? 'rgba(var(--accent-primary-rgb), 0.04)'
-                  : 'transparent',
-              cursor: 'grab'
+                  : 'transparent'
             }}
           >
+            <span style={{ marginTop: '2px' }}>
+              <DragHandle {...warrantySort.handleProps(wi, `Move warranty ${wi + 1}`)} />
+            </span>
             {bulkMode && (
               <input
                 type="checkbox"
@@ -3199,14 +3144,14 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...deductibles]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(deductibles, from, to)
     setDeductibles(newOrder)
     await window.api.piReorderDeductibles(newOrder.map((d) => d.id))
   }
+  const dedSort = useDragSort(deductibles.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => deductibles[i]?.id === editingId
+  })
 
   const handleAddTextDed = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -3234,14 +3179,14 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
     loadData()
   }
 
-  const handleTextMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...textDeds]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleTextMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(textDeds, from, to)
     setTextDeds(newOrder)
     await window.api.piReorderTextDeductibles(newOrder.map((d) => d.id))
   }
+  const textDedSort = useDragSort(textDeds.length, (from, to) => void handleTextMove(from, to), {
+    disabled: (i) => textDeds[i]?.id === editingTextId
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3330,6 +3275,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
         {deductibles.map((d, i) => (
           <div
             key={d.id}
+            {...dedSort.rowProps(i)}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
@@ -3340,6 +3286,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
               alignItems: 'flex-start'
             }}
           >
+            <DragHandle {...dedSort.handleProps(i, `Move ${d.title || 'deductible'}`)} />
             {editingId === d.id ? (
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -3482,38 +3429,6 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                     }}
                   />
                   <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => handleMove(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => handleMove(i, 'down')}
-                    disabled={i === deductibles.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === deductibles.length - 1 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                  <button
                     title="Edit"
                     aria-label="Edit"
                     onClick={() => {
@@ -3609,6 +3524,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
         {textDeds.map((td, i) => (
           <div
             key={td.id}
+            {...textDedSort.rowProps(i)}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
@@ -3619,6 +3535,7 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
               alignItems: 'flex-start'
             }}
           >
+            <DragHandle {...textDedSort.handleProps(i, `Move ${td.title || 'deductible'}`)} />
             {editingTextId === td.id ? (
               <div style={{ flex: 1 }}>
                 <input
@@ -3733,38 +3650,6 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                     }}
                   />
                   <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => handleTextMove(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => handleTextMove(i, 'down')}
-                    disabled={i === textDeds.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === textDeds.length - 1 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                  <button
                     title="Edit"
                     aria-label="Edit"
                     onClick={() => {
@@ -3875,12 +3760,15 @@ function ExclusionsTab({ showSuccess, showError }: TabProps): React.JSX.Element 
     void usage.reload()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(exclusions, visibleExclusions, index, direction)
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(exclusions, visibleExclusions, from, to)
     if (!newOrder) return
     setExclusions(newOrder)
     await window.api.piReorderExclusions(newOrder.map((e) => e.id))
   }
+  const exclSort = useDragSort(visibleExclusions.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => visibleExclusions[i]?.id === editingId
+  })
 
   const toggleVT = (vtId: string, current: string[], setter: (ids: string[]) => void): void => {
     setter(current.includes(vtId) ? current.filter((id) => id !== vtId) : [...current, vtId])
@@ -4186,6 +4074,7 @@ function ExclusionsTab({ showSuccess, showError }: TabProps): React.JSX.Element 
       {visibleExclusions.map((ex, i) => (
         <div
           key={ex.id}
+          {...exclSort.rowProps(i)}
           style={{
             ...hiddenRowStyle(isHiddenItem(ex)),
             padding: '10px 14px',
@@ -4204,6 +4093,9 @@ function ExclusionsTab({ showSuccess, showError }: TabProps): React.JSX.Element 
                 : 'transparent'
           }}
         >
+          <span style={{ marginTop: '2px' }}>
+            <DragHandle {...exclSort.handleProps(i, `Move exclusion ${i + 1}`)} />
+          </span>
           {bulkMode && (
             <input
               type="checkbox"
@@ -4311,38 +4203,6 @@ function ExclusionsTab({ showSuccess, showError }: TabProps): React.JSX.Element 
                     loadData()
                   }}
                 />
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMove(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMove(i, 'down')}
-                  disabled={i === visibleExclusions.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === visibleExclusions.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
                 <button
                   title={ex.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                   aria-label="Edit"
@@ -4453,14 +4313,14 @@ function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...templates]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(templates, from, to)
     setTemplates(newOrder)
     await window.api.piReorderSubLimitTemplates(newOrder.map((t) => t.id))
   }
+  const subLimitSort = useDragSort(templates.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => templates[i]?.id === editingId
+  })
 
   return (
     <div>
@@ -4519,6 +4379,7 @@ function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
         {templates.map((t, i) => (
           <div
             key={t.id}
+            {...subLimitSort.rowProps(i)}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
@@ -4529,6 +4390,7 @@ function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
               alignItems: 'center'
             }}
           >
+            <DragHandle {...subLimitSort.handleProps(i, `Move template ${i + 1}`)} />
             {editingId === t.id ? (
               <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
@@ -4583,38 +4445,6 @@ function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
                   {t.textTemplate}
                 </div>
                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => handleMove(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => handleMove(i, 'down')}
-                    disabled={i === templates.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === templates.length - 1 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
                   <button
                     title="Edit"
                     aria-label="Edit"
@@ -4724,12 +4554,17 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(clauses, visibleClauses, from, to)
     if (!newOrder) return
     setClauses(newOrder)
     await window.api.piReorderAdditionalClauses(newOrder.map((c) => c.id))
   }
+  const addlClauseSort = useDragSort(
+    visibleClauses.length,
+    (from, to) => void handleMove(from, to),
+    { disabled: (i) => visibleClauses[i]?.id === editingId }
+  )
 
   const startEditSet = (s: PIAdditionalClauseSet): void => {
     setEditSetId(s.id)
@@ -4742,15 +4577,10 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
     setEditSetOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const moveSetClause = (index: number, direction: 'up' | 'down'): void => {
-    setEditSetOrder((prev) => {
-      const next = [...prev]
-      const swapIndex = direction === 'up' ? index - 1 : index + 1
-      if (swapIndex < 0 || swapIndex >= next.length) return prev
-      ;[next[index], next[swapIndex]] = [next[swapIndex], next[index]]
-      return next
-    })
+  const moveSetClause = (from: number, to: number): void => {
+    setEditSetOrder((prev) => moveInArray(prev, from, to))
   }
+  const setClauseSort = useDragSort(editSetOrder.length, moveSetClause)
 
   const saveSet = async (): Promise<void> => {
     if (!editSetId) return
@@ -4824,6 +4654,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
         {visibleClauses.map((c, i) => (
           <div
             key={c.id}
+            {...addlClauseSort.rowProps(i)}
             style={{
               ...hiddenRowStyle(isHiddenItem(c)),
               padding: '10px 14px',
@@ -4835,6 +4666,11 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
               alignItems: 'flex-start'
             }}
           >
+            <span style={{ marginTop: '2px' }}>
+              <DragHandle
+                {...addlClauseSort.handleProps(i, `Move ${c.code || c.title || 'clause'}`)}
+              />
+            </span>
             {editingId === c.id ? (
               <div
                 style={{
@@ -4955,38 +4791,6 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                     />
                     Default
                   </label>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => handleMove(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => handleMove(i, 'down')}
-                    disabled={i === visibleClauses.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      color: 'var(--text-secondary)',
-                      opacity: i === visibleClauses.length - 1 ? 0.3 : 1
-                    }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
                   <button
                     title={c.replacedBy ? OLDER_WORDING_EDIT_TITLE : 'Edit'}
                     aria-label="Edit"
@@ -5128,6 +4932,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                       return (
                         <div
                           key={id}
+                          {...setClauseSort.rowProps(idx)}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -5138,38 +4943,12 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                             marginBottom: '3px'
                           }}
                         >
-                          <button
-                            title="Move up"
-                            aria-label="Move up"
-                            onClick={() => moveSetClause(idx, 'up')}
-                            disabled={idx === 0}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '1px',
-                              color: 'var(--text-secondary)',
-                              opacity: idx === 0 ? 0.3 : 1
-                            }}
-                          >
-                            <ChevronUp size={13} />
-                          </button>
-                          <button
-                            title="Move down"
-                            aria-label="Move down"
-                            onClick={() => moveSetClause(idx, 'down')}
-                            disabled={idx === editSetOrder.length - 1}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '1px',
-                              color: 'var(--text-secondary)',
-                              opacity: idx === editSetOrder.length - 1 ? 0.3 : 1
-                            }}
-                          >
-                            <ChevronDown size={13} />
-                          </button>
+                          <DragHandle
+                            {...setClauseSort.handleProps(
+                              idx,
+                              `Move ${c.code || c.title || 'clause'}`
+                            )}
+                          />
                           {c.title && (
                             <span
                               style={{
@@ -6258,14 +6037,14 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
     }
   }
 
-  const move = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const newIdx = idx + dir
-    if (newIdx < 0 || newIdx >= templates.length) return
-    const reordered = [...templates]
-    ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+  const move = async (from: number, to: number): Promise<void> => {
+    const reordered = moveInArray(templates, from, to)
     setTemplates(reordered)
     await window.api.piReorderTradingWarrantyTemplates(reordered.map((t) => t.id))
   }
+  const twTemplateSort = useDragSort(templates.length, (from, to) => void move(from, to), {
+    disabled: (i) => templates[i]?.id === editingId
+  })
 
   const startEdit = (t: TradingWarrantyTemplate): void => {
     setEditingId(t.id)
@@ -6362,6 +6141,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
       {templates.map((t, idx) => (
         <div
           key={t.id}
+          {...twTemplateSort.rowProps(idx)}
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
@@ -6398,6 +6178,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DragHandle {...twTemplateSort.handleProps(idx, `Move ${t.name}`)} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
                   {t.name}
@@ -6413,44 +6194,12 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): Reac
                   }}
                 >
                   {t.text
-                      .replace(/<[^>]*>/g, '')
-                      .replace(/&nbsp;/g, ' ')
-                      .substring(0, 120) || '(empty)'}
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/&nbsp;/g, ' ')
+                    .substring(0, 120) || '(empty)'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => move(idx, -1)}
-                  disabled={idx === 0}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: idx === 0 ? 'default' : 'pointer',
-                    opacity: idx === 0 ? 0.3 : 1,
-                    padding: '2px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => move(idx, 1)}
-                  disabled={idx === templates.length - 1}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: idx === templates.length - 1 ? 'default' : 'pointer',
-                    opacity: idx === templates.length - 1 ? 0.3 : 1,
-                    padding: '2px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
                 <button
                   title="Edit"
                   aria-label="Edit"
@@ -6549,14 +6298,14 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
     }
   }
 
-  const move = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const newIdx = idx + dir
-    if (newIdx < 0 || newIdx >= items.length) return
-    const reordered = [...items]
-    ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+  const move = async (from: number, to: number): Promise<void> => {
+    const reordered = moveInArray(items, from, to)
     setItems(reordered)
     await window.api.piReorderTradingCustomTexts(reordered.map((t) => t.id))
   }
+  const customTextSort = useDragSort(items.length, (from, to) => void move(from, to), {
+    disabled: (i) => items[i]?.id === editingId
+  })
 
   const startEdit = (t: TradingCustomText): void => {
     setEditingId(t.id)
@@ -6633,6 +6382,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
       {items.map((t, idx) => (
         <div
           key={t.id}
+          {...customTextSort.rowProps(idx)}
           style={{
             padding: '12px 14px',
             borderRadius: '8px',
@@ -6669,40 +6419,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => move(idx, -1)}
-                  disabled={idx === 0}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0',
-                    color: 'var(--text-secondary)',
-                    opacity: idx === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => move(idx, 1)}
-                  disabled={idx === items.length - 1}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0',
-                    color: 'var(--text-secondary)',
-                    opacity: idx === items.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
-              </div>
+              <DragHandle {...customTextSort.handleProps(idx, `Move ${t.name}`)} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>
                   {t.name}
@@ -6847,17 +6564,26 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
 
   const move = async (
     templates: PremiumTextTemplate[],
-    idx: number,
-    dir: -1 | 1
+    from: number,
+    to: number
   ): Promise<void> => {
-    const newIdx = idx + dir
-    if (newIdx < 0 || newIdx >= templates.length) return
-    const reordered = [...templates]
-    ;[reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]]
+    const reordered = moveInArray(templates, from, to)
     if (reordered[0]?.type === 'ncb') setNcbTemplates(reordered)
     else setUpccTemplates(reordered)
     await window.api.premiumReorderTextTemplates(reordered.map((t) => t.id))
   }
+  const ncbSort = useDragSort(
+    ncbTemplates.length,
+    (from, to) => void move(ncbTemplates, from, to),
+    {
+      disabled: (i) => ncbTemplates[i]?.id === editingId
+    }
+  )
+  const upccSort = useDragSort(
+    upccTemplates.length,
+    (from, to) => void move(upccTemplates, from, to),
+    { disabled: (i) => upccTemplates[i]?.id === editingId }
+  )
 
   const startEdit = (t: PremiumTextTemplate): void => {
     setEditingId(t.id)
@@ -6884,6 +6610,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
     showAdd: boolean,
     setShowAdd: (v: boolean) => void
   ): React.JSX.Element => {
+    const sort = type === 'ncb' ? ncbSort : upccSort
     const autoPlaceholders =
       type === 'ncb'
         ? '{ncb_percent}, {ncb_amount}, {currency}'
@@ -7002,6 +6729,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
         {templates.map((t, idx) => (
           <div
             key={t.id}
+            {...sort.rowProps(idx)}
             style={{
               padding: '12px 16px',
               borderRadius: '8px',
@@ -7038,6 +6766,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
               </>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <DragHandle {...sort.handleProps(idx, `Move ${t.name}`)} />
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
@@ -7087,38 +6816,6 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JS
                     }}
                   >
                     <Star size={14} fill={t.isDefault ? 'currentColor' : 'none'} />
-                  </button>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => move(templates, idx, -1)}
-                    disabled={idx === 0}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: idx === 0 ? 'default' : 'pointer',
-                      opacity: idx === 0 ? 0.3 : 1,
-                      padding: '2px',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => move(templates, idx, 1)}
-                    disabled={idx === templates.length - 1}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: idx === templates.length - 1 ? 'default' : 'pointer',
-                      opacity: idx === templates.length - 1 ? 0.3 : 1,
-                      padding: '2px',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    <ChevronDown size={14} />
                   </button>
                   <button
                     title="Edit"
@@ -7298,14 +6995,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
     }
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...items]
-    const targetIdx = idx + dir
-    if (targetIdx < 0 || targetIdx >= arr.length) return
-    ;[arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(items, from, to)
     setItems(arr)
     await window.api.reorderPISubjectivities(arr.map((s) => s.id))
   }
+  const masterSubjSort = useDragSort(items.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => items[i]?.id === editingId
+  })
 
   const toggleDocType = (ids: string[], setIds: (v: string[]) => void, dtId: string): void => {
     setIds(ids.includes(dtId) ? ids.filter((id) => id !== dtId) : [...ids, dtId])
@@ -7428,6 +7125,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
           items.map((s, idx) => (
             <div
               key={s.id}
+              {...masterSubjSort.rowProps(idx)}
               style={{
                 padding: '12px 14px',
                 borderRadius: '8px',
@@ -7540,28 +7238,11 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
               ) : (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <DragHandle
+                      {...masterSubjSort.handleProps(idx, `Move subjectivity ${idx + 1}`)}
+                    />
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{s.text}</span>
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button
-                        title="Move up"
-                        aria-label="Move up"
-                        onClick={() => handleMove(idx, -1)}
-                        disabled={idx === 0}
-                        className="btn-secondary"
-                        style={{ padding: '3px' }}
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        title="Move down"
-                        aria-label="Move down"
-                        onClick={() => handleMove(idx, 1)}
-                        disabled={idx === items.length - 1}
-                        className="btn-secondary"
-                        style={{ padding: '3px' }}
-                      >
-                        <ChevronDown size={14} />
-                      </button>
                       <button
                         title="Edit"
                         aria-label="Edit"
@@ -7771,14 +7452,16 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
     setDirtyIds((prev) => new Set(prev).add(id))
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...versions]
-    const targetIdx = idx + dir
-    if (targetIdx < 0 || targetIdx >= arr.length) return
-    ;[arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(versions, from, to)
     setVersions(arr)
     await window.api.piReorderSanctionsVersions(arr.map((v) => v.id))
   }
+  const sanctionsVersionSort = useDragSort(
+    versions.length,
+    (from, to) => void handleMove(from, to),
+    { disabled: (i) => versions[i]?.id === editingId }
+  )
 
   return (
     <div>
@@ -7828,6 +7511,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
           versions.map((v, idx) => (
             <div
               key={v.id}
+              {...sanctionsVersionSort.rowProps(idx)}
               style={{
                 padding: '14px',
                 borderRadius: '8px',
@@ -7868,6 +7552,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
                 >
+                  <DragHandle {...sanctionsVersionSort.handleProps(idx, `Move ${v.name}`)} />
                   <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name}</span>
                   <span
                     style={{
@@ -7881,26 +7566,6 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.E
                     {v.key}
                   </span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                    <button
-                      title="Move up"
-                      aria-label="Move up"
-                      onClick={() => handleMove(idx, -1)}
-                      disabled={idx === 0}
-                      className="btn-secondary"
-                      style={{ padding: '3px' }}
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      title="Move down"
-                      aria-label="Move down"
-                      onClick={() => handleMove(idx, 1)}
-                      disabled={idx === versions.length - 1}
-                      className="btn-secondary"
-                      style={{ padding: '3px' }}
-                    >
-                      <ChevronDown size={14} />
-                    </button>
                     <button
                       title="Edit"
                       aria-label="Edit"
@@ -8422,14 +8087,12 @@ function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
     void run()
   }, [loadData])
 
-  const handleMove = (index: number, direction: 'up' | 'down'): void => {
-    const newOrder = [...order]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMove = (from: number, to: number): void => {
+    const newOrder = moveInArray(order, from, to)
     setOrder(newOrder)
     setDirty(true)
   }
+  const sectionSort = useDragSort(order.length, (from, to) => void handleMove(from, to))
 
   const handleSave = async (): Promise<void> => {
     await window.api.piSetSectionOrderDefaultsByType(selectedType, order)
@@ -8510,6 +8173,7 @@ function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
         {order.map((key, i) => (
           <div
             key={key}
+            {...sectionSort.rowProps(i)}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
@@ -8519,6 +8183,7 @@ function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
               alignItems: 'center'
             }}
           >
+            <DragHandle {...sectionSort.handleProps(i, `Move ${SECTION_LABELS[key] || key}`)} />
             <span
               style={{
                 fontSize: '0.75rem',
@@ -8532,40 +8197,6 @@ function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
             <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>
               {SECTION_LABELS[key] || key}
             </span>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => handleMove(i, 'up')}
-                disabled={i === 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === 0 ? 0.3 : 1
-                }}
-              >
-                <ChevronUp size={16} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => handleMove(i, 'down')}
-                disabled={i === order.length - 1}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === order.length - 1 ? 0.3 : 1
-                }}
-              >
-                <ChevronDown size={16} />
-              </button>
-            </div>
           </div>
         ))}
       </div>
@@ -8624,14 +8255,12 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps): React.JSX.Element {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...texts]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(texts, from, to)
     setTexts(newOrder)
     await window.api.hullReorderAgreedValueTexts(newOrder.map((t) => t.id))
   }
+  const agreedTextSort = useDragSort(texts.length, (from, to) => void handleMove(from, to))
 
   return (
     <section className="glass-card" style={{ padding: '20px' }}>
@@ -8695,6 +8324,7 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps): React.JSX.Element {
       {texts.map((t, i) => (
         <div
           key={t.id}
+          {...agreedTextSort.rowProps(i)}
           style={{
             padding: '10px 14px',
             borderRadius: '8px',
@@ -8705,40 +8335,7 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps): React.JSX.Element {
             gap: '10px'
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <button
-              title="Move up"
-              aria-label="Move up"
-              onClick={() => handleMove(i, 'up')}
-              disabled={i === 0}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '2px',
-                color: 'var(--text-secondary)',
-                opacity: i === 0 ? 0.3 : 1
-              }}
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              title="Move down"
-              aria-label="Move down"
-              onClick={() => handleMove(i, 'down')}
-              disabled={i === texts.length - 1}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '2px',
-                color: 'var(--text-secondary)',
-                opacity: i === texts.length - 1 ? 0.3 : 1
-              }}
-            >
-              <ChevronDown size={14} />
-            </button>
-          </div>
+          <DragHandle {...agreedTextSort.handleProps(i, `Move text ${i + 1}`)} />
           <div style={{ flex: 1 }}>
             {editingId === t.id ? (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -9020,12 +8617,17 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     void clauseUsage.reload()
   }
 
-  const handleMoveClause = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+  const handleMoveClause = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(clauses, visibleClauses, from, to)
     if (!newOrder) return
     setClauses(newOrder)
     await window.api.hullReorderClauses(newOrder.map((c) => c.id))
   }
+  const hullClauseSort = useDragSort(
+    visibleClauses.length,
+    (from, to) => void handleMoveClause(from, to),
+    { disabled: (i) => visibleClauses[i]?.id === editingId }
+  )
 
   // Condition CRUD
   const handleAddCondition = async (e: React.FormEvent): Promise<void> => {
@@ -9089,13 +8691,18 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
     void condUsage.reload()
   }
 
-  const handleMoveCondition = async (index: number, direction: 'up' | 'down'): Promise<void> => {
+  const handleMoveCondition = async (from: number, to: number): Promise<void> => {
     if (!selectedClauseId) return
-    const newOrder = moveAmongVisible(conditions, visibleConditions, index, direction)
+    const newOrder = dragAmongVisible(conditions, visibleConditions, from, to)
     if (!newOrder) return
     setConditions(newOrder)
     await window.api.hullReorderClauseConditions(newOrder.map((c) => c.id))
   }
+  const hullCondSort = useDragSort(
+    visibleConditions.length,
+    (from, to) => void handleMoveCondition(from, to),
+    { disabled: (i) => visibleConditions[i]?.id === editCondId }
+  )
 
   const selectedClause = clauses.find((c) => c.id === selectedClauseId)
 
@@ -9187,6 +8794,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
         {visibleClauses.map((c, i) => (
           <div
             key={c.id}
+            {...hullClauseSort.rowProps(i)}
             style={{
               ...hiddenRowStyle(isHiddenItem(c)),
               padding: '10px 14px',
@@ -9209,38 +8817,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
               style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => handleMoveClause(i, 'up')}
-                disabled={i === 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === 0 ? 0.3 : 1
-                }}
-              >
-                <ChevronUp size={14} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => handleMoveClause(i, 'down')}
-                disabled={i === visibleClauses.length - 1}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === visibleClauses.length - 1 ? 0.3 : 1
-                }}
-              >
-                <ChevronDown size={14} />
-              </button>
+              <DragHandle {...hullClauseSort.handleProps(i, `Move ${c.name || 'clause'}`)} />
             </div>
             {editingId === c.id ? (
               <div style={{ flex: 1 }} onClick={(e) => e.stopPropagation()}>
@@ -9501,6 +9078,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
           {visibleConditions.map((cond, i) => (
             <div
               key={cond.id}
+              {...hullCondSort.rowProps(i)}
               style={{
                 ...hiddenRowStyle(isHiddenItem(cond)),
                 padding: '8px 12px',
@@ -9512,40 +9090,9 @@ function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element
                 gap: '8px'
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMoveCondition(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={12} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMoveCondition(i, 'down')}
-                  disabled={i === visibleConditions.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === visibleConditions.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={12} />
-                </button>
-              </div>
+              <DragHandle
+                {...hullCondSort.handleProps(i, `Move condition ${cond.conditionNumber || i + 1}`)}
+              />
               {editCondId === cond.id ? (
                 <div
                   style={{
@@ -9821,42 +9368,18 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
     void usage.reload()
   }
 
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-
-  const handleDragStart = (index: number): void => {
-    setDragIndex(index)
-  }
-
-  const handleDragOver = (e: React.DragEvent, index: number): void => {
-    e.preventDefault()
-    if (dragIndex === null || dragIndex === index) return
-    setDragOverIndex(index)
-  }
-
-  const handleDrop = async (index: number): Promise<void> => {
-    if (dragIndex === null || dragIndex === index) {
-      setDragIndex(null)
-      setDragOverIndex(null)
-      return
-    }
-    // Indexes are of the shown rows (hidden ones may be filtered out)
-    const newOrder = [...conditions]
-    const from = newOrder.findIndex((c) => c.id === visibleConditions[dragIndex]?.id)
-    const to = newOrder.findIndex((c) => c.id === visibleConditions[index]?.id)
-    setDragIndex(null)
-    setDragOverIndex(null)
-    if (from === -1 || to === -1) return
-    const [moved] = newOrder.splice(from, 1)
-    newOrder.splice(to, 0, moved)
+  // Drag a condition by its handle; indexes are of the shown rows (hidden ones may be left out)
+  const moveCondition = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(conditions, visibleConditions, from, to)
+    if (!newOrder) return
     setConditions(newOrder)
     await window.api.hullReorderAdditionalConditions(newOrder.map((c) => c.id))
   }
-
-  const handleDragEnd = (): void => {
-    setDragIndex(null)
-    setDragOverIndex(null)
-  }
+  const condSort = useDragSort(
+    visibleConditions.length,
+    (from, to) => void moveCondition(from, to),
+    { disabled: (i) => visibleConditions[i]?.id === editingId }
+  )
 
   return (
     <section className="glass-card" style={{ padding: '20px' }}>
@@ -10039,21 +9562,13 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
       {visibleConditions.map((c, i) => (
         <div
           key={c.id}
-          draggable
-          onDragStart={() => handleDragStart(i)}
-          onDragOver={(e) => handleDragOver(e, i)}
-          onDrop={() => handleDrop(i)}
-          onDragEnd={handleDragEnd}
+          {...condSort.rowProps(i)}
           style={{
             borderRadius: '10px',
-            border:
-              dragOverIndex === i
-                ? '1px solid var(--accent-primary)'
-                : '1px solid rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.15)',
             marginBottom: '10px',
             overflow: 'hidden',
-            opacity: dragIndex === i ? 0.5 : isHiddenItem(c) ? 0.55 : 1,
-            transition: 'border-color 0.15s, opacity 0.15s'
+            opacity: isHiddenItem(c) ? 0.55 : 1
           }}
         >
           {/* Header: title + actions */}
@@ -10067,17 +9582,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): Reac
               borderBottom: '1px solid rgba(255,255,255,0.08)'
             }}
           >
-            <div
-              style={{
-                cursor: 'grab',
-                color: 'var(--text-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                marginRight: '2px'
-              }}
-            >
-              <GripVertical size={16} />
-            </div>
+            <DragHandle {...condSort.handleProps(i, `Move ${c.title || 'condition'}`)} />
             <span
               style={{
                 flex: 1,
@@ -10407,12 +9912,17 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
     void usage.reload()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(conditions, visibleConditions, index, direction)
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(conditions, visibleConditions, from, to)
     if (!newOrder) return
     setConditions(newOrder)
     await window.api.warReorderConditions(newOrder.map((c) => c.id))
   }
+  const warCondSort = useDragSort(
+    visibleConditions.length,
+    (from, to) => void handleMove(from, to),
+    { disabled: (i) => visibleConditions[i]?.id === editingId }
+  )
 
   return (
     <section className="glass-card" style={{ padding: '20px' }}>
@@ -10524,6 +10034,7 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
       {visibleConditions.map((c, i) => (
         <div
           key={c.id}
+          {...warCondSort.rowProps(i)}
           style={{
             ...hiddenRowStyle(isHiddenItem(c)),
             padding: '10px 14px',
@@ -10535,40 +10046,7 @@ function WarConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Eleme
             gap: '10px'
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <button
-              title="Move up"
-              aria-label="Move up"
-              onClick={() => handleMove(i, 'up')}
-              disabled={i === 0}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '2px',
-                color: 'var(--text-secondary)',
-                opacity: i === 0 ? 0.3 : 1
-              }}
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              title="Move down"
-              aria-label="Move down"
-              onClick={() => handleMove(i, 'down')}
-              disabled={i === visibleConditions.length - 1}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '2px',
-                color: 'var(--text-secondary)',
-                opacity: i === visibleConditions.length - 1 ? 0.3 : 1
-              }}
-            >
-              <ChevronDown size={14} />
-            </button>
-          </div>
+          <DragHandle {...warCondSort.handleProps(i, `Move condition ${i + 1}`)} />
           <div style={{ flex: 1 }}>
             {editingId === c.id ? (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -11097,14 +10575,12 @@ function WorkflowDesignerTab({ showSuccess, showError }: TabProps): React.JSX.El
     }
   }
 
-  const moveStep = async (index: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...steps]
-    const target = index + dir
-    if (target < 0 || target >= arr.length) return
-    ;[arr[index], arr[target]] = [arr[target], arr[index]]
+  const moveStep = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(steps, from, to)
     setSteps(arr)
     await window.api.workflowReorderSteps(arr.map((s) => s.id))
   }
+  const stepSort = useDragSort(steps.length, (from, to) => void moveStep(from, to))
 
   const handleAddTransition = async (): Promise<void> => {
     if (!newTransition.fromStepId || !newTransition.toStepId) return
@@ -11253,30 +10729,9 @@ function WorkflowDesignerTab({ showSuccess, showError }: TabProps): React.JSX.El
             </thead>
             <tbody>
               {steps.map((step, i) => (
-                <tr key={step.id}>
+                <tr key={step.id} {...stepSort.rowProps(i)}>
                   <td>
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      <button
-                        title="Move up"
-                        aria-label="Move up"
-                        onClick={() => moveStep(i, -1)}
-                        disabled={i === 0}
-                        className="btn-secondary"
-                        style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        title="Move down"
-                        aria-label="Move down"
-                        onClick={() => moveStep(i, 1)}
-                        disabled={i === steps.length - 1}
-                        className="btn-secondary"
-                        style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                    </div>
+                    <DragHandle {...stepSort.handleProps(i, `Move ${step.name}`)} />
                   </td>
                   <td>
                     {editingStep === step.id ? (
@@ -11829,13 +11284,14 @@ function SurveyWarrantyTemplatesTab({
     }
   }
 
-  const handleReorder = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...templates]
-    const [item] = arr.splice(idx, 1)
-    arr.splice(idx + dir, 0, item)
+  const handleReorder = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(templates, from, to)
     setTemplates(arr)
     await window.api.surveyWarrantyTemplateReorder(arr.map((t) => t.id))
   }
+  const surveyTplSort = useDragSort(templates.length, (from, to) => void handleReorder(from, to), {
+    disabled: !!readOnly
+  })
 
   const handleAddSet = async (): Promise<void> => {
     if (!setName.trim() || setTemplateIds.length === 0) return
@@ -11951,6 +11407,7 @@ function SurveyWarrantyTemplatesTab({
         {templates.map((t, idx) => (
           <div
             key={t.id}
+            {...surveyTplSort.rowProps(idx)}
             style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -11966,38 +11423,7 @@ function SurveyWarrantyTemplatesTab({
               <div
                 style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}
               >
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  disabled={idx === 0}
-                  onClick={() => handleReorder(idx, -1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: idx === 0 ? 'default' : 'pointer',
-                    padding: '1px',
-                    opacity: idx === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  disabled={idx === templates.length - 1}
-                  onClick={() => handleReorder(idx, 1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: idx === templates.length - 1 ? 'default' : 'pointer',
-                    padding: '1px',
-                    opacity: idx === templates.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
+                <DragHandle {...surveyTplSort.handleProps(idx, `Move ${t.title || 'template'}`)} />
               </div>
             )}
             <div style={{ flex: 1 }}>
@@ -12942,12 +12368,17 @@ function CargoClausesTab({
     void icUsage.reload()
   }
 
-  const handleIcMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(instituteClauses, visibleInstituteClauses, index, direction)
+  const handleIcMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(instituteClauses, visibleInstituteClauses, from, to)
     if (!newOrder) return
     setInstituteClauses(newOrder)
     await window.api.cargoReorderInstituteClauses(newOrder.map((c) => c.id))
   }
+  const icSort = useDragSort(
+    visibleInstituteClauses.length,
+    (from, to) => void handleIcMove(from, to),
+    { disabled: (i) => visibleInstituteClauses[i]?.id === icEditingId }
+  )
 
   const parseBulkLines = (raw: string): { code: string; title: string }[] => {
     return raw
@@ -13081,12 +12512,17 @@ function CargoClausesTab({
     void usage.reload()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = moveAmongVisible(clauses, visibleClauses, index, direction)
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = dragAmongVisible(clauses, visibleClauses, from, to)
     if (!newOrder) return
     setClauses(newOrder)
     await window.api.cargoReorderClauses(newOrder.map((c) => c.id))
   }
+  const cargoClauseSort = useDragSort(
+    visibleClauses.length,
+    (from, to) => void handleMove(from, to),
+    { disabled: (i) => visibleClauses[i]?.id === editingId }
+  )
 
   return (
     <>
@@ -13189,6 +12625,7 @@ function CargoClausesTab({
           {visibleInstituteClauses.map((c, i) => (
             <div
               key={c.id}
+              {...icSort.rowProps(i)}
               style={{
                 padding: '10px 14px',
                 borderRadius: '8px',
@@ -13201,40 +12638,7 @@ function CargoClausesTab({
                 background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleIcMove(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleIcMove(i, 'down')}
-                  disabled={i === visibleInstituteClauses.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === visibleInstituteClauses.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
-              </div>
+              <DragHandle {...icSort.handleProps(i, `Move ${c.code || c.name || 'clause'}`)} />
               <div style={{ flex: 1 }}>
                 {icEditingId === c.id ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -13660,6 +13064,7 @@ function CargoClausesTab({
         {visibleClauses.map((c, i) => (
           <div
             key={c.id}
+            {...cargoClauseSort.rowProps(i)}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
@@ -13672,40 +13077,7 @@ function CargoClausesTab({
               background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => handleMove(i, 'up')}
-                disabled={i === 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === 0 ? 0.3 : 1
-                }}
-              >
-                <ChevronUp size={14} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => handleMove(i, 'down')}
-                disabled={i === visibleClauses.length - 1}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  color: 'var(--text-secondary)',
-                  opacity: i === visibleClauses.length - 1 ? 0.3 : 1
-                }}
-              >
-                <ChevronDown size={14} />
-              </button>
-            </div>
+            <DragHandle {...cargoClauseSort.handleProps(i, `Move ${c.title || 'clause'}`)} />
             <div style={{ flex: 1 }}>
               {editingId === c.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

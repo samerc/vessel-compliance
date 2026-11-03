@@ -17,10 +17,10 @@ import RichTextEditor, { type PlaceholderItem } from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './sharedUtils'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
-import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
-import { Field } from '../ui'
+import { Field, useDragSort, DragHandle, moveInArray } from '../ui'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
 import { hullClausesPerVesselOnly } from '../../../../shared/premium'
@@ -91,6 +91,12 @@ export default function PremiumTab({
   // Per-vessel premium under each hull alternative, keyed `${altId}:${vesselId}`
   const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
   const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
+  // Drag a discount by its handle (or Up / Down on it): the order they are deducted in
+  const discountSort = useDragSort(discounts.length, (from, to) => {
+    const arr = moveInArray(discounts, from, to)
+    setDiscounts(arr)
+    void window.api.quotationDiscountReorder(arr.map((x) => x.id))
+  })
   // Vessels of a new-business quotation that already have a policy of this type with us
   const [alreadyInsured, setAlreadyInsured] = useState<string[]>([])
   const linkedVesselKey = qVessels
@@ -2692,17 +2698,10 @@ export default function PremiumTab({
               setDiscounts((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...u } : x)))
             const save = (u: Partial<QuotationDiscount>): Promise<void> =>
               window.api.quotationDiscountUpdate(d.id, u)
-            const move = async (dir: -1 | 1): Promise<void> => {
-              const j = idx + dir
-              if (j < 0 || j >= discounts.length) return
-              const arr = [...discounts]
-              ;[arr[idx], arr[j]] = [arr[j], arr[idx]]
-              setDiscounts(arr)
-              await window.api.quotationDiscountReorder(arr.map((x) => x.id))
-            }
             return (
               <div
                 key={d.id}
+                {...discountSort.rowProps(idx)}
                 style={{
                   padding: '10px 12px',
                   borderRadius: '8px',
@@ -2719,6 +2718,9 @@ export default function PremiumTab({
                     flexWrap: 'wrap'
                   }}
                 >
+                  <DragHandle
+                    {...discountSort.handleProps(idx, `Move discount ${d.label || idx + 1}`)}
+                  />
                   <input
                     value={d.label || ''}
                     placeholder="Discount name (e.g. Loyalty Discount)"
@@ -2798,38 +2800,6 @@ export default function PremiumTab({
                       <span style={{ fontSize: '0.78rem' }}>%</span>
                     </div>
                   )}
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => move(-1)}
-                    disabled={idx === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      opacity: idx === 0 ? 0.3 : 1,
-                      padding: '2px'
-                    }}
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => move(1)}
-                    disabled={idx === discounts.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      opacity: idx === discounts.length - 1 ? 0.3 : 1,
-                      padding: '2px'
-                    }}
-                  >
-                    <ChevronDown size={16} />
-                  </button>
                   <button
                     title="Delete"
                     aria-label="Delete"

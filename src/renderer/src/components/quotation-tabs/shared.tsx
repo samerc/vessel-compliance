@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { QuotationPIAlternative } from '../../../../shared/types'
-import { useTheme } from '../../contexts/ThemeContext'
 import { ALT_COLORS, fmtMoney, parseMoney } from './sharedUtils'
-import { Badge } from '../ui'
+import { Badge, Combobox } from '../ui'
 import { isHiddenItem } from '../../utils/settingsItems'
 
 /** Number input that shows commas when not focused, raw number while editing */
@@ -232,6 +230,7 @@ export function AlternativeMultiScopeChips({
   )
 }
 
+/** "Add from settings..." pick-list: type to search, Down / Up / Enter, then the field clears */
 export function PickerDropdown({
   placeholder,
   options,
@@ -243,96 +242,19 @@ export function PickerDropdown({
   onSelect: (value: string) => void
   fontSize?: string
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
-  const dropdownBg = 'var(--bg-primary)'
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          padding: '8px 12px',
-          borderRadius: '8px',
-          fontSize,
-          border: '1px solid var(--input-border)',
-          background: 'var(--input-bg)',
-          color: 'var(--text-secondary)',
-          cursor: 'pointer',
-          textAlign: 'left',
-          minWidth: '200px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px'
-        }}
-      >
-        {placeholder}
-        <ChevronDown
-          size={14}
-          style={{
-            opacity: 0.5,
-            transform: open ? 'rotate(180deg)' : undefined,
-            transition: 'transform 0.15s'
-          }}
-        />
-      </button>
-      {open && options.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            zIndex: 9999,
-            marginTop: '4px',
-            minWidth: '100%',
-            maxWidth: '420px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-            borderRadius: '8px',
-            border: `1px solid ${'color-mix(in srgb, var(--text-primary) 15%, transparent)'}`,
-            background: dropdownBg,
-            boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
-          }}
-        >
-          {options.map((o) => (
-            <div
-              key={o.value}
-              onClick={() => {
-                onSelect(o.value)
-                setOpen(false)
-              }}
-              style={{
-                padding: '8px 14px',
-                fontSize,
-                cursor: 'pointer',
-                color: 'var(--text-primary)',
-                borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 7%, transparent)'}`,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = isLight
-                  ? 'rgba(0,0,0,0.04)'
-                  : 'rgba(255,255,255,0.06)')
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {o.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <Combobox
+      aria-label={placeholder}
+      placeholder={placeholder}
+      options={options}
+      getKey={(o) => o.value}
+      getLabel={(o) => o.label}
+      onSelect={(o) => onSelect(o.value)}
+      clearOnSelect
+      emptyText={options.length ? 'No matches' : 'Nothing left to add'}
+      listMinWidth={260}
+      style={{ display: 'inline-block', minWidth: '200px' }}
+      inputStyle={{ fontSize }}
+    />
   )
 }

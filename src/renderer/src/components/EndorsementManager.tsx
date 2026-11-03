@@ -7,8 +7,6 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  ArrowUp,
-  ArrowDown,
   Loader2,
   PenTool,
   FileText,
@@ -17,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Field } from './ui'
+import { Field, Combobox, useDragSort, DragHandle, moveInArray } from './ui'
 import { formatDateShort } from '../utils/dateUtils'
 import RichTextEditor from './RichTextEditor'
 import ConfirmationModal from './ConfirmationModal'
@@ -575,15 +573,21 @@ export default function EndorsementManager({
     }))
   }
 
-  const moveSection = (idx: number, dir: -1 | 1): void => {
-    const target = idx + dir
-    if (target < 0 || target >= editState.sections.length) return
+  // Moves section fromKey to where toKey is in the full list (only enabled sections are shown)
+  const moveSection = (fromKey: string, toKey: string): void => {
     setEditState((prev) => {
-      const arr = [...prev.sections]
-      ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+      const from = prev.sections.findIndex((s) => s.sectionKey === fromKey)
+      const to = prev.sections.findIndex((s) => s.sectionKey === toKey)
+      if (from < 0 || to < 0 || from === to) return prev
+      const arr = moveInArray(prev.sections, from, to)
       return { ...prev, sections: arr.map((s, i) => ({ ...s, orderIndex: i })) }
     })
   }
+  // Drag a section editor by its handle (or Up / Down on it)
+  const enabledSections = editState.sections.filter((s) => s.isEnabled)
+  const sectionSort = useDragSort(enabledSections.length, (from, to) =>
+    moveSection(enabledSections[from].sectionKey, enabledSections[to].sectionKey)
+  )
 
   const updateSectionContent = (key: string, content: string): void => {
     setEditState((prev) => ({
@@ -1025,177 +1029,148 @@ export default function EndorsementManager({
           </div>
 
           {/* Section editors */}
-          {editState.sections
-            .filter((s) => s.isEnabled)
-            .map((s) => {
-              const isCustom = s.sectionKey.startsWith('custom__')
-              const expanded = expandedSections.has(s.sectionKey)
-              const sectionTemplates = templates.filter(
-                (t) => t.sectionKey === s.sectionKey || t.sectionKey === 'general'
-              )
-              return (
+          {enabledSections.map((s, sIdx) => {
+            const isCustom = s.sectionKey.startsWith('custom__')
+            const expanded = expandedSections.has(s.sectionKey)
+            const sectionTemplates = templates.filter(
+              (t) => t.sectionKey === s.sectionKey || t.sectionKey === 'general'
+            )
+            return (
+              <div
+                key={s.sectionKey}
+                {...sectionSort.rowProps(sIdx)}
+                style={{
+                  border: '1px solid var(--glass-border-color)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden'
+                }}
+              >
                 <div
-                  key={s.sectionKey}
                   style={{
-                    border: '1px solid var(--glass-border-color)',
-                    borderRadius: '8px',
-                    marginBottom: '8px',
-                    overflow: 'hidden'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    background: 'var(--table-header-bg)',
+                    cursor: 'pointer'
                   }}
+                  onClick={() =>
+                    setExpandedSections((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(s.sectionKey)) next.delete(s.sectionKey)
+                      else next.add(s.sectionKey)
+                      return next
+                    })
+                  }
                 >
+                  {/* A click on the handle does not open / close the section */}
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <DragHandle
+                      {...sectionSort.handleProps(sIdx, `Move ${s.sectionTitle || 'section'}`)}
+                    />
+                  </span>
+                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {isCustom ? (
+                    <input
+                      value={s.sectionTitle}
+                      onChange={(e) => updateSectionTitle(s.sectionKey, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        ...inputStyle,
+                        width: '200px',
+                        padding: '2px 8px',
+                        fontSize: '0.82rem',
+                        fontWeight: 600
+                      }}
+                      placeholder="Section title"
+                    />
+                  ) : (
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{s.sectionTitle}</span>
+                  )}
                   <div
                     style={{
+                      marginLeft: 'auto',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      background: 'var(--table-header-bg)',
-                      cursor: 'pointer'
+                      gap: '4px',
+                      alignItems: 'center'
                     }}
-                    onClick={() =>
-                      setExpandedSections((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(s.sectionKey)) next.delete(s.sectionKey)
-                        else next.add(s.sectionKey)
-                        return next
-                      })
-                    }
                   >
-                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    {isCustom ? (
-                      <input
-                        value={s.sectionTitle}
-                        onChange={(e) => updateSectionTitle(s.sectionKey, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          ...inputStyle,
-                          width: '200px',
-                          padding: '2px 8px',
-                          fontSize: '0.82rem',
-                          fontWeight: 600
-                        }}
-                        placeholder="Section title"
-                      />
-                    ) : (
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{s.sectionTitle}</span>
-                    )}
-                    <div
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFullWidth(s.sectionKey)
+                      }}
+                      title={
+                        s.isFullWidth
+                          ? 'Two columns (title + content)'
+                          : 'Full width (no title column)'
+                      }
                       style={{
-                        marginLeft: 'auto',
-                        display: 'flex',
-                        gap: '4px',
-                        alignItems: 'center'
+                        background: 'transparent',
+                        border: `1px solid ${s.isFullWidth ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        color: s.isFullWidth ? 'var(--accent-primary)' : 'var(--text-secondary)'
                       }}
                     >
+                      {s.isFullWidth ? 'FULL' : '2-COL'}
+                    </button>
+                    {isCustom && (
                       <button
+                        title="Remove"
+                        aria-label="Remove"
                         onClick={(e) => {
                           e.stopPropagation()
-                          toggleFullWidth(s.sectionKey)
-                        }}
-                        title={
-                          s.isFullWidth
-                            ? 'Two columns (title + content)'
-                            : 'Full width (no title column)'
-                        }
-                        style={{
-                          background: 'transparent',
-                          border: `1px solid ${s.isFullWidth ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          padding: '1px 6px',
-                          fontSize: '0.65rem',
-                          fontWeight: 600,
-                          color: s.isFullWidth ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                        }}
-                      >
-                        {s.isFullWidth ? 'FULL' : '2-COL'}
-                      </button>
-                      <button
-                        title="Move up"
-                        aria-label="Move up"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          moveSection(editState.sections.indexOf(s), -1)
+                          removeSection(s.sectionKey)
                         }}
                         style={{
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          color: 'var(--text-secondary)',
+                          color: 'var(--danger)',
                           padding: '2px'
                         }}
                       >
-                        <ArrowUp size={13} />
+                        <X size={13} />
                       </button>
-                      <button
-                        title="Move down"
-                        aria-label="Move down"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          moveSection(editState.sections.indexOf(s), 1)
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--text-secondary)',
-                          padding: '2px'
-                        }}
-                      >
-                        <ArrowDown size={13} />
-                      </button>
-                      {isCustom && (
-                        <button
-                          title="Remove"
-                          aria-label="Remove"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeSection(s.sectionKey)
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--danger)',
-                            padding: '2px'
+                    )}
+                  </div>
+                </div>
+                {expanded && (
+                  <div style={{ padding: '12px' }}>
+                    {sectionTemplates.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <select
+                          style={{ ...inputStyle, width: 'auto', fontSize: '0.75rem' }}
+                          value=""
+                          onChange={(e) => {
+                            const tmpl = templates.find((t) => t.id === e.target.value)
+                            if (tmpl) applyTemplate(s.sectionKey, tmpl)
                           }}
                         >
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
+                          <option value="">Apply template...</option>
+                          {sectionTemplates.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <RichTextEditor
+                      value={s.content}
+                      onChange={(val) => updateSectionContent(s.sectionKey, val)}
+                      minHeight={100}
+                    />
                   </div>
-                  {expanded && (
-                    <div style={{ padding: '12px' }}>
-                      {sectionTemplates.length > 0 && (
-                        <div style={{ marginBottom: '8px' }}>
-                          <select
-                            style={{ ...inputStyle, width: 'auto', fontSize: '0.75rem' }}
-                            value=""
-                            onChange={(e) => {
-                              const tmpl = templates.find((t) => t.id === e.target.value)
-                              if (tmpl) applyTemplate(s.sectionKey, tmpl)
-                            }}
-                          >
-                            <option value="">Apply template...</option>
-                            {sectionTemplates.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <RichTextEditor
-                        value={s.content}
-                        onChange={(val) => updateSectionContent(s.sectionKey, val)}
-                        minHeight={100}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                )}
+              </div>
+            )
+          })}
 
           {/* Parties the endorsement names: screened before export / signing */}
           <div
@@ -1210,22 +1185,28 @@ export default function EndorsementManager({
               New owners, managers, operators or co-assureds. They are screened for sanctions before
               the endorsement is exported or signed, with the policy&apos;s own parties.
             </p>
-            <datalist id="endorsement-party-entities">
-              {partyEntities.map((e) => (
-                <option key={e.id} value={e.name} />
-              ))}
-            </datalist>
             {editState.screenParties.map((p, i) => (
               <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                <input
-                  type="text"
-                  list="endorsement-party-entities"
+                <Combobox
                   value={p.name}
+                  options={partyEntities}
+                  getKey={(en) => en.id}
+                  getLabel={(en) => en.name}
                   placeholder="Name (from the Directory or typed)"
                   aria-label="Party name"
+                  // A typed name is kept on Enter; Down / Up highlight a Directory entry
+                  autoHighlight={false}
                   style={{ flex: 2, minWidth: 0 }}
-                  onChange={(e) => {
-                    const name = e.target.value
+                  emptyText="Not in the Directory: the typed name is screened"
+                  onSelect={(en) =>
+                    setEditState((prev) => ({
+                      ...prev,
+                      screenParties: prev.screenParties.map((x, j) =>
+                        j === i ? { ...x, kind: 'entity', id: en.id, name: en.name } : x
+                      )
+                    }))
+                  }
+                  onInputChange={(name) => {
                     const hit = partyEntities.find(
                       (en) => en.name.trim().toLowerCase() === name.trim().toLowerCase()
                     )

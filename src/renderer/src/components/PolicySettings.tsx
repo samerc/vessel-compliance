@@ -2,8 +2,6 @@ import { useState, useEffect, useEffectEvent } from 'react'
 import {
   Plus,
   Trash2,
-  ChevronUp,
-  ChevronDown,
   Save,
   FileText,
   Clock,
@@ -35,7 +33,7 @@ import { BC_DEFAULTS } from '../services/policyExportDefaults'
 import { sanitizeHtml } from '../utils/sanitize'
 import { ok, isIpcError } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
-import { Modal, Field } from './ui'
+import { Modal, Field, useDragSort, DragHandle, moveInArray } from './ui'
 import type {
   TcTemplateMeta,
   EndorsementTriggerField,
@@ -602,13 +600,10 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }): 
 
   const handleRemove = (tz: string): Promise<void> => save(timezones.filter((t) => t !== tz))
 
-  const handleMove = (idx: number, dir: -1 | 1): void => {
-    const newIdx = idx + dir
-    if (newIdx < 0 || newIdx >= timezones.length) return
-    const updated = [...timezones]
-    ;[updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]]
-    save(updated)
-  }
+  // Drag a timezone by its handle (or Up / Down on it); the first one is the default
+  const sort = useDragSort(timezones.length, (from, to) => {
+    void save(moveInArray(timezones, from, to))
+  })
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
 
@@ -639,6 +634,7 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }): 
         {timezones.map((tz, idx) => (
           <div
             key={tz}
+            {...sort.rowProps(idx)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -649,40 +645,7 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }): 
               background: idx === 0 ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent'
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => handleMove(idx, -1)}
-                disabled={idx === 0}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  color: 'var(--text-secondary)',
-                  opacity: idx === 0 ? 0.3 : 1
-                }}
-              >
-                <ChevronUp size={12} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => handleMove(idx, 1)}
-                disabled={idx === timezones.length - 1}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  color: 'var(--text-secondary)',
-                  opacity: idx === timezones.length - 1 ? 0.3 : 1
-                }}
-              >
-                <ChevronDown size={12} />
-              </button>
-            </div>
+            <DragHandle {...sort.handleProps(idx, `Move ${tz}`)} />
             <span style={{ flex: 1, fontSize: '0.9rem' }}>{tz}</span>
             {idx === 0 && (
               <span
@@ -1081,11 +1044,8 @@ function BanksTab({
     }
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...banks]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(banks, from, to)
     setBanks(newOrder)
     try {
       await window.api.bankReorder(newOrder.map((b) => b.id))
@@ -1093,6 +1053,10 @@ function BanksTab({
       /* ignore */
     }
   }
+  // Drag a bank by its handle (or Up / Down on it); not while it is being edited
+  const sort = useDragSort(banks.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => banks[i]?.id === editingBankId
+  })
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
 
@@ -1135,6 +1099,7 @@ function BanksTab({
           {banks.map((bank, index) => (
             <div
               key={bank.id}
+              {...sort.rowProps(index)}
               style={{
                 padding: '14px 16px',
                 borderRadius: '10px',
@@ -1186,36 +1151,7 @@ function BanksTab({
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <button
-                      onClick={() => handleMove(index, 'up')}
-                      disabled={index === 0}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: index === 0 ? 'default' : 'pointer',
-                        padding: '0',
-                        opacity: index === 0 ? 0.3 : 1
-                      }}
-                      aria-label="Move up"
-                    >
-                      <ChevronUp size={14} color="var(--text-secondary)" />
-                    </button>
-                    <button
-                      onClick={() => handleMove(index, 'down')}
-                      disabled={index === banks.length - 1}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: index === banks.length - 1 ? 'default' : 'pointer',
-                        padding: '0',
-                        opacity: index === banks.length - 1 ? 0.3 : 1
-                      }}
-                      aria-label="Move down"
-                    >
-                      <ChevronDown size={14} color="var(--text-secondary)" />
-                    </button>
-                  </div>
+                  <DragHandle {...sort.handleProps(index, `Move ${bank.name}`)} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{bank.name}</div>
                     {bank.details && (
@@ -3665,13 +3601,8 @@ function PolicySectionOrderTab({
     }
   }, [typeCode])
 
-  const move = (i: number, dir: 'up' | 'down'): void => {
-    const j = dir === 'up' ? i - 1 : i + 1
-    if (j < 0 || j >= order.length) return
-    const next = [...order]
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setOrder(next)
-  }
+  // Drag a section by its handle (or Up / Down on it); saved with Save Order
+  const sort = useDragSort(order.length, (from, to) => setOrder(moveInArray(order, from, to)))
 
   const save = async (): Promise<void> => {
     try {
@@ -3724,6 +3655,7 @@ function PolicySectionOrderTab({
           {order.map((k, i) => (
             <div
               key={k}
+              {...sort.rowProps(i)}
               style={{
                 padding: '9px 14px',
                 borderRadius: '8px',
@@ -3735,6 +3667,7 @@ function PolicySectionOrderTab({
                 background: 'var(--table-header-bg)'
               }}
             >
+              <DragHandle {...sort.handleProps(i, `Move ${SECTION_LABELS[k] || k}`)} />
               <span
                 style={{
                   fontSize: '0.75rem',
@@ -3748,40 +3681,6 @@ function PolicySectionOrderTab({
               <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>
                 {SECTION_LABELS[k] || k}
               </span>
-              <div style={{ display: 'flex', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => move(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => move(i, 'down')}
-                  disabled={i === order.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === order.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={16} />
-                </button>
-              </div>
             </div>
           ))}
         </div>

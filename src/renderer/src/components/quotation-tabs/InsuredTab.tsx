@@ -1,5 +1,5 @@
 import { useState, useEffect, useEffectEvent } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, X, RefreshCw } from 'lucide-react'
 import {
   Quotation,
   AssuredRole,
@@ -11,6 +11,15 @@ import {
 } from '../../../../shared/types'
 import { confirmDialog } from '../DialogHost'
 import { CaseToggleBtn } from '../CaseToggle'
+import { Combobox, useDragSort, DragHandle, moveInArray } from '../ui'
+
+// Entities matching what is typed
+const matchEntities = (list: Entity[], typed: string, skipExact = false): Entity[] => {
+  const q = typed.toLowerCase()
+  return list
+    .filter((e) => e.name.toLowerCase().includes(q) && !(skipExact && e.name.toLowerCase() === q))
+    .slice(0, 8)
+}
 
 export default function InsuredTab({
   quotation,
@@ -40,8 +49,6 @@ export default function InsuredTab({
   const [newRoleName, setNewRoleName] = useState('')
   const [newGroupName, setNewGroupName] = useState('')
   const [coInputValue, setCoInputValue] = useState(quotation.coName || '')
-  const [showCoDropdown, setShowCoDropdown] = useState(false)
-  const [showEntityDropdown, setShowEntityDropdown] = useState(false)
   const [customerType, setCustomerType] = useState<'broker' | 'direct' | ''>(
     quotation.customerType || ''
   )
@@ -119,14 +126,14 @@ export default function InsuredTab({
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...assureds]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  // Drag an assured by its handle (or Up / Down on it). One order for all of them: in the group
+  // and vessel views a row moves next to the row it is dropped on
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(assureds, from, to)
     setAssureds(newOrder)
     await window.api.reorderQuotationAssureds(newOrder.map((a) => a.id))
   }
+  const sort = useDragSort(assureds.length, (from, to) => void handleMove(from, to))
 
   const handleAddGroup = async (defaultName?: string): Promise<void> => {
     const name = defaultName || newGroupName.trim()
@@ -165,26 +172,12 @@ export default function InsuredTab({
     }
   }
 
-  const coFiltered = entities
-    .filter(
-      (e) => coInputValue.length > 0 && e.name.toLowerCase().includes(coInputValue.toLowerCase())
-    )
-    .slice(0, 8)
-
-  const entityFiltered = entities
-    .filter(
-      (e) =>
-        newName.length > 0 &&
-        e.name.toLowerCase().includes(newName.toLowerCase()) &&
-        e.name.toLowerCase() !== newName.toLowerCase()
-    )
-    .slice(0, 8)
-
   const renderAssuredRow = (a: QuotationAssured): React.JSX.Element => {
     const i = assureds.indexOf(a)
     return (
       <div
         key={a.id}
+        {...sort.rowProps(i)}
         style={{
           padding: '8px 12px',
           borderRadius: '8px',
@@ -195,6 +188,7 @@ export default function InsuredTab({
           alignItems: 'center'
         }}
       >
+        <DragHandle {...sort.handleProps(i, `Move ${a.name}`)} />
         {groups.length > 0 && (
           <select
             value={a.groupId || ''}
@@ -256,26 +250,6 @@ export default function InsuredTab({
         )}
         <div style={{ display: 'flex', gap: '2px' }}>
           <button
-            title="Move up"
-            aria-label="Move up"
-            onClick={() => handleMove(i, 'up')}
-            disabled={i === 0}
-            className="btn-secondary"
-            style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}
-          >
-            <ChevronUp size={14} />
-          </button>
-          <button
-            title="Move down"
-            aria-label="Move down"
-            onClick={() => handleMove(i, 'down')}
-            disabled={i === assureds.length - 1}
-            className="btn-secondary"
-            style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}
-          >
-            <ChevronDown size={14} />
-          </button>
-          <button
             title="Delete"
             aria-label="Delete"
             onClick={() => handleDeleteAssured(a.id)}
@@ -327,26 +301,35 @@ export default function InsuredTab({
         ))}
       </div>
       <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '28px' }}>
-        <input
-          type="text"
+        <Combobox
+          aria-label={customerType === 'direct' ? 'Customer' : 'Broker'}
           value={coInputValue}
-          onChange={(e) => {
-            setCoInputValue(e.target.value)
-            setShowCoDropdown(true)
+          onInputChange={setCoInputValue}
+          options={entities}
+          filter={(list, typed) => matchEntities(list, typed)}
+          getKey={(e) => e.id}
+          getLabel={(e) => e.name}
+          getDetail={(e) => `(${e.type})`}
+          onSelect={(e) => {
+            setCoInputValue(e.name)
+            updateField('coName', e.name)
+            updateField('customerEntityId', e.id)
+            if (!customerType) {
+              setCustomerType('broker')
+              updateField('customerType', 'broker')
+            }
           }}
-          onBlur={() => {
-            setTimeout(() => setShowCoDropdown(false), 150)
-            saveCoName(coInputValue)
-          }}
-          onFocus={() => {
-            if (coInputValue) setShowCoDropdown(true)
-          }}
+          onBlur={(text) => saveCoName(text)}
+          // Free text: Enter keeps the typed name, Down / Up pick from the Directory
+          autoHighlight={false}
+          minChars={1}
+          hideWhenEmpty
           placeholder={
             customerType === 'direct'
               ? 'Search customer or type a name...'
               : 'Search broker or type a name...'
           }
-          style={{ width: '100%', paddingRight: '44px' }}
+          inputStyle={{ paddingRight: '44px' }}
         />
         <CaseToggleBtn
           value={coInputValue}
@@ -355,54 +338,6 @@ export default function InsuredTab({
             saveCoName(v)
           }}
         />
-        {showCoDropdown && coFiltered.length > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: 'var(--bg-primary)',
-              border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px',
-              zIndex: 100,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-              maxHeight: '200px',
-              overflowY: 'auto'
-            }}
-          >
-            {coFiltered.map((e) => (
-              <div
-                key={e.id}
-                onMouseDown={() => {
-                  setCoInputValue(e.name)
-                  setShowCoDropdown(false)
-                  updateField('coName', e.name)
-                  updateField('customerEntityId', e.id)
-                  if (!customerType) {
-                    setCustomerType('broker')
-                    updateField('customerType', 'broker')
-                  }
-                }}
-                style={{
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  borderBottom: '1px solid var(--table-border)'
-                }}
-                onMouseEnter={(ev) =>
-                  (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)')
-                }
-                onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
-              >
-                {e.name}{' '}
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  ({e.type})
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Assured Groups — collapsed by default, auto-expands when groups exist */}
@@ -597,72 +532,33 @@ export default function InsuredTab({
         }}
       >
         <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-          <input
-            type="text"
+          <Combobox
+            aria-label="Assured name"
             value={newName}
-            onChange={(e) => {
-              setNewName(e.target.value)
+            onInputChange={(t) => {
+              setNewName(t)
               setNewEntityId('')
-              setShowEntityDropdown(true)
             }}
-            onFocus={() => {
-              if (newName) setShowEntityDropdown(true)
+            options={entities}
+            filter={(list, typed) => matchEntities(list, typed, true)}
+            getKey={(e) => e.id}
+            getLabel={(e) => e.name}
+            getDetail={(e) => `(${e.type})`}
+            onSelect={(e) => {
+              setNewName(e.name)
+              setNewEntityId(e.id)
             }}
-            onBlur={() => setTimeout(() => setShowEntityDropdown(false), 150)}
+            // Free text: Enter adds the typed name (or the picked entity), Down / Up pick
+            autoHighlight={false}
+            minChars={1}
+            hideWhenEmpty
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setShowEntityDropdown(false)
-                handleAddAssured()
-              }
+              if (e.key === 'Enter') void handleAddAssured()
             }}
             placeholder="Search entity or type a new assured name..."
-            style={{ width: '100%', paddingRight: '44px' }}
+            inputStyle={{ paddingRight: '44px' }}
           />
           <CaseToggleBtn value={newName} onChange={setNewName} />
-          {showEntityDropdown && entityFiltered.length > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--glass-border-color)',
-                borderRadius: '6px',
-                zIndex: 100,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                maxHeight: '220px',
-                overflowY: 'auto',
-                marginTop: '2px'
-              }}
-            >
-              {entityFiltered.map((e) => (
-                <div
-                  key={e.id}
-                  onMouseDown={() => {
-                    setNewName(e.name)
-                    setNewEntityId(e.id)
-                    setShowEntityDropdown(false)
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    borderBottom: '1px solid var(--table-border)'
-                  }}
-                  onMouseEnter={(ev) =>
-                    (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)')
-                  }
-                  onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
-                >
-                  {e.name}{' '}
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    ({e.type})
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
         {showNewRoleInput ? (
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>

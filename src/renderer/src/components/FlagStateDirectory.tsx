@@ -18,7 +18,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import ConfirmationModal from './ConfirmationModal'
-import { Field, Modal } from './ui'
+import { Field, Modal, Combobox } from './ui'
 import 'flag-icons/css/flag-icons.min.css'
 
 interface FlagStateDirectoryProps {
@@ -1220,19 +1220,21 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
         >
           <div className="form-grid" style={{ gridTemplateColumns: '1fr 100px' }}>
             <Field label="Country name" required>
-              <input
-                type="text"
+              <Combobox
+                aria-label="Country name"
                 value={formName}
-                onChange={(e) => handleNameChange(e.target.value, setFormName, setFormIso3)}
+                onInputChange={(t) => handleNameChange(t, setFormName, setFormIso3)}
+                options={countryNameToIso3}
+                getKey={(c) => c.iso3}
+                getLabel={(c) => c.name}
+                getDetail={(c) => c.iso3}
+                onSelect={(c) => handleNameChange(c.name, setFormName, setFormIso3)}
+                autoHighlight={false}
+                maxResults={50}
+                emptyText="Not in the country list: type the ISO code yourself"
                 placeholder="e.g. Panama"
-                list="country-names-modal"
                 autoFocus
               />
-              <datalist id="country-names-modal">
-                {countryNameToIso3.map((c) => (
-                  <option key={c.iso3} value={c.name} />
-                ))}
-              </datalist>
             </Field>
             <Field label="ISO code" required>
               <input

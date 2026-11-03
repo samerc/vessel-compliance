@@ -1,15 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Layers,
-  RefreshCw,
-  Pencil,
-  Check,
-  X
-} from 'lucide-react'
+import { Plus, Trash2, Layers, RefreshCw, Pencil, Check, X } from 'lucide-react'
 import {
   Quotation,
   Vessel,
@@ -24,7 +14,7 @@ import {
 import { ok } from '../../utils/ipc'
 import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
-import { Combobox, Field } from '../ui'
+import { Combobox, Field, useDragSort, DragHandle, moveInArray } from '../ui'
 import { masterData } from './masterDataCache'
 
 const EMPTY_NEW_VESSEL = {
@@ -121,87 +111,36 @@ function ClassSocietyInput({
   societies: ClassificationSociety[]
   placeholder?: string
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const filtered = matchSocieties(value, societies).slice(0, 10)
-  const pick = (c: ClassificationSociety): void => {
-    onChange(c.name)
-    setOpen(false)
-  }
   return (
-    <div style={{ position: 'relative' }}>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value)
-          setOpen(true)
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => {
-          setTimeout(() => setOpen(false), 150)
-          const t = value.trim().toLowerCase()
-          const exact = societies.find((c) => c.abbreviation && c.abbreviation.toLowerCase() === t)
-          if (exact) onChange(exact.name)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && open && value.trim() && filtered[0]) {
-            e.preventDefault()
-            pick(filtered[0])
-          } else if (e.key === 'Escape') setOpen(false)
-        }}
-        placeholder={placeholder || 'Name or abbreviation (e.g. BV)'}
-        style={{ width: '100%' }}
-      />
-      {open && filtered.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '2px',
-            maxHeight: '200px',
-            overflowY: 'auto',
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--input-border)',
-            borderRadius: '8px',
-            zIndex: 100,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-          }}
-        >
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              onMouseDown={(e) => {
-                // Keep the focus in the field: no blur runs with the text typed before the pick
-                e.preventDefault()
-                pick(c)
-              }}
-              style={{
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                borderBottom: '1px solid var(--table-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <span>{c.name}</span>
-              {c.abbreviation && (
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  {c.abbreviation}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+    <Combobox
+      aria-label="Classification society"
+      value={value}
+      onInputChange={onChange}
+      options={societies}
+      filter={(list, typed) => matchSocieties(typed, list)}
+      maxResults={10}
+      getKey={(c) => c.id}
+      getLabel={(c) => c.name}
+      renderOption={(c) => (
+        <span style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+          <span>{c.name}</span>
+          {c.abbreviation && (
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+              {c.abbreviation}
+            </span>
+          )}
+        </span>
       )}
-    </div>
+      onSelect={(c) => onChange(c.name)}
+      // A typed abbreviation (e.g. BV) becomes the society's name
+      onBlur={(text) => {
+        const t = text.trim().toLowerCase()
+        const exact = societies.find((c) => c.abbreviation && c.abbreviation.toLowerCase() === t)
+        if (exact) onChange(exact.name)
+      }}
+      emptyText="No society matches: the text is kept as typed"
+      placeholder={placeholder || 'Name or abbreviation (e.g. BV)'}
+    />
   )
 }
 
@@ -226,11 +165,9 @@ export default function VesselTab({
   const [addMode, setAddMode] = useState<'existing' | 'new' | 'fleet'>('existing')
   const [selectedVesselId, setSelectedVesselId] = useState('')
   const [vesselSearch, setVesselSearch] = useState('')
-  const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
   const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
-  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
   const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
   const [classSocietiesLocal, setClassSocietiesLocal] = useState<ClassificationSociety[]>([])
   const [vesselTypesLocal, setVesselTypesLocal] = useState<VesselType[]>([])
@@ -650,16 +587,11 @@ export default function VesselTab({
     }
   }
 
-  const handleMoveVessel = async (vesselId: string, direction: 'up' | 'down'): Promise<void> => {
-    const idx = qVessels.findIndex((v) => v.id === vesselId)
-    if (idx < 0) return
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= qVessels.length) return
-
-    const newVessels = [...qVessels]
-    const temp = newVessels[idx]
-    newVessels[idx] = newVessels[swapIdx]
-    newVessels[swapIdx] = temp
+  // Drag a vessel by its handle (or Up / Down on it): the vessels are relabelled V1, V2... in
+  // their new order
+  const handleMoveVessel = async (from: number, to: number): Promise<void> => {
+    const newVessels = moveInArray(qVessels, from, to)
+    setQVessels(newVessels)
 
     // Reorder and relabel
     const orderedIds = newVessels.map((v) => v.id)
@@ -673,6 +605,9 @@ export default function VesselTab({
     loadData()
     if (onVesselsChanged) onVesselsChanged()
   }
+  const vesselSort = useDragSort(qVessels.length, (from, to) => void handleMoveVessel(from, to), {
+    disabled: (i) => qVessels[i]?.id === editingId
+  })
 
   const alreadyAdded = new Set(qVessels.map((v) => v.vesselId).filter(Boolean) as string[])
   const availableVessels = vessels.filter((v) => !alreadyAdded.has(v.id))
@@ -763,79 +698,48 @@ export default function VesselTab({
           </div>
           {addMode === 'fleet' ? (
             <div>
-              <div style={{ position: 'relative', maxWidth: '400px', marginBottom: '10px' }}>
-                <input
-                  type="text"
-                  value={fleetSearch}
-                  onChange={(e) => setFleetSearch(e.target.value)}
-                  placeholder="Search fleets..."
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <div
-                style={{
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  borderRadius: '8px',
-                  border: '1px solid var(--glass-border-color)'
-                }}
-              >
-                {(() => {
-                  const q = fleetSearch.toLowerCase()
-                  const filtered = availableFleets.filter((f) => f.name.toLowerCase().includes(q))
-                  if (filtered.length === 0)
-                    return (
-                      <div
-                        style={{
-                          padding: '16px',
-                          textAlign: 'center',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.85rem',
-                          fontStyle: 'italic'
-                        }}
-                      >
-                        {availableFleets.length === 0
-                          ? 'No fleets with active vessels found'
-                          : 'No fleets match your search'}
-                      </div>
-                    )
-                  return filtered.map((f) => (
-                    <div
-                      key={f.id}
-                      onClick={() => !addingFleet && handleAddFleet(f.id)}
+              <Combobox
+                aria-label="Fleet"
+                autoFocus
+                value={fleetSearch}
+                onInputChange={setFleetSearch}
+                options={availableFleets}
+                getKey={(f) => f.id}
+                getLabel={(f) => f.name}
+                renderOption={(f) => (
+                  <span
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      opacity: addingFleet ? 0.6 : 1
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{f.name}</span>
+                    <span
                       style={{
-                        padding: '10px 14px',
-                        cursor: addingFleet ? 'wait' : 'pointer',
-                        fontSize: '0.85rem',
-                        borderBottom: '1px solid var(--table-border)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        transition: 'background 0.15s',
-                        opacity: addingFleet ? 0.6 : 1
+                        fontSize: '0.78rem',
+                        color: 'var(--text-secondary)',
+                        background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
                       }}
-                      onMouseEnter={(e) => {
-                        if (!addingFleet)
-                          e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)'
-                      }}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <span style={{ fontWeight: 600 }}>{f.name}</span>
-                      <span
-                        style={{
-                          fontSize: '0.78rem',
-                          color: 'var(--text-secondary)',
-                          background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                          padding: '2px 8px',
-                          borderRadius: '10px'
-                        }}
-                      >
-                        {f.vesselCount} vessel{f.vesselCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))
-                })()}
-              </div>
+                      {f.vesselCount} vessel{f.vesselCount !== 1 ? 's' : ''}
+                    </span>
+                  </span>
+                )}
+                onSelect={(f) => {
+                  if (!addingFleet) void handleAddFleet(f.id)
+                }}
+                emptyText={
+                  availableFleets.length === 0
+                    ? 'No fleets with active vessels found'
+                    : 'No fleets match your search'
+                }
+                placeholder="Search fleets..."
+                style={{ maxWidth: '400px' }}
+              />
               <div style={{ marginTop: '10px' }}>
                 <button
                   onClick={() => {
@@ -851,84 +755,48 @@ export default function VesselTab({
             </div>
           ) : addMode === 'existing' ? (
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
-                <input
-                  type="text"
-                  value={vesselSearch}
-                  onChange={(e) => {
-                    setVesselSearch(e.target.value)
-                    setVesselDropdownOpen(true)
-                    setSelectedVesselId('')
-                  }}
-                  onFocus={() => setVesselDropdownOpen(true)}
-                  onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 200)}
-                  placeholder="Search vessel by name or IMO..."
-                  style={{ width: '100%' }}
-                />
-                {vesselDropdownOpen &&
-                  (() => {
-                    const q = vesselSearch.toLowerCase()
-                    const filtered = q
-                      ? availableVessels.filter(
-                          (v) =>
-                            v.name.toLowerCase().includes(q) ||
-                            v.imoNumber.toLowerCase().includes(q)
-                        )
-                      : availableVessels
-                    return filtered.length > 0 ? (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          marginTop: '4px',
-                          maxHeight: '220px',
-                          overflowY: 'auto',
-                          background: 'var(--bg-primary)',
-                          border: '1px solid var(--glass-border-color)',
-                          borderRadius: '8px',
-                          zIndex: 20,
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
-                        }}
-                      >
-                        {filtered.slice(0, 20).map((v) => (
-                          <div
-                            key={v.id}
-                            onClick={() => {
-                              setSelectedVesselId(v.id)
-                              setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`)
-                              setVesselDropdownOpen(false)
-                            }}
-                            style={{
-                              padding: '10px 14px',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderBottom: '1px solid var(--table-border)',
-                              transition: 'background 0.15s'
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background =
-                                'rgba(var(--accent-primary-rgb), 0.06)')
-                            }
-                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <span style={{ fontWeight: 600 }}>{v.name}</span>
-                            <span
-                              style={{
-                                color: 'var(--text-secondary)',
-                                marginLeft: '8px',
-                                fontSize: '0.8rem'
-                              }}
-                            >
-                              IMO: {v.imoNumber}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null
-                  })()}
-              </div>
+              <Combobox
+                aria-label="Vessel from the registry"
+                value={vesselSearch}
+                onInputChange={(t) => {
+                  setVesselSearch(t)
+                  setSelectedVesselId('')
+                }}
+                options={availableVessels}
+                filter={(list, typed) => {
+                  const q = typed.toLowerCase()
+                  return q
+                    ? list.filter(
+                        (v) =>
+                          v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)
+                      )
+                    : list
+                }}
+                maxResults={20}
+                getKey={(v) => v.id}
+                getLabel={(v) => v.name}
+                renderOption={(v) => (
+                  <>
+                    <span style={{ fontWeight: 600 }}>{v.name}</span>
+                    <span
+                      style={{
+                        color: 'var(--text-secondary)',
+                        marginLeft: '8px',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      IMO: {v.imoNumber}
+                    </span>
+                  </>
+                )}
+                onSelect={(v) => {
+                  setSelectedVesselId(v.id)
+                  setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`)
+                }}
+                emptyText={selectedVesselId ? 'Vessel selected: click Add' : 'No vessel matches'}
+                placeholder="Search vessel by name or IMO..."
+                style={{ flex: 1, maxWidth: '400px' }}
+              />
               <button
                 onClick={handleAddExisting}
                 disabled={!selectedVesselId}
@@ -941,7 +809,6 @@ export default function VesselTab({
                 onClick={() => {
                   setShowAddForm(false)
                   setVesselSearch('')
-                  setVesselDropdownOpen(false)
                 }}
                 className="btn-secondary"
                 style={{ fontSize: '0.82rem' }}
@@ -1005,70 +872,19 @@ export default function VesselTab({
                 </Field>
                 {/* Vessel Type combobox */}
                 <Field label="Vessel type">
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={newData.vesselType}
-                      onChange={(e) => {
-                        setNewData((p) => ({ ...p, vesselType: e.target.value }))
-                        setTypeDropdownOpen(true)
-                      }}
-                      onFocus={() => setTypeDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
-                      placeholder="Search vessel types..."
-                      style={{ width: '100%' }}
-                    />
-                    {typeDropdownOpen &&
-                      (() => {
-                        const q = newData.vesselType.toLowerCase()
-                        const filtered = vesselTypesLocal
-                          .filter((t) => t.name?.toLowerCase().includes(q))
-                          .slice(0, 10)
-                        return filtered.length > 0 ? (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              right: 0,
-                              marginTop: '2px',
-                              maxHeight: '200px',
-                              overflowY: 'auto',
-                              background: 'var(--bg-primary)',
-                              border: '1px solid var(--input-border)',
-                              borderRadius: '8px',
-                              zIndex: 100,
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                            }}
-                          >
-                            {filtered.map((t) => (
-                              <div
-                                key={t.id}
-                                onMouseDown={() => {
-                                  setNewData((p) => ({ ...p, vesselType: t.name }))
-                                  setTypeDropdownOpen(false)
-                                }}
-                                style={{
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  borderBottom: '1px solid var(--table-border)'
-                                }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background =
-                                    'rgba(var(--accent-primary-rgb), 0.06)')
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background = 'transparent')
-                                }
-                              >
-                                {t.name}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null
-                      })()}
-                  </div>
+                  <Combobox
+                    aria-label="Vessel type"
+                    value={newData.vesselType}
+                    onInputChange={(t) => setNewData((p) => ({ ...p, vesselType: t }))}
+                    options={vesselTypesLocal}
+                    maxResults={10}
+                    getKey={(t) => t.id}
+                    getLabel={(t) => t.name || ''}
+                    onSelect={(t) => setNewData((p) => ({ ...p, vesselType: t.name }))}
+                    autoHighlight={false}
+                    emptyText="No type matches: the text is kept as typed"
+                    placeholder="Search vessel types..."
+                  />
                 </Field>
                 {/* Classification: by name or abbreviation */}
                 <Field label="Classification">
@@ -1109,7 +925,7 @@ export default function VesselTab({
         </p>
       )}
 
-      {qVessels.map((qv) => {
+      {qVessels.map((qv, qIdx) => {
         const reg = qv.vesselId ? vessels.find((v) => v.id === qv.vesselId) : null
         // Show the per-quotation snapshot (what is exported), falling back to the linked registry
         // record. Use the "Refresh" button to re-sync the snapshot from the registry.
@@ -1126,6 +942,7 @@ export default function VesselTab({
         return (
           <div
             key={qv.id}
+            {...vesselSort.rowProps(qIdx)}
             style={{
               padding: '14px 16px',
               borderRadius: '10px',
@@ -1137,30 +954,8 @@ export default function VesselTab({
             }}
           >
             {qVessels.length > 1 && !isEditing && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMoveVessel(qv.id, 'up')}
-                  disabled={qVessels.indexOf(qv) === 0}
-                  className="btn-secondary"
-                  style={{ padding: '2px', opacity: qVessels.indexOf(qv) === 0 ? 0.3 : 1 }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMoveVessel(qv.id, 'down')}
-                  disabled={qVessels.indexOf(qv) === qVessels.length - 1}
-                  className="btn-secondary"
-                  style={{
-                    padding: '2px',
-                    opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
+              <div style={{ paddingTop: '11px' }}>
+                <DragHandle {...vesselSort.handleProps(qIdx, `Move vessel ${name}`)} />
               </div>
             )}
             <div

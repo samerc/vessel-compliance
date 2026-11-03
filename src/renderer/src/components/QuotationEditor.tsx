@@ -43,7 +43,6 @@ import {
   Lock,
   MoreHorizontal,
   Copy,
-  Search,
   History
 } from 'lucide-react'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
@@ -79,7 +78,7 @@ import {
   clearMasterDataCache,
   masterData
 } from './quotation-tabs/masterDataCache'
-import { Modal, Field, SaveStatus, Badge, TypeChip } from './ui'
+import { Modal, Field, SaveStatus, Badge, TypeChip, Combobox } from './ui'
 import { ScreeningBadge } from './ScreeningPanel'
 import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
 import { ok, asArray } from '../utils/ipc'
@@ -2822,12 +2821,11 @@ function CopyFromQuotationModal({
   showError: (msg: string) => void
 }): React.JSX.Element {
   const [allQuotations, setAllQuotations] = useState<QuotationRowWithCount[]>([])
-  const [searchText, setSearchText] = useState('')
+  // While the source field has the focus it searches; otherwise it shows the chosen quotation
+  const [searchText, setSearchText] = useState<string | null>(null)
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const sectionOptions = [
     { key: 'insured', label: 'Insured (assureds + c/o broker)' },
@@ -2851,29 +2849,23 @@ function CopyFromQuotationModal({
       .catch(() => {})
   }, [quotation.id])
 
-  useEffect(() => {
-    const handler = (e: MouseEvent): void => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const filtered = allQuotations.filter((q) => {
-    if (!searchText) return true
-    const s = searchText.toLowerCase()
-    return (
-      (q.referenceNumber || '').toLowerCase().includes(s) ||
-      (q.vesselNames?.length ? q.vesselNames : [q.vesselName || '']).some((n) =>
-        (n || '').toLowerCase().includes(s)
-      ) ||
-      (q.quotationTypeName || '').toLowerCase().includes(s)
-    )
-  })
+  const filterQuotations = (rows: QuotationRowWithCount[], text: string): QuotationRowWithCount[] =>
+    rows.filter((q) => {
+      if (!text) return true
+      const s = text.toLowerCase()
+      return (
+        (q.referenceNumber || '').toLowerCase().includes(s) ||
+        (q.vesselNames?.length ? q.vesselNames : [q.vesselName || '']).some((n) =>
+          (n || '').toLowerCase().includes(s)
+        ) ||
+        (q.quotationTypeName || '').toLowerCase().includes(s)
+      )
+    })
 
   const selectedQuotation = allQuotations.find((q) => q.id === sourceId)
+  const selectedLabel = selectedQuotation
+    ? `${selectedQuotation.referenceNumber}${selectedQuotation.vesselName ? ` - ${selectedQuotation.vesselName}` : ''}`
+    : ''
 
   const toggleSection = (key: string): void => {
     setSelectedSections((prev) => {
@@ -2946,169 +2938,61 @@ function CopyFromQuotationModal({
       <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
         {/* Source quotation selector */}
         <Field label="Source quotation">
-          <div ref={dropdownRef} style={{ position: 'relative' }}>
-            <div
-              onClick={() => setShowDropdown(!showDropdown)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--bg-card)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.85rem',
-                color: selectedQuotation ? 'var(--text-primary)' : 'var(--text-secondary)'
-              }}
-            >
-              {selectedQuotation ? (
-                <>
-                  <span
-                    style={{
-                      padding: '1px 6px',
-                      borderRadius: '4px',
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      background: typeColor(selectedQuotation.quotationTypeCode) + '22',
-                      color: typeColor(selectedQuotation.quotationTypeCode)
-                    }}
-                  >
-                    {selectedQuotation.quotationTypeCode}
-                  </span>
-                  <span>{selectedQuotation.referenceNumber}</span>
-                  {selectedQuotation.vesselName && (
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      - {selectedQuotation.vesselName}
-                    </span>
-                  )}
-                </>
-              ) : (
-                'Select a quotation...'
-              )}
-              <ChevronDown size={14} style={{ marginLeft: 'auto' }} />
-            </div>
-            {showDropdown && (
-              <div
+          <Combobox
+            aria-label="Source quotation"
+            value={searchText ?? selectedLabel}
+            onInputChange={setSearchText}
+            onFocus={() => setSearchText('')}
+            onBlur={() => setSearchText(null)}
+            options={allQuotations}
+            filter={filterQuotations}
+            getKey={(fq) => fq.id}
+            getLabel={(fq) => fq.referenceNumber}
+            renderOption={(fq) => (
+              <span
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  zIndex: 10,
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--glass-border-color)',
-                  borderRadius: '10px',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                  maxHeight: '280px',
-                  overflowY: 'auto'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: fq.id === sourceId ? 600 : undefined
                 }}
               >
-                <div
+                <span
                   style={{
-                    padding: '8px',
-                    position: 'sticky',
-                    top: 0,
-                    background: 'var(--bg-primary)',
-                    zIndex: 1
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    background: typeColor(fq.quotationTypeCode) + '22',
+                    color: typeColor(fq.quotationTypeCode),
+                    flexShrink: 0
                   }}
                 >
-                  <div
+                  {fq.quotationTypeCode}
+                </span>
+                <span style={{ fontWeight: 500 }}>{fq.referenceNumber}</span>
+                {fq.vesselName && (
+                  <span
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: 'var(--bg-card)'
+                      color: 'var(--text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    <Search size={14} style={{ color: 'var(--text-secondary)' }} />
-                    <input
-                      type="text"
-                      value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
-                      placeholder="Search quotations..."
-                      autoFocus
-                      style={{
-                        flex: 1,
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        fontSize: '0.82rem',
-                        color: 'var(--text-primary)'
-                      }}
-                    />
-                  </div>
-                </div>
-                {filtered.length === 0 && (
-                  <div
-                    style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      fontSize: '0.82rem',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    No quotations found
-                  </div>
+                    - {fq.vesselName}
+                    {(fq.vesselCount || 0) > 1 ? ` +${(fq.vesselCount ?? 0) - 1}` : ''}
+                  </span>
                 )}
-                {filtered.map((fq) => (
-                  <div
-                    key={fq.id}
-                    onClick={() => {
-                      setSourceId(fq.id)
-                      setShowDropdown(false)
-                      setSearchText('')
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      background:
-                        fq.id === sourceId
-                          ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                          : 'transparent',
-                      fontSize: '0.83rem'
-                    }}
-                    className="hover-effect"
-                  >
-                    <span
-                      style={{
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.68rem',
-                        fontWeight: 600,
-                        background: typeColor(fq.quotationTypeCode) + '22',
-                        color: typeColor(fq.quotationTypeCode),
-                        flexShrink: 0
-                      }}
-                    >
-                      {fq.quotationTypeCode}
-                    </span>
-                    <span style={{ fontWeight: 500 }}>{fq.referenceNumber}</span>
-                    {fq.vesselName && (
-                      <span
-                        style={{
-                          color: 'var(--text-secondary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        - {fq.vesselName}
-                        {(fq.vesselCount || 0) > 1 ? ` +${(fq.vesselCount ?? 0) - 1}` : ''}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              </span>
             )}
-          </div>
+            onSelect={(fq) => {
+              setSourceId(fq.id)
+              setSearchText(null)
+            }}
+            placeholder={selectedLabel || 'Search quotations...'}
+            emptyText="No quotations found"
+          />
         </Field>
 
         {/* Section checkboxes */}

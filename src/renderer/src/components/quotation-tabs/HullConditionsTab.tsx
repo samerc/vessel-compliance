@@ -1,15 +1,5 @@
 import { useState, useEffect, useEffectEvent, useRef, useMemo } from 'react'
-import {
-  Plus,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  X,
-  RefreshCw,
-  Users,
-  Ship,
-  GitBranch
-} from 'lucide-react'
+import { Plus, Trash2, ChevronDown, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
 import {
   Quotation,
   HullClause,
@@ -28,6 +18,7 @@ import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
 import { masterData } from './masterDataCache'
 import { HiddenInSettingsBadge } from './shared'
+import { Combobox, useDragSort, DragHandle } from '../ui'
 import { isHiddenItem, isOffered, offeredItems } from '../../utils/settingsItems'
 
 function HullClauseDropdown({
@@ -43,130 +34,59 @@ function HullClauseDropdown({
   description?: string
   hideLabel?: boolean
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
-  const bg = 'var(--bg-primary)'
+  // While the field has the focus it searches (empty = every clause); otherwise it shows the pick
+  const [query, setQuery] = useState<string | null>(null)
   const selected = clauses.find((c) => c.id === selectedId)
+  const selectedLabel = selected ? `${selected.code} — ${selected.name}` : ''
   // Clauses hidden in settings are only offered while this one is using them
   const shown = offeredItems(clauses, [selectedId])
 
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
   return (
-    <div style={{ marginBottom: '20px' }} ref={ref}>
+    <div style={{ marginBottom: '20px' }}>
       {!hideLabel && (
         <label className="field-label" style={{ display: 'block', marginBottom: '6px' }}>
           Hull clause
         </label>
       )}
-      <div style={{ position: 'relative' }}>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            border: '1px solid var(--input-border)',
-            background: bg,
-            color: 'var(--text-primary)',
-            cursor: 'pointer',
-            fontSize: '0.88rem',
-            fontWeight: 600,
-            textAlign: 'left',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <span>
-            {selected ? `${selected.code} — ${selected.name}` : 'Select a hull clause...'}{' '}
-            <HiddenInSettingsBadge item={selected} />
-          </span>
-          <ChevronDown
-            size={16}
-            style={{
-              transform: open ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.15s',
-              color: 'var(--text-secondary)'
-            }}
-          />
-        </button>
-        {open && shown.length > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
-              maxHeight: '300px',
-              overflowY: 'auto',
-              borderRadius: '8px',
-              border: '1px solid var(--glass-border-color)',
-              background: bg,
-              zIndex: 999,
-              boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)'
-            }}
-          >
-            {shown.map((hc) => {
-              const active = hc.id === selectedId
-              return (
-                <div
-                  key={hc.id}
-                  onClick={() => {
-                    onChange(hc.id)
-                    setOpen(false)
-                  }}
-                  style={{
-                    padding: '10px 14px',
-                    cursor: 'pointer',
-                    color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    fontWeight: active ? 600 : 400,
-                    fontSize: '0.86rem',
-                    background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
-                    borderBottom: `1px solid ${'color-mix(in srgb, var(--text-primary) 6%, transparent)'}`
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active)
-                      e.currentTarget.style.background = isLight
-                        ? 'rgba(0,0,0,0.04)'
-                        : 'rgba(255,255,255,0.05)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = active
-                      ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                      : 'transparent'
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>{hc.code}</span> — {hc.name}{' '}
-                  <HiddenInSettingsBadge item={hc} />
-                  {hc.description && (
-                    <div
-                      style={{
-                        fontSize: '0.78rem',
-                        color: 'var(--text-secondary)',
-                        marginTop: '2px'
-                      }}
-                    >
-                      {hc.description}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+      <Combobox
+        aria-label="Hull clause"
+        value={query ?? selectedLabel}
+        onInputChange={setQuery}
+        onFocus={() => setQuery('')}
+        onBlur={() => setQuery(null)}
+        options={shown}
+        getKey={(hc) => hc.id}
+        getLabel={(hc) => `${hc.code} — ${hc.name}`}
+        getDetail={(hc) => hc.description}
+        renderOption={(hc) => (
+          <>
+            <span
+              style={{
+                fontWeight: hc.id === selectedId ? 700 : 600,
+                color: hc.id === selectedId ? 'var(--accent-primary)' : undefined
+              }}
+            >
+              {hc.code}
+            </span>{' '}
+            — {hc.name} <HiddenInSettingsBadge item={hc} />
+            {hc.description && (
+              <div
+                style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}
+              >
+                {hc.description}
+              </div>
+            )}
+          </>
         )}
-      </div>
+        onSelect={(hc) => {
+          onChange(hc.id)
+          setQuery(null)
+        }}
+        placeholder={selectedLabel || 'Select a hull clause...'}
+        emptyText="No hull clause matches"
+        inputStyle={{ fontWeight: 600 }}
+      />
+      {selected && <HiddenInSettingsBadge item={selected} />}
       {description && (
         <p
           style={{
@@ -1737,6 +1657,12 @@ export default function HullConditionsTab({
   const isVesselEmptyState = selectedVesselScope !== null && visibleAlternatives.length === 0
   const isSharedEmptyState = selectedVesselScope === null && visibleAlternatives.length === 0
 
+  // The additional + custom conditions order: rows move by their handle (drag, or Up / Down)
+  const mergedCond = buildMergedCondItems()
+  const mergedSort = useDragSort(mergedCond.length, (from, to) => {
+    void reorderMergedConditions(mergedCond, from, to)
+  })
+
   return (
     <>
       <div className="glass-card" style={{ padding: '16px', position: 'relative', zIndex: 2 }}>
@@ -2530,7 +2456,7 @@ export default function HullConditionsTab({
 
             {/* Unified order list: additional + custom, drag to reorder together */}
             {(() => {
-              const merged = buildMergedCondItems()
+              const merged = mergedCond
               if (merged.length === 0) return null
               return (
                 <div
@@ -2541,20 +2467,12 @@ export default function HullConditionsTab({
                   }}
                 >
                   <label className="field-label" style={{ display: 'block', marginBottom: '8px' }}>
-                    Conditions order (drag to reorder)
+                    Conditions order (drag the handle to reorder)
                   </label>
                   {merged.map((item, idx) => (
                     <div
                       key={`${item.kind}-${item.key}`}
-                      draggable
-                      onDragStart={(e) => e.dataTransfer.setData('merged-idx', String(idx))}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={async (e) => {
-                        e.preventDefault()
-                        const fromIdx = parseInt(e.dataTransfer.getData('merged-idx'))
-                        if (isNaN(fromIdx)) return
-                        await reorderMergedConditions(merged, fromIdx, idx)
-                      }}
+                      {...mergedSort.rowProps(idx)}
                       style={{
                         display: 'flex',
                         alignItems: 'flex-start',
@@ -2563,7 +2481,6 @@ export default function HullConditionsTab({
                         marginBottom: '4px',
                         borderRadius: '6px',
                         border: '1px solid var(--table-border)',
-                        cursor: 'grab',
                         fontSize: '0.8rem',
                         background:
                           item.kind === 'custom'
@@ -2575,50 +2492,9 @@ export default function HullConditionsTab({
                               : 'rgba(255,255,255,0.02)'
                       }}
                     >
-                      <span
-                        style={{
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.7rem',
-                          cursor: 'grab',
-                          paddingTop: '3px'
-                        }}
-                      >
-                        ⠿
+                      <span style={{ paddingTop: '3px' }}>
+                        <DragHandle {...mergedSort.handleProps(idx, `Move condition ${idx + 1}`)} />
                       </span>
-                      <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                        <button
-                          onClick={() => reorderMergedConditions(merged, idx, idx - 1)}
-                          disabled={idx === 0}
-                          title="Move up"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: idx === 0 ? 'default' : 'pointer',
-                            color: 'var(--text-secondary)',
-                            opacity: idx === 0 ? 0.25 : 0.7,
-                            padding: 0,
-                            display: 'flex'
-                          }}
-                        >
-                          <ChevronUp size={14} />
-                        </button>
-                        <button
-                          onClick={() => reorderMergedConditions(merged, idx, idx + 1)}
-                          disabled={idx === merged.length - 1}
-                          title="Move down"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: idx === merged.length - 1 ? 'default' : 'pointer',
-                            color: 'var(--text-secondary)',
-                            opacity: idx === merged.length - 1 ? 0.25 : 0.7,
-                            padding: 0,
-                            display: 'flex'
-                          }}
-                        >
-                          <ChevronDown size={14} />
-                        </button>
-                      </div>
                       <span
                         style={{
                           fontWeight: 600,

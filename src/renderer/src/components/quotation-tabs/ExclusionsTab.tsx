@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, GripVertical, Pencil, Upload, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Pencil, Upload, AlertTriangle } from 'lucide-react'
 import {
   Quotation,
   PIClause,
@@ -11,7 +11,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
-import { Modal } from '../ui'
+import { Modal, useDragSort, DragHandle, moveInArray } from '../ui'
 import { AlternativeScopeChips, AlternativeMultiScopeChips, HiddenInSettingsBadge } from './shared'
 import { confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
@@ -55,8 +55,6 @@ export default function ExclusionsTab({
     { id: string; name: string; description?: string }[]
   >([])
   const autoApplied = useRef(false)
-  const dragExcRef = useRef<number | null>(null)
-  const dragCustomRef = useRef<number | null>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -193,34 +191,22 @@ export default function ExclusionsTab({
     setSelectedRows(Array.isArray(qe) ? qe : [])
   }
 
-  const handleExcDragStart = (idx: number): void => {
-    dragExcRef.current = idx
-  }
-  const handleExcDrop = async (targetIdx: number): Promise<void> => {
-    const fromIdx = dragExcRef.current
-    dragExcRef.current = null
-    if (fromIdx === null || fromIdx === targetIdx) return
-    // Single-scope model: reorder the full selected list (no per-alternative filtering)
-    const newOrder = [...selectedRows]
-    const [moved] = newOrder.splice(fromIdx, 1)
-    newOrder.splice(targetIdx, 0, moved)
+  // Rows move by their handle. Single-scope model: the full selected list is reordered (no
+  // per-alternative filtering)
+  const excSort = useDragSort(selectedRows.length, (from, to) => {
+    const newOrder = moveInArray(selectedRows, from, to)
     setSelectedRows(newOrder)
-    await window.api.reorderQuotationExclusions(newOrder.map((r) => r.id))
-  }
-
-  const handleCustomDragStart = (idx: number): void => {
-    dragCustomRef.current = idx
-  }
-  const handleCustomDrop = async (targetIdx: number): Promise<void> => {
-    const fromIdx = dragCustomRef.current
-    dragCustomRef.current = null
-    if (fromIdx === null || fromIdx === targetIdx) return
-    const newOrder = [...customExclusions]
-    const [moved] = newOrder.splice(fromIdx, 1)
-    newOrder.splice(targetIdx, 0, moved)
-    setCustomExclusions(newOrder)
-    await window.api.reorderQuotationCustomExclusions(newOrder.map((ce) => ce.id))
-  }
+    void window.api.reorderQuotationExclusions(newOrder.map((r) => r.id))
+  })
+  const customSort = useDragSort(
+    customExclusions.length,
+    (from, to) => {
+      const newOrder = moveInArray(customExclusions, from, to)
+      setCustomExclusions(newOrder)
+      void window.api.reorderQuotationCustomExclusions(newOrder.map((ce) => ce.id))
+    },
+    { disabled: (i) => customExclusions[i]?.id === editingCustomId }
+  )
 
   const updateExclusionScope = async (id: string, scope: string[] | null): Promise<void> => {
     setSelectedRows((prev) => prev.map((e) => (e.id === id ? { ...e, vesselScope: scope } : e)))
@@ -532,10 +518,7 @@ export default function ExclusionsTab({
                 return (
                   <div
                     key={row.id}
-                    draggable
-                    onDragStart={() => handleExcDragStart(i)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleExcDrop(i)}
+                    {...excSort.rowProps(i)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -544,14 +527,10 @@ export default function ExclusionsTab({
                       borderRadius: '5px',
                       background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)',
                       border: '1px solid var(--table-border)',
-                      fontSize: '0.8rem',
-                      cursor: 'grab'
+                      fontSize: '0.8rem'
                     }}
                   >
-                    <GripVertical
-                      size={14}
-                      style={{ color: 'var(--text-secondary)', flexShrink: 0, opacity: 0.5 }}
-                    />
+                    <DragHandle {...excSort.handleProps(i, `Move exclusion ${i + 1}`)} />
                     <span
                       style={{
                         color: 'var(--text-secondary)',
@@ -616,17 +595,13 @@ export default function ExclusionsTab({
         {customExclusions.map((ce, i) => (
           <div
             key={ce.id}
-            draggable={editingCustomId !== ce.id}
-            onDragStart={() => handleCustomDragStart(i)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleCustomDrop(i)}
+            {...customSort.rowProps(i)}
             style={{
               padding: '8px 12px',
               borderRadius: '6px',
               border: '1px solid var(--table-border)',
               marginBottom: '6px',
-              background: 'rgba(var(--accent-primary-rgb), 0.03)',
-              cursor: editingCustomId === ce.id ? 'default' : 'grab'
+              background: 'rgba(var(--accent-primary-rgb), 0.03)'
             }}
           >
             {editingCustomId === ce.id ? (
@@ -653,15 +628,9 @@ export default function ExclusionsTab({
               </div>
             ) : (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                <GripVertical
-                  size={14}
-                  style={{
-                    color: 'var(--text-secondary)',
-                    flexShrink: 0,
-                    opacity: 0.5,
-                    marginTop: '2px'
-                  }}
-                />
+                <span style={{ marginTop: '2px' }}>
+                  <DragHandle {...customSort.handleProps(i, `Move custom exclusion ${i + 1}`)} />
+                </span>
                 <span style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
                   {ce.text}
                 </span>

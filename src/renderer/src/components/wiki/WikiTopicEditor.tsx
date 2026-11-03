@@ -8,7 +8,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard'
 import { formatDateTime } from '../../utils/dateUtils'
 import { confirmDialog } from '../DialogHost'
-import { Field } from '../ui'
+import { Field, Combobox } from '../ui'
 import RichTextEditor from '../RichTextEditor'
 import WikiTopicPicker from './WikiTopicPicker'
 
@@ -231,20 +231,20 @@ export default function WikiTopicEditor({
           />
         </Field>
         <Field label="Category" htmlFor="wiki-category">
-          <input
+          <Combobox
             id="wiki-category"
             dir="auto"
-            list="wiki-categories"
             value={draft.category}
-            onChange={(e) => set('category', e.target.value)}
+            onInputChange={(t) => set('category', t)}
+            options={categories}
+            getKey={(c) => c}
+            getLabel={(c) => c}
+            onSelect={(c) => set('category', c)}
+            autoHighlight={false}
+            hideWhenEmpty
             placeholder="Pick or type a category"
             maxLength={100}
           />
-          <datalist id="wiki-categories">
-            {categories.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
         </Field>
         <Field
           label="Explains a page of the app"
@@ -310,16 +310,23 @@ export default function WikiTopicEditor({
                 </button>
               </span>
             ))}
-            <input
+            <Combobox
               id="wiki-tags"
               dir="auto"
-              list="wiki-tag-list"
               value={tagInput}
-              onChange={(e) => {
-                const v = e.target.value
+              onInputChange={(v) => {
                 if (/[,،;]$/.test(v)) addTags(v)
                 else setTagInput(v)
               }}
+              options={allTags.filter((t) => !draft.tags.includes(t))}
+              getKey={(t) => t}
+              getLabel={(t) => t}
+              onSelect={(t) => addTags(t)}
+              autoHighlight={false}
+              hideWhenEmpty
+              minChars={1}
+              // Enter the list did not use adds what is typed; Backspace in an empty box removes
+              // the last tag
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
@@ -330,13 +337,9 @@ export default function WikiTopicEditor({
               }}
               onBlur={() => addTags(tagInput)}
               placeholder={draft.tags.length ? '' : 'e.g. bunker, BBC, شهادة'}
-              style={{ flex: 1, minWidth: '140px', border: 'none', background: 'transparent' }}
+              style={{ flex: 1, minWidth: '140px' }}
+              inputStyle={{ border: 'none', background: 'transparent' }}
             />
-            <datalist id="wiki-tag-list">
-              {allTags.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
           </div>
         </Field>
       </div>

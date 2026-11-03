@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Download, Search, Ship, Layers, X, FileText, Users } from 'lucide-react'
-import { EmptyState } from './ui'
+import { Combobox, EmptyState } from './ui'
 import { Vessel, Entity, VesselAssured, Fleet, AssuredRole } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
@@ -35,9 +35,7 @@ export default function AssuredReport(): React.JSX.Element {
   const [selectedFleetId, setSelectedFleetId] = useState('')
   const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set())
   const [vesselSearch, setVesselSearch] = useState('')
-  const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
   const [fleetSearch, setFleetSearch] = useState('')
-  const [fleetDropdownOpen, setFleetDropdownOpen] = useState(false)
   const [assuredSearch, setAssuredSearch] = useState('')
 
   useEffect(() => {
@@ -348,7 +346,6 @@ export default function AssuredReport(): React.JSX.Element {
   }
 
   // Vessel search + select
-  const vesselDropdownRef = useRef<HTMLDivElement>(null)
   const filteredVesselOptions = useMemo(() => {
     if (!vesselSearch) return []
     const q = vesselSearch.toLowerCase()
@@ -427,62 +424,31 @@ export default function AssuredReport(): React.JSX.Element {
 
         {/* Fleet: searchable dropdown */}
         {filterMode === 'fleet' && (
-          <div style={{ position: 'relative', maxWidth: '320px' }}>
-            <input
-              type="text"
-              value={fleetSearch}
-              onChange={(e) => {
-                setFleetSearch(e.target.value)
-                setFleetDropdownOpen(true)
-              }}
-              onFocus={() => setFleetDropdownOpen(true)}
-              onBlur={() => setTimeout(() => setFleetDropdownOpen(false), 150)}
-              placeholder="Search fleets..."
-              style={{ width: '100%' }}
-            />
-            {fleetDropdownOpen && filteredFleetOptions.length > 0 && (
-              <div
+          <Combobox
+            style={{ maxWidth: '320px' }}
+            aria-label="Fleet"
+            value={fleetSearch}
+            onInputChange={setFleetSearch}
+            options={filteredFleetOptions}
+            filter={(o) => o}
+            getKey={(f) => f.id}
+            getLabel={(f) => f.name}
+            renderOption={(f) => (
+              <span
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--glass-border-color)',
-                  borderRadius: '8px',
-                  zIndex: 100,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                  fontWeight: selectedFleetId === f.id ? 600 : 400,
+                  color: selectedFleetId === f.id ? 'var(--accent-primary)' : undefined
                 }}
               >
-                {filteredFleetOptions.map((f) => (
-                  <div
-                    key={f.id}
-                    onMouseDown={() => {
-                      setSelectedFleetId(f.id)
-                      setFleetSearch(f.name)
-                      setFleetDropdownOpen(false)
-                    }}
-                    style={{
-                      padding: '8px 14px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      borderBottom: '1px solid var(--table-border)',
-                      fontWeight: selectedFleetId === f.id ? 600 : 400,
-                      color:
-                        selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    {f.name}
-                  </div>
-                ))}
-              </div>
+                {f.name}
+              </span>
             )}
-          </div>
+            onSelect={(f) => {
+              setSelectedFleetId(f.id)
+              setFleetSearch(f.name)
+            }}
+            placeholder="Search fleets..."
+          />
         )}
 
         {/* Vessels: search + select chips */}
@@ -533,70 +499,26 @@ export default function AssuredReport(): React.JSX.Element {
                 ))}
               </div>
             )}
-            <div style={{ position: 'relative', maxWidth: '320px' }} ref={vesselDropdownRef}>
-              <input
-                type="text"
-                value={vesselSearch}
-                onChange={(e) => {
-                  setVesselSearch(e.target.value)
-                  setVesselDropdownOpen(true)
-                }}
-                onFocus={() => {
-                  if (vesselSearch) setVesselDropdownOpen(true)
-                }}
-                onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 150)}
-                placeholder="Search and select vessels..."
-                style={{ width: '100%' }}
-              />
-              {vesselDropdownOpen && filteredVesselOptions.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    background: 'var(--bg-primary)',
-                    border: '1px solid var(--glass-border-color)',
-                    borderRadius: '8px',
-                    zIndex: 100,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  {filteredVesselOptions.map((v) => (
-                    <div
-                      key={v.id}
-                      onMouseDown={() => {
-                        setSelectedVesselIds((prev) => new Set(prev).add(v.id))
-                        setVesselSearch('')
-                        setVesselDropdownOpen(false)
-                      }}
-                      style={{
-                        padding: '8px 14px',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        borderBottom: '1px solid var(--table-border)'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--row-hover)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <span style={{ fontWeight: 600 }}>{v.name}</span>
-                      <span
-                        style={{
-                          color: 'var(--text-secondary)',
-                          marginLeft: '8px',
-                          fontSize: '0.78rem'
-                        }}
-                      >
-                        IMO: {v.imoNumber}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <Combobox
+              style={{ maxWidth: '320px' }}
+              aria-label="Vessels"
+              value={vesselSearch}
+              onInputChange={setVesselSearch}
+              options={filteredVesselOptions}
+              filter={(o) => o}
+              getKey={(v) => v.id}
+              getLabel={(v) => v.name}
+              renderOption={(v) => (
+                <>
+                  <span style={{ fontWeight: 600 }}>{v.name}</span>
+                  <span className="combo-detail">IMO: {v.imoNumber}</span>
+                </>
               )}
-            </div>
+              onSelect={(v) => setSelectedVesselIds((prev) => new Set(prev).add(v.id))}
+              clearOnSelect
+              emptyText={vesselSearch ? 'No matches' : 'Type a vessel name or IMO'}
+              placeholder="Search and select vessels..."
+            />
           </div>
         )}
       </div>

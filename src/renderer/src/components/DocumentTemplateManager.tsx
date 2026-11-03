@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import {
-  FileText,
-  Trash2,
-  Save,
-  ChevronUp,
-  ChevronDown,
-  Tag,
-  Plus,
-  Copy,
-  FileDown,
-  Mail
-} from 'lucide-react'
+import { FileText, Trash2, Save, Tag, Plus, Copy, FileDown, Mail } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import type { DocumentTemplate } from '../../../shared/types'
@@ -18,7 +7,7 @@ import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/type
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
 import { useUnsavedGuard } from '../utils/useUnsavedGuard'
-import { PageHeader, Modal, Field, EmptyState } from './ui'
+import { PageHeader, Modal, Field, EmptyState, useDragSort, DragHandle, moveInArray } from './ui'
 
 const CATEGORY_TABS = [
   { id: 'all', label: 'All' },
@@ -245,13 +234,12 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
-  const handleReorder = async (id: string, direction: 'up' | 'down'): Promise<void> => {
-    const idx = templates.findIndex((t) => t.id === id)
-    if (idx < 0) return
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= templates.length) return
-    const newList = [...templates]
-    ;[newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]]
+  // Moves template fromId to where toId is (in the full list, so a category view works too)
+  const handleReorder = async (fromId: string, toId: string): Promise<void> => {
+    const from = templates.findIndex((t) => t.id === fromId)
+    const to = templates.findIndex((t) => t.id === toId)
+    if (from < 0 || to < 0 || from === to) return
+    const newList = moveInArray(templates, from, to)
     setTemplates(newList)
     try {
       await window.api.docTemplateReorder(newList.map((t) => t.id))
@@ -262,6 +250,12 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
   const filteredTemplates =
     activeCategory === 'all' ? templates : templates.filter((t) => t.category === activeCategory)
+  // Drag a template by its handle (or Up / Down on it), within the category shown
+  const sort = useDragSort(
+    filteredTemplates.length,
+    (from, to) => void handleReorder(filteredTemplates[from].id, filteredTemplates[to].id),
+    { disabled: !canManage }
+  )
 
   // Grouped placeholders for reference
   const groupedPlaceholders = TEMPLATE_PLACEHOLDERS.reduce<
@@ -337,6 +331,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               {filteredTemplates.map((t, i) => (
                 <div
                   key={t.id}
+                  {...sort.rowProps(i)}
                   onClick={() => {
                     if (t.id !== selectedId) void discardThen(() => setSelectedId(t.id))
                   }}
@@ -350,8 +345,14 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     gap: '12px',
                     transition: 'background 0.15s ease'
                   }}
-                  className="hover-effect"
+                  className={'hover-effect ' + sort.rowProps(i).className}
                 >
+                  {canManage && (
+                    // A click on the handle does not open the template
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <DragHandle {...sort.handleProps(i, `Move ${t.name}`)} />
+                    </span>
+                  )}
                   <div
                     style={{
                       width: '36px',
@@ -408,51 +409,6 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       )}
                     </div>
                   </div>
-                  {canManage && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <button
-                        title="Move up"
-                        aria-label="Move up"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleReorder(t.id, 'up')
-                        }}
-                        disabled={i === 0}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: i === 0 ? 'var(--text-secondary)' : 'var(--accent-primary)',
-                          cursor: i === 0 ? 'default' : 'pointer',
-                          padding: '2px',
-                          opacity: i === 0 ? 0.3 : 1
-                        }}
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        title="Move down"
-                        aria-label="Move down"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleReorder(t.id, 'down')
-                        }}
-                        disabled={i === filteredTemplates.length - 1}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color:
-                            i === filteredTemplates.length - 1
-                              ? 'var(--text-secondary)'
-                              : 'var(--accent-primary)',
-                          cursor: i === filteredTemplates.length - 1 ? 'default' : 'pointer',
-                          padding: '2px',
-                          opacity: i === filteredTemplates.length - 1 ? 0.3 : 1
-                        }}
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

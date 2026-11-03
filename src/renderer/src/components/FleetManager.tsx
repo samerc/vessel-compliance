@@ -1423,7 +1423,17 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
                               return (
                                 <div
                                   key={vessel.id}
+                                  role="checkbox"
+                                  aria-checked={checked}
+                                  tabIndex={0}
                                   onClick={() => togglePending(vessel.id)}
+                                  // Tab through the list, Space / Enter ticks a vessel
+                                  onKeyDown={(e) => {
+                                    if (e.key === ' ' || e.key === 'Enter') {
+                                      e.preventDefault()
+                                      togglePending(vessel.id)
+                                    }
+                                  }}
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save } from 'lucide-react'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import { confirmDelete } from './sharedUtils'
 import RichTextEditor from '../RichTextEditor'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { isIpcError } from '../../utils/ipc'
+import { useDragSort, DragHandle, moveInArray } from '../ui'
 
 export default function CustomSectionsTab({
   quotation,
@@ -82,11 +83,8 @@ export default function CustomSectionsTab({
     }
   }
 
-  const handleMove = async (index: number, dir: 'up' | 'down'): Promise<void> => {
-    const newSections = [...sections]
-    const swapIdx = dir === 'up' ? index - 1 : index + 1
-    if (swapIdx < 0 || swapIdx >= newSections.length) return
-    ;[newSections[index], newSections[swapIdx]] = [newSections[swapIdx], newSections[index]]
+  const handleMove = async (from: number, to: number): Promise<void> => {
+    const newSections = moveInArray(sections, from, to)
     setSections(newSections)
     try {
       await window.api.reorderQuotationCustomSections(newSections.map((s) => s.id))
@@ -94,6 +92,11 @@ export default function CustomSectionsTab({
       showError((err instanceof Error ? err.message : '') || 'Failed to reorder')
     }
   }
+
+  // Drag a section by its handle (or Up / Down on it)
+  const sort = useDragSort(sections.length, (from, to) => void handleMove(from, to), {
+    disabled: (i) => sections[i]?.id === editingId
+  })
 
   const startEdit = (section: QuotationCustomSection): void => {
     setEditingId(section.id)
@@ -145,6 +148,7 @@ export default function CustomSectionsTab({
       {sections.map((section, i) => (
         <div
           key={section.id}
+          {...sort.rowProps(i)}
           style={{
             padding: '16px',
             borderRadius: '8px',
@@ -197,39 +201,8 @@ export default function CustomSectionsTab({
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMove(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMove(i, 'down')}
-                  disabled={i === sections.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === sections.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={16} />
-                </button>
+              <div style={{ paddingTop: '3px' }}>
+                <DragHandle {...sort.handleProps(i, `Move section ${section.title}`)} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '4px' }}>

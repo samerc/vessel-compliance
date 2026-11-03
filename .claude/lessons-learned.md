@@ -202,6 +202,12 @@ The local dev DB was reimported from a prod `mysqldump` that ran over a non-utf8
 
 ---
 
+## Drag-to-sort (HTML5 drag and drop)
+- Setting `dataTransfer.effectAllowed = 'move'` / `dropEffect = 'move'` made the drop never arrive (Electron on Windows, 2026-11-03): the drop line showed, release did nothing. `ui/useDragSort` sets neither.
+- A row that is always `draggable` steals text selection from its inputs: useDragSort makes the row draggable only while its handle is pressed.
+- CDP testing: mouse events alone start the OS drag loop but never drop; use `Input.setInterceptDrags` + `Input.dispatchDragEvent` (scratchpad drag.mjs).
+- Pick-list highlight: a list that scrolls under a resting mouse fires mousemove at the same point; Combobox ignores moves without a real coordinate change, or the keyboard highlight jumps back.
+
 ## Patterns to Avoid
 
 - **Never call `loadDynamicPolicies()` only on tab switch** if the data is needed on other tabs (e.g. Documents tab needs P&I date from dynamicPolicies)

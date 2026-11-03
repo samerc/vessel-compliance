@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save, X } from 'lucide-react'
+import { Plus, Trash2, Pencil, Save, X } from 'lucide-react'
 import {
   Quotation,
   SurveyWarrantyTemplate,
@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
+import { useDragSort, DragHandle, moveInArray } from '../ui'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok, isIpcError, type IpcErrorValue } from '../../utils/ipc'
 import { Field } from '../ui'
@@ -182,10 +183,8 @@ export default function SurveyWarrantiesTab({
     }
   }
 
-  const reorder = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const arr = [...items]
-    const [item] = arr.splice(idx, 1)
-    arr.splice(idx + dir, 0, item)
+  const reorder = async (from: number, to: number): Promise<void> => {
+    const arr = moveInArray(items, from, to)
     setItems(arr)
     try {
       await window.api.quotationSurveyWarrantySet(
@@ -196,6 +195,11 @@ export default function SurveyWarrantiesTab({
       showError(e instanceof Error ? e.message : String(e))
     }
   }
+
+  // Drag a warranty by its handle (or Up / Down on it)
+  const sort = useDragSort(items.length, (from, to) => void reorder(from, to), {
+    disabled: (i) => items[i]?.id === editingId
+  })
 
   const placeholderColor = (p: string): { bg: string; text: string } => {
     if (p === '{deadline}')
@@ -335,6 +339,7 @@ export default function SurveyWarrantiesTab({
         return (
           <div
             key={item.id}
+            {...sort.rowProps(idx)}
             style={{
               padding: '12px',
               marginBottom: '6px',
@@ -345,8 +350,16 @@ export default function SurveyWarrantiesTab({
             }}
           >
             <div
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '8px'
+              }}
             >
+              <div style={{ paddingTop: '2px' }}>
+                <DragHandle {...sort.handleProps(idx, `Move survey warranty ${idx + 1}`)} />
+              </div>
               <div style={{ flex: 1 }}>
                 {editingId === item.id ? (
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
@@ -643,38 +656,6 @@ export default function SurveyWarrantiesTab({
                 style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginLeft: '8px' }}
               >
                 <button
-                  title="Move up"
-                  aria-label="Move up"
-                  disabled={idx === 0}
-                  onClick={() => reorder(idx, -1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: idx === 0 ? 'default' : 'pointer',
-                    padding: '1px',
-                    opacity: idx === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  disabled={idx === items.length - 1}
-                  onClick={() => reorder(idx, 1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: idx === items.length - 1 ? 'default' : 'pointer',
-                    padding: '1px',
-                    opacity: idx === items.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={14} />
-                </button>
-                <button
                   title="Delete"
                   aria-label="Delete"
                   onClick={() => deleteItem(item.id)}
@@ -683,8 +664,7 @@ export default function SurveyWarrantiesTab({
                     border: 'none',
                     color: 'var(--danger)',
                     cursor: 'pointer',
-                    padding: '1px',
-                    marginTop: '4px'
+                    padding: '1px'
                   }}
                 >
                   <Trash2 size={14} />

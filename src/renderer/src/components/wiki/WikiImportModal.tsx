@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Upload, AlertTriangle } from 'lucide-react'
 import type { WikiImportFile } from '../../../../shared/types'
 import { useToast } from '../../contexts/ToastContext'
-import { Field, Modal, Spinner } from '../ui'
+import { Field, Modal, Spinner, Combobox } from '../ui'
 
 type Row = WikiImportFile & { include: boolean }
 
@@ -117,19 +117,19 @@ export default function WikiImportModal({
           </p>
           <div className="form-grid" style={{ marginBottom: '12px' }}>
             <Field label="Category" htmlFor="wiki-import-category">
-              <input
+              <Combobox
                 id="wiki-import-category"
                 dir="auto"
-                list="wiki-import-categories"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onInputChange={setCategory}
+                options={categories}
+                getKey={(c) => c}
+                getLabel={(c) => c}
+                onSelect={setCategory}
+                autoHighlight={false}
+                hideWhenEmpty
                 placeholder="For all imported topics"
               />
-              <datalist id="wiki-import-categories">
-                {categories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </Field>
             <Field label="Tags" htmlFor="wiki-import-tags" hint="Comma between tags">
               <input

@@ -109,22 +109,20 @@ export async function confirmWordingEdit(sent: number, wordingChanged: boolean):
   )
 }
 
-/** Swap an item with its visible neighbour (hidden rows in between are skipped). */
-export function moveAmongVisible<T extends { id: string }>(
+/** Drag among the shown rows: they move among their own places, hidden / filtered rows stay */
+export function dragAmongVisible<T extends { id: string }>(
   all: T[],
   visible: T[],
-  index: number,
-  direction: 'up' | 'down'
+  from: number,
+  to: number
 ): T[] | null {
-  const other = visible[direction === 'up' ? index - 1 : index + 1]
-  const item = visible[index]
-  if (!item || !other) return null
-  const next = [...all]
-  const a = next.findIndex((x) => x.id === item.id)
-  const b = next.findIndex((x) => x.id === other.id)
-  if (a === -1 || b === -1) return null
-  ;[next[a], next[b]] = [next[b], next[a]]
-  return next
+  if (from === to || !visible[from] || !visible[to]) return null
+  const out = [...visible]
+  const [m] = out.splice(from, 1)
+  out.splice(to, 0, m)
+  const shownIds = new Set(visible.map((v) => v.id))
+  let k = 0
+  return all.map((x) => (shownIds.has(x.id) ? out[k++] : x))
 }
 
 /** Dim style for a hidden row that is shown */

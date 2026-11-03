@@ -50,7 +50,7 @@ import { captureQuotationBaseline } from '../utils/policyQuotationSync'
 import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
 import { isPiLike } from '../../../shared/quotationTypes'
-import { TypeChip } from './ui'
+import { TypeChip, Combobox } from './ui'
 import { useUnsavedGuard } from '../utils/useUnsavedGuard'
 import { htmlToPlainText } from '../utils/htmlToDocx'
 import { ScreeningPanel } from './ScreeningPanel'
@@ -1980,19 +1980,19 @@ function StepPeriodPremium({
         </div>
         <div>
           <label style={labelStyle}>Timezone</label>
-          <input
-            type="text"
-            list="wizard-tz-options"
+          <Combobox
+            aria-label="Timezone"
             value={data.timezone}
-            onChange={(e) => onUpdate({ timezone: e.target.value })}
-            style={inputStyle}
+            onInputChange={(t) => onUpdate({ timezone: t })}
+            options={timezoneOptions}
+            getKey={(tz) => tz}
+            getLabel={(tz) => tz}
+            onSelect={(tz) => onUpdate({ timezone: tz })}
+            autoHighlight={false}
+            emptyText="Your own wording is kept"
+            inputStyle={inputStyle}
             placeholder="Type or select..."
           />
-          <datalist id="wizard-tz-options">
-            {timezoneOptions.map((tz) => (
-              <option key={tz} value={tz} />
-            ))}
-          </datalist>
         </div>
       </div>
 
@@ -2553,17 +2553,20 @@ function StepDetails({
     ])
   const removeRow = (idx: number): void => setRows(rows.filter((_, i) => i !== idx))
   // Typed value matches an existing entity → link it (and default its address); otherwise keep as a custom name
+  const onEntityPick = (idx: number, match: { id: string; name: string }): void => {
+    const first = (entityAddrs[match.id] || [])[0]
+    updateRow(idx, {
+      entityId: match.id,
+      entityName: match.name,
+      addressText: first?.addressLine1 || '',
+      addressId: first?.id || '',
+      isNew: false
+    })
+  }
   const onEntityInput = (idx: number, text: string): void => {
     const match = allEntities.find((e) => e.name.toLowerCase() === text.trim().toLowerCase())
     if (match) {
-      const first = (entityAddrs[match.id] || [])[0]
-      updateRow(idx, {
-        entityId: match.id,
-        entityName: match.name,
-        addressText: first?.addressLine1 || '',
-        addressId: first?.id || '',
-        isNew: false
-      })
+      onEntityPick(idx, match)
     } else {
       updateRow(idx, { entityId: '', entityName: text, addressId: '', isNew: false })
     }
@@ -2743,19 +2746,20 @@ function StepDetails({
                     alignItems: 'center'
                   }}
                 >
-                  <input
-                    type="text"
-                    list={`wiz-ent-${vid}-${idx}`}
+                  {/* A typed name that is no entity stays as a custom (unlinked) insured */}
+                  <Combobox
+                    aria-label="Insured"
                     value={r.entityName}
-                    onChange={(e) => onEntityInput(idx, e.target.value)}
+                    onInputChange={(t) => onEntityInput(idx, t)}
+                    options={allEntities}
+                    getKey={(e) => e.id}
+                    getLabel={(e) => e.name}
+                    onSelect={(e) => onEntityPick(idx, e)}
+                    autoHighlight={false}
+                    emptyText="Not in the Directory: kept as a custom name"
+                    inputStyle={cellInput}
                     placeholder="Type to search or add a name…"
-                    style={cellInput}
                   />
-                  <datalist id={`wiz-ent-${vid}-${idx}`}>
-                    {allEntities.map((e) => (
-                      <option key={e.id} value={e.name} />
-                    ))}
-                  </datalist>
                   <input
                     type="text"
                     value={r.role}

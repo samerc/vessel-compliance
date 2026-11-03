@@ -1,19 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  Upload,
-  FileText,
-  X,
-  AlertCircle,
-  Settings,
-  ChevronUp,
-  ChevronDown,
-  Plus,
-  Trash2,
-  Save
-} from 'lucide-react'
+import { Upload, FileText, X, AlertCircle, Settings, Plus, Trash2, Save } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Modal, Field } from './ui'
+import { Modal, Field, useDragSort, DragHandle, moveInArray } from './ui'
 import {
   parseStatementWorkbook,
   defaultVisibleColumns,
@@ -111,14 +100,10 @@ function StatementSettingsModal({
 
   const setTitle = (i: number, patch: Partial<StatementSettings['titles'][number]>): void =>
     setS((p) => ({ ...p, titles: p.titles.map((t, j) => (j === i ? { ...t, ...patch } : t)) }))
-  const move = (i: number, dir: -1 | 1): void =>
-    setS((p) => {
-      const j = i + dir
-      if (j < 0 || j >= p.titles.length) return p
-      const arr = [...p.titles]
-      ;[arr[i], arr[j]] = [arr[j], arr[i]]
-      return { ...p, titles: arr }
-    })
+  // Drag a title by its handle (or Up / Down on it)
+  const titleSort = useDragSort(s.titles.length, (from, to) =>
+    setS((p) => ({ ...p, titles: moveInArray(p.titles, from, to) }))
+  )
 
   const save = async (): Promise<void> => {
     const titles = s.titles.filter((t) => t.title.trim())
@@ -191,6 +176,7 @@ function StatementSettingsModal({
             {s.titles.map((t, i) => (
               <div
                 key={i}
+                {...titleSort.rowProps(i)}
                 style={{
                   padding: '12px',
                   borderRadius: '8px',
@@ -198,30 +184,13 @@ function StatementSettingsModal({
                 }}
               >
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <DragHandle {...titleSort.handleProps(i, `Move ${t.title || 'title'}`)} />
                   <input
                     value={t.title}
                     placeholder="Title, e.g. Statement of Account"
                     onChange={(e) => setTitle(i, { title: e.target.value })}
                     style={{ flex: 1, fontWeight: 600 }}
                   />
-                  <button
-                    className="btn-ghost btn-icon"
-                    title="Move up"
-                    aria-label="Move up"
-                    disabled={i === 0}
-                    onClick={() => move(i, -1)}
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                  <button
-                    className="btn-ghost btn-icon"
-                    title="Move down"
-                    aria-label="Move down"
-                    disabled={i === s.titles.length - 1}
-                    onClick={() => move(i, 1)}
-                  >
-                    <ChevronDown size={16} />
-                  </button>
                   <button
                     className="btn-ghost btn-icon"
                     title="Delete title"
@@ -438,13 +407,13 @@ export default function StatementReport(): React.JSX.Element {
       return next
     })
   }
-  const moveColumn = (key: string, dir: -1 | 1): void =>
+  // Moves column fromKey to where toKey is
+  const moveColumn = (fromKey: string, toKey: string): void =>
     setVisible((prev) => {
-      const i = prev.indexOf(key)
-      const j = i + dir
-      if (i < 0 || j < 0 || j >= prev.length) return prev
-      const next = [...prev]
-      ;[next[i], next[j]] = [next[j], next[i]]
+      const i = prev.indexOf(fromKey)
+      const j = prev.indexOf(toKey)
+      if (i < 0 || j < 0 || i === j) return prev
+      const next = moveInArray(prev, i, j)
       saveColumnPrefs(next)
       return next
     })
@@ -469,6 +438,10 @@ export default function StatementReport(): React.JSX.Element {
 
   const currencyKey = data ? currencyColumn(data.columns) : null
   const ordered = data ? visible.filter((k) => data.columns.some((c) => c.key === k)) : []
+  // Drag a column by its handle (or Up / Down on it)
+  const columnSort = useDragSort(ordered.length, (from, to) =>
+    moveColumn(ordered[from], ordered[to])
+  )
   const hidden = data ? data.columns.filter((c) => !visible.includes(c.key)) : []
   const totals =
     data && totalKey && ordered.includes(totalKey)
@@ -693,7 +666,14 @@ export default function StatementReport(): React.JSX.Element {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {ordered.map((key, i) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    key={key}
+                    {...columnSort.rowProps(i)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <DragHandle
+                      {...columnSort.handleProps(i, `Move column ${labels[key] ?? key}`)}
+                    />
                     <input
                       type="checkbox"
                       checked
@@ -707,24 +687,6 @@ export default function StatementReport(): React.JSX.Element {
                       title={`Excel column: ${key}`}
                       style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem' }}
                     />
-                    <button
-                      className="btn-ghost btn-icon"
-                      title="Move left"
-                      aria-label="Move column left"
-                      disabled={i === 0}
-                      onClick={() => moveColumn(key, -1)}
-                    >
-                      <ChevronUp size={15} />
-                    </button>
-                    <button
-                      className="btn-ghost btn-icon"
-                      title="Move right"
-                      aria-label="Move column right"
-                      disabled={i === ordered.length - 1}
-                      onClick={() => moveColumn(key, 1)}
-                    >
-                      <ChevronDown size={15} />
-                    </button>
                   </div>
                 ))}
               </div>

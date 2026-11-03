@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useEffectEvent, useRef, lazy, Suspense } from 'react'
+import { Fragment, useState, useEffect, useEffectEvent, lazy, Suspense } from 'react'
 import {
   Plus,
   Trash2,
@@ -6,7 +6,6 @@ import {
   UserCheck,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   Pencil,
   Shield,
   X,
@@ -18,7 +17,6 @@ import {
   ClipboardCheck,
   ArrowLeft,
   Ship,
-  GripVertical,
   Tag,
   Edit3,
   Lock,
@@ -117,7 +115,7 @@ const SECTION_KEYWORDS: Record<string, string> = {
 }
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog, promptDialog } from './DialogHost'
-import { PageHeader, Modal, Field, SaveStatus } from './ui'
+import { PageHeader, Modal, Field, SaveStatus, useDragSort, DragHandle, moveInArray } from './ui'
 import type { SubTabProps } from '../utils/useRequestedSubTab'
 import type { NavTarget } from '../features'
 import { DocTypeCodeInput } from './DocTypeCodeInput'
@@ -167,9 +165,6 @@ export default function AdminPanel({
   const [editEdtDescription, setEditEdtDescription] = useState('')
   const [editEdtScope, setEditEdtScope] = useState<'company' | 'person' | 'both'>('both')
   const [editEdtRequired, setEditEdtRequired] = useState(true)
-  const dragEdtIndex = useRef<number | null>(null)
-  const [draggingEdtIndex, setDraggingEdtIndex] = useState<number | null>(null)
-  const [dragOverEdtIndex, setDragOverEdtIndex] = useState<number | null>(null)
 
   const [roles, setRoles] = useState<AssuredRole[]>([])
   const [newRole, setNewRole] = useState('')
@@ -449,11 +444,8 @@ export default function AdminPanel({
     }
   }
 
-  const handleReorderNotifGroup = async (index: number, direction: -1 | 1): Promise<void> => {
-    const newList = [...notifGroups]
-    const target = index + direction
-    if (target < 0 || target >= newList.length) return
-    ;[newList[index], newList[target]] = [newList[target], newList[index]]
+  const handleReorderNotifGroup = async (from: number, to: number): Promise<void> => {
+    const newList = moveInArray(notifGroups, from, to)
     setNotifGroups(newList)
     try {
       await window.api.notifGroupReorder(newList.map((g) => g.id))
@@ -983,11 +975,8 @@ export default function AdminPanel({
     showSuccess('Policy type updated')
   }
 
-  const handleMovePolicyType = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...policyTypes]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMovePolicyType = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(policyTypes, from, to)
     setPolicyTypes(newOrder)
     await window.api.reorderPolicyTypes(newOrder.map((p) => p.id))
   }
@@ -1022,11 +1011,8 @@ export default function AdminPanel({
     showSuccess('Classification society deleted')
   }
 
-  const handleMoveClassSociety = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...classSocieties]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMoveClassSociety = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(classSocieties, from, to)
     setClassSocieties(newOrder)
     await window.api.reorderClassificationSocieties(newOrder.map((c) => c.id))
   }
@@ -1070,11 +1056,8 @@ export default function AdminPanel({
     showSuccess('Vessel type deleted')
   }
 
-  const handleMoveVesselType = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const newOrder = [...vesselTypes]
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const handleMoveVesselType = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(vesselTypes, from, to)
     setVesselTypes(newOrder)
     await window.api.reorderVesselTypes(newOrder.map((v) => v.id))
   }
@@ -1247,23 +1230,9 @@ export default function AdminPanel({
     await loadEntityDocTypes()
   }
 
-  const handleEdtDragStart = (index: number): void => {
-    dragEdtIndex.current = index
-    setDraggingEdtIndex(index)
-  }
-  const handleEdtDragOver = (e: React.DragEvent, index: number): void => {
-    e.preventDefault()
-    setDragOverEdtIndex(index)
-  }
-  const handleEdtDrop = async (e: React.DragEvent, dropIndex: number): Promise<void> => {
-    e.preventDefault()
-    setDragOverEdtIndex(null)
-    if (dragEdtIndex.current === null || dragEdtIndex.current === dropIndex) return
-    const reordered = [...entityDocTypes]
-    const [moved] = reordered.splice(dragEdtIndex.current, 1)
-    reordered.splice(dropIndex, 0, moved)
-    dragEdtIndex.current = null
-    setDraggingEdtIndex(null)
+  const handleMoveEdt = async (from: number, to: number): Promise<void> => {
+    const reordered = moveInArray(entityDocTypes, from, to)
+    setEntityDocTypes(reordered)
     for (let i = 0; i < reordered.length; i++) {
       await window.api.updateEntityDocumentType(reordered[i].id, { orderIndex: i + 1 })
     }
@@ -1310,27 +1279,8 @@ export default function AdminPanel({
     }
   }
 
-  const handleDocDragStart = (index: number): void => {
-    dragDocIndex.current = index
-    setDraggingDocIndex(index)
-  }
-
-  const handleDocDragOver = (e: React.DragEvent, index: number): void => {
-    e.preventDefault()
-    if (dragOverDocIndex !== index) setDragOverDocIndex(index)
-  }
-
-  const handleDocDrop = async (e: React.DragEvent, targetIndex: number): Promise<void> => {
-    e.preventDefault()
-    setDragOverDocIndex(null)
-    const fromIndex = dragDocIndex.current
-    if (fromIndex === null || fromIndex === targetIndex) return
-    dragDocIndex.current = null
-    setDraggingDocIndex(null)
-
-    const reordered = [...docTypes]
-    const [moved] = reordered.splice(fromIndex, 1)
-    reordered.splice(targetIndex, 0, moved)
+  const handleMoveDocType = async (from: number, to: number): Promise<void> => {
+    const reordered = moveInArray(docTypes, from, to)
 
     // Optimistic UI update
     for (let i = 0; i < reordered.length; i++) {
@@ -1344,27 +1294,8 @@ export default function AdminPanel({
     }
   }
 
-  const handleRoleDragStart = (index: number): void => {
-    dragRoleIndex.current = index
-    setDraggingRoleIndex(index)
-  }
-
-  const handleRoleDragOver = (e: React.DragEvent, index: number): void => {
-    e.preventDefault()
-    if (dragOverRoleIndex !== index) setDragOverRoleIndex(index)
-  }
-
-  const handleRoleDrop = async (e: React.DragEvent, targetIndex: number): Promise<void> => {
-    e.preventDefault()
-    setDragOverRoleIndex(null)
-    const fromIndex = dragRoleIndex.current
-    if (fromIndex === null || fromIndex === targetIndex) return
-    dragRoleIndex.current = null
-    setDraggingRoleIndex(null)
-
-    const reordered = [...roles]
-    const [moved] = reordered.splice(fromIndex, 1)
-    reordered.splice(targetIndex, 0, moved)
+  const handleMoveRole = async (from: number, to: number): Promise<void> => {
+    const reordered = moveInArray(roles, from, to)
 
     // Optimistic UI update
     setRoles(reordered)
@@ -1431,11 +1362,8 @@ export default function AdminPanel({
     }
   }
 
-  const handleMoveSurveyType = async (index: number, dir: -1 | 1): Promise<void> => {
-    const j = index + dir
-    if (j < 0 || j >= surveyTypes.length) return
-    const next = [...surveyTypes]
-    ;[next[index], next[j]] = [next[j], next[index]]
+  const handleMoveSurveyType = async (from: number, to: number): Promise<void> => {
+    const next = moveInArray(surveyTypes, from, to)
     setSurveyTypes(next)
     try {
       await window.api.reorderConditionSurveyTypes(next.map((t) => t.id))
@@ -1457,15 +1385,6 @@ export default function AdminPanel({
   const [editDocDescription, setEditDocDescription] = useState('')
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
   const [editRoleName, setEditRoleName] = useState('')
-
-  // Drag-to-reorder state
-  const dragDocIndex = useRef<number | null>(null)
-  const dragRoleIndex = useRef<number | null>(null)
-  // Mirrors of the refs for rendering (refs must not be read during render)
-  const [draggingDocIndex, setDraggingDocIndex] = useState<number | null>(null)
-  const [draggingRoleIndex, setDraggingRoleIndex] = useState<number | null>(null)
-  const [dragOverDocIndex, setDragOverDocIndex] = useState<number | null>(null)
-  const [dragOverRoleIndex, setDragOverRoleIndex] = useState<number | null>(null)
 
   const startEditingDoc = (doc: DocumentType): void => {
     setEditingDocId(doc.id)
@@ -1679,6 +1598,19 @@ export default function AdminPanel({
       loadOnMount()
     })()
   }, [])
+
+  // Drag-to-sort of the settings lists (rows move by their handle, or Up / Down on it)
+  const docTypeSort = useDragSort(docTypes.length, (f, t) => void handleMoveDocType(f, t))
+  const edtSort = useDragSort(entityDocTypes.length, (f, t) => void handleMoveEdt(f, t))
+  const roleSort = useDragSort(roles.length, (f, t) => void handleMoveRole(f, t))
+  const surveyTypeSort = useDragSort(surveyTypes.length, (f, t) => void handleMoveSurveyType(f, t))
+  const vesselTypeSort = useDragSort(vesselTypes.length, (f, t) => void handleMoveVesselType(f, t))
+  const classSort = useDragSort(classSocieties.length, (f, t) => void handleMoveClassSociety(f, t))
+  const policyTypeSort = useDragSort(policyTypes.length, (f, t) => void handleMovePolicyType(f, t))
+  const notifGroupSort = useDragSort(
+    notifGroups.length,
+    (f, t) => void handleReorderNotifGroup(f, t)
+  )
 
   // Full-page view for vessels by role
   if (roleVesselPopup) {
@@ -2431,34 +2363,10 @@ export default function AdminPanel({
                   </thead>
                   <tbody>
                     {docTypes.map((doc, index) => (
-                      <tr
-                        key={doc.id}
-                        draggable
-                        onDragStart={() => handleDocDragStart(index)}
-                        onDragOver={(e) => handleDocDragOver(e, index)}
-                        onDrop={(e) => handleDocDrop(e, index)}
-                        onDragEnd={() => {
-                          dragDocIndex.current = null
-                          setDraggingDocIndex(null)
-                          setDraggingDocIndex(null)
-                          setDragOverDocIndex(null)
-                        }}
-                        style={{
-                          opacity: draggingDocIndex === index ? 0.5 : 1,
-                          background:
-                            dragOverDocIndex === index
-                              ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                              : 'transparent',
-                          cursor: 'grab'
-                        }}
-                      >
+                      <tr key={doc.id} {...docTypeSort.rowProps(index)}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <GripVertical
-                              size={16}
-                              color="var(--text-secondary)"
-                              style={{ opacity: 0.5 }}
-                            />
+                            <DragHandle {...docTypeSort.handleProps(index, `Move ${doc.name}`)} />
                             <span
                               style={{
                                 fontSize: '0.9rem',
@@ -2868,34 +2776,10 @@ export default function AdminPanel({
                   </thead>
                   <tbody>
                     {entityDocTypes.map((edt, index) => (
-                      <tr
-                        key={edt.id}
-                        draggable
-                        onDragStart={() => handleEdtDragStart(index)}
-                        onDragOver={(e) => handleEdtDragOver(e, index)}
-                        onDrop={(e) => handleEdtDrop(e, index)}
-                        onDragEnd={() => {
-                          dragEdtIndex.current = null
-                          setDraggingEdtIndex(null)
-                          setDraggingEdtIndex(null)
-                          setDragOverEdtIndex(null)
-                        }}
-                        style={{
-                          opacity: draggingEdtIndex === index ? 0.5 : 1,
-                          background:
-                            dragOverEdtIndex === index
-                              ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                              : 'transparent',
-                          cursor: 'grab'
-                        }}
-                      >
+                      <tr key={edt.id} {...edtSort.rowProps(index)}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <GripVertical
-                              size={16}
-                              color="var(--text-secondary)"
-                              style={{ opacity: 0.5 }}
-                            />
+                            <DragHandle {...edtSort.handleProps(index, `Move ${edt.name}`)} />
                             <span
                               style={{
                                 fontSize: '0.9rem',
@@ -3191,34 +3075,10 @@ export default function AdminPanel({
                   </thead>
                   <tbody>
                     {roles.map((role, index) => (
-                      <tr
-                        key={role.id}
-                        draggable
-                        onDragStart={() => handleRoleDragStart(index)}
-                        onDragOver={(e) => handleRoleDragOver(e, index)}
-                        onDrop={(e) => handleRoleDrop(e, index)}
-                        onDragEnd={() => {
-                          dragRoleIndex.current = null
-                          setDraggingRoleIndex(null)
-                          setDraggingRoleIndex(null)
-                          setDragOverRoleIndex(null)
-                        }}
-                        style={{
-                          opacity: draggingRoleIndex === index ? 0.5 : 1,
-                          background:
-                            dragOverRoleIndex === index
-                              ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                              : 'transparent',
-                          cursor: 'grab'
-                        }}
-                      >
+                      <tr key={role.id} {...roleSort.rowProps(index)}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <GripVertical
-                              size={16}
-                              color="var(--text-secondary)"
-                              style={{ opacity: 0.5 }}
-                            />
+                            <DragHandle {...roleSort.handleProps(index, `Move ${role.name}`)} />
                             <span
                               style={{
                                 fontSize: '0.9rem',
@@ -3351,27 +3211,14 @@ export default function AdminPanel({
                   </thead>
                   <tbody>
                     {surveyTypes.map((type, i) => (
-                      <tr key={type.id}>
-                        <td>{type.name}</td>
+                      <tr key={type.id} {...surveyTypeSort.rowProps(i)}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <DragHandle {...surveyTypeSort.handleProps(i, `Move ${type.name}`)} />
+                            {type.name}
+                          </div>
+                        </td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button
-                            className="btn-ghost btn-icon btn-sm"
-                            onClick={() => void handleMoveSurveyType(i, -1)}
-                            disabled={i === 0}
-                            aria-label="Move up"
-                            title="Move up"
-                          >
-                            <ChevronUp size={16} />
-                          </button>
-                          <button
-                            className="btn-ghost btn-icon btn-sm"
-                            onClick={() => void handleMoveSurveyType(i, 1)}
-                            disabled={i === surveyTypes.length - 1}
-                            aria-label="Move down"
-                            title="Move down"
-                          >
-                            <ChevronDown size={16} />
-                          </button>
                           <button
                             className="btn-ghost btn-icon btn-sm"
                             onClick={() => void handleRenameSurveyType(type)}
@@ -4839,40 +4686,12 @@ export default function AdminPanel({
                     </thead>
                     <tbody>
                       {vesselTypes.map((vt, index) => (
-                        <tr key={vt.id}>
+                        <tr key={vt.id} {...vesselTypeSort.rowProps(index)}>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button
-                                  onClick={() => handleMoveVesselType(index, 'up')}
-                                  disabled={index === 0}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: index === 0 ? 'default' : 'pointer',
-                                    padding: '0',
-                                    opacity: index === 0 ? 0.3 : 1
-                                  }}
-                                  aria-label="Move up"
-                                >
-                                  <ChevronUp size={14} color="var(--text-secondary)" />
-                                </button>
-                                <button
-                                  onClick={() => handleMoveVesselType(index, 'down')}
-                                  disabled={index === vesselTypes.length - 1}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor:
-                                      index === vesselTypes.length - 1 ? 'default' : 'pointer',
-                                    padding: '0',
-                                    opacity: index === vesselTypes.length - 1 ? 0.3 : 1
-                                  }}
-                                  aria-label="Move down"
-                                >
-                                  <ChevronDown size={14} color="var(--text-secondary)" />
-                                </button>
-                              </div>
+                              <DragHandle
+                                {...vesselTypeSort.handleProps(index, `Move ${vt.name}`)}
+                              />
                               <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                                 {index + 1}
                               </span>
@@ -5047,40 +4866,10 @@ export default function AdminPanel({
                     </thead>
                     <tbody>
                       {classSocieties.map((cs, index) => (
-                        <tr key={cs.id}>
+                        <tr key={cs.id} {...classSort.rowProps(index)}>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button
-                                  onClick={() => handleMoveClassSociety(index, 'up')}
-                                  disabled={index === 0}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: index === 0 ? 'default' : 'pointer',
-                                    padding: '0',
-                                    opacity: index === 0 ? 0.3 : 1
-                                  }}
-                                  aria-label="Move up"
-                                >
-                                  <ChevronUp size={14} color="var(--text-secondary)" />
-                                </button>
-                                <button
-                                  onClick={() => handleMoveClassSociety(index, 'down')}
-                                  disabled={index === classSocieties.length - 1}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor:
-                                      index === classSocieties.length - 1 ? 'default' : 'pointer',
-                                    padding: '0',
-                                    opacity: index === classSocieties.length - 1 ? 0.3 : 1
-                                  }}
-                                  aria-label="Move down"
-                                >
-                                  <ChevronDown size={14} color="var(--text-secondary)" />
-                                </button>
-                              </div>
+                              <DragHandle {...classSort.handleProps(index, `Move ${cs.name}`)} />
                               <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                                 {index + 1}
                               </span>
@@ -5239,6 +5028,7 @@ export default function AdminPanel({
                   {policyTypes.map((pt, index) => (
                     <div
                       key={pt.id}
+                      {...policyTypeSort.rowProps(index)}
                       style={{
                         border: '1px solid var(--table-border)',
                         borderRadius: '8px',
@@ -5258,36 +5048,7 @@ export default function AdminPanel({
                               : 'transparent'
                         }}
                       >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <button
-                            onClick={() => handleMovePolicyType(index, 'up')}
-                            disabled={index === 0}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: index === 0 ? 'default' : 'pointer',
-                              padding: '0',
-                              opacity: index === 0 ? 0.3 : 1
-                            }}
-                            aria-label="Move up"
-                          >
-                            <ChevronUp size={14} color="var(--text-secondary)" />
-                          </button>
-                          <button
-                            onClick={() => handleMovePolicyType(index, 'down')}
-                            disabled={index === policyTypes.length - 1}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: index === policyTypes.length - 1 ? 'default' : 'pointer',
-                              padding: '0',
-                              opacity: index === policyTypes.length - 1 ? 0.3 : 1
-                            }}
-                            aria-label="Move down"
-                          >
-                            <ChevronDown size={14} color="var(--text-secondary)" />
-                          </button>
-                        </div>
+                        <DragHandle {...policyTypeSort.handleProps(index, `Move ${pt.name}`)} />
                         <button
                           onClick={() => toggleExpandPolicyType(pt.id)}
                           style={{
@@ -6205,6 +5966,7 @@ export default function AdminPanel({
                   {notifGroups.map((g, idx) => (
                     <div
                       key={g.id}
+                      {...notifGroupSort.rowProps(idx)}
                       onClick={() => handleSelectNotifGroup(g.id)}
                       style={{
                         padding: '12px 14px',
@@ -6256,46 +6018,10 @@ export default function AdminPanel({
                         </div>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <button
-                              title="Move up"
-                              aria-label="Move up"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleReorderNotifGroup(idx, -1)
-                              }}
-                              disabled={idx === 0}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                color: 'var(--text-secondary)',
-                                opacity: idx === 0 ? 0.3 : 1
-                              }}
-                            >
-                              <ChevronUp size={12} />
-                            </button>
-                            <button
-                              title="Move down"
-                              aria-label="Move down"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleReorderNotifGroup(idx, 1)
-                              }}
-                              disabled={idx === notifGroups.length - 1}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                color: 'var(--text-secondary)',
-                                opacity: idx === notifGroups.length - 1 ? 0.3 : 1
-                              }}
-                            >
-                              <ChevronDown size={12} />
-                            </button>
-                          </div>
+                          {/* A click on the handle does not select the group */}
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <DragHandle {...notifGroupSort.handleProps(idx, `Move ${g.name}`)} />
+                          </span>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{g.name}</div>
                             {g.description && (

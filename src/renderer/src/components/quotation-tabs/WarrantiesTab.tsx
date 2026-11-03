@@ -1,16 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  X,
-  Pencil,
-  Save,
-  Upload,
-  Search,
-  Check
-} from 'lucide-react'
+import { Plus, Trash2, ChevronDown, X, Pencil, Save, Upload, Search, Check } from 'lucide-react'
 import {
   Quotation,
   PIWarranty,
@@ -25,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, HiddenInSettingsBadge } from './shared'
+import { useDragSort, DragHandle, moveInArray } from '../ui'
 import { ALT_COLORS, confirmDelete, allLivestockCarriers } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
 import { inTypeScope } from '../../../../shared/quotationTypes'
@@ -208,19 +198,10 @@ export default function WarrantiesTab({
     showSuccess(`Applied "${ws.name}"`)
   }
 
-  const dragWarrantyRef = useRef<number | null>(null)
-  const handleWarrantyDragStart = (globalIdx: number): void => {
-    dragWarrantyRef.current = globalIdx
-  }
-  const handleWarrantyDrop = async (targetIdx: number): Promise<void> => {
-    const fromIdx = dragWarrantyRef.current
-    dragWarrantyRef.current = null
-    if (fromIdx === null || fromIdx === targetIdx) return
-    const newIds = [...selectedIds]
-    const [moved] = newIds.splice(fromIdx, 1)
-    newIds.splice(targetIdx, 0, moved)
-    await saveSelected(newIds)
-  }
+  // Selected warranties move by their handle, across the set groups (one list, global index)
+  const warrantySort = useDragSort(selectedIds.length, (from, to) => {
+    void saveSelected(moveInArray(selectedIds, from, to))
+  })
 
   const updateWarrantyScope = async (
     piWarrantyId: string,
@@ -281,14 +262,14 @@ export default function WarrantiesTab({
     await reloadCustom()
   }
 
-  const moveCustom = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= customWarranties.length) return
-    const newOrder = [...customWarranties]
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  const moveCustom = async (from: number, to: number): Promise<void> => {
+    const newOrder = moveInArray(customWarranties, from, to)
     setCustomWarranties(newOrder)
     await window.api.reorderQuotationCustomWarranties(newOrder.map((c) => c.id))
   }
+  const customSort = useDragSort(customWarranties.length, (from, to) => void moveCustom(from, to), {
+    disabled: (i) => customWarranties[i]?.id === editingCustomId
+  })
 
   const parseImportText = (): void => {
     const lines = importText
@@ -471,7 +452,7 @@ export default function WarrantiesTab({
     await saveSelected(selectedIds.filter((id) => !toRemove.has(id)))
   }
 
-  const moveSetGroup = async (setId: string, direction: 'up' | 'down'): Promise<void> => {
+  const moveSetGroup = async (fromSetIdx: number, toSetIdx: number): Promise<void> => {
     // Build a lookup: warrantyId → setId for all applied sets
     const idToSet = new Map<string, string>()
     for (const as of appliedSets) {
@@ -493,20 +474,21 @@ export default function WarrantiesTab({
       }
     }
 
-    const blockIdx = blocks.findIndex((b) => b.setId === setId)
-    if (blockIdx < 0) return
-    const swapIdx = direction === 'up' ? blockIdx - 1 : blockIdx + 1
-    if (swapIdx < 0 || swapIdx >= blocks.length) return
-    ;[blocks[blockIdx], blocks[swapIdx]] = [blocks[swapIdx], blocks[blockIdx]]
-    await saveSelected(blocks.flatMap((b) => b.ids))
+    // The dragged set's block takes the place of the set it was dropped on
+    const fromBlock = blocks.findIndex((b) => b.setId === appliedSets[fromSetIdx]?.set.id)
+    const toBlock = blocks.findIndex((b) => b.setId === appliedSets[toSetIdx]?.set.id)
+    if (fromBlock < 0 || toBlock < 0 || fromBlock === toBlock) return
+    await saveSelected(moveInArray(blocks, fromBlock, toBlock).flatMap((b) => b.ids))
   }
+  // A whole set group moves by the handle in its header
+  const setGroupSort = useDragSort(appliedSets.length, (from, to) => void moveSetGroup(from, to))
 
   return (
     <div>
       <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Warranties</h3>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-        Select warranties from the master list. Apply sets for quick selection. Reorder using
-        arrows.
+        Select warranties from the master list. Apply sets for quick selection. Drag the handle to
+        reorder.
       </p>
 
       {allWarranties.length === 0 && (
@@ -973,6 +955,7 @@ export default function WarrantiesTab({
                 return (
                   <div
                     key={as.set.id}
+                    {...setGroupSort.rowProps(asIdx)}
                     style={{
                       marginBottom: '6px',
                       borderRadius: '6px',
@@ -992,6 +975,11 @@ export default function WarrantiesTab({
                       }}
                       onClick={() => toggleSetCollapse(as.set.id)}
                     >
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <DragHandle
+                          {...setGroupSort.handleProps(asIdx, `Move set ${as.set.name}`)}
+                        />
+                      </span>
                       <ChevronDown
                         size={13}
                         style={{
@@ -1020,38 +1008,6 @@ export default function WarrantiesTab({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
-                          onClick={() => moveSetGroup(as.set.id, 'up')}
-                          disabled={asIdx === 0 && as.startIdx === 0}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '0',
-                            color: 'var(--text-secondary)',
-                            opacity: asIdx === 0 && as.startIdx === 0 ? 0.2 : 0.6,
-                            lineHeight: 1
-                          }}
-                          title="Move group up"
-                        >
-                          <ChevronUp size={12} />
-                        </button>
-                        <button
-                          onClick={() => moveSetGroup(as.set.id, 'down')}
-                          disabled={as.endIdx >= selectedIds.length - 1}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '0',
-                            color: 'var(--text-secondary)',
-                            opacity: as.endIdx >= selectedIds.length - 1 ? 0.2 : 0.6,
-                            lineHeight: 1
-                          }}
-                          title="Move group down"
-                        >
-                          <ChevronDown size={12} />
-                        </button>
-                        <button
                           onClick={() => removeSetWarranties(as.set.id)}
                           style={{
                             background: 'transparent',
@@ -1077,10 +1033,7 @@ export default function WarrantiesTab({
                         return (
                           <div
                             key={wid}
-                            draggable
-                            onDragStart={() => handleWarrantyDragStart(globalIdx)}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={() => handleWarrantyDrop(globalIdx)}
+                            {...warrantySort.rowProps(globalIdx)}
                             style={{
                               borderTop: '1px solid var(--table-border)',
                               ...altStyle(warrantyAltIds[wid])
@@ -1105,18 +1058,12 @@ export default function WarrantiesTab({
                               >
                                 {globalIdx + 1}.
                               </span>
-                              <span
-                                style={{
-                                  cursor: 'grab',
-                                  color: 'var(--text-secondary)',
-                                  opacity: 0.4,
-                                  fontSize: '0.7rem',
-                                  flexShrink: 0
-                                }}
-                                title="Drag to reorder"
-                              >
-                                ⠿
-                              </span>
+                              <DragHandle
+                                {...warrantySort.handleProps(
+                                  globalIdx,
+                                  `Move warranty ${globalIdx + 1}`
+                                )}
+                              />
                               <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>
                                 {w.text} <HiddenInSettingsBadge item={w} />
                               </span>
@@ -1183,10 +1130,7 @@ export default function WarrantiesTab({
                       return (
                         <div
                           key={id}
-                          draggable
-                          onDragStart={() => handleWarrantyDragStart(globalIdx)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={() => handleWarrantyDrop(globalIdx)}
+                          {...warrantySort.rowProps(globalIdx)}
                           style={{
                             borderTop: li > 0 ? '1px solid var(--table-border)' : 'none',
                             background:
@@ -1217,18 +1161,12 @@ export default function WarrantiesTab({
                             >
                               {globalIdx + 1}.
                             </span>
-                            <span
-                              style={{
-                                cursor: 'grab',
-                                color: 'var(--text-secondary)',
-                                opacity: 0.4,
-                                fontSize: '0.7rem',
-                                flexShrink: 0
-                              }}
-                              title="Drag to reorder"
-                            >
-                              ⠿
-                            </span>
+                            <DragHandle
+                              {...warrantySort.handleProps(
+                                globalIdx,
+                                `Move warranty ${globalIdx + 1}`
+                              )}
+                            />
                             <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>
                               {w.text} <HiddenInSettingsBadge item={w} />
                             </span>
@@ -1291,6 +1229,7 @@ export default function WarrantiesTab({
                       return (
                         <div
                           key={cw.id}
+                          {...customSort.rowProps(i)}
                           style={{
                             borderTop: i > 0 ? '1px solid var(--table-border)' : 'none',
                             background:
@@ -1366,44 +1305,9 @@ export default function WarrantiesTab({
                               </>
                             ) : (
                               <>
-                                <div
-                                  style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}
-                                >
-                                  <button
-                                    title="Move up"
-                                    aria-label="Move up"
-                                    onClick={() => moveCustom(i, 'up')}
-                                    disabled={i === 0}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      padding: '0',
-                                      color: 'var(--text-secondary)',
-                                      opacity: i === 0 ? 0.2 : 0.6,
-                                      lineHeight: 1
-                                    }}
-                                  >
-                                    <ChevronUp size={10} />
-                                  </button>
-                                  <button
-                                    title="Move down"
-                                    aria-label="Move down"
-                                    onClick={() => moveCustom(i, 'down')}
-                                    disabled={i === customWarranties.length - 1}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      padding: '0',
-                                      color: 'var(--text-secondary)',
-                                      opacity: i === customWarranties.length - 1 ? 0.2 : 0.6,
-                                      lineHeight: 1
-                                    }}
-                                  >
-                                    <ChevronDown size={10} />
-                                  </button>
-                                </div>
+                                <DragHandle
+                                  {...customSort.handleProps(i, `Move custom warranty ${i + 1}`)}
+                                />
                                 <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>
                                   {cw.text}
                                 </span>

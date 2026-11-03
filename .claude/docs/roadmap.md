@@ -20,7 +20,7 @@ of a risk, so every screen is a view of the same story.
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
-- 8 shared UI building blocks: ON HOLD (user 2026-10-31), do later; drag-to-sort question still open.
+- 8 shared UI building blocks: pick-list + drag-to-sort BUILT 2026-11-03 (user: drag everywhere, remove the arrows, pick-lists must work with the keyboard), undeployed. Money input, date range, document picker and the lint rule still to do.
 - 9 server: ON HOLD (user 2026-10-31; everyone works on the Windows server via RDP, see point 9). Revisit for a broker portal / phone view.
 - 10 safety net: ON HOLD (user 2026-10-31), do later; detailed 2026-10-30, the user picks the 10-15 cases.
 
@@ -146,8 +146,14 @@ One combobox, sortable list, document picker, money input, date range used every
 flag-field and arrows-vs-drag fixes of 2026-10-29 came from tabs building their own), with a
 lint rule against hand-built copies.
 Mostly code: users see the same keyboard behaviour everywhere, drag-to-sort instead of arrows,
-fewer "works on my screen" bugs. Done screen by screen alongside other work. Question for the user:
-drag-to-sort everywhere?
+fewer "works on my screen" bugs.
+DONE 2026-11-03: `ui/Combobox` on every hand-built search dropdown and datalist (quotation tabs, Copy
+from Quotation, vessel page, receipts, sea transit, assured report, roles, defects, flag directory,
+policy wizard, endorsement parties, wiki category/tags, Add from settings); `ui/useDragSort` on every
+reorderable list (all quotation tabs, Quotation Settings ~25 lists, Settings hub lists, Policy
+Settings, document templates, endorsement sections, statement titles/columns), arrows removed.
+Left: multi-select checklists (MultiSelectDropdown, vessel Class, fleet add), money input, date
+range, document picker, a lint rule against hand-built copies.
 
 ## 9. A small server between the app and the database
 Holds the DB login, enforces permissions server-side, runs migrations once. Opens the door to

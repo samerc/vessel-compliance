@@ -72,7 +72,7 @@ import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
-import { TypeChip, Modal, Field, EmptyState } from './ui'
+import { TypeChip, Modal, Field, EmptyState, Combobox } from './ui'
 import { addRegistryVessel } from '../utils/addRegistryVessel'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
@@ -539,6 +539,8 @@ export default function VesselDetail({
   const [replyText, setReplyText] = useState('')
   const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  // Keyboard-highlighted row of the @mention list
+  const [mentionActive, setMentionActive] = useState(0)
   const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
   const [vesselNoteCount, setVesselNoteCount] = useState(0)
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
@@ -1195,6 +1197,7 @@ export default function VesselDetail({
     const atMatch = textBefore.match(/@(\w*)$/)
     if (atMatch) setMentionQuery(atMatch[1].toLowerCase())
     else setMentionQuery(null)
+    setMentionActive(0)
   }
 
   const insertMention = (username: string): void => {
@@ -1219,10 +1222,30 @@ export default function VesselDetail({
           .slice(0, 6)
       : []
 
+  // Down / Up / Enter / Tab / Escape in a note box while its @mention list is open. true = handled
+  const mentionKeyDown = (e: React.KeyboardEvent): boolean => {
+    if (mentionQuery === null || filteredMentionUsers.length === 0) return false
+    const last = filteredMentionUsers.length - 1
+    const at = Math.min(mentionActive, last)
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMentionActive(e.key === 'ArrowDown' ? Math.min(at + 1, last) : Math.max(at - 1, 0))
+    } else if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey) || e.key === 'Tab') {
+      e.preventDefault()
+      insertMention(filteredMentionUsers[at].username)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setMentionQuery(null)
+    } else return false
+    return true
+  }
+
   const renderMentionDropdown = (): React.JSX.Element | null => {
     if (mentionQuery === null || filteredMentionUsers.length === 0) return null
     return (
       <div
+        role="listbox"
         style={{
           // Opens downward: the note box sits at the top of the scrolling dialog body
           position: 'absolute',
@@ -1239,11 +1262,23 @@ export default function VesselDetail({
           minWidth: '160px'
         }}
       >
-        {filteredMentionUsers.map((u) => (
+        {filteredMentionUsers.map((u, i) => (
           <div
             key={u.id}
+            role="option"
+            aria-selected={i === Math.min(mentionActive, filteredMentionUsers.length - 1)}
+            // Keeps the note box focused (and its cursor) while clicking
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => insertMention(u.username)}
-            style={{ padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem' }}
+            style={{
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              background:
+                i === Math.min(mentionActive, filteredMentionUsers.length - 1)
+                  ? 'rgba(var(--accent-primary-rgb), 0.12)'
+                  : undefined
+            }}
             className="hover-effect"
           >
             @{u.username}
@@ -1795,191 +1830,63 @@ export default function VesselDetail({
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span className="field-label">Flag</span>
-                  <div
-                    style={{ position: 'relative' }}
-                    onBlur={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                        setFlagDropdownOpen(false)
-                        setFlagSearch('')
-                      }
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (flagDropdownOpen) setFlagSearch('')
-                        setFlagDropdownOpen((o) => !o)
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        background: 'var(--input-bg)',
-                        color: selectedFlagStateId
-                          ? 'var(--text-primary)'
-                          : 'var(--text-secondary)',
-                        border: '1px solid var(--input-border)',
-                        cursor: 'pointer',
-                        minWidth: '180px',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                          textAlign: 'left'
-                        }}
-                      >
-                        {selectedFlagStateId
+                  {/* Shows the vessel's flag; focused, it searches (Down / Up / Enter) */}
+                  <Combobox
+                    aria-label="Flag"
+                    style={{ minWidth: '180px' }}
+                    inputStyle={{ padding: '4px 10px', fontSize: '0.85rem' }}
+                    listMinWidth={220}
+                    value={
+                      flagDropdownOpen
+                        ? flagSearch
+                        : selectedFlagStateId
                           ? flagStates.find((f) => f.id === selectedFlagStateId)?.name || 'Unknown'
-                          : 'No flag'}
-                      </span>
-                      <ChevronDown
-                        size={13}
-                        style={{
-                          flexShrink: 0,
-                          transform: flagDropdownOpen ? 'rotate(180deg)' : 'none',
-                          transition: 'transform 0.15s'
-                        }}
-                      />
-                    </button>
-                    {flagDropdownOpen && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 200,
-                          marginTop: '4px',
-                          background: 'var(--bg-primary)',
-                          border: '1px solid var(--input-border)',
-                          borderRadius: '8px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-                          minWidth: '220px',
-                          maxHeight: '264px',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: '6px 8px',
-                            borderBottom: '1px solid var(--table-border)',
-                            flexShrink: 0
-                          }}
-                        >
-                          <input
-                            type="text"
-                            placeholder="Search flags…"
-                            value={flagSearch}
-                            onChange={(e) => setFlagSearch(e.target.value)}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            autoFocus
-                            style={{
-                              width: '100%',
-                              padding: '4px 8px',
-                              borderRadius: '5px',
-                              border: '1px solid var(--input-border)',
-                              background: 'var(--bg-dark)',
-                              color: 'var(--text-primary)',
-                              fontSize: '0.8rem',
-                              boxSizing: 'border-box',
-                              outline: 'none'
-                            }}
-                          />
-                        </div>
-                        <div style={{ overflowY: 'auto', flex: 1 }}>
-                          <div
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              setSelectedFlagStateId('')
-                              setFlagDropdownOpen(false)
-                              setFlagSearch('')
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              padding: '7px 12px',
-                              cursor: 'pointer',
-                              background: !selectedFlagStateId
-                                ? isLight
-                                  ? 'rgba(0,119,163,0.08)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.08)'
-                                : 'transparent',
-                              borderBottom: '1px solid var(--table-border)'
-                            }}
-                          >
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                              No flag
-                            </span>
-                          </div>
-                          {flagStates
-                            .filter(
-                              (fs) =>
-                                !flagSearch.trim() ||
-                                fs.name.toLowerCase().includes(flagSearch.toLowerCase()) ||
-                                fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())
-                            )
-                            .map((fs) => (
-                              <div
-                                key={fs.id}
-                                onMouseDown={(e) => {
-                                  e.preventDefault()
-                                  setSelectedFlagStateId(fs.id)
-                                  setFlagDropdownOpen(false)
-                                  setFlagSearch('')
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '10px',
-                                  padding: '7px 12px',
-                                  cursor: 'pointer',
-                                  background:
-                                    selectedFlagStateId === fs.id
-                                      ? isLight
-                                        ? 'rgba(0,119,163,0.08)'
-                                        : 'rgba(var(--accent-primary-rgb), 0.08)'
-                                      : 'transparent',
-                                  borderBottom: '1px solid var(--table-border)'
-                                }}
-                              >
-                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                  {fs.name}{' '}
-                                  <span
-                                    style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}
-                                  >
-                                    ({fs.iso3Code})
-                                  </span>
-                                </span>
-                              </div>
-                            ))}
-                          {flagSearch.trim() &&
-                            flagStates.filter(
-                              (fs) =>
-                                fs.name.toLowerCase().includes(flagSearch.toLowerCase()) ||
-                                fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())
-                            ).length === 0 && (
-                              <div
-                                style={{
-                                  padding: '10px 12px',
-                                  fontSize: '0.82rem',
-                                  color: 'var(--text-secondary)'
-                                }}
-                              >
-                                No matches
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                          : ''
+                    }
+                    onInputChange={(t) => {
+                      setFlagSearch(t)
+                      setFlagDropdownOpen(true)
+                    }}
+                    onFocus={() => {
+                      setFlagDropdownOpen(true)
+                      setFlagSearch('')
+                    }}
+                    onBlur={() => {
+                      setFlagDropdownOpen(false)
+                      setFlagSearch('')
+                    }}
+                    options={[
+                      { id: '', name: 'No flag', iso3Code: '' } as FlagState,
+                      ...flagStates
+                    ]}
+                    filter={(opts, q) => {
+                      const t = q.trim().toLowerCase()
+                      if (!t) return opts
+                      return opts.filter(
+                        (fs) =>
+                          fs.id &&
+                          (fs.name.toLowerCase().includes(t) ||
+                            fs.iso3Code.toLowerCase().includes(t))
+                      )
+                    }}
+                    getKey={(fs) => fs.id || 'none'}
+                    getLabel={(fs) => fs.name}
+                    renderOption={(fs) =>
+                      fs.id ? (
+                        <span style={{ fontWeight: selectedFlagStateId === fs.id ? 600 : 400 }}>
+                          {fs.name} <span className="combo-detail">({fs.iso3Code})</span>
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)' }}>No flag</span>
+                      )
+                    }
+                    onSelect={(fs) => {
+                      setSelectedFlagStateId(fs.id)
+                      setFlagDropdownOpen(false)
+                      setFlagSearch('')
+                    }}
+                    placeholder={flagDropdownOpen ? 'Search flags…' : 'No flag'}
+                  />
                   <button
                     onClick={() => setShowAddFlagModal(true)}
                     title="Add new flag state"
@@ -4170,6 +4077,7 @@ export default function VesselDetail({
                 value={newVesselNoteText}
                 onChange={(e) => handleMentionCheck(e.target.value, 'new')}
                 onKeyDown={(e) => {
+                  if (mentionKeyDown(e)) return
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote()
                 }}
                 rows={3}
@@ -4397,6 +4305,7 @@ export default function VesselDetail({
                           value={replyText}
                           onChange={(e) => handleMentionCheck(e.target.value, 'reply')}
                           onKeyDown={(e) => {
+                            if (mentionKeyDown(e)) return
                             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddReply(n.id)
                           }}
                           rows={2}
@@ -4561,7 +4470,6 @@ type PolicyFormValue = string | number | boolean | null | undefined
 function DynamicPoliciesView({
   vesselId,
   dynamicPolicies,
-  isLight,
   onReload,
   showSuccess,
   showError
@@ -5309,104 +5217,57 @@ function DynamicPoliciesView({
                     </button>
                   ))}
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    placeholder={
-                      formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'
-                    }
-                    value={
-                      brokerDropdownOpen
-                        ? brokerSearch
-                        : entities.find((e) => e.id === formBrokerId)?.name || ''
-                    }
-                    onFocus={() => {
-                      setBrokerDropdownOpen(true)
-                      setBrokerSearch('')
-                    }}
-                    onChange={(e) => setBrokerSearch(e.target.value)}
-                    onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
-                  {brokerDropdownOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        background: 'var(--bg-primary)',
-                        border: isLight
-                          ? '1px solid rgba(0,0,0,0.1)'
-                          : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        zIndex: 100,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <div
-                        onMouseDown={() => {
-                          setFormBrokerId('')
-                          setFormCustomerType('')
-                          setBrokerDropdownOpen(false)
-                          setBrokerSearch('')
-                        }}
+                <Combobox
+                  aria-label={formCustomerType === 'direct' ? 'Customer' : 'Broker'}
+                  placeholder={
+                    formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'
+                  }
+                  // While the field has the focus it shows the search, otherwise the pick
+                  value={
+                    brokerDropdownOpen
+                      ? brokerSearch
+                      : entities.find((e) => e.id === formBrokerId)?.name || ''
+                  }
+                  onInputChange={(t) => {
+                    setBrokerSearch(t)
+                    setBrokerDropdownOpen(true)
+                  }}
+                  onFocus={() => {
+                    setBrokerDropdownOpen(true)
+                    setBrokerSearch('')
+                  }}
+                  onBlur={() => setBrokerDropdownOpen(false)}
+                  options={[{ id: '', name: 'None' } as Entity, ...entities]}
+                  filter={(opts, q) => {
+                    const t = q.trim().toLowerCase()
+                    return t ? opts.filter((e) => e.id && e.name.toLowerCase().includes(t)) : opts
+                  }}
+                  getKey={(e) => e.id || 'none'}
+                  getLabel={(e) => e.name}
+                  renderOption={(e) =>
+                    e.id ? (
+                      <span
                         style={{
-                          padding: '8px 12px',
-                          cursor: 'pointer',
-                          color:
-                            formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                          fontStyle: 'italic',
-                          fontSize: '0.9rem'
+                          color: e.id === formBrokerId ? 'var(--accent-primary)' : undefined,
+                          fontWeight: e.id === formBrokerId ? 600 : 400
                         }}
                       >
+                        {e.name}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                         None
-                      </div>
-                      {entities
-                        .filter((e) => e.name.toLowerCase().includes(brokerSearch.toLowerCase()))
-                        .map((e) => (
-                          <div
-                            key={e.id}
-                            onMouseDown={() => {
-                              setFormBrokerId(e.id)
-                              if (!formCustomerType) setFormCustomerType('broker')
-                              setBrokerDropdownOpen(false)
-                              setBrokerSearch('')
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              color:
-                                e.id === formBrokerId
-                                  ? 'var(--accent-primary)'
-                                  : 'var(--text-primary)',
-                              background:
-                                e.id === formBrokerId ? 'var(--accent-tint)' : 'transparent',
-                              fontSize: '0.9rem'
-                            }}
-                          >
-                            {e.name}
-                          </div>
-                        ))}
-                      {entities.filter((e) =>
-                        e.name.toLowerCase().includes(brokerSearch.toLowerCase())
-                      ).length === 0 && (
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '0.85rem',
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          No matches
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                      </span>
+                    )
+                  }
+                  onSelect={(e) => {
+                    setFormBrokerId(e.id)
+                    if (!e.id) setFormCustomerType('')
+                    else if (!formCustomerType) setFormCustomerType('broker')
+                    setBrokerDropdownOpen(false)
+                    setBrokerSearch('')
+                  }}
+                />
               </Field>
             </div>
 

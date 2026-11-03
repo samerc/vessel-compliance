@@ -29,7 +29,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
-import { Field, Modal, EmptyState } from './ui'
+import { Field, Modal, EmptyState, Combobox } from './ui'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
@@ -65,6 +65,41 @@ function sortDefects(
   const open = data.filter((d) => d.status === 'OPEN').sort(sorter)
   const closed = data.filter((d) => d.status !== 'OPEN').sort(sorter)
   return [...open, ...closed]
+}
+
+// Suggestions for the "due event" fields (deadlines that are events, not dates); any wording is kept
+const DUE_EVENTS = [
+  'Before next sailing',
+  'Prior to departure',
+  'At next dry dock',
+  'At next port',
+  'Upon completion of work',
+  'At next class survey'
+]
+
+function DueEventInput({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (v: string) => void
+}): React.JSX.Element {
+  return (
+    <div title="A deadline that is an event rather than a date">
+      <Combobox
+        aria-label="Due event"
+        value={value}
+        onInputChange={onChange}
+        options={DUE_EVENTS}
+        getKey={(e) => e}
+        getLabel={(e) => e}
+        onSelect={onChange}
+        autoHighlight={false}
+        emptyText="Your own wording is kept"
+        placeholder="e.g. At next dry dock"
+      />
+    </div>
+  )
 }
 
 export default function DefectManager({
@@ -412,15 +447,6 @@ export default function DefectManager({
         border: 'var(--glass-border)'
       }}
     >
-      {/* Suggestions for the "due event" inputs (deadlines that are events, not dates) */}
-      <datalist id="defect-due-events">
-        <option value="Before next sailing" />
-        <option value="Prior to departure" />
-        <option value="At next dry dock" />
-        <option value="At next port" />
-        <option value="Upon completion of work" />
-        <option value="At next class survey" />
-      </datalist>
       {/* Header */}
       <div
         style={{
@@ -692,15 +718,7 @@ export default function DefectManager({
               />
             </Field>
             <Field label="Or due event">
-              <input
-                type="text"
-                list="defect-due-events"
-                placeholder="e.g. At next dry dock"
-                value={newDueEvent}
-                onChange={(e) => setNewDueEvent(e.target.value)}
-                aria-label="Due event"
-                title="A deadline that is an event rather than a date"
-              />
+              <DueEventInput value={newDueEvent} onChange={setNewDueEvent} />
             </Field>
             <Field label="Description" required span="all">
               <div ref={newDescriptionWrapRef}>
@@ -820,15 +838,7 @@ export default function DefectManager({
                       />
                     </Field>
                     <Field label="Or due event">
-                      <input
-                        type="text"
-                        list="defect-due-events"
-                        placeholder="e.g. At next dry dock"
-                        value={editDueEvent}
-                        onChange={(e) => setEditDueEvent(e.target.value)}
-                        aria-label="Due event"
-                        title="A deadline that is an event rather than a date"
-                      />
+                      <DueEventInput value={editDueEvent} onChange={setEditDueEvent} />
                     </Field>
                     <Field label="Description" required span="all">
                       <FormattedTextArea

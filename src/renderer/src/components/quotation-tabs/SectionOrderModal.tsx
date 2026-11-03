@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
-import { Modal } from '../ui'
+import { ArrowUpDown } from 'lucide-react'
+import { Modal, useDragSort, DragHandle, moveInArray } from '../ui'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 
@@ -83,13 +83,8 @@ export default function SectionOrderModal({
     void loadData()
   }, [])
 
-  const handleMove = (index: number, dir: 'up' | 'down'): void => {
-    const newOrder = [...order]
-    const swapIdx = dir === 'up' ? index - 1 : index + 1
-    if (swapIdx < 0 || swapIdx >= newOrder.length) return
-    ;[newOrder[index], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[index]]
-    setOrder(newOrder)
-  }
+  // Drag a section by its handle (or Up / Down on it); saved with Save
+  const sort = useDragSort(order.length, (from, to) => setOrder(moveInArray(order, from, to)))
 
   const handleSave = async (): Promise<void> => {
     try {
@@ -158,6 +153,7 @@ export default function SectionOrderModal({
           {order.map((key, i) => (
             <div
               key={key}
+              {...sort.rowProps(i)}
               style={{
                 padding: '10px 14px',
                 borderRadius: '8px',
@@ -169,6 +165,7 @@ export default function SectionOrderModal({
                 background: isCustom(key) ? 'rgba(160,100,255,0.06)' : 'transparent'
               }}
             >
+              <DragHandle {...sort.handleProps(i, `Move ${getLabel(key)}`)} />
               <span
                 style={{
                   fontSize: '0.75rem',
@@ -187,40 +184,6 @@ export default function SectionOrderModal({
                   </span>
                 )}
               </span>
-              <div style={{ display: 'flex', gap: '2px' }}>
-                <button
-                  title="Move up"
-                  aria-label="Move up"
-                  onClick={() => handleMove(i, 'up')}
-                  disabled={i === 0}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === 0 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  title="Move down"
-                  aria-label="Move down"
-                  onClick={() => handleMove(i, 'down')}
-                  disabled={i === order.length - 1}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    color: 'var(--text-secondary)',
-                    opacity: i === order.length - 1 ? 0.3 : 1
-                  }}
-                >
-                  <ChevronDown size={16} />
-                </button>
-              </div>
             </div>
           ))}
         </div>

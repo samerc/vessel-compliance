@@ -26,9 +26,20 @@ import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import ConfirmationModal from './ConfirmationModal'
-import { Badge, Field, EmptyState } from './ui'
+import { Badge, Field, EmptyState, Combobox } from './ui'
 import EntityEditPanel from './EntityEditPanel'
 import { ok, isIpcError } from '../utils/ipc'
+
+// Role suggestions for what is typed, the exact match first
+function matchRoles(roles: AssuredRole[], typed: string): AssuredRole[] {
+  const t = typed.trim().toLowerCase()
+  if (!t) return roles
+  const hits = roles.filter((r) => r.name.toLowerCase().includes(t))
+  return [
+    ...hits.filter((r) => r.name.toLowerCase() === t),
+    ...hits.filter((r) => r.name.toLowerCase() !== t)
+  ]
+}
 
 interface AssuredManagerProps {
   vessel: Vessel
@@ -456,19 +467,20 @@ export default function AssuredManager({
                 )}
               </Field>
               <Field label="Role on vessel" required>
-                <input
-                  list="role-suggestions"
-                  type="text"
+                <Combobox
+                  aria-label="Role on vessel"
                   value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
+                  onInputChange={setNewRole}
+                  options={roles}
+                  filter={matchRoles}
+                  getKey={(r) => r.id}
+                  getLabel={(r) => r.name}
+                  onSelect={(r) => setNewRole(r.name)}
+                  autoHighlight={false}
+                  emptyText="A new role: it is added to the list"
                   placeholder="Select or type role..."
                   required
                 />
-                <datalist id="role-suggestions">
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.name} />
-                  ))}
-                </datalist>
               </Field>
               {!selectedEntityId && (
                 <>
@@ -783,23 +795,25 @@ export default function AssuredManager({
                   Edit Role
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    list="role-suggestions-edit"
-                    type="text"
+                  <Combobox
+                    aria-label="Role"
+                    style={{ flex: 1 }}
                     value={editRoleValue}
-                    onChange={(e) => setEditRoleValue(e.target.value)}
+                    onInputChange={setEditRoleValue}
+                    options={roles}
+                    filter={matchRoles}
+                    getKey={(r) => r.id}
+                    getLabel={(r) => r.name}
+                    onSelect={(r) => setEditRoleValue(r.name)}
+                    autoHighlight={false}
+                    // Enter / Escape the list did not use: save / cancel
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleUpdateRole(selectedVA.id)
                       if (e.key === 'Escape') setEditingVesselAssuredId(null)
                     }}
-                    style={{ flex: 1 }}
+                    emptyText="A new role: it is added to the list"
                     autoFocus
                   />
-                  <datalist id="role-suggestions-edit">
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.name} />
-                    ))}
-                  </datalist>
                   <button
                     onClick={() => handleUpdateRole(selectedVA.id)}
                     className="btn-primary"

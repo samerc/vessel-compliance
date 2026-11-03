@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, ChevronUp, ChevronDown, X, Trash2 } from 'lucide-react'
+import { Plus, X, Trash2 } from 'lucide-react'
 import {
   Quotation,
   HullAgreedValueText,
@@ -10,7 +10,7 @@ import {
 } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 import { MoneyInput } from './shared'
-import { Field } from '../ui'
+import { Field, useDragSort, DragHandle, moveInArray } from '../ui'
 import { masterData } from './masterDataCache'
 
 export default function AgreedValueTab({
@@ -178,20 +178,19 @@ export default function AgreedValueTab({
     await saveItems(items)
   }
 
-  const moveItem = async (idx: number, dir: 'up' | 'down'): Promise<void> => {
-    const arr = [...items]
-    const swap = dir === 'up' ? idx - 1 : idx + 1
-    if (swap < 0 || swap >= arr.length) return
-    ;[arr[idx], arr[swap]] = [arr[swap], arr[idx]]
-    await saveItems(arr)
-  }
-
   const updateScope = async (idx: number, scope: string[] | null): Promise<void> => {
     const updated = items.map((it, i) => (i === idx ? { ...it, vesselScope: scope } : it))
     await saveItems(updated)
   }
 
   const visibleItems = quotation.ivEnabled ? items : items.filter((it) => it.section !== 'iv')
+  // Drag a text item by its handle (or Up / Down on it). Indexes are of the shown items (IV
+  // texts are hidden when IV is off); the move is made in the full list
+  const sort = useDragSort(visibleItems.length, (from, to) => {
+    const a = items.indexOf(visibleItems[from])
+    const b = items.indexOf(visibleItems[to])
+    if (a >= 0 && b >= 0) void saveItems(moveInArray(items, a, b))
+  })
   const unusedTexts = allTexts
     .filter((t) => !items.some((it) => it.hullTextId === t.id))
     .filter((t) => quotation.ivEnabled || (t.section || 'hm') !== 'iv')
@@ -969,11 +968,12 @@ export default function AgreedValueTab({
             No text items yet. Add from templates above or write custom text below.
           </div>
         ) : (
-          visibleItems.map((it) => {
+          visibleItems.map((it, vIdx) => {
             const idx = items.indexOf(it)
             return (
               <div
                 key={it.id || idx}
+                {...sort.rowProps(vIdx)}
                 style={{
                   marginBottom: '8px',
                   padding: '10px 12px',
@@ -983,46 +983,8 @@ export default function AgreedValueTab({
                 }}
               >
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '2px',
-                      paddingTop: '4px'
-                    }}
-                  >
-                    <button
-                      title="Move up"
-                      aria-label="Move up"
-                      onClick={() => moveItem(idx, 'up')}
-                      disabled={idx === 0}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '1px',
-                        color: 'var(--text-secondary)',
-                        opacity: idx === 0 ? 0.3 : 1
-                      }}
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      title="Move down"
-                      aria-label="Move down"
-                      onClick={() => moveItem(idx, 'down')}
-                      disabled={idx === items.length - 1}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '1px',
-                        color: 'var(--text-secondary)',
-                        opacity: idx === items.length - 1 ? 0.3 : 1
-                      }}
-                    >
-                      <ChevronDown size={14} />
-                    </button>
+                  <div style={{ paddingTop: '6px' }}>
+                    <DragHandle {...sort.handleProps(vIdx, `Move value text ${vIdx + 1}`)} />
                   </div>
                   <textarea
                     value={it.text}

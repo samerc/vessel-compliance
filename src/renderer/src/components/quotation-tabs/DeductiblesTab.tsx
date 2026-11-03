@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, X, Pencil, Save } from 'lucide-react'
 import {
   Quotation,
   PIDeductible,
@@ -13,6 +13,7 @@ import {
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, PickerDropdown, MoneyInput } from './shared'
+import { useDragSort, DragHandle, moveInArray } from '../ui'
 import { ALT_COLORS, confirmDelete } from './sharedUtils'
 import DeductibleValueInputs from './DeductibleValueInputs'
 import { fillDeductibleText, withCurrency } from '../../../../shared/deductibleValues'
@@ -249,14 +250,12 @@ export default function DeductiblesTab({
     })
   }
 
-  const moveDeductible = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= deductibles.length) return
-    const newOrder = [...deductibles]
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
+  // Deductibles move by their handle (drag, or Up / Down on it)
+  const deductibleSort = useDragSort(deductibles.length, (from, to) => {
+    const newOrder = moveInArray(deductibles, from, to)
     setDeductibles(newOrder)
-    await window.api.reorderQuotationDeductibles(newOrder.map((d) => d.id))
-  }
+    void window.api.reorderQuotationDeductibles(newOrder.map((d) => d.id))
+  })
 
   const handleAddTextDed = async (): Promise<void> => {
     if (!newTextTitle.trim() && !newTextDed.trim()) return
@@ -287,14 +286,15 @@ export default function DeductiblesTab({
     await reload()
   }
 
-  const moveTextDed = async (index: number, direction: 'up' | 'down'): Promise<void> => {
-    const swapIndex = direction === 'up' ? index - 1 : index + 1
-    if (swapIndex < 0 || swapIndex >= textDeds.length) return
-    const newOrder = [...textDeds]
-    ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
-    setTextDeds(newOrder)
-    await window.api.reorderQuotationTextDeductibles(newOrder.map((d) => d.id))
-  }
+  const textDedSort = useDragSort(
+    textDeds.length,
+    (from, to) => {
+      const newOrder = moveInArray(textDeds, from, to)
+      setTextDeds(newOrder)
+      void window.api.reorderQuotationTextDeductibles(newOrder.map((d) => d.id))
+    },
+    { disabled: (i) => textDeds[i]?.id === editingTextId }
+  )
 
   const updateDeductibleScope = async (id: string, scope: string[] | null): Promise<void> => {
     setDeductibles((prev) => prev.map((d) => (d.id === id ? { ...d, vesselScope: scope } : d)))
@@ -353,6 +353,7 @@ export default function DeductiblesTab({
           {deductibles.map((d, i) => (
             <div
               key={d.id}
+              {...deductibleSort.rowProps(i)}
               style={{
                 padding: '10px 14px',
                 borderRadius: '8px',
@@ -365,42 +366,7 @@ export default function DeductiblesTab({
               <div
                 style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}
               >
-                <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-                  <button
-                    title="Move up"
-                    aria-label="Move up"
-                    onClick={() => moveDeductible(i, 'up')}
-                    disabled={i === 0}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0',
-                      color: 'var(--text-secondary)',
-                      opacity: i === 0 ? 0.2 : 0.6,
-                      lineHeight: 1
-                    }}
-                  >
-                    <ChevronUp size={12} />
-                  </button>
-                  <button
-                    title="Move down"
-                    aria-label="Move down"
-                    onClick={() => moveDeductible(i, 'down')}
-                    disabled={i === deductibles.length - 1}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0',
-                      color: 'var(--text-secondary)',
-                      opacity: i === deductibles.length - 1 ? 0.2 : 0.6,
-                      lineHeight: 1
-                    }}
-                  >
-                    <ChevronDown size={12} />
-                  </button>
-                </div>
+                <DragHandle {...deductibleSort.handleProps(i, `Move deductible ${i + 1}`)} />
                 {d.title && (
                   <span
                     style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}
@@ -860,6 +826,7 @@ export default function DeductiblesTab({
       {textDeds.map((td, i) => (
         <div
           key={td.id}
+          {...textDedSort.rowProps(i)}
           style={{
             padding: '8px 12px',
             borderRadius: '6px',
@@ -869,42 +836,9 @@ export default function DeductiblesTab({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-            <div style={{ display: 'flex', gap: '1px', flexDirection: 'column', flexShrink: 0 }}>
-              <button
-                title="Move up"
-                aria-label="Move up"
-                onClick={() => moveTextDed(i, 'up')}
-                disabled={i === 0}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0',
-                  color: 'var(--text-secondary)',
-                  opacity: i === 0 ? 0.2 : 0.6,
-                  lineHeight: 1
-                }}
-              >
-                <ChevronUp size={10} />
-              </button>
-              <button
-                title="Move down"
-                aria-label="Move down"
-                onClick={() => moveTextDed(i, 'down')}
-                disabled={i === textDeds.length - 1}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0',
-                  color: 'var(--text-secondary)',
-                  opacity: i === textDeds.length - 1 ? 0.2 : 0.6,
-                  lineHeight: 1
-                }}
-              >
-                <ChevronDown size={10} />
-              </button>
-            </div>
+            <span style={{ marginTop: '2px' }}>
+              <DragHandle {...textDedSort.handleProps(i, `Move deductible wording ${i + 1}`)} />
+            </span>
             {editingTextId === td.id ? (
               <>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>

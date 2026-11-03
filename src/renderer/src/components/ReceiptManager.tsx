@@ -3,7 +3,7 @@ import { Receipt, Vessel, VesselAssured, ReceiptInput } from '../../../shared/ty
 import { isIpcError } from '../utils/ipc'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, EmptyState, Modal, Field, Spinner } from './ui'
+import { PageHeader, EmptyState, Modal, Field, Spinner, Combobox } from './ui'
 import { ordinal, formatReceiptAmount } from '../services/receiptFormat'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
@@ -884,98 +884,59 @@ function ReceiptModal({
             <input style={{ opacity: 0.8 }} value={vName} disabled />
           ) : (
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'relative' }}>
-                <Ship
-                  size={15}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-secondary)'
-                  }}
-                />
-                <input
-                  style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '32px' }}
-                  placeholder="Search vessel by name or IMO…"
-                  value={vesselDropOpen ? vesselSearch : vName}
-                  onFocus={() => {
-                    setVesselDropOpen(true)
-                    setVesselSearch('')
-                  }}
-                  onChange={(e) => {
-                    setVesselSearch(e.target.value)
-                    setVesselDropOpen(true)
-                  }}
-                  onBlur={() => setTimeout(() => setVesselDropOpen(false), 150)}
-                />
-              </div>
-              {vesselDropOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    marginTop: '4px',
-                    maxHeight: '240px',
-                    overflowY: 'auto',
-                    borderRadius: '8px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--bg-primary)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  {filteredVessels.length === 0 ? (
-                    <div
-                      style={{
-                        padding: '10px 14px',
-                        fontSize: '0.82rem',
-                        color: 'var(--text-secondary)'
-                      }}
+              <Ship
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)',
+                  zIndex: 1,
+                  pointerEvents: 'none'
+                }}
+              />
+              <Combobox
+                aria-label="Vessel"
+                inputStyle={{ boxSizing: 'border-box', paddingLeft: '32px' }}
+                placeholder="Search vessel by name or IMO…"
+                // While the field has the focus it shows the search, otherwise the vessel
+                value={vesselDropOpen ? vesselSearch : vName}
+                onInputChange={(t) => {
+                  setVesselSearch(t)
+                  setVesselDropOpen(true)
+                }}
+                onFocus={() => {
+                  setVesselDropOpen(true)
+                  setVesselSearch('')
+                }}
+                onBlur={() => setVesselDropOpen(false)}
+                options={filteredVessels}
+                filter={(o) => o}
+                getKey={(v) => v.id}
+                getLabel={(v) => v.name}
+                renderOption={(v) => (
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                    <span>
+                      {v.name}
+                      {!v.isActive && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                          {' '}
+                          (inactive)
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className="mono"
+                      style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}
                     >
-                      No vessels found
-                    </div>
-                  ) : (
-                    filteredVessels.map((v) => (
-                      <div
-                        key={v.id}
-                        onMouseDown={() => selectVessel(v)}
-                        style={{
-                          padding: '8px 14px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                          borderBottom: '1px solid var(--glass-border-color)'
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = 'var(--row-hover)')
-                        }
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <span>
-                          {v.name}
-                          {!v.isActive && (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
-                              {' '}
-                              (inactive)
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className="mono"
-                          style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}
-                        >
-                          {v.imoNumber || ''}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+                      {v.imoNumber || ''}
+                    </span>
+                  </span>
+                )}
+                onSelect={selectVessel}
+                emptyText="No vessels found"
+              />
             </div>
           )}
         </Field>

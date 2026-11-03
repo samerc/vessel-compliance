@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeftRight, CheckCircle, Copy, RotateCcw } from 'lucide-react'
-import { Field } from './ui'
+import { Combobox, Field } from './ui'
 import { formatDate } from '../utils/dateUtils'
 import {
   findSeaRoute,
@@ -30,115 +30,38 @@ function PortPicker({
 }): React.JSX.Element {
   // What is being typed; once a port is picked the input shows the port instead
   const [typed, setTyped] = useState('')
-  const [open, setOpen] = useState(false)
-  const [highlight, setHighlight] = useState(0)
-  const listRef = useRef<HTMLDivElement | null>(null)
   const text = value ? portLabel(value) : typed
-
-  useEffect(() => {
-    if (open) listRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [open])
-
   const matches = useMemo(() => (value ? [] : searchPorts(ports, typed)), [ports, typed, value])
 
-  const pick = (p: SeaPort): void => {
-    onChange(p)
-    setTyped('')
-    setOpen(false)
-  }
-
   return (
-    <div style={{ position: 'relative' }}>
-      <input
-        type="text"
-        value={text}
-        onChange={(e) => {
-          setTyped(e.target.value)
-          if (value) onChange(null)
-          setOpen(true)
-          setHighlight(0)
-        }}
-        onFocus={(e) => {
-          e.target.select()
-          setOpen(true)
-        }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
-            e.preventDefault()
-            setOpen(true)
-            setHighlight((h) => Math.min(h + 1, matches.length - 1))
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault()
-            setHighlight((h) => Math.max(h - 1, 0))
-          } else if (e.key === 'Enter' && open && matches[highlight]) {
-            e.preventDefault()
-            pick(matches[highlight])
-          } else if (e.key === 'Escape' && open) {
-            e.stopPropagation()
-            setOpen(false)
-          }
-        }}
-        placeholder="Port name, country or UN/LOCODE"
-        aria-label={label}
-        aria-autocomplete="list"
-        aria-expanded={open}
-        disabled={ports.length === 0}
-        style={{ width: '100%' }}
-      />
-      {open && text.trim() && !value && (
-        <div
-          ref={listRef}
-          role="listbox"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '2px',
-            maxHeight: '240px',
-            overflowY: 'auto',
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--input-border)',
-            borderRadius: '8px',
-            zIndex: 100,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-          }}
-        >
-          {matches.length === 0 && (
-            <div
-              style={{ padding: '8px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
-            >
-              No port matches. Try another spelling, the country or the 5-letter UN/LOCODE.
-            </div>
-          )}
-          {matches.map((p, i) => (
-            <div
-              key={p.code}
-              role="option"
-              aria-selected={i === highlight}
-              onMouseDown={() => pick(p)}
-              onMouseEnter={() => setHighlight(i)}
-              style={{
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                borderBottom: '1px solid var(--table-border)',
-                background:
-                  i === highlight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent'
-              }}
-            >
-              {p.name}
-              <span
-                style={{ color: 'var(--text-secondary)', marginLeft: '6px', fontSize: '0.8rem' }}
-              >
-                {p.country} · {p.code}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <Combobox
+      aria-label={label}
+      value={text}
+      onInputChange={(t) => {
+        setTyped(t)
+        if (value) onChange(null)
+      }}
+      // Clicking into a picked port selects it, so typing replaces it
+      onFocus={() => (document.activeElement as HTMLInputElement | null)?.select()}
+      options={matches}
+      filter={(o) => o}
+      getKey={(p) => p.code}
+      getLabel={(p) => p.name}
+      getDetail={(p) => `${p.country} · ${p.code}`}
+      onSelect={(p) => {
+        onChange(p)
+        setTyped('')
+      }}
+      emptyText={
+        value
+          ? 'Type to choose another port'
+          : typed.trim()
+            ? 'No port matches. Try another spelling, the country or the 5-letter UN/LOCODE.'
+            : 'Type a port name, country or UN/LOCODE'
+      }
+      placeholder="Port name, country or UN/LOCODE"
+      disabled={ports.length === 0}
+    />
   )
 }
 
