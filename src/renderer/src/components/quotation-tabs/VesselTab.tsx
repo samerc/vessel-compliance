@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   Trash2,
@@ -24,7 +24,7 @@ import {
 import { ok } from '../../utils/ipc'
 import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
-import { Field } from '../ui'
+import { Combobox, Field } from '../ui'
 import { masterData } from './masterDataCache'
 
 const EMPTY_NEW_VESSEL = {
@@ -230,14 +230,6 @@ export default function VesselTab({
   const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
-  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
-  // Keyboard-highlighted row of the flag list; the list scrolls itself into view when it opens
-  // (the Flag field is low in the form, so on a small screen the list opened below the window)
-  const [flagHighlight, setFlagHighlight] = useState(0)
-  const flagListRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (flagDropdownOpen) flagListRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [flagDropdownOpen])
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
   const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
   const [classSocietiesLocal, setClassSocietiesLocal] = useState<ClassificationSociety[]>([])
@@ -986,130 +978,30 @@ export default function VesselTab({
                 ))}
                 {/* Flag combobox */}
                 <Field label="Flag">
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={newData.flag}
-                      onChange={(e) => {
-                        setNewData((p) => ({ ...p, flag: e.target.value }))
-                        setFlagDropdownOpen(true)
-                        setFlagHighlight(0)
-                      }}
-                      onFocus={() => {
-                        setFlagDropdownOpen(true)
-                        setFlagHighlight(0)
-                      }}
-                      onBlur={() =>
-                        setTimeout(() => {
-                          setFlagDropdownOpen(false)
-                          // A typed name or code that is a flag becomes that flag's name
-                          setNewData((p) => {
-                            const typed = p.flag.trim().toLowerCase()
-                            const hit = flagStatesLocal.find(
-                              (f) =>
-                                f.name?.toLowerCase() === typed ||
-                                f.iso3Code?.toLowerCase() === typed
-                            )
-                            return hit && hit.name !== p.flag ? { ...p, flag: hit.name } : p
-                          })
-                        }, 150)
-                      }
-                      onKeyDown={(e) => {
-                        const list = filterFlags(flagStatesLocal, newData.flag)
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault()
-                          setFlagDropdownOpen(true)
-                          setFlagHighlight((h) => Math.min(h + 1, list.length - 1))
-                        } else if (e.key === 'ArrowUp') {
-                          e.preventDefault()
-                          setFlagHighlight((h) => Math.max(h - 1, 0))
-                        } else if (e.key === 'Enter' && flagDropdownOpen && list[flagHighlight]) {
-                          e.preventDefault()
-                          setNewData((p) => ({ ...p, flag: list[flagHighlight].name }))
-                          setFlagDropdownOpen(false)
-                        } else if (e.key === 'Escape' && flagDropdownOpen) {
-                          e.stopPropagation()
-                          setFlagDropdownOpen(false)
-                        }
-                      }}
-                      placeholder="Search flag states..."
-                      aria-label="Flag"
-                      aria-autocomplete="list"
-                      aria-expanded={flagDropdownOpen}
-                      style={{ width: '100%' }}
-                    />
-                    {flagDropdownOpen &&
-                      (() => {
-                        const filtered = filterFlags(flagStatesLocal, newData.flag)
-                        return (
-                          <div
-                            ref={flagListRef}
-                            role="listbox"
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              right: 0,
-                              marginTop: '2px',
-                              maxHeight: '200px',
-                              overflowY: 'auto',
-                              background: 'var(--bg-primary)',
-                              border: '1px solid var(--input-border)',
-                              borderRadius: '8px',
-                              zIndex: 100,
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                            }}
-                          >
-                            {filtered.length === 0 && (
-                              <div
-                                style={{
-                                  padding: '8px 12px',
-                                  fontSize: '0.82rem',
-                                  color: 'var(--text-secondary)'
-                                }}
-                              >
-                                No flag matches. Check the spelling or type the 3-letter code.
-                              </div>
-                            )}
-                            {filtered.map((f, i) => (
-                              <div
-                                key={f.id}
-                                role="option"
-                                aria-selected={i === flagHighlight}
-                                onMouseDown={() => {
-                                  setNewData((p) => ({ ...p, flag: f.name }))
-                                  setFlagDropdownOpen(false)
-                                }}
-                                onMouseEnter={() => setFlagHighlight(i)}
-                                style={{
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  borderBottom: '1px solid var(--table-border)',
-                                  background:
-                                    i === flagHighlight
-                                      ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                                      : 'transparent'
-                                }}
-                              >
-                                {f.name}
-                                {f.iso3Code ? (
-                                  <span
-                                    style={{
-                                      color: 'var(--text-secondary)',
-                                      marginLeft: '6px',
-                                      fontSize: '0.8rem'
-                                    }}
-                                  >
-                                    ({f.iso3Code})
-                                  </span>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
+                  <Combobox
+                    aria-label="Flag"
+                    value={newData.flag}
+                    onInputChange={(t) => setNewData((p) => ({ ...p, flag: t }))}
+                    options={flagStatesLocal}
+                    filter={filterFlags}
+                    getKey={(f) => f.id}
+                    getLabel={(f) => f.name}
+                    getDetail={(f) => (f.iso3Code ? `(${f.iso3Code})` : null)}
+                    onSelect={(f) => setNewData((p) => ({ ...p, flag: f.name }))}
+                    // A typed name or code that is a flag becomes that flag's name
+                    onBlur={() =>
+                      setNewData((p) => {
+                        const typed = p.flag.trim().toLowerCase()
+                        const hit = flagStatesLocal.find(
+                          (f) =>
+                            f.name?.toLowerCase() === typed || f.iso3Code?.toLowerCase() === typed
                         )
-                      })()}
-                  </div>
+                        return hit && hit.name !== p.flag ? { ...p, flag: hit.name } : p
+                      })
+                    }
+                    placeholder="Search flag states..."
+                    emptyText="No flag matches. Check the spelling or type the 3-letter code."
+                  />
                 </Field>
                 {/* Vessel Type combobox */}
                 <Field label="Vessel type">

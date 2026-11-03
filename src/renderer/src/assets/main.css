@@ -1318,3 +1318,79 @@ body.density-spacious .glass-card {
 .inline-combo:focus-visible svg {
   opacity: 0.5;
 }
+
+/* ===== Shared pick-list (ui/Combobox): floats above dialogs ===== */
+.combo-list {
+  position: fixed;
+  z-index: 10000;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+.combo-option {
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--table-border);
+}
+.combo-option:last-child {
+  border-bottom: none;
+}
+.combo-option.active {
+  background: rgba(var(--accent-primary-rgb), 0.12);
+}
+.combo-detail {
+  color: var(--text-secondary);
+  margin-left: 6px;
+  font-size: 0.8rem;
+}
+.combo-empty {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.combo-footer {
+  border-top: 1px solid var(--table-border);
+  padding: 4px;
+}
+
+/* ===== Drag-to-sort rows (ui/useDragSort) ===== */
+.drag-handle {
+  cursor: grab;
+  color: var(--text-secondary);
+  opacity: 0.55;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  user-select: none;
+  padding: 0 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  opacity: 1;
+  color: var(--accent-primary);
+}
+.drag-handle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.drag-handle-off {
+  display: inline-block;
+  width: 0.85rem;
+  cursor: default;
+}
+.drag-row-moving {
+  opacity: 0.5;
+}
+.drag-row-drop-before:not(tr),
+tr.drag-row-drop-before > td {
+  box-shadow: inset 0 3px 0 var(--accent-primary);
+}
+.drag-row-drop-after:not(tr),
+tr.drag-row-drop-after > td {
+  box-shadow: inset 0 -3px 0 var(--accent-primary);
+}
