@@ -1,11 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Search,
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Ship,
   X,
   Loader2,
@@ -23,8 +21,7 @@ import {
   VesselType
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
-import { Badge } from './ui'
+import { Badge, MultiSelect } from './ui'
 import VesselCompareModal from './VesselCompareModal'
 import { promptDialog, confirmDialog } from './DialogHost'
 import { saveFile, SaveCancelledError } from '../utils/saveFile'
@@ -70,278 +67,6 @@ interface VesselFilterProps {
   onNavigateToVessel?: (vesselId: string) => void
   /** Back to the plain vessel list */
   onClose?: () => void
-}
-
-// ── Reusable multi-select dropdown with inline search ──────────────────────────
-function MultiSelectDropdown({
-  options,
-  selected,
-  onChange,
-  placeholder = 'Any'
-}: {
-  options: { id: string; label: string; sublabel?: string }[]
-  selected: string[]
-  onChange: (ids: string[]) => void
-  placeholder?: string
-  isLight: boolean
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-  const dropdownBg = 'var(--bg-primary)'
-  const showSearch = options.length > 6
-
-  const close = (): void => {
-    setOpen(false)
-    setSearch('')
-  }
-
-  const handleToggle = (): void => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      const searchH = showSearch ? 44 : 0
-      const dropH = Math.min(options.length * 37 + searchH + 8, 280)
-      const top =
-        window.innerHeight - rect.bottom < dropH + 8 ? rect.top - dropH - 4 : rect.bottom + 4
-      setPos({ top, left: rect.left, width: rect.width })
-    }
-    if (open) {
-      close()
-    } else setOpen(true)
-  }
-
-  useEffect(() => {
-    if (open && showSearch) setTimeout(() => searchRef.current?.focus(), 40)
-  }, [open, showSearch])
-
-  const filtered = search.trim()
-    ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(search.toLowerCase()) ||
-          o.sublabel?.toLowerCase().includes(search.toLowerCase())
-      )
-    : options
-
-  const toggle = (id: string): void =>
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
-
-  const selectedLabels = options.filter((o) => selected.includes(o.id)).map((o) => o.label)
-  const displayText = selected.length === 0 ? placeholder : selectedLabels.join(', ')
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={handleToggle}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '6px 10px',
-          borderRadius: '6px',
-          fontSize: '0.78rem',
-          background: dropdownBg,
-          color: selected.length > 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
-          border:
-            selected.length > 0
-              ? '1px solid var(--accent-primary)'
-              : '1px solid var(--input-border)',
-          cursor: 'pointer',
-          width: '100%',
-          textAlign: 'left',
-          justifyContent: 'space-between'
-        }}
-      >
-        <span
-          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
-        >
-          {displayText}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-          {selected.length > 0 && (
-            <span
-              style={{
-                background: 'var(--accent-primary)',
-                color: '#000',
-                borderRadius: '10px',
-                padding: '0 6px',
-                fontSize: '0.68rem',
-                fontWeight: '700'
-              }}
-            >
-              {selected.length}
-            </span>
-          )}
-          <ChevronDown
-            size={12}
-            style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-          />
-        </div>
-      </button>
-
-      {open &&
-        createPortal(
-          <>
-            {/* Backdrop */}
-            <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onMouseDown={close} />
-            {/* Dropdown */}
-            <div
-              style={{
-                position: 'fixed',
-                top: pos.top,
-                left: pos.left,
-                width: pos.width,
-                zIndex: 9999,
-                background: dropdownBg,
-                border: '1px solid var(--input-border)',
-                borderRadius: '6px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                maxHeight: '280px'
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {/* All / None buttons */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '4px',
-                  padding: '6px 8px',
-                  borderBottom: '1px solid var(--table-border)',
-                  flexShrink: 0
-                }}
-              >
-                <button
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    onChange(options.map((o) => o.id))
-                  }}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    borderRadius: '4px',
-                    border: '1px solid var(--input-border)',
-                    background: 'transparent',
-                    color: 'var(--accent-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  All
-                </button>
-                <button
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    onChange([])
-                  }}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    borderRadius: '4px',
-                    border: '1px solid var(--input-border)',
-                    background: 'transparent',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  None
-                </button>
-              </div>
-              {/* Search input — shown when list is long */}
-              {showSearch && (
-                <div
-                  style={{
-                    padding: '6px 8px',
-                    borderBottom: '1px solid var(--table-border)',
-                    flexShrink: 0
-                  }}
-                >
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    placeholder="Search..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={{
-                      width: '100%',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid var(--input-border)',
-                      background: dropdownBg,
-                      color: 'var(--text-primary)',
-                      fontSize: '0.78rem',
-                      boxSizing: 'border-box',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              )}
-              {/* Options list */}
-              <div style={{ overflowY: 'auto', flex: 1 }}>
-                {filtered.length === 0 && (
-                  <div
-                    style={{
-                      padding: '10px 12px',
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {search ? 'No matches' : 'No options available'}
-                  </div>
-                )}
-                {filtered.map((opt) => {
-                  const checked = selected.includes(opt.id)
-                  return (
-                    <label
-                      key={opt.id}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        toggle(opt.id)
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '5px 10px',
-                        cursor: 'pointer',
-                        fontSize: '0.78rem',
-                        color: 'var(--text-primary)'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        readOnly
-                        checked={checked}
-                        style={{
-                          accentColor: 'var(--accent-primary)',
-                          pointerEvents: 'none',
-                          flexShrink: 0
-                        }}
-                      />
-                      <span>
-                        {opt.label}
-                        {opt.sublabel && (
-                          <span style={{ color: 'var(--text-secondary)', marginLeft: '4px' }}>
-                            -- {opt.sublabel}
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          </>,
-          document.body
-        )}
-    </>
-  )
 }
 
 // ── Module-level cache — persists filter state only when returning from vessel detail ──
@@ -404,8 +129,6 @@ export default function VesselFilter({
   onClose
 }: VesselFilterProps): React.JSX.Element {
   const { showError, showSuccess } = useToast()
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -1036,12 +759,14 @@ export default function VesselFilter({
               {policyTypes.length > 0 && (
                 <div>
                   <SectionLabel>Policy types</SectionLabel>
-                  <MultiSelectDropdown
+                  <MultiSelect
+                    getKey={(o) => o.id}
+                    getLabel={(o) => o.label}
+                    allNone
                     options={policyTypes.map((pt) => ({ id: pt.id, label: pt.name }))}
                     selected={selectedPolicyTypes}
                     onChange={setSelectedPolicyTypes}
                     placeholder="Any policy type"
-                    isLight={isLight}
                   />
                   {selectedPolicyTypes.length > 0 && (
                     <div style={{ marginTop: '8px' }}>
@@ -1066,7 +791,11 @@ export default function VesselFilter({
               {vesselTypes.length > 0 && (
                 <div>
                   <SectionLabel>Vessel type</SectionLabel>
-                  <MultiSelectDropdown
+                  <MultiSelect
+                    getKey={(o) => o.id}
+                    getLabel={(o) => o.label}
+                    getDetail={(o) => o.sublabel}
+                    allNone
                     options={vesselTypes.map((vt) => ({
                       id: vt.id,
                       label: vt.name,
@@ -1075,7 +804,6 @@ export default function VesselFilter({
                     selected={selectedVesselTypes}
                     onChange={setSelectedVesselTypes}
                     placeholder="Any vessel type"
-                    isLight={isLight}
                   />
                 </div>
               )}
@@ -1084,12 +812,14 @@ export default function VesselFilter({
               {flagStates.length > 0 && (
                 <div>
                   <SectionLabel>Flag state</SectionLabel>
-                  <MultiSelectDropdown
+                  <MultiSelect
+                    getKey={(o) => o.id}
+                    getLabel={(o) => o.label}
+                    allNone
                     options={flagOptions}
                     selected={allSelectedFlags}
                     onChange={handleFlagChange}
                     placeholder="Any flag state"
-                    isLight={isLight}
                   />
                 </div>
               )}
@@ -1098,12 +828,15 @@ export default function VesselFilter({
               {classSocieties.length > 0 && (
                 <div>
                   <SectionLabel>Classification</SectionLabel>
-                  <MultiSelectDropdown
+                  <MultiSelect
+                    getKey={(o) => o.id}
+                    getLabel={(o) => o.label}
+                    getDetail={(o) => o.sublabel}
+                    allNone
                     options={classOptions}
                     selected={selectedClassifications}
                     onChange={setSelectedClassifications}
                     placeholder="Any classification"
-                    isLight={isLight}
                   />
                 </div>
               )}

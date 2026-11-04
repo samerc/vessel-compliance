@@ -24,16 +24,25 @@ import { ThemeProvider } from './contexts/ThemeProvider'
 import { ToastProvider } from './contexts/ToastProvider'
 import { DialogHost } from './components/DialogRoot'
 
-// Block keyboard up/down arrows on number inputs to prevent accidental value changes
-document.addEventListener('keydown', (e) => {
-  if (
-    (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
-    (e.target as HTMLElement)?.tagName === 'INPUT' &&
-    (e.target as HTMLInputElement)?.type === 'number'
-  ) {
-    e.preventDefault()
-  }
-})
+// Up / Down and the mouse wheel never change a number field (amounts, rates, days): too easy to
+// do by accident. Capture phase, so a component that stops the key event cannot skip this
+const isNumberField = (t: EventTarget | null): boolean =>
+  t instanceof HTMLInputElement && t.type === 'number'
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isNumberField(e.target))
+      e.preventDefault()
+  },
+  true
+)
+document.addEventListener(
+  'wheel',
+  (e) => {
+    if (isNumberField(e.target) && e.target === document.activeElement) e.preventDefault()
+  },
+  { capture: true, passive: false }
+)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

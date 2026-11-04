@@ -20,7 +20,7 @@ of a risk, so every screen is a view of the same story.
 - 7 wording library: to DISCUSS. Found 2026-10-30: quotation items point to the settings rows by id with ON
   DELETE CASCADE, and Delete in settings has no confirmation, so deleting a wording removes it from every
   quotation using it; editing a wording changes every quotation that uses it.
-- 8 shared UI building blocks: BUILT (undeployed). Pick-list + drag-to-sort 2026-11-03 (user: drag everywhere, remove the arrows, pick-lists must work with the keyboard); money input, date range, file drop + lint rule 2026-11-04. Left: multi-select checklists.
+- 8 shared UI building blocks: BUILT (undeployed). Pick-list + drag-to-sort 2026-11-03 (user: drag everywhere, remove the arrows, pick-lists must work with the keyboard); money input, date range, file drop + lint rule, multi-select / check list 2026-11-04. Point 8 complete.
 - 9 server: ON HOLD (user 2026-10-31; everyone works on the Windows server via RDP, see point 9). Revisit for a broker portal / phone view.
 - 10 safety net: ON HOLD (user 2026-10-31), do later; detailed 2026-10-30, the user picks the 10-15 cases.
 
@@ -159,8 +159,10 @@ policy wizard instalments, policy cancellation NCB/UPCC amount, and replaces Sum
 `ui/FileDrop` on Loss Record, Statement of Account, document filing (vessel tab + drop dialog), survey
 attachments (could only drag before, now also browse) and defect attachments; lint rule in
 eslint.config.mjs (datalist, file input, draggable, native dialogs outside components/ui).
-Left: multi-select checklists (MultiSelectDropdown, vessel Class, fleet add); row drop targets on
-vessel / entity document rows keep their own handlers.
+Also 2026-11-04: `ui/MultiSelect` + `ui/CheckList` replace both MultiSelectDropdown copies (Vessels
+more filters, Fleet Analytics), the vessel Class dropdown and the fleet "Add vessels" list (keyboard,
+All / None, search); number fields ignore Up / Down and the wheel everywhere (user: arrows changed
+amounts). Not converted on purpose: row drop targets on vessel / entity document rows.
 
 ## 9. A small server between the app and the database
 Holds the DB login, enforces permissions server-side, runs migrations once. Opens the door to

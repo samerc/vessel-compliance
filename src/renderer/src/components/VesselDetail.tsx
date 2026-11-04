@@ -72,7 +72,7 @@ import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
-import { TypeChip, Modal, Field, EmptyState, Combobox } from './ui'
+import { TypeChip, Modal, Field, EmptyState, Combobox, MultiSelect } from './ui'
 import { addRegistryVessel } from '../utils/addRegistryVessel'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
@@ -562,8 +562,6 @@ export default function VesselDetail({
   const [newClassAbbr, setNewClassAbbr] = useState('')
   const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
   const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
-  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
-  const [classSearch, setClassSearch] = useState('')
   const [classConfirm, setClassConfirm] = useState<{
     show: boolean
     newId: string
@@ -824,6 +822,12 @@ export default function VesselDetail({
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Failed to add vessel type')
     }
+  }
+
+  const cancelAddClass = (): void => {
+    setShowAddClass(false)
+    setNewClassName('')
+    setNewClassAbbr('')
   }
 
   const handleAddClassSociety = async (): Promise<void> => {
@@ -1496,322 +1500,111 @@ export default function VesselDetail({
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span className="field-label">Class</span>
-                  <div style={{ position: 'relative' }}>
-                    {/* Trigger button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (classDropdownOpen) setClassSearch('')
-                        setClassDropdownOpen((o) => !o)
-                      }}
-                      onBlur={(e) => {
-                        if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node))
-                          setTimeout(() => {
-                            setClassDropdownOpen(false)
-                            setClassSearch('')
-                          }, 150)
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        background: 'var(--input-bg)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--input-border)',
-                        cursor: 'pointer',
-                        minWidth: '220px',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                          textAlign: 'left'
-                        }}
-                      >
-                        {vesselClassificationIds.size === 0
-                          ? 'None'
-                          : classSocieties
-                              .filter((cs) => vesselClassificationIds.has(cs.id))
-                              .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
-                              .map((cs) => cs.abbreviation || cs.name)
-                              .join(', ')}
-                      </span>
-                      <ChevronDown
-                        size={13}
-                        style={{
-                          flexShrink: 0,
-                          transform: classDropdownOpen ? 'rotate(180deg)' : 'none',
-                          transition: 'transform 0.15s'
-                        }}
-                      />
-                    </button>
-                    {/* Dropdown list */}
-                    {classDropdownOpen && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 200,
-                          marginTop: '4px',
-                          background: 'var(--bg-primary)',
-                          border: '1px solid var(--input-border)',
-                          borderRadius: '8px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-                          minWidth: '220px',
-                          maxHeight: '264px',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        {classSocieties.length > 6 && (
-                          <div
-                            style={{
-                              padding: '6px 8px',
-                              borderBottom: '1px solid var(--table-border)',
-                              flexShrink: 0
+                  <MultiSelect
+                    aria-label="Class"
+                    placeholder="None"
+                    style={{ minWidth: '220px' }}
+                    options={classSocieties}
+                    getKey={(cs) => cs.id}
+                    getLabel={(cs) => cs.abbreviation || cs.name}
+                    getDetail={(cs) => (cs.abbreviation ? cs.name : null)}
+                    selected={[...vesselClassificationIds]}
+                    onChange={(ids) => setVesselClassificationIds(new Set(ids))}
+                    onToggle={(cs, tick) => {
+                      if (!tick) {
+                        // Unchecking: always allowed
+                        setVesselClassificationIds((prev) => {
+                          const next = new Set(prev)
+                          next.delete(cs.id)
+                          return next
+                        })
+                      } else if (vesselClassificationIds.size > 0) {
+                        // Adding when one exists: ask replace or add
+                        setClassConfirm({
+                          show: true,
+                          newId: cs.id,
+                          newName: cs.abbreviation || cs.name
+                        })
+                      } else {
+                        setVesselClassificationIds((prev) => new Set(prev).add(cs.id))
+                      }
+                    }}
+                    summary={(ticked) =>
+                      [...ticked]
+                        .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
+                        .map((cs) => cs.abbreviation || cs.name)
+                        .join(', ')
+                    }
+                    emptyText="No classification societies defined"
+                    footer={
+                      showAddClass ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '4px',
+                            alignItems: 'center',
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          <input
+                            value={newClassName}
+                            onChange={(e) => setNewClassName(e.target.value)}
+                            placeholder="Name"
+                            aria-label="New classification society name"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddClassSociety()
+                              if (e.key === 'Escape') {
+                                e.stopPropagation()
+                                cancelAddClass()
+                              }
                             }}
+                            style={{ padding: '3px 6px', width: '110px', fontSize: '0.78rem' }}
+                          />
+                          <input
+                            value={newClassAbbr}
+                            onChange={(e) => setNewClassAbbr(e.target.value)}
+                            placeholder="Abbr"
+                            aria-label="New classification society abbr"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddClassSociety()
+                              if (e.key === 'Escape') {
+                                e.stopPropagation()
+                                cancelAddClass()
+                              }
+                            }}
+                            style={{ padding: '3px 6px', width: '60px', fontSize: '0.78rem' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddClassSociety}
+                            disabled={!newClassName.trim()}
+                            className="btn-primary btn-sm"
                           >
-                            <input
-                              type="text"
-                              placeholder="Search…"
-                              value={classSearch}
-                              onChange={(e) => setClassSearch(e.target.value)}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              autoFocus
-                              style={{
-                                width: '100%',
-                                padding: '4px 8px',
-                                borderRadius: '5px',
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--bg-dark)',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.8rem',
-                                boxSizing: 'border-box',
-                                outline: 'none'
-                              }}
-                            />
-                          </div>
-                        )}
-                        <div style={{ overflowY: 'auto', flex: 1 }}>
-                          {(() => {
-                            const filtered = classSearch.trim()
-                              ? classSocieties.filter(
-                                  (cs) =>
-                                    cs.name.toLowerCase().includes(classSearch.toLowerCase()) ||
-                                    cs.abbreviation
-                                      ?.toLowerCase()
-                                      .includes(classSearch.toLowerCase())
-                                )
-                              : classSocieties
-                            if (filtered.length === 0)
-                              return (
-                                <div
-                                  style={{
-                                    padding: '10px 12px',
-                                    fontSize: '0.82rem',
-                                    color: 'var(--text-secondary)'
-                                  }}
-                                >
-                                  {classSearch
-                                    ? 'No matches'
-                                    : 'No classification societies defined'}
-                                </div>
-                              )
-                            return filtered.map((cs) => {
-                              const checked = vesselClassificationIds.has(cs.id)
-                              return (
-                                <div
-                                  key={cs.id}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault()
-                                    if (checked) {
-                                      // Unchecking — always allow
-                                      setVesselClassificationIds((prev) => {
-                                        const next = new Set(prev)
-                                        next.delete(cs.id)
-                                        return next
-                                      })
-                                    } else if (vesselClassificationIds.size > 0) {
-                                      // Adding when one exists — ask replace or add
-                                      setClassConfirm({
-                                        show: true,
-                                        newId: cs.id,
-                                        newName: cs.abbreviation || cs.name
-                                      })
-                                    } else {
-                                      // Adding first class — just add
-                                      setVesselClassificationIds((prev) => new Set(prev).add(cs.id))
-                                    }
-                                  }}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    padding: '8px 12px',
-                                    cursor: 'pointer',
-                                    background: checked
-                                      ? isLight
-                                        ? 'rgba(0,119,163,0.08)'
-                                        : 'rgba(var(--accent-primary-rgb), 0.08)'
-                                      : 'transparent',
-                                    borderBottom: '1px solid var(--table-border)'
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    readOnly
-                                    checked={checked}
-                                    style={{
-                                      accentColor: 'var(--accent-primary)',
-                                      pointerEvents: 'none',
-                                      flexShrink: 0
-                                    }}
-                                  />
-                                  <span
-                                    style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}
-                                  >
-                                    {cs.abbreviation ? (
-                                      <>
-                                        <strong>{cs.abbreviation}</strong> – {cs.name}
-                                      </>
-                                    ) : (
-                                      cs.name
-                                    )}
-                                  </span>
-                                </div>
-                              )
-                            })
-                          })()}
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost btn-icon btn-sm"
+                            onClick={cancelAddClass}
+                            aria-label="Cancel new classification society"
+                          >
+                            <X size={12} />
+                          </button>
                         </div>
-                        {/* Add new classification inline */}
-                        {showAddClass ? (
-                          <div
-                            style={{
-                              padding: '8px',
-                              borderTop: '1px solid var(--table-border)',
-                              display: 'flex',
-                              gap: '4px',
-                              alignItems: 'center',
-                              flexWrap: 'wrap'
-                            }}
-                            onMouseDown={(e) => e.preventDefault()}
-                          >
-                            <input
-                              value={newClassName}
-                              onChange={(e) => setNewClassName(e.target.value)}
-                              placeholder="Name"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleAddClassSociety()
-                                if (e.key === 'Escape') {
-                                  setShowAddClass(false)
-                                  setNewClassName('')
-                                  setNewClassAbbr('')
-                                }
-                              }}
-                              style={{
-                                padding: '3px 6px',
-                                borderRadius: '4px',
-                                width: '110px',
-                                fontSize: '0.78rem',
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--bg-dark)',
-                                color: 'var(--text-primary)'
-                              }}
-                            />
-                            <input
-                              value={newClassAbbr}
-                              onChange={(e) => setNewClassAbbr(e.target.value)}
-                              placeholder="Abbr"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleAddClassSociety()
-                                if (e.key === 'Escape') {
-                                  setShowAddClass(false)
-                                  setNewClassName('')
-                                  setNewClassAbbr('')
-                                }
-                              }}
-                              style={{
-                                padding: '3px 6px',
-                                borderRadius: '4px',
-                                width: '60px',
-                                fontSize: '0.78rem',
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--bg-dark)',
-                                color: 'var(--text-primary)'
-                              }}
-                            />
-                            <button
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                handleAddClassSociety()
-                              }}
-                              disabled={!newClassName.trim()}
-                              className="btn-primary"
-                              style={{ padding: '2px 6px', fontSize: '0.72rem' }}
-                            >
-                              Add
-                            </button>
-                            <button
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                setShowAddClass(false)
-                                setNewClassName('')
-                                setNewClassAbbr('')
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--text-secondary)',
-                                padding: '2px'
-                              }}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              padding: '6px 8px',
-                              borderTop: '1px solid var(--table-border)'
-                            }}
-                            onMouseDown={(e) => e.preventDefault()}
-                          >
-                            <button
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                setShowAddClass(true)
-                              }}
-                              style={{
-                                background: 'none',
-                                border: '1px dashed var(--input-border)',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                color: 'var(--accent-primary)',
-                                padding: '3px 8px',
-                                fontSize: '0.75rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                width: '100%'
-                              }}
-                            >
-                              <Plus size={11} /> Add new
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setShowAddClass(true)}
+                          style={{ width: '100%', justifyContent: 'flex-start' }}
+                        >
+                          <Plus size={11} /> Add new
+                        </button>
+                      )
+                    }
+                  />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span className="field-label">Call Sign</span>

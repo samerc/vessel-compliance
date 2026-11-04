@@ -31,7 +31,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, Tabs, EmptyState } from './ui'
+import { PageHeader, Tabs, EmptyState, CheckList } from './ui'
 
 interface CustomerGroup {
   entity: Entity
@@ -82,7 +82,6 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
   const [panelFleet, setPanelFleet] = useState<Fleet | null>(null)
   // "Add vessels" section
   const [addOpen, setAddOpen] = useState(false)
-  const [addSearch, setAddSearch] = useState('')
   const [pendingAdd, setPendingAdd] = useState<Set<string>>(new Set())
   const [addSaving, setAddSaving] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
@@ -145,7 +144,6 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
   const openPanel = (fleet: Fleet): void => {
     setPanelFleet(fleet)
     setAddOpen(false)
-    setAddSearch('')
     setPendingAdd(new Set())
   }
 
@@ -193,22 +191,12 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
       await loadData()
       setPendingAdd(new Set())
       setAddOpen(false)
-      setAddSearch('')
       showSuccess(
         `${pendingAdd.size} vessel${pendingAdd.size !== 1 ? 's' : ''} added to ${panelFleet.name}`
       )
     } finally {
       setAddSaving(false)
     }
-  }
-
-  const togglePending = (id: string): void => {
-    setPendingAdd((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   // Stats
@@ -269,13 +257,8 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
   // Panel: vessels available to add (not in this fleet), filtered by search
   const availableVessels = useMemo(() => {
     if (!panelFleet) return []
-    const base = vessels.filter((v) => v.fleetId !== panelFleet.id)
-    if (!addSearch.trim()) return base
-    const s = addSearch.toLowerCase()
-    return base.filter(
-      (v) => v.name.toLowerCase().includes(s) || v.imoNumber.toLowerCase().includes(s)
-    )
-  }, [panelFleet, vessels, addSearch])
+    return vessels.filter((v) => v.fleetId !== panelFleet.id)
+  }, [panelFleet, vessels])
 
   // Customer grouping
   const { brokerGroups, directGroups, customerUnassigned } = useMemo(() => {
@@ -1335,7 +1318,6 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
                       onClick={() => {
                         setAddOpen((v) => !v)
                         setPendingAdd(new Set())
-                        setAddSearch('')
                       }}
                       style={{
                         width: '100%',
@@ -1369,144 +1351,53 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
 
                     {addOpen && (
                       <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
-                        {/* Search */}
-                        <div
-                          style={{
-                            padding: '10px 12px',
-                            borderBottom: '1px solid var(--glass-border-color)'
-                          }}
-                        >
-                          <div style={{ position: 'relative' }}>
-                            <Search
-                              style={{
-                                position: 'absolute',
-                                left: 9,
-                                top: '50%',
-                                transform: 'translateY(-50%)'
-                              }}
-                              size={13}
-                              color="var(--text-secondary)"
-                            />
-                            <input
-                              type="text"
-                              value={addSearch}
-                              onChange={(e) => setAddSearch(e.target.value)}
-                              placeholder="Filter vessels..."
-                              style={{
-                                width: '100%',
-                                padding: '6px 8px 6px 28px',
-                                fontSize: '0.82rem'
-                              }}
-                              autoFocus
-                            />
-                          </div>
-                        </div>
-
-                        {/* Vessel checklist */}
-                        <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                          {availableVessels.length === 0 ? (
-                            <div
-                              style={{
-                                padding: '20px',
-                                textAlign: 'center',
-                                color: 'var(--text-secondary)',
-                                fontSize: '0.83rem'
-                              }}
-                            >
-                              {addSearch
-                                ? 'No vessels match.'
-                                : 'All vessels are already in this fleet.'}
-                            </div>
-                          ) : (
-                            availableVessels.map((vessel) => {
-                              const checked = pendingAdd.has(vessel.id)
-                              return (
-                                <div
-                                  key={vessel.id}
-                                  role="checkbox"
-                                  aria-checked={checked}
-                                  tabIndex={0}
-                                  onClick={() => togglePending(vessel.id)}
-                                  // Tab through the list, Space / Enter ticks a vessel
-                                  onKeyDown={(e) => {
-                                    if (e.key === ' ' || e.key === 'Enter') {
-                                      e.preventDefault()
-                                      togglePending(vessel.id)
-                                    }
-                                  }}
+                        <CheckList
+                          aria-label="Vessels to add"
+                          options={availableVessels}
+                          getKey={(v) => v.id}
+                          getLabel={(v) => v.name}
+                          getDetail={(v) => `IMO ${v.imoNumber}`}
+                          renderOption={(vessel, checked) => (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                              <Ship
+                                size={13}
+                                color={checked ? 'var(--accent-primary)' : 'var(--text-secondary)'}
+                                style={{ flexShrink: 0 }}
+                              />
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span
                                   style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '9px',
-                                    padding: '8px 14px',
-                                    cursor: 'pointer',
-                                    background: checked ? 'var(--row-selected)' : 'transparent',
-                                    borderLeft: checked
-                                      ? '2px solid var(--accent-primary)'
-                                      : '2px solid transparent',
-                                    borderBottom: '1px solid rgba(0,0,0,0.04)',
-                                    transition: 'background 0.1s'
+                                    display: 'block',
+                                    fontWeight: checked ? 600 : 400,
+                                    textTransform: 'uppercase',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
                                   }}
-                                  className="hover-effect"
                                 >
-                                  <div
-                                    style={{
-                                      width: 16,
-                                      height: 16,
-                                      borderRadius: 4,
-                                      flexShrink: 0,
-                                      background: checked ? 'var(--accent-primary)' : 'transparent',
-                                      border: checked
-                                        ? 'none'
-                                        : '1.5px solid var(--text-secondary)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
-                                  >
-                                    {checked && (
-                                      <Check
-                                        size={10}
-                                        color="var(--accent-contrast)"
-                                        strokeWidth={2.5}
-                                      />
-                                    )}
-                                  </div>
-                                  <Ship
-                                    size={13}
-                                    color={
-                                      checked ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                                    }
-                                    style={{ flexShrink: 0 }}
-                                  />
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontWeight: checked ? 600 : 400,
-                                        fontSize: '0.83rem',
-                                        textTransform: 'uppercase',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      {vessel.name}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: '0.71rem',
-                                        color: 'var(--text-secondary)'
-                                      }}
-                                    >
-                                      IMO {vessel.imoNumber}
-                                    </div>
-                                  </div>
-                                  {renderVesselFlag(vessel)}
-                                </div>
-                              )
-                            })
+                                  {vessel.name}
+                                </span>
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    fontSize: '0.71rem',
+                                    color: 'var(--text-secondary)'
+                                  }}
+                                >
+                                  IMO {vessel.imoNumber}
+                                </span>
+                              </span>
+                              {renderVesselFlag(vessel)}
+                            </span>
                           )}
-                        </div>
+                          selected={[...pendingAdd]}
+                          onChange={(ids) => setPendingAdd(new Set(ids))}
+                          searchFrom={0}
+                          searchPlaceholder="Filter vessels (name or IMO)..."
+                          emptyText="All vessels are already in this fleet."
+                          allNone
+                          autoFocus
+                        />
 
                         {/* Add footer */}
                         {pendingAdd.size > 0 && (
@@ -1544,7 +1435,6 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}):
                               onClick={() => {
                                 setAddOpen(false)
                                 setPendingAdd(new Set())
-                                setAddSearch('')
                               }}
                               style={{
                                 background: 'transparent',

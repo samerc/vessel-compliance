@@ -19,7 +19,7 @@ import {
   X,
   BarChart2
 } from 'lucide-react'
-import { PageHeader, Badge, Modal } from './ui'
+import { PageHeader, Badge, Modal, MultiSelect } from './ui'
 import type { jsPDF } from 'jspdf'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -201,195 +201,6 @@ function CollapsibleFilter({
         )}
       </button>
       {open && children}
-    </div>
-  )
-}
-
-// ── MultiSelectDropdown ───────────────────────────────────────────────────────
-
-function MultiSelectDropdown({
-  label,
-  options,
-  selectedIds,
-  onChange
-}: {
-  label: string
-  options: { id: string; name: string }[]
-  selectedIds: string[]
-  onChange: (ids: string[]) => void
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-
-  const dropdownBg = 'var(--bg-primary)'
-
-  const filtered = useMemo(() => {
-    if (!search) return options
-    const q = search.toLowerCase()
-    return options.filter((o) => o.name.toLowerCase().includes(q))
-  }, [options, search])
-
-  const toggle = (id: string): void => {
-    onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id])
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: '100%',
-          padding: '6px 10px',
-          borderRadius: '6px',
-          border: '1px solid var(--input-border)',
-          background: dropdownBg,
-          color: 'var(--text-primary)',
-          fontSize: '0.78rem',
-          textAlign: 'left',
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}
-      >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {selectedIds.length === 0 ? `Select ${label}...` : `${selectedIds.length} selected`}
-        </span>
-        <ChevronDown
-          size={13}
-          style={{
-            flexShrink: 0,
-            transform: open ? 'rotate(180deg)' : 'none',
-            transition: '0.15s'
-          }}
-        />
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 20,
-            background: dropdownBg,
-            border: '1px solid var(--input-border)',
-            borderRadius: '6px',
-            marginTop: '2px',
-            maxHeight: '240px',
-            overflowY: 'auto',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-          }}
-        >
-          {/* All / None buttons */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '4px',
-              padding: '6px 8px',
-              borderBottom: '1px solid var(--table-border)',
-              position: 'sticky',
-              top: 0,
-              background: dropdownBg,
-              zIndex: 1
-            }}
-          >
-            <button
-              onClick={() => onChange(options.map((o) => o.id))}
-              style={{
-                padding: '2px 8px',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                borderRadius: '4px',
-                border: '1px solid var(--input-border)',
-                background: 'transparent',
-                color: 'var(--accent-primary)',
-                cursor: 'pointer'
-              }}
-            >
-              All
-            </button>
-            <button
-              onClick={() => onChange([])}
-              style={{
-                padding: '2px 8px',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                borderRadius: '4px',
-                border: '1px solid var(--input-border)',
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer'
-              }}
-            >
-              None
-            </button>
-          </div>
-          {options.length > 6 && (
-            <div
-              style={{
-                padding: '6px',
-                borderBottom: '1px solid var(--table-border)',
-                position: 'sticky',
-                top: 32,
-                background: dropdownBg,
-                zIndex: 1
-              }}
-            >
-              <input
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  fontSize: '0.78rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: dropdownBg,
-                  color: 'var(--text-primary)',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          )}
-          {filtered.map((o) => (
-            <label
-              key={o.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '5px 10px',
-                cursor: 'pointer',
-                fontSize: '0.78rem',
-                color: 'var(--text-primary)'
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(o.id)}
-                onChange={() => toggle(o.id)}
-                style={{ accentColor: 'var(--accent-primary)' }}
-              />
-              {o.name}
-            </label>
-          ))}
-          {filtered.length === 0 && (
-            <div
-              style={{
-                padding: '10px',
-                fontSize: '0.78rem',
-                color: 'var(--text-secondary)',
-                textAlign: 'center'
-              }}
-            >
-              No results
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -1579,41 +1390,57 @@ export default function FleetAnalytics(): React.JSX.Element {
 
         {/* Flag States */}
         <CollapsibleFilter label="Flag States">
-          <MultiSelectDropdown
-            label="flag states"
+          <MultiSelect
+            aria-label="Flag states"
+            placeholder="Select flag states..."
             options={flagStates.map((f) => ({ id: f.id, name: f.name }))}
-            selectedIds={filters.flagStateIds}
+            getKey={(o) => o.id}
+            getLabel={(o) => o.name}
+            selected={filters.flagStateIds}
             onChange={(ids) => updateFilter('flagStateIds', ids)}
+            allNone
           />
         </CollapsibleFilter>
 
         {/* Vessel Types */}
         <CollapsibleFilter label="Vessel Types">
-          <MultiSelectDropdown
-            label="vessel types"
+          <MultiSelect
+            aria-label="Vessel types"
+            placeholder="Select vessel types..."
             options={vesselTypes.map((vt) => ({ id: vt.id, name: vt.name }))}
-            selectedIds={filters.vesselTypeIds}
+            getKey={(o) => o.id}
+            getLabel={(o) => o.name}
+            selected={filters.vesselTypeIds}
             onChange={(ids) => updateFilter('vesselTypeIds', ids)}
+            allNone
           />
         </CollapsibleFilter>
 
         {/* Fleets */}
         <CollapsibleFilter label="Fleets" defaultCollapsed>
-          <MultiSelectDropdown
-            label="fleets"
+          <MultiSelect
+            aria-label="Fleets"
+            placeholder="Select fleets..."
             options={fleets.map((f) => ({ id: f.id, name: f.name }))}
-            selectedIds={filters.fleetIds}
+            getKey={(o) => o.id}
+            getLabel={(o) => o.name}
+            selected={filters.fleetIds}
             onChange={(ids) => updateFilter('fleetIds', ids)}
+            allNone
           />
         </CollapsibleFilter>
 
         {/* Customers */}
         <CollapsibleFilter label="Customers" defaultCollapsed>
-          <MultiSelectDropdown
-            label="customers"
+          <MultiSelect
+            aria-label="Customers"
+            placeholder="Select customers..."
             options={customerEntities.map((e) => ({ id: e.id, name: e.name }))}
-            selectedIds={filters.customerIds}
+            getKey={(o) => o.id}
+            getLabel={(o) => o.name}
+            selected={filters.customerIds}
             onChange={(ids) => updateFilter('customerIds', ids)}
+            allNone
           />
         </CollapsibleFilter>
 
