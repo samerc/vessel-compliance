@@ -26,6 +26,30 @@ export interface WhatsNewEntry {
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
     version: '8.1.0',
+    update: 'policy-signing-lists',
+    date: '2026-11-04',
+    items: [
+      {
+        tag: 'New',
+        text: 'Policies stay editable until they are signed: Assign Number when ready, sign in the app or upload the hand-signed scan; an unsigned policy follows a new revision of its quotation',
+        featureId: 'policies'
+      },
+      {
+        tag: 'New',
+        text: 'NCB and UPCC templates in one place (Quotation Settings > General > NCB / UPCC): the starred one fills in when you tick NCB or UPCC'
+      },
+      {
+        tag: 'Improved',
+        text: 'Reorder any list by dragging its ⠿ handle; every pick-list and multi-choice filter works with the keyboard (type, Down / Up, Enter)'
+      },
+      {
+        tag: 'Improved',
+        text: 'Amounts: type 250k or 2.5m. Date filters have quick picks (last 30 days, this month, this year)'
+      }
+    ]
+  },
+  {
+    version: '8.1.0',
     update: 'documents-sanctions',
     date: '2026-10-31',
     items: [
