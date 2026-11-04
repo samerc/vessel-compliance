@@ -5329,6 +5329,16 @@ export class MySQLAdapter {
       } catch {
         /* idempotent migration: already applied or not applicable */
       }
+      // Fix (2026-11-04): editing a custom survey warranty saved only custom_text, while the
+      // exports and the converter read text, so they kept the first wording. Copy the edited one
+      try {
+        await this.pool.query(
+          `UPDATE quotation_survey_warranties SET text = custom_text
+           WHERE custom_text IS NOT NULL AND custom_text <> '' AND (text IS NULL OR text <> custom_text)`
+        )
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: title on survey_warranty_templates
       try {
@@ -24346,9 +24356,12 @@ export class MySQLAdapter {
     if (!this.pool) return
     const fields: string[] = []
     const values: SqlValue[] = []
-    if (data.text !== undefined) {
+    // A custom warranty's wording lives in both columns: the tab shows custom_text, the exports
+    // and the converter read text
+    const text = data.text !== undefined ? data.text : data.customText
+    if (text !== undefined) {
       fields.push('text = ?')
-      values.push(data.text)
+      values.push(text)
     }
     if (data.deadlineValue !== undefined) {
       fields.push('deadline_value = ?')

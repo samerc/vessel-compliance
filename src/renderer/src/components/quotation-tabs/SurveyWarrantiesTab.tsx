@@ -386,7 +386,9 @@ export default function SurveyWarrantiesTab({
                       onClick={() => {
                         updateItem(
                           item.id,
-                          item.customText ? { customText: editText } : { text: editText }
+                          item.customText
+                            ? { customText: editText, text: editText }
+                            : { text: editText }
                         )
                         setEditingId(null)
                       }}

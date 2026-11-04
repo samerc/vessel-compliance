@@ -219,7 +219,7 @@ Per-quotation P&I alternatives (similar to hull):
 - **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
 - **Editor Tab**: "Survey Warranties" in all quotation types. Templates and selected items visually separated.
 - **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event/surveyor/dateofsurvey
-- **Editable text**: Pencil icon on each selected survey warranty opens inline text editing for the resolved text
+- **Editable text**: Pencil icon on each selected survey warranty opens inline text editing for the resolved text. A custom warranty keeps its wording in BOTH `custom_text` (shown in the tab) and `text` (read by the quotation / policy exports and the converter); `updateQuotationSurveyWarranty` writes `text` whenever `customText` changes. Until 2026-11-04 an edit saved only `custom_text`, so exports kept the first wording (fixed + one-time copy in runMigrations)
 - **Vessel scope**: VesselScopeChips shown on each survey warranty when 2+ vessels; per-vessel scoping stored in `vessel_scope`
 - **Days=0 handling**: When `{days}` is 0, "within 0 days of inception" renders as "prior inception" in exports
 
