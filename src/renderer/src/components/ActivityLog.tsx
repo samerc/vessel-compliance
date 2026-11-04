@@ -19,7 +19,7 @@ import { formatDateTime } from '../utils/dateUtils'
 import { getReportSettings } from '../services/ReportSettingsService'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { PageHeader, EmptyState } from './ui'
+import { PageHeader, EmptyState, DateRange } from './ui'
 import { confirmDialog } from './DialogHost'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
@@ -452,26 +452,15 @@ function ActivityLogView(): React.JSX.Element {
           ))}
         </select>
 
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => {
-            setDateFrom(e.target.value)
+        <DateRange
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => {
+            setDateFrom(f)
+            setDateTo(t)
             setPage(1)
           }}
-          style={inputStyle}
-          title="From date"
-        />
-        <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => {
-            setDateTo(e.target.value)
-            setPage(1)
-          }}
-          style={inputStyle}
-          title="To date"
+          inputStyle={inputStyle}
         />
 
         <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>

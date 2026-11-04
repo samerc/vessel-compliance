@@ -1,87 +1,9 @@
-import { useState } from 'react'
 import { QuotationPIAlternative } from '../../../../shared/types'
-import { ALT_COLORS, fmtMoney, parseMoney } from './sharedUtils'
+import { ALT_COLORS } from './sharedUtils'
 import { Badge, Combobox } from '../ui'
 import { isHiddenItem } from '../../utils/settingsItems'
 
-/** Number input that shows commas when not focused, raw number while editing */
-export function MoneyInput({
-  value,
-  placeholder,
-  onChange,
-  onBlur,
-  style,
-  className,
-  showZero,
-  disabled,
-  title,
-  'aria-label': ariaLabel
-}: {
-  value: number | undefined | null
-  placeholder?: string
-  onChange: (val: number | undefined) => void
-  onBlur?: (val: number | undefined) => void
-  style?: React.CSSProperties
-  className?: string
-  /** Render a stored 0 as a visible "0" instead of blank — lets a pinned zero be told apart
-   *  from an empty field (which falls back to a default amount). */
-  showZero?: boolean
-  disabled?: boolean
-  title?: string
-  'aria-label'?: string
-}): React.JSX.Element {
-  const [editing, setEditing] = useState(false)
-  const [raw, setRaw] = useState('')
-  const zeroStr = showZero && value === 0 ? '0' : ''
-  const displayVal = editing ? raw : fmtMoney(value) || zeroStr
-  return (
-    <input
-      type="text"
-      className={className}
-      value={displayVal}
-      placeholder={placeholder}
-      disabled={disabled}
-      title={title}
-      aria-label={ariaLabel}
-      inputMode="decimal"
-      onFocus={() => {
-        setEditing(true)
-        setRaw(value != null && value !== 0 ? String(value) : zeroStr)
-      }}
-      onChange={(e) => {
-        const v = e.target.value.replace(/[^0-9.,-]/g, '')
-        setRaw(v)
-        onChange(parseMoney(v))
-      }}
-      onBlur={() => {
-        setEditing(false)
-        const parsed = parseMoney(raw)
-        onBlur?.(parsed)
-      }}
-      style={style}
-    />
-  )
-}
-
-/** MoneyInput for fields kept as strings in state (calculators, draft forms) */
-export function StrMoneyInput({
-  value,
-  onChange,
-  ...rest
-}: Omit<React.ComponentProps<typeof MoneyInput>, 'value' | 'onChange' | 'onBlur' | 'showZero'> & {
-  value: string | number | undefined | null
-  onChange: (val: string) => void
-}): React.JSX.Element {
-  const n = value === '' || value == null ? undefined : parseMoney(String(value))
-  return (
-    <MoneyInput
-      {...rest}
-      value={n}
-      showZero
-      onChange={(v) => onChange(v != null ? String(v) : '')}
-    />
-  )
-}
+export { MoneyInput, StrMoneyInput } from '../ui'
 
 /** Muted marker on a selected settings item that is hidden in settings (no longer offered) */
 export function HiddenInSettingsBadge({

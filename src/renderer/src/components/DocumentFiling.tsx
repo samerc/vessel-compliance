@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FolderOpen, Inbox, Loader2, Upload } from 'lucide-react'
+import { FolderOpen, Inbox, Loader2 } from 'lucide-react'
 import type {
   DocFilingCandidate,
   DocFilingResult,
@@ -7,7 +7,7 @@ import type {
   DocumentType,
   Vessel
 } from '../../../shared/types'
-import { Badge, Modal } from './ui'
+import { Badge, Modal, FileDrop } from './ui'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -402,77 +402,6 @@ function FilingReview({
 }
 
 /** A drop area + "Choose files" button; files go to `onFiles` */
-function DropArea({
-  busy,
-  text,
-  onFiles,
-  tall = false
-}: {
-  busy: boolean
-  text: string
-  onFiles: (files: File[]) => void
-  tall?: boolean
-}): React.JSX.Element {
-  const [over, setOver] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault()
-        setOver(true)
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setOver(false)
-        if (!busy) onFiles([...e.dataTransfer.files])
-      }}
-      style={{
-        border: `2px dashed ${over ? 'var(--accent-primary)' : 'var(--glass-border-color)'}`,
-        background: over ? 'var(--accent-tint)' : 'transparent',
-        borderRadius: '10px',
-        padding: tall ? '40px 20px' : '12px 16px',
-        marginBottom: tall ? 0 : '16px',
-        display: 'flex',
-        flexDirection: tall ? 'column' : 'row',
-        alignItems: 'center',
-        gap: '12px',
-        flexWrap: 'wrap',
-        textAlign: tall ? 'center' : 'left',
-        color: 'var(--text-secondary)',
-        fontSize: '0.88rem'
-      }}
-    >
-      {busy ? (
-        <Loader2 size={tall ? 28 : 18} className="spinner" />
-      ) : (
-        <Inbox size={tall ? 28 : 18} />
-      )}
-      <span style={{ flex: tall ? undefined : 1, minWidth: '220px' }}>
-        {busy ? 'Reading the files...' : text}
-      </span>
-      <button
-        type="button"
-        className="btn-secondary btn-sm"
-        disabled={busy}
-        onClick={() => inputRef.current?.click()}
-      >
-        <Upload size={14} /> Choose files
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => {
-          const list = [...(e.target.files || [])]
-          e.target.value = ''
-          if (list.length > 0) onFiles(list)
-        }}
-      />
-    </div>
-  )
-}
 
 /** The drop bar on a vessel's Documents tab: the vessel is known, only the types are guessed */
 export default function DocumentFiling({
@@ -503,10 +432,15 @@ export default function DocumentFiling({
 
   return (
     <>
-      <DropArea
+      <FileDrop
+        variant="bar"
+        multiple
         busy={reading}
+        busyText="Reading the files..."
         onFiles={(f) => void start(f)}
-        text="Drop several files here (from Outlook, Downloads or a folder) to file them at once: the app suggests each type, you check, then they are moved to the vessel folder, renamed and linked."
+        title="Drop several files here to file them at once"
+        hint="From Outlook, Downloads or a folder: the app suggests each type, you check, then they are moved to the vessel folder, renamed and linked."
+        style={{ marginBottom: '16px' }}
       />
       {review && (
         <FilingReview
@@ -624,11 +558,13 @@ export function GlobalDocumentFiling(): React.JSX.Element | null {
           onClose={() => !reading && setPicker(false)}
           width={620}
         >
-          <DropArea
-            tall
+          <FileDrop
+            multiple
             busy={reading}
+            busyText="Reading the files..."
             onFiles={(f) => void start(f)}
-            text="Drop files here (from Outlook, Downloads or a folder). The app suggests the vessel (IMO or name) and the document type of each; you check, then they are moved to the vessel folders, renamed and linked."
+            title="Drop files here (from Outlook, Downloads or a folder)"
+            hint="or click to choose them. The app suggests the vessel (IMO or name) and the document type of each; you check, then they are moved to the vessel folders, renamed and linked."
           />
         </Modal>
       )}

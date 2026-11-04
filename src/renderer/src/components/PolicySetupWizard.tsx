@@ -2355,22 +2355,22 @@ function StepInstalments({
                   }}
                   style={{ ...inputStyle, flex: 1 }}
                 />
-                <input
-                  type="number"
-                  value={data.instalmentAmounts[i] || ''}
+                <MoneyInput
+                  value={data.instalmentAmounts[i] || null}
                   readOnly={isMultiSelection}
                   title={
                     isMultiSelection
                       ? 'Sum of the per-vessel instalments — edit the vessel premiums above'
                       : undefined
                   }
-                  onChange={(e) => {
+                  onChange={(n) => {
                     if (isMultiSelection) return
                     const updated = [...data.instalmentAmounts]
-                    updated[i] = parseFloat(e.target.value) || 0
+                    updated[i] = n || 0
                     recalcPremiumFromInstalments(updated)
                   }}
                   placeholder="Amount"
+                  aria-label={`Instalment ${i + 1} amount`}
                   style={{ ...inputStyle, width: '130px', flex: 'none', textAlign: 'right' }}
                 />
                 <span

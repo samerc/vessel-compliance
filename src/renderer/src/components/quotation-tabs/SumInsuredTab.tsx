@@ -1,65 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
 import { warSectionTexts } from '../../utils/warTexts'
-import { Field } from '../ui'
+import { Field, MoneyInput, fmtMoney } from '../ui'
 import { masterData } from './masterDataCache'
-
-/** Format a number with thousand separators for display in text inputs */
-function fmtNum(val: number | undefined | null): string {
-  if (val == null || val === 0) return ''
-  return val.toLocaleString('en-US', { maximumFractionDigits: 2 })
-}
-
-/** Parse a formatted number string (with commas) back to a number */
-function parseNum(str: string): number | undefined {
-  const cleaned = str.replace(/,/g, '')
-  if (!cleaned) return undefined
-  const n = parseFloat(cleaned)
-  return isNaN(n) ? undefined : n
-}
-
-/** Number input that shows commas when not focused, raw number while editing */
-function MoneyInput({
-  value,
-  placeholder,
-  onChange,
-  onBlur,
-  style
-}: {
-  value: number | undefined | null
-  placeholder?: string
-  onChange: (val: number | undefined) => void
-  onBlur?: (val: number | undefined) => void
-  style?: React.CSSProperties
-}): React.JSX.Element {
-  const [editing, setEditing] = useState(false)
-  const [raw, setRaw] = useState('')
-
-  const displayVal = editing ? raw : fmtNum(value)
-
-  return (
-    <input
-      type="text"
-      value={displayVal}
-      placeholder={placeholder}
-      onFocus={() => {
-        setEditing(true)
-        setRaw(value != null && value !== 0 ? String(value) : '')
-      }}
-      onChange={(e) => {
-        const v = e.target.value.replace(/[^0-9.,-]/g, '')
-        setRaw(v)
-        onChange(parseNum(v))
-      }}
-      onBlur={() => {
-        setEditing(false)
-        const parsed = parseNum(raw)
-        if (onBlur) onBlur(parsed)
-      }}
-      style={style}
-    />
-  )
-}
 
 export default function SumInsuredTab({
   quotation,
@@ -227,7 +170,7 @@ export default function SumInsuredTab({
                   </span>
                   <MoneyInput
                     value={v.agreedValue}
-                    placeholder={fmtNum(quotation.agreedValue) || '0'}
+                    placeholder={fmtMoney(quotation.agreedValue) || '0'}
                     onChange={(val) =>
                       setQVessels((prev) =>
                         prev.map((qv) =>
@@ -484,7 +427,7 @@ export default function SumInsuredTab({
                         </span>
                         <MoneyInput
                           value={v.warExcessAmount}
-                          placeholder={fmtNum(quotation.warExcessAmount) || '0'}
+                          placeholder={fmtMoney(quotation.warExcessAmount) || '0'}
                           onChange={(val) =>
                             setQVessels((prev) =>
                               prev.map((qv) =>

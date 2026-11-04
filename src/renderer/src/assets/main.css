@@ -2,7 +2,8 @@
    Aurora (.aurora) themes map to dark and light. The accent is per user: utils/accent.ts sets
    --accent-primary, --accent-primary-rgb, --accent-secondary and --accent-contrast on <body>. */
 :root {
-  --font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family:
+    'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
 
   /* Colors */
@@ -1355,6 +1356,93 @@ body.density-spacious .glass-card {
 .combo-footer {
   border-top: 1px solid var(--table-border);
   padding: 4px;
+}
+
+/* ===== From / to date filter (ui/DateRange) ===== */
+.date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.date-range .muted {
+  font-size: 0.78rem;
+}
+
+/* ===== Drop or choose files (ui/FileDrop) ===== */
+.file-drop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border: 2px dashed var(--glass-border-color);
+  transition: var(--transition);
+}
+.file-drop:hover,
+.file-drop:focus-visible {
+  border-color: var(--accent-primary);
+}
+.file-drop.over {
+  border-color: var(--accent-primary);
+  background: var(--accent-tint);
+}
+.file-drop.off {
+  cursor: default;
+  opacity: 0.7;
+}
+.file-drop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.file-drop-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.file-drop-hint {
+  font-size: 0.8rem;
+}
+.file-drop-large {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 32px;
+  border-radius: 16px;
+  background: var(--bg-card);
+}
+.file-drop-large .file-drop-icon {
+  color: var(--accent-primary);
+  opacity: 0.7;
+}
+.file-drop-large .file-drop-title {
+  font-size: 1.05rem;
+}
+.file-drop-bar {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+.file-drop-bar .file-drop-text {
+  flex: 1;
+  min-width: 200px;
+}
+.file-drop-btn {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.file-drop-chip {
+  display: inline-flex;
+  gap: 5px;
+  padding: 4px 10px;
+  border-width: 1px;
+  border-color: var(--input-border);
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+.file-drop-chip .file-drop-title {
+  color: var(--text-secondary);
+  font-weight: 400;
 }
 
 /* ===== Drag-to-sort rows (ui/useDragSort) ===== */

@@ -8,7 +8,7 @@ import {
   Download,
   ClipboardList
 } from 'lucide-react'
-import { PageHeader, EmptyState } from './ui'
+import { PageHeader, EmptyState, DateRange } from './ui'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate } from '../utils/dateUtils'
@@ -560,11 +560,15 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
           alignItems: 'center'
         }}
       >
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          style={{
+        <DateRange
+          label="Survey date"
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => {
+            setDateFrom(f)
+            setDateTo(t)
+          }}
+          inputStyle={{
             padding: '6px 10px',
             borderRadius: '6px',
             border: '1px solid var(--input-border)',
@@ -572,22 +576,6 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
             color: 'var(--text-primary)',
             fontSize: '0.82rem'
           }}
-          title="From date"
-        />
-        <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          style={{
-            padding: '6px 10px',
-            borderRadius: '6px',
-            border: '1px solid var(--input-border)',
-            background: 'var(--input-bg)',
-            color: 'var(--text-primary)',
-            fontSize: '0.82rem'
-          }}
-          title="To date"
         />
         <select
           value={typeFilter}

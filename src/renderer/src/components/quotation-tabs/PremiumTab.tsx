@@ -568,17 +568,17 @@ export default function PremiumTab({
               >
                 {v.name || v.vesselLabel}
               </span>
-              <input
-                type="number"
-                value={altVesselPrems[`${altId}:${v.id}`] || ''}
-                onChange={(e) =>
+              <MoneyInput
+                value={altVesselPrems[`${altId}:${v.id}`] || null}
+                onChange={(n) =>
                   setAltVesselPrems((prev) => ({
                     ...prev,
-                    [`${altId}:${v.id}`]: parseFloat(e.target.value) || 0
+                    [`${altId}:${v.id}`]: n || 0
                   }))
                 }
-                onBlur={(e) => onSave(v.id, parseFloat(e.target.value) || null)}
+                onBlur={(n) => onSave(v.id, n || null)}
                 placeholder={premiumLabel}
+                aria-label={`${premiumLabel} ${v.name || v.vesselLabel}`}
                 style={{ width: '160px', textAlign: 'right' }}
               />
               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>

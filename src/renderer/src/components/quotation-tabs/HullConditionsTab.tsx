@@ -18,7 +18,7 @@ import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
 import { masterData } from './masterDataCache'
 import { HiddenInSettingsBadge } from './shared'
-import { Combobox, useDragSort, DragHandle } from '../ui'
+import { Combobox, useDragSort, DragHandle, MoneyInput } from '../ui'
 import { isHiddenItem, isOffered, offeredItems } from '../../utils/settingsItems'
 
 function HullClauseDropdown({
@@ -515,17 +515,11 @@ function HullConditionPicker({
                                 >
                                   {(v.name || v.vesselLabel).toUpperCase()}
                                 </span>
-                                <input
-                                  type="number"
-                                  value={perVesselVal ?? amounts[item.id] ?? ''}
-                                  onChange={(e) =>
-                                    onVesselAmountChange(
-                                      item.id,
-                                      v.id,
-                                      e.target.value ? Number(e.target.value) : undefined
-                                    )
-                                  }
-                                  onBlur={onVesselAmountBlur}
+                                <MoneyInput
+                                  value={perVesselVal ?? amounts[item.id]}
+                                  onChange={(n) => onVesselAmountChange(item.id, v.id, n)}
+                                  onBlur={() => onVesselAmountBlur?.()}
+                                  aria-label={`${item.amountPlaceholder || 'Amount'} ${v.name || v.vesselLabel}`}
                                   placeholder="0"
                                   style={{
                                     width: '120px',
@@ -550,16 +544,11 @@ function HullConditionPicker({
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                             {item.amountPlaceholder || 'Amount'}:
                           </span>
-                          <input
-                            type="number"
-                            value={amounts[item.id] ?? ''}
-                            onChange={(e) =>
-                              onAmountChange(
-                                item.id,
-                                e.target.value ? Number(e.target.value) : undefined
-                              )
-                            }
-                            onBlur={onAmountBlur}
+                          <MoneyInput
+                            value={amounts[item.id]}
+                            onChange={(n) => onAmountChange(item.id, n)}
+                            onBlur={() => onAmountBlur?.()}
+                            aria-label={item.amountPlaceholder || 'Amount'}
                             placeholder="0"
                             style={{
                               width: '120px',

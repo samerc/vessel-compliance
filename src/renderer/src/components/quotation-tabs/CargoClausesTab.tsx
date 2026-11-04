@@ -10,7 +10,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ok } from '../../utils/ipc'
-import { Field } from '../ui'
+import { Field, MoneyInput } from '../ui'
 import { cachedIpc, masterData } from './masterDataCache'
 import { confirmDelete } from './sharedUtils'
 import { HiddenInSettingsBadge } from './shared'
@@ -628,25 +628,16 @@ export default function CargoClausesTab({
                     >
                       {sc.amountPlaceholder || 'Amount'}:
                     </label>
-                    <input
-                      type="number"
-                      value={sc.amount ?? ''}
+                    <MoneyInput
+                      value={sc.amount}
                       placeholder="0.00"
-                      onChange={(e) =>
+                      aria-label={sc.amountPlaceholder || 'Amount'}
+                      onChange={(n) =>
                         setSelectedClauses((prev) =>
-                          prev.map((c) =>
-                            c.id === sc.id
-                              ? { ...c, amount: e.target.value ? parseFloat(e.target.value) : null }
-                              : c
-                          )
+                          prev.map((c) => (c.id === sc.id ? { ...c, amount: n ?? null } : c))
                         )
                       }
-                      onBlur={(e) =>
-                        updateAmount(
-                          sc.cargoClauseId,
-                          e.target.value ? parseFloat(e.target.value) : null
-                        )
-                      }
+                      onBlur={(n) => updateAmount(sc.cargoClauseId, n ?? null)}
                       style={{
                         width: '180px',
                         padding: '5px 8px',

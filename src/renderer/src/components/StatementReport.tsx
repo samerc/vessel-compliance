@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { Upload, FileText, X, AlertCircle, Settings, Plus, Trash2, Save } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FileText, X, AlertCircle, Settings, Plus, Trash2, Save } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Modal, Field, useDragSort, DragHandle, moveInArray } from './ui'
+import { Modal, Field, useDragSort, DragHandle, moveInArray, FileDrop } from './ui'
 import {
   parseStatementWorkbook,
   defaultVisibleColumns,
@@ -308,7 +308,6 @@ export default function StatementReport(): React.JSX.Element {
   const { hasPermission } = useAuth()
   const { showError, showSuccess } = useToast()
   const canConfigure = hasPermission('admin:settings')
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [settings, setSettings] = useState<StatementSettings>(DEFAULT_STATEMENT_SETTINGS)
   const [showSettings, setShowSettings] = useState(false)
@@ -316,7 +315,6 @@ export default function StatementReport(): React.JSX.Element {
   const [data, setData] = useState<ParsedStatement | null>(null)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [dragging, setDragging] = useState(false)
   const [exporting, setExporting] = useState<'' | 'docx' | 'pdf'>('')
 
   const [titleIdx, setTitleIdx] = useState(0)
@@ -511,55 +509,12 @@ export default function StatementReport(): React.JSX.Element {
           {settingsButton && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{settingsButton}</div>
           )}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragging(false)
-              const f = e.dataTransfer.files?.[0]
-              if (f) handleFile(f)
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              border: `2px dashed ${dragging ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-              borderRadius: '16px',
-              padding: '64px 32px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              background: dragging ? 'var(--accent-tint)' : 'var(--bg-card)'
-            }}
-          >
-            <Upload
-              size={48}
-              color="var(--accent-primary)"
-              style={{ marginBottom: '16px', opacity: 0.7 }}
-            />
-            <p style={{ fontSize: '1.05rem', fontWeight: 600, margin: '0 0 8px' }}>
-              Drop the statement Excel here
-            </p>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>
-              or click to browse
-            </p>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', opacity: 0.7 }}>
-              An accounting export (e.g. QuickBooks open invoices) with a header row. It is
-              formatted on the company letterhead.
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) handleFile(f)
-                e.target.value = ''
-              }}
-            />
-          </div>
+          <FileDrop
+            accept=".xlsx,.xls"
+            title="Drop the statement Excel here"
+            hint="or click to browse - an accounting export (e.g. QuickBooks open invoices) with a header row; it is formatted on the company letterhead"
+            onFiles={([f]) => handleFile(f)}
+          />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

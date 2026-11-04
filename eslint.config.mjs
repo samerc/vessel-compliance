@@ -57,5 +57,34 @@ export default defineConfig(
       ]
     }
   },
+  {
+    // Renderer: the shared building blocks in components/ui, not hand-built copies (roadmap point 8)
+    files: ['src/renderer/src/**/*.tsx'],
+    ignores: ['src/renderer/src/components/ui/**', 'src/renderer/src/components/DialogHost.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXOpeningElement[name.name="datalist"]',
+          message: 'Use <Combobox> from components/ui (keyboard, search, works in dialogs).'
+        },
+        {
+          selector:
+            'JSXOpeningElement[name.name="input"]:has(JSXAttribute[name.name="type"][value.value="file"])',
+          message: 'Use <FileDrop> from components/ui (drop or click / Enter to browse).'
+        },
+        {
+          selector: 'JSXAttribute[name.name="draggable"]:not([value.expression.value=false])',
+          message: 'Use useDragSort + <DragHandle> from components/ui for reorderable lists.'
+        },
+        {
+          selector:
+            'CallExpression[callee.object.name="window"][callee.property.name=/^(confirm|alert|prompt)$/]',
+          message:
+            'Use confirmDialog / alertDialog / promptDialog from DialogHost (no native dialogs).'
+        }
+      ]
+    }
+  },
   eslintConfigPrettier
 )

@@ -1045,6 +1045,8 @@ export default function VesselDocumentsView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Behind each row's Upload button (the rows themselves take dropped files), not a picker */}
+      {/* eslint-disable-next-line no-restricted-syntax */}
       <input
         ref={fileInputRef}
         type="file"

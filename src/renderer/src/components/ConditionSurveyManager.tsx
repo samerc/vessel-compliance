@@ -26,7 +26,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
-import { Field, Modal } from './ui'
+import { Field, Modal, FileDrop } from './ui'
 import { ok } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 
@@ -104,7 +104,6 @@ export default function ConditionSurveyManager({
   const [attachments, setAttachments] = useState<SurveyAttachment[]>([])
   const [expandedSurveyId, setExpandedSurveyId] = useState<string | null>(initialSurveyId ?? null)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [dragOverSurveyId, setDragOverSurveyId] = useState<string | null>(null)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)
   const [showNewSurveyorForm, setShowNewSurveyorForm] = useState(false)
   const [closingSurveyId, setClosingSurveyId] = useState<string | null>(null)
@@ -354,31 +353,8 @@ export default function ConditionSurveyManager({
     return surveyor ? `${surveyor.companyName} (${surveyor.country})` : 'Unknown Surveyor'
   }
 
-  const handleDragOver = (e: React.DragEvent, surveyId: string): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy'
-    }
-    setDragOverSurveyId(surveyId)
-  }
-
-  const handleDragLeave = (e: React.DragEvent): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverSurveyId(null)
-  }
-
-  const handleDrop = async (e: React.DragEvent, surveyId: string): Promise<void> => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverSurveyId(null)
-
-    const files = e.dataTransfer.files
-    if (files.length === 0) return
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+  const addAttachmentFiles = async (files: File[], surveyId: string): Promise<void> => {
+    for (const file of files) {
       const filePath = window.api.getFilePath(file)
 
       if (!filePath) {
@@ -754,7 +730,6 @@ export default function ConditionSurveyManager({
                   const counts = defectCounts[survey.id] || { open: 0, closed: 0 }
                   const totalDefects = counts.open + counts.closed
                   const surveyAttachments = getSurveyAttachments(survey.id)
-                  const isDragOver = dragOverSurveyId === survey.id
                   const allClosed = counts.open === 0 && totalDefects > 0
 
                   return (
@@ -762,11 +737,9 @@ export default function ConditionSurveyManager({
                       key={survey.id}
                       style={{
                         borderRadius: '12px',
-                        border: isDragOver
-                          ? '2px dashed var(--accent-primary)'
-                          : isLight
-                            ? '1px solid rgba(0,0,0,0.08)'
-                            : '1px solid rgba(255,255,255,0.06)',
+                        border: isLight
+                          ? '1px solid rgba(0,0,0,0.08)'
+                          : '1px solid rgba(255,255,255,0.06)',
                         overflow: 'hidden',
                         transition: 'all 0.2s ease',
                         background: 'var(--bg-card)'
@@ -1155,10 +1128,7 @@ export default function ConditionSurveyManager({
                           {!isEditing && (
                             <SurveyAttachments
                               attachments={surveyAttachments}
-                              isDragOver={isDragOver}
-                              onDragOver={(e) => handleDragOver(e, survey.id)}
-                              onDragLeave={handleDragLeave}
-                              onDrop={(e) => handleDrop(e, survey.id)}
+                              onFiles={(files) => void addAttachmentFiles(files, survey.id)}
                               onDelete={handleDeleteAttachment}
                               onOpenFile={handleOpenFile}
                               onImportWord={() => handleImportDefectsFromWord(survey.id)}
@@ -1311,20 +1281,14 @@ export default function ConditionSurveyManager({
 
 function SurveyAttachments({
   attachments,
-  isDragOver,
-  onDragOver,
-  onDragLeave,
-  onDrop,
+  onFiles,
   onDelete,
   onOpenFile,
   onImportWord,
   canManage
 }: {
   attachments: SurveyAttachment[]
-  isDragOver: boolean
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
-  onDrop: (e: React.DragEvent) => void
+  onFiles: (files: File[]) => void
   onDelete: (id: string) => void
   onOpenFile: (path: string) => void
   onImportWord: () => void
@@ -1386,25 +1350,14 @@ function SurveyAttachments({
       </div>
 
       {showUpload && (
-        <div
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          style={{
-            border: '2px dashed var(--input-border)',
-            borderRadius: '8px',
-            padding: '20px',
-            textAlign: 'center',
-            background: isDragOver ? 'var(--bg-card-hover)' : 'var(--input-bg)',
-            marginBottom: '15px',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-            Drag and drop files here (multiple files supported)
-          </p>
-        </div>
+        <FileDrop
+          variant="bar"
+          multiple
+          title="Drop files here"
+          hint="or click to choose them (several at once)"
+          onFiles={onFiles}
+          style={{ marginBottom: '15px' }}
+        />
       )}
 
       {attachments.length === 0 ? (

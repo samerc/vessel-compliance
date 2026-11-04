@@ -3,7 +3,7 @@ import { Receipt, Vessel, VesselAssured, ReceiptInput } from '../../../shared/ty
 import { isIpcError } from '../utils/ipc'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
-import { PageHeader, EmptyState, Modal, Field, Spinner, Combobox } from './ui'
+import { PageHeader, EmptyState, Modal, Field, Spinner, Combobox, DateRange } from './ui'
 import { ordinal, formatReceiptAmount } from '../services/receiptFormat'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
@@ -283,20 +283,14 @@ export default function ReceiptManager({
             }}
           />
         </div>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          aria-label="Received from"
-          title="Received from"
-        />
-        <span className="muted">to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          aria-label="Received until"
-          title="Received until"
+        <DateRange
+          label="Received"
+          from={dateFrom}
+          to={dateTo}
+          onChange={(f, t) => {
+            setDateFrom(f)
+            setDateTo(t)
+          }}
         />
         {currencies.length > 1 && (
           <select

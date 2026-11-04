@@ -74,7 +74,7 @@ import type {
 import { splitInstalments, upccPercentFor } from '../../../shared/premium'
 import { ok, asArray } from '../utils/ipc'
 import { isPiLike } from '../../../shared/quotationTypes'
-import { MoneyInput } from './quotation-tabs/shared'
+import { MoneyInput, StrMoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { Modal, Field, Tabs } from './ui'
 import { ScreeningBadge } from './ScreeningPanel'
@@ -5753,15 +5753,24 @@ export default function PolicyDetail({
                               <option value="pct">%</option>
                               <option value="amount">Amount</option>
                             </select>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={d.value}
-                              onChange={(e) => setD({ ...d, value: e.target.value })}
-                              aria-label={`${label} given`}
-                              style={{ flex: 1, minWidth: 0 }}
-                            />
+                            {d.type === 'amount' ? (
+                              <StrMoneyInput
+                                value={d.value}
+                                onChange={(v) => setD({ ...d, value: v })}
+                                aria-label={`${label} given`}
+                                style={{ flex: 1, minWidth: 0 }}
+                              />
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={d.value}
+                                onChange={(e) => setD({ ...d, value: e.target.value })}
+                                aria-label={`${label} given`}
+                                style={{ flex: 1, minWidth: 0 }}
+                              />
+                            )}
                           </div>
                         </Field>
                       ))}

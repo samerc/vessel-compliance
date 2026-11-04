@@ -29,7 +29,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
-import { Field, Modal, EmptyState, Combobox } from './ui'
+import { Field, Modal, EmptyState, Combobox, FileDrop } from './ui'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
@@ -1797,7 +1797,6 @@ function DefectAttachments({
   showError: (m: string) => void
 }): React.JSX.Element {
   const [items, setItems] = useState<DefectAttachment[]>([])
-  const [dragOver, setDragOver] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = async (): Promise<void> => {
@@ -1841,35 +1840,14 @@ function DefectAttachments({
     })
   }
 
-  const handleDrop = async (e: React.DragEvent): Promise<void> => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOver(false)
+  const handleFiles = async (files: File[]): Promise<void> => {
     if (!canManage) return
-    const files = e.dataTransfer.files
-    if (!files.length) return
     setBusy(true)
     try {
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i]
+      for (const f of files) {
         const p = window.api.getFilePath(f)
         if (p) await addByPath(p, f.name)
       }
-      await load()
-    } catch (err) {
-      showError((err instanceof Error && err.message) || 'Upload failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handlePick = async (): Promise<void> => {
-    if (!canManage) return
-    try {
-      const p = await window.api.dialogOpenFileAny()
-      if (!p) return
-      setBusy(true)
-      await addByPath(p, p.split(/[\\/]/).pop() || 'file')
       await load()
     } catch (err) {
       showError((err instanceof Error && err.message) || 'Upload failed')
@@ -1960,29 +1938,14 @@ function DefectAttachments({
           </span>
         ))}
         {canManage && (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragOver(true)
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={handlePick}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              border: `1px dashed ${dragOver ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-              background: dragOver ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
-              fontSize: '0.76rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            <Paperclip size={12} /> {busy ? 'Uploading…' : 'Drop or attach file'}
-          </div>
+          <FileDrop
+            variant="chip"
+            multiple
+            busy={busy}
+            busyText="Uploading…"
+            title="Drop or attach files"
+            onFiles={(f) => void handleFiles(f)}
+          />
         )}
       </div>
     </div>

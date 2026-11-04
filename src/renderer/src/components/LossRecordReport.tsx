@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import type { RowInput, Styles } from 'jspdf-autotable'
-import { Upload, FileText, X, AlertCircle } from 'lucide-react'
+import { FileText, X, AlertCircle } from 'lucide-react'
+import { FileDrop } from './ui'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
 import type { ReportSettings, Vessel, VesselAssured } from '../../../shared/types'
@@ -590,14 +591,11 @@ async function exportToPDF(
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LossRecordReport(): React.JSX.Element {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [data, setData] = useState<LossUWY[] | null>(null)
   const [particulars, setParticulars] = useState<VesselParticulars[]>([])
   const [fileName, setFileName] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
-  const [dragging, setDragging] = useState(false)
 
   // Report-specific options (not shared with other reports)
   const [currency, setCurrency] = useState('USD')
@@ -631,19 +629,6 @@ export default function LossRecordReport(): React.JSX.Element {
       }
     }
     reader.readAsArrayBuffer(file)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-    e.target.value = ''
-  }
-
-  const handleDrop = (e: React.DragEvent): void => {
-    e.preventDefault()
-    setDragging(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleFile(file)
   }
 
   const handleExport = async (): Promise<void> => {
@@ -690,53 +675,12 @@ export default function LossRecordReport(): React.JSX.Element {
     <div>
       {/* Upload zone */}
       {!data ? (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragging(true)
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            border: `2px dashed ${dragging ? 'var(--accent-primary)' : 'var(--glass-border-color)'}`,
-            borderRadius: '16px',
-            padding: '64px 32px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            background: dragging ? 'var(--row-hover)' : 'var(--bg-card)',
-            transition: 'var(--transition)'
-          }}
-        >
-          <Upload
-            size={48}
-            color="var(--accent-primary)"
-            style={{ marginBottom: '16px', opacity: 0.7 }}
-          />
-          <p
-            style={{
-              fontSize: '1.05rem',
-              fontWeight: '600',
-              color: 'var(--text-primary)',
-              marginBottom: '8px'
-            }}
-          >
-            Drop your Excel file here
-          </p>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-            or click to browse
-          </p>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', opacity: 0.6 }}>
-            Supports .xlsx and .xls files in the standard loss record format
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            style={{ display: 'none' }}
-            onChange={handleInputChange}
-          />
-        </div>
+        <FileDrop
+          accept=".xlsx,.xls"
+          title="Drop your Excel file here"
+          hint="or click to browse - .xlsx and .xls files in the standard loss record format"
+          onFiles={([f]) => handleFile(f)}
+        />
       ) : (
         /* Loaded state */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
