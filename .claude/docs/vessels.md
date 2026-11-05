@@ -257,6 +257,10 @@ Entity document types are configurable via Admin Panel → Entity Document Types
 - **Remap**: `getEntityFilePaths` / `remapEntityFilePaths` read from entity_documents table
 - **Merge**: `mergeEntities` copies entity_documents from source to target (skip duplicates)
 
+### Assured history (2026-11-05)
+
+One vessel record per IMO, also after a sale. `vessel_assureds` holds only the CURRENT assureds, so everything that reads it (compliance, screening, new quotations) needs no filter. Ended ones move to `vessel_assured_history` (`removeVesselAssuredWithHistory`): name, role, from, to, ended by. The Remove button asks: "the assured changed" (end date, optional replacement, then per active policy: leave as is = cancel and re-issue, or change from that date = endorsement) or "entered by mistake" (plain delete, no history, policies untouched). Adding an assured asks the same per policy (default leave as is; not asked for a c/o). Vessel changes NEVER reach a policy unless chosen. The Assured tab has Current / History; ended assureds have no papers link yet (their papers stay in the Directory). Both new tables count as "in use" for deleting and merging a company.
+
 ### AssuredManager (Vessel Assureds Page)
 
 Redesigned to table + slide-in panel layout:

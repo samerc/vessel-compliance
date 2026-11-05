@@ -2,6 +2,10 @@
 
 Customer per policy, vessel policies and renewals, the policy system (converter, exports, freezing, signed files), revisions, blue cards, signatures, T&C, QR, QuickBooks, commissions, war declaration. Read with the root CLAUDE.md (architecture, IPC chain, migrations, code style).
 
+### Assured per policy (2026-11-05)
+
+`vessel_policy_assureds` = who is assured under a hand-filled policy (`vessel_dynamic_policies`): entity (or a typed name), role, optional from / to (blank = whole period; ended rows stay). Shown on the vessel's Policies tab, edited in the policy form (Fill from vessel, Add assured, Change from a date). A new ACTIVE policy (also Renew) starts from the vessel's current assureds; a policy added as expired starts empty; conversion copies the converter's insured (`policy_doc_addresses`). The c/o is never copied: the broker is the policy's customer. Backfill ran once (`app_settings.policy_assureds_backfilled`): active policies only, expired / cancelled show "Not recorded" (user decision). Names are read through the entity, so a typo fixed in the Directory reaches every policy.
+
 ### Customer Assignment (Policy-Level)
 
 Customer/broker is tracked at the **policy level**, not the vessel level. A vessel can have different customers per policy type (e.g., Hull via Broker A, P&I via Broker B).

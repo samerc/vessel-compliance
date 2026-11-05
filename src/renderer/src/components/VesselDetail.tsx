@@ -50,6 +50,7 @@ import {
   PolicyType,
   VesselPolicy,
   VesselDynamicPolicy,
+  VesselPolicyAssured,
   PolicyTypeCharacteristic,
   PolicyTypeCondition,
   Entity,
@@ -70,6 +71,7 @@ import DocumentFiling, { DOCUMENTS_FILED_EVENT } from './DocumentFiling'
 import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesModal'
 import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
+import { PolicyAssuredList, PolicyAssuredsEditor } from './PolicyAssureds'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
 import { TypeChip, Modal, Field, EmptyState, Combobox, MultiSelect } from './ui'
@@ -4297,6 +4299,7 @@ function DynamicPoliciesView({
   const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
   const [formNotes, setFormNotes] = useState('')
   const [formValues, setFormValues] = useState<Record<string, PolicyFormValue>>({})
+  const [formAssureds, setFormAssureds] = useState<VesselPolicyAssured[]>([])
   const modalRef = useRef<HTMLDivElement>(null)
 
   // Confirmation modal state
@@ -4427,6 +4430,7 @@ function DynamicPoliciesView({
       }
     }
     setFormValues(vals)
+    setFormAssureds(p.assureds || [])
 
     setShowAddModal(true)
   }
@@ -4463,6 +4467,9 @@ function DynamicPoliciesView({
             c.fieldType === 'boolean' ? (formValues[c.id] as boolean) || false : undefined
         }))
         ok(await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals))
+        const before = dynamicPolicies.find((x) => x.id === editingPolicyId)?.assureds || []
+        if (JSON.stringify(before) !== JSON.stringify(formAssureds))
+          await window.api.setVesselPolicyAssureds(editingPolicyId, formAssureds)
         showSuccess('Policy updated')
       } else {
         const newId = await window.api.addVesselDynamicPolicy({
@@ -4846,6 +4853,7 @@ function DynamicPoliciesView({
                         {p.notes}
                       </p>
                     )}
+                    <PolicyAssuredList assureds={p.assureds} onAdd={() => openEditModal(p)} />
                     <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                       <button
                         onClick={() => openEditModal(p)}
@@ -4907,7 +4915,7 @@ function DynamicPoliciesView({
         <Modal
           title={editingPolicyId ? 'Edit Policy' : 'Add Policy'}
           onClose={() => setShowAddModal(false)}
-          width={600}
+          width={editingPolicyId ? 860 : 600}
           closeOnOverlay={false}
           footer={
             <>
@@ -4962,8 +4970,8 @@ function DynamicPoliciesView({
               <Field label="Currency">
                 <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value)}>
                   <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (\u20AC)</option>
-                  <option value="GBP">GBP (\u00A3)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
                 </select>
               </Field>
               {typeCondsForForm.length > 0 && (
@@ -5152,6 +5160,24 @@ function DynamicPoliciesView({
                 />
               </Field>
             </div>
+
+            {editingPolicyId ? (
+              <PolicyAssuredsEditor
+                vesselId={vesselId}
+                policyId={editingPolicyId}
+                rows={formAssureds}
+                onChange={setFormAssureds}
+                entities={entities}
+              />
+            ) : (
+              <div
+                style={{ marginTop: '14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
+              >
+                {formStatus === 'active'
+                  ? "The vessel's current assureds are copied to this policy when you add it. You can change them afterwards."
+                  : 'A policy that is not active starts with no assured. You can add them afterwards.'}
+              </div>
+            )}
           </div>
         </Modal>
       )}

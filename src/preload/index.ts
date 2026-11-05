@@ -169,6 +169,13 @@ const api: Api = {
   getVesselAssureds: (vesselId) => ipcRenderer.invoke('db:getVesselAssureds', vesselId),
   addVesselAssured: (assured) => ipcRenderer.invoke('db:addVesselAssured', assured),
   deleteVesselAssured: (id) => ipcRenderer.invoke('db:deleteVesselAssured', id),
+  getVesselAssuredHistory: (vesselId) => ipcRenderer.invoke('db:getVesselAssuredHistory', vesselId),
+  removeVesselAssuredWithHistory: (id, opts) =>
+    ipcRenderer.invoke('db:removeVesselAssuredWithHistory', id, opts),
+  addVesselAssuredToPolicies: (policyIds, a) =>
+    ipcRenderer.invoke('db:addVesselAssuredToPolicies', policyIds, a),
+  setVesselPolicyAssureds: (policyId, rows) =>
+    ipcRenderer.invoke('db:setVesselPolicyAssureds', policyId, rows),
   updateVesselAssuredRole: (id, role) => ipcRenderer.invoke('db:updateVesselAssuredRole', id, role),
 
   getEntityUBOs: (assuredEntityId) => ipcRenderer.invoke('db:getEntityUBOs', assuredEntityId),

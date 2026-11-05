@@ -13,6 +13,9 @@ import {
   Entity,
   AssuredRole,
   VesselAssured,
+  VesselAssuredHistory,
+  VesselPolicyAssured,
+  RemoveAssuredOptions,
   EntityUBO,
   User,
   SanctionsMatch,
@@ -420,6 +423,13 @@ export interface Api {
   getVesselAssureds: (vesselId?: string) => Promise<VesselAssured[]>
   addVesselAssured: (assured: Omit<VesselAssured, 'id'>) => Promise<VesselAssured>
   deleteVesselAssured: (id: string) => Promise<void>
+  getVesselAssuredHistory: (vesselId: string) => Promise<VesselAssuredHistory[]>
+  removeVesselAssuredWithHistory: (id: string, opts: RemoveAssuredOptions) => Promise<void>
+  addVesselAssuredToPolicies: (
+    policyIds: string[],
+    a: { entityId: string; role: string; fromDate?: string | null }
+  ) => Promise<void>
+  setVesselPolicyAssureds: (policyId: string, rows: VesselPolicyAssured[]) => Promise<void>
   updateVesselAssuredRole: (id: string, role: string) => Promise<void>
 
   getEntityUBOs: (assuredEntityId?: string) => Promise<EntityUBO[]>

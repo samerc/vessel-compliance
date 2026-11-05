@@ -31,6 +31,8 @@ import type {
   TradingExcludedCountry,
   Vessel,
   VesselAssured,
+  VesselPolicyAssured,
+  RemoveAssuredOptions,
   VesselClassification,
   VesselCustomDocType,
   VesselDocument,
@@ -2740,6 +2742,70 @@ app.whenReady().then(() => {
       ).catch(() => {})
     return result
   })
+  safeHandle('db:getVesselAssuredHistory', (event, vesselId: string) => {
+    requireSession(event)
+    return db.getVesselAssuredHistory(vesselId)
+  })
+  safeHandle(
+    'db:removeVesselAssuredWithHistory',
+    async (event, id: string, opts: RemoveAssuredOptions) => {
+      const user = await requirePermission(event, 'assureds:manage')
+      const r = await db.removeVesselAssuredWithHistory(id, opts, user.username)
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'UPDATE',
+        module: 'Assureds',
+        entityType: 'vessel_assured',
+        entityId: r.vesselId,
+        entityName: r.vesselName,
+        details:
+          `Ended ${r.entityName} (${r.role}) on ${r.vesselName} at ${opts.endDate}` +
+          (r.replacementName ? `, replaced by ${r.replacementName}` : '')
+      }).catch(() => {})
+      db.addVesselAuditEntry(
+        r.vesselId,
+        'Assured Removed',
+        `${r.entityName} (${r.role}), ended ${opts.endDate}`,
+        null,
+        user.username
+      ).catch(() => {})
+      if (r.replacementName)
+        db.addVesselAuditEntry(
+          r.vesselId,
+          'Assured Added',
+          null,
+          `${r.replacementName} (${r.role}), from ${opts.endDate}`,
+          user.username
+        ).catch(() => {})
+    }
+  )
+  safeHandle(
+    'db:addVesselAssuredToPolicies',
+    async (
+      event,
+      policyIds: string[],
+      a: { entityId: string; role: string; fromDate?: string | null }
+    ) => {
+      await requirePermission(event, 'assureds:manage')
+      return db.addVesselAssuredToPolicies(policyIds, a)
+    }
+  )
+  safeHandle(
+    'db:setVesselPolicyAssureds',
+    async (event, policyId: string, rows: VesselPolicyAssured[]) => {
+      const user = await requirePermission(event, 'policies:manage')
+      const r = await db.setVesselPolicyAssureds(policyId, rows)
+      if (r && r.before !== r.after)
+        db.addVesselAuditEntry(
+          r.vesselId,
+          `Policy ${r.policyNumber} Assured`,
+          r.before || null,
+          r.after || null,
+          user.username
+        ).catch(() => {})
+    }
+  )
   safeHandle('db:updateVesselAssuredRole', async (event, id: string, role: string) => {
     const user = await requirePermission(event, 'assureds:manage')
     try {

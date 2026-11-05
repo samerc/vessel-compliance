@@ -20,13 +20,17 @@ import {
   EntityUBO,
   EntityAddress,
   EntityDocumentType,
-  EntityDocument
+  EntityDocument,
+  VesselAssuredHistory,
+  VesselDynamicPolicy
 } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import ConfirmationModal from './ConfirmationModal'
-import { Badge, Field, EmptyState, Combobox } from './ui'
+import { Badge, Field, EmptyState, Combobox, SegmentedControl } from './ui'
+import { RemoveAssuredModal, AddAssuredToPoliciesModal } from './AssuredPolicyDialogs'
+import { isCareOfRole } from '../utils/policyAssureds'
+import { formatDate } from '../utils/dateUtils'
 import EntityEditPanel from './EntityEditPanel'
 import { ok, isIpcError } from '../utils/ipc'
 
@@ -100,15 +104,16 @@ export default function AssuredManager({
   // Loading states
   const [isAddingAssured, setIsAddingAssured] = useState(false)
 
-  // Confirmation modal state
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{
-    show: boolean
-    id: string | null
-    title: string
-    message: string
-    type: 'assured' | 'ubo'
-    uboParentId?: string // For UBO deletion we need parent assured ID
-  }>({ show: false, id: null, title: '', message: '', type: 'assured' })
+  // Current assureds or the history; removing one; the policies question after adding one
+  const [view, setView] = useState<'current' | 'history'>('current')
+  const [history, setHistory] = useState<VesselAssuredHistory[]>([])
+  const [policies, setPolicies] = useState<VesselDynamicPolicy[]>([])
+  const [removing, setRemoving] = useState<VesselAssured | null>(null)
+  const [addedPrompt, setAddedPrompt] = useState<{
+    entityId: string
+    entityName: string
+    role: string
+  } | null>(null)
 
   // Bumped after every change to reload the vessel's assureds and their entities
   const [reloadKey, setReloadKey] = useState(0)
@@ -118,16 +123,20 @@ export default function AssuredManager({
     let alive = true
     const load = async (): Promise<void> => {
       try {
-        const [e, r, va, eu, addrs, edTypes, allDocs] = await Promise.all([
+        const [e, r, va, eu, addrs, edTypes, allDocs, hist, pols] = await Promise.all([
           window.api.getEntities(),
           window.api.getAssuredRoles(),
           window.api.getVesselAssureds(vessel.id),
           window.api.getEntityUBOs(),
           window.api.getAllEntityAddresses(),
           window.api.getEntityDocumentTypes(),
-          window.api.getEntityDocuments()
+          window.api.getEntityDocuments(),
+          window.api.getVesselAssuredHistory(vessel.id),
+          window.api.getVesselDynamicPolicies(vessel.id)
         ])
         if (!alive) return
+        setHistory(Array.isArray(hist) ? hist : [])
+        setPolicies(Array.isArray(pols) ? pols : [])
         setEntities(Array.isArray(e) ? e : [])
         setRoles(Array.isArray(r) ? r : [])
         setVesselAssureds(Array.isArray(va) ? va : [])
@@ -186,6 +195,9 @@ export default function AssuredManager({
         entityId: entityId,
         role: newRole
       })
+
+      if (!isCareOfRole(newRole) && policies.some((p) => p.status === 'active'))
+        setAddedPrompt({ entityId, entityName: newName, role: newRole })
 
       setNewName('')
       setNewRole('')
@@ -276,37 +288,6 @@ export default function AssuredManager({
     } catch (e) {
       showError((e instanceof Error && e.message) || 'Failed to add address')
     }
-  }
-
-  const handleDeleteAssured = async (id: string): Promise<void> => {
-    setDeleteConfirmation({
-      show: true,
-      id,
-      title: 'Remove Assured?',
-      message:
-        'Are you sure you want to remove this assured from this vessel? This will also remove any linked UBOs.',
-      type: 'assured'
-    })
-  }
-
-  const handleConfirmDelete = async (): Promise<void> => {
-    if (!deleteConfirmation.id) return
-
-    if (deleteConfirmation.type === 'assured') {
-      try {
-        await window.api.deleteVesselAssured(deleteConfirmation.id)
-        showSuccess('Assured removed successfully')
-        setIsAddingAssured(false)
-        if (selectedAssuredId === deleteConfirmation.id) setSelectedAssuredId(null)
-        loadData()
-      } catch (error) {
-        showError(
-          (error instanceof Error && error.message) ||
-            'Failed to remove assured. You may need admin privileges.'
-        )
-      }
-    }
-    setDeleteConfirmation((prev) => ({ ...prev, show: false }))
   }
 
   const sortedAssureds = [...vesselAssureds].sort((a, b) => {
@@ -534,253 +515,385 @@ export default function AssuredManager({
         </div>
       )}
 
-      {sortedAssureds.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-          <button
-            className={!onlyMissingDocs ? 'chip active' : 'chip'}
-            aria-pressed={!onlyMissingDocs}
-            onClick={() => setOnlyMissingDocs(false)}
-          >
-            All <span className="chip-count">{sortedAssureds.length}</span>
-          </button>
-          <button
-            className={onlyMissingDocs ? 'chip active' : 'chip'}
-            aria-pressed={onlyMissingDocs}
-            onClick={() => setOnlyMissingDocs(true)}
-          >
-            Missing documents{' '}
-            <span className="chip-count">
-              {
-                sortedAssureds.filter((va) => {
-                  const e = entities.find((x) => x.id === va.entityId)
-                  const sc = e ? getDocScore(e.id, e.type) : { have: 0, total: 0 }
-                  return sc.have < sc.total
-                }).length
-              }
-            </span>
-          </button>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: '0' }}>
-        {/* Left: Assured table */}
-        <div
-          className="table-wrap"
-          style={{
-            flex: 1,
-            borderRadius: selectedAssuredId ? '12px 0 0 12px' : '12px'
-          }}
-        >
+      <div style={{ marginBottom: '12px' }}>
+        <SegmentedControl
+          items={[
+            { key: 'current', label: `Current (${vesselAssureds.length})` },
+            { key: 'history', label: `History (${history.length})` }
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
+
+      {view === 'history' && (
+        <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Assured Name</th>
+                <th>Name</th>
                 <th>Role</th>
-                <th style={{ minWidth: '100px' }}>Documents</th>
-                <th>UBOs</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Ended by</th>
               </tr>
             </thead>
             <tbody>
-              {sortedAssureds.map((va) => {
-                const entity = entities.find((e) => e.id === va.entityId)
-                const ubos = entityUBOs.filter((u) => u.assuredEntityId === va.entityId)
-                const isSelected = selectedAssuredId === va.id
-                const score = entity ? getDocScore(entity.id, entity.type) : { have: 0, total: 0 }
-                if (onlyMissingDocs && score.have >= score.total) return null
-                const docColor =
-                  score.total === 0
-                    ? 'var(--text-secondary)'
-                    : score.have === score.total
-                      ? 'var(--success)'
-                      : score.have === 0
-                        ? 'var(--danger)'
-                        : 'var(--warning)'
-
-                return (
-                  <tr
-                    key={va.id}
-                    onClick={() => setSelectedAssuredId(isSelected ? null : va.id)}
-                    className={isSelected ? 'clickable selected' : 'clickable'}
-                  >
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {entity?.type === 'company' ? (
-                          <Building2 size={15} opacity={0.5} />
-                        ) : (
-                          <User size={15} opacity={0.5} />
-                        )}
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{entity?.name}</div>
-                          {entity?.identifier && (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                              {entity.identifier}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge tone="neutral">{va.role}</Badge>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: docColor }}>
-                        {score.have}/{score.total}
-                      </span>
-                    </td>
-                    <td className="muted">{ubos.length}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div
-                        style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {canManageAssureds && (
-                          <button
-                            onClick={() => {
-                              setEditingVesselAssuredId(va.id)
-                              setEditRoleValue(va.role)
-                            }}
-                            style={{
-                              background: 'transparent',
-                              color: 'var(--accent-primary)',
-                              padding: '3px'
-                            }}
-                            title="Edit Role"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                        )}
-                        {canManageAssureds && (
-                          <button
-                            onClick={() => handleDeleteAssured(va.id)}
-                            style={{
-                              background: 'transparent',
-                              color: 'var(--danger)',
-                              padding: '3px'
-                            }}
-                            title="Remove"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {vesselAssureds.length === 0 && (
+              {sortedAssureds.map((va) => (
+                <tr
+                  key={va.id}
+                  className="clickable"
+                  title="Open this assured and its papers"
+                  onClick={() => {
+                    setView('current')
+                    setSelectedAssuredId(va.id)
+                  }}
+                >
+                  <td style={{ fontWeight: 600 }}>{va.entityName}</td>
+                  <td>
+                    <Badge tone="neutral">{va.role}</Badge>
+                  </td>
+                  <td className="muted">{va.fromDate ? formatDate(va.fromDate) : '-'}</td>
+                  <td>
+                    <Badge tone="success">Current</Badge>
+                  </td>
+                  <td className="muted">-</td>
+                </tr>
+              ))}
+              {history.map((h) => (
+                <tr key={h.id}>
+                  <td style={{ fontWeight: 600 }}>{h.entityName}</td>
+                  <td>
+                    <Badge tone="neutral">{h.role}</Badge>
+                  </td>
+                  <td className="muted">{h.fromDate ? formatDate(h.fromDate) : 'Not recorded'}</td>
+                  <td>{h.toDate ? formatDate(h.toDate) : '-'}</td>
+                  <td className="muted">{h.endedBy || '-'}</td>
+                </tr>
+              ))}
+              {sortedAssureds.length === 0 && history.length === 0 && (
                 <tr>
                   <td colSpan={5}>
-                    <EmptyState
-                      compact
-                      title="No assureds yet"
-                      text="Add the owners, managers and other parties of this vessel."
-                    />
+                    <EmptyState compact title="No assureds recorded yet" />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+      )}
 
-        {/* Right: Slide-in panel */}
-        {selectedAssuredId && selectedEntity && selectedVA && (
+      <div style={{ display: view === 'current' ? undefined : 'none' }}>
+        {sortedAssureds.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+            <button
+              className={!onlyMissingDocs ? 'chip active' : 'chip'}
+              aria-pressed={!onlyMissingDocs}
+              onClick={() => setOnlyMissingDocs(false)}
+            >
+              All <span className="chip-count">{sortedAssureds.length}</span>
+            </button>
+            <button
+              className={onlyMissingDocs ? 'chip active' : 'chip'}
+              aria-pressed={onlyMissingDocs}
+              onClick={() => setOnlyMissingDocs(true)}
+            >
+              Missing documents{' '}
+              <span className="chip-count">
+                {
+                  sortedAssureds.filter((va) => {
+                    const e = entities.find((x) => x.id === va.entityId)
+                    const sc = e ? getDocScore(e.id, e.type) : { have: 0, total: 0 }
+                    return sc.have < sc.total
+                  }).length
+                }
+              </span>
+            </button>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '0' }}>
+          {/* Left: Assured table */}
           <div
+            className="table-wrap"
             style={{
-              width: '440px',
-              flexShrink: 0,
-              background: 'var(--bg-card)',
-              border: '1px solid var(--glass-border-color)',
-              borderLeft: 'none',
-              borderRadius: '0 12px 12px 0',
-              maxHeight: 'calc(100vh - 280px)',
-              overflowY: 'auto'
+              flex: 1,
+              borderRadius: selectedAssuredId ? '12px 0 0 12px' : '12px'
             }}
           >
-            {/* Panel header */}
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Assured Name</th>
+                  <th>Role</th>
+                  <th style={{ minWidth: '100px' }}>Documents</th>
+                  <th>UBOs</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedAssureds.map((va) => {
+                  const entity = entities.find((e) => e.id === va.entityId)
+                  const ubos = entityUBOs.filter((u) => u.assuredEntityId === va.entityId)
+                  const isSelected = selectedAssuredId === va.id
+                  const score = entity ? getDocScore(entity.id, entity.type) : { have: 0, total: 0 }
+                  if (onlyMissingDocs && score.have >= score.total) return null
+                  const docColor =
+                    score.total === 0
+                      ? 'var(--text-secondary)'
+                      : score.have === score.total
+                        ? 'var(--success)'
+                        : score.have === 0
+                          ? 'var(--danger)'
+                          : 'var(--warning)'
+
+                  return (
+                    <tr
+                      key={va.id}
+                      onClick={() => setSelectedAssuredId(isSelected ? null : va.id)}
+                      className={isSelected ? 'clickable selected' : 'clickable'}
+                    >
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {entity?.type === 'company' ? (
+                            <Building2 size={15} opacity={0.5} />
+                          ) : (
+                            <User size={15} opacity={0.5} />
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                              {entity?.name}
+                            </div>
+                            {entity?.identifier && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                {entity.identifier}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <Badge tone="neutral">{va.role}</Badge>
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: docColor }}>
+                          {score.have}/{score.total}
+                        </span>
+                      </td>
+                      <td className="muted">{ubos.length}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div
+                          style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {canManageAssureds && (
+                            <button
+                              onClick={() => {
+                                setEditingVesselAssuredId(va.id)
+                                setEditRoleValue(va.role)
+                              }}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--accent-primary)',
+                                padding: '3px'
+                              }}
+                              title="Edit Role"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canManageAssureds && (
+                            <button
+                              onClick={() => setRemoving(va)}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--danger)',
+                                padding: '3px'
+                              }}
+                              title="Remove"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {vesselAssureds.length === 0 && (
+                  <tr>
+                    <td colSpan={5}>
+                      <EmptyState
+                        compact
+                        title="No assureds yet"
+                        text="Add the owners, managers and other parties of this vessel."
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Right: Slide-in panel */}
+          {selectedAssuredId && selectedEntity && selectedVA && (
             <div
               style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--table-border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
+                width: '440px',
+                flexShrink: 0,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--glass-border-color)',
+                borderLeft: 'none',
+                borderRadius: '0 12px 12px 0',
+                maxHeight: 'calc(100vh - 280px)',
+                overflowY: 'auto'
               }}
             >
+              {/* Panel header */}
               <div
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background:
-                    'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.15), rgba(var(--accent-primary-rgb), 0.05))',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid var(--table-border)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  gap: '12px'
                 }}
               >
-                {selectedEntity.type === 'company' ? (
-                  <Building2 size={20} color="var(--accent-primary)" />
-                ) : (
-                  <User size={20} color="var(--accent-primary)" />
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background:
+                      'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.15), rgba(var(--accent-primary-rgb), 0.05))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {selectedEntity.type === 'company' ? (
+                    <Building2 size={20} color="var(--accent-primary)" />
+                  ) : (
+                    <User size={20} color="var(--accent-primary)" />
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {selectedEntity.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
+                  </div>
+                </div>
+                {canManageAssureds && (
+                  <button
+                    onClick={() => setEditingEntityCore(true)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
                 )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {selectedEntity.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'var(--text-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
-                </div>
-              </div>
-              {canManageAssureds && (
                 <button
-                  onClick={() => setEditingEntityCore(true)}
-                  className="btn-secondary"
+                  title="Close"
+                  aria-label="Close"
+                  onClick={() => setSelectedAssuredId(null)}
                   style={{
-                    padding: '4px 10px',
-                    fontSize: '0.74rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    padding: '4px'
                   }}
                 >
-                  <Pencil size={12} /> Edit
+                  <X size={18} />
                 </button>
-              )}
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setSelectedAssuredId(null)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+              </div>
 
-            {/* Role editing (vessel-specific) */}
-            {editingVesselAssuredId === selectedVA.id && (
+              {/* Role editing (vessel-specific) */}
+              {editingVesselAssuredId === selectedVA.id && (
+                <div
+                  style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}
+                >
+                  <div
+                    style={{
+                      fontSize: '0.68rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.7px',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 600,
+                      marginBottom: '6px'
+                    }}
+                  >
+                    Edit Role
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Combobox
+                      aria-label="Role"
+                      style={{ flex: 1 }}
+                      value={editRoleValue}
+                      onInputChange={setEditRoleValue}
+                      options={roles}
+                      filter={matchRoles}
+                      getKey={(r) => r.id}
+                      getLabel={(r) => r.name}
+                      onSelect={(r) => setEditRoleValue(r.name)}
+                      autoHighlight={false}
+                      // Enter / Escape the list did not use: save / cancel
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleUpdateRole(selectedVA.id)
+                        if (e.key === 'Escape') setEditingVesselAssuredId(null)
+                      }}
+                      emptyText="A new role: it is added to the list"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleUpdateRole(selectedVA.id)}
+                      className="btn-primary"
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                      disabled={isUpdatingRole}
+                    >
+                      {isUpdatingRole ? (
+                        <Loader2 size={14} className="spinner" />
+                      ) : (
+                        <Save size={14} />
+                      )}
+                    </button>
+                    <button
+                      title="Close"
+                      aria-label="Close"
+                      onClick={() => setEditingVesselAssuredId(null)}
+                      className="btn-secondary"
+                      style={{ padding: '6px 8px' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Address */}
               <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
                 <div
                   style={{
@@ -792,177 +905,142 @@ export default function AssuredManager({
                     marginBottom: '6px'
                   }}
                 >
-                  Edit Role
+                  Address
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <Combobox
-                    aria-label="Role"
-                    style={{ flex: 1 }}
-                    value={editRoleValue}
-                    onInputChange={setEditRoleValue}
-                    options={roles}
-                    filter={matchRoles}
-                    getKey={(r) => r.id}
-                    getLabel={(r) => r.name}
-                    onSelect={(r) => setEditRoleValue(r.name)}
-                    autoHighlight={false}
-                    // Enter / Escape the list did not use: save / cancel
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleUpdateRole(selectedVA.id)
-                      if (e.key === 'Escape') setEditingVesselAssuredId(null)
-                    }}
-                    emptyText="A new role: it is added to the list"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleUpdateRole(selectedVA.id)}
-                    className="btn-primary"
-                    style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-                    disabled={isUpdatingRole}
-                  >
-                    {isUpdatingRole ? (
-                      <Loader2 size={14} className="spinner" />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                  </button>
-                  <button
-                    title="Close"
-                    aria-label="Close"
-                    onClick={() => setEditingVesselAssuredId(null)}
-                    className="btn-secondary"
-                    style={{ padding: '6px 8px' }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Address */}
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
-              <div
-                style={{
-                  fontSize: '0.68rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.7px',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 600,
-                  marginBottom: '6px'
-                }}
-              >
-                Address
-              </div>
-              {(() => {
-                const entityAddrs = allAddresses.filter((a) => a.entityId === selectedVA.entityId)
-                return (
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <select
-                        value={selectedVA.addressId || ''}
-                        onChange={(e) => handleChangeAddress(selectedVA.id, e.target.value || null)}
-                        style={{ flex: 1 }}
-                      >
-                        <option value="">— No address —</option>
-                        {entityAddrs.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.label}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => {
-                          setShowAddAddressFor(
-                            showAddAddressFor === selectedVA.id ? null : selectedVA.id
-                          )
-                          setAddrForm({
-                            label: '',
-                            addressLine1: '',
-                            addressLine2: '',
-                            city: '',
-                            country: '',
-                            postalCode: ''
-                          })
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--accent-primary)',
-                          padding: '2px'
-                        }}
-                        title="Add new address"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                    {showAddAddressFor === selectedVA.id && (
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '5px'
-                        }}
-                      >
-                        <input
-                          placeholder="Label *"
-                          value={addrForm.label}
-                          onChange={(e) => setAddrForm((p) => ({ ...p, label: e.target.value }))}
-                          aria-label="Address label"
-                        />
-                        <textarea
-                          placeholder="Full address *"
-                          value={addrForm.addressLine1}
+                {(() => {
+                  const entityAddrs = allAddresses.filter((a) => a.entityId === selectedVA.entityId)
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <select
+                          value={selectedVA.addressId || ''}
                           onChange={(e) =>
-                            setAddrForm((p) => ({ ...p, addressLine1: e.target.value }))
+                            handleChangeAddress(selectedVA.id, e.target.value || null)
                           }
-                          rows={2}
-                          aria-label="Full address"
-                          style={{ resize: 'vertical' }}
-                        />
-                        <div style={{ display: 'flex', gap: '5px' }}>
-                          <button
-                            onClick={() => handleAddNewAddress(selectedVA.id, selectedVA.entityId)}
-                            disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()}
-                            className="btn-primary btn-sm"
-                          >
-                            Save & Assign
-                          </button>
-                          <button
-                            onClick={() => setShowAddAddressFor(null)}
-                            className="btn-secondary btn-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+                          style={{ flex: 1 }}
+                        >
+                          <option value="">— No address —</option>
+                          {entityAddrs.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => {
+                            setShowAddAddressFor(
+                              showAddAddressFor === selectedVA.id ? null : selectedVA.id
+                            )
+                            setAddrForm({
+                              label: '',
+                              addressLine1: '',
+                              addressLine2: '',
+                              city: '',
+                              country: '',
+                              postalCode: ''
+                            })
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--accent-primary)',
+                            padding: '2px'
+                          }}
+                          title="Add new address"
+                        >
+                          <Plus size={14} />
+                        </button>
                       </div>
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
+                      {showAddAddressFor === selectedVA.id && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '5px'
+                          }}
+                        >
+                          <input
+                            placeholder="Label *"
+                            value={addrForm.label}
+                            onChange={(e) => setAddrForm((p) => ({ ...p, label: e.target.value }))}
+                            aria-label="Address label"
+                          />
+                          <textarea
+                            placeholder="Full address *"
+                            value={addrForm.addressLine1}
+                            onChange={(e) =>
+                              setAddrForm((p) => ({ ...p, addressLine1: e.target.value }))
+                            }
+                            rows={2}
+                            aria-label="Full address"
+                            style={{ resize: 'vertical' }}
+                          />
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button
+                              onClick={() =>
+                                handleAddNewAddress(selectedVA.id, selectedVA.entityId)
+                              }
+                              disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()}
+                              className="btn-primary btn-sm"
+                            >
+                              Save & Assign
+                            </button>
+                            <button
+                              onClick={() => setShowAddAddressFor(null)}
+                              className="btn-secondary btn-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
 
-            {/* Entity-level editing — shared with the Entity Directory */}
-            <EntityEditPanel
-              entityId={selectedVA.entityId}
-              canManage={canManageAssureds}
-              onChanged={loadData}
-              editing={editingEntityCore}
-              onEditingChange={setEditingEntityCore}
-            />
-          </div>
-        )}
+              {/* Entity-level editing — shared with the Entity Directory */}
+              <EntityEditPanel
+                entityId={selectedVA.entityId}
+                canManage={canManageAssureds}
+                onChanged={loadData}
+                editing={editingEntityCore}
+                onEditingChange={setEditingEntityCore}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {deleteConfirmation.show && (
-        <ConfirmationModal
-          title={deleteConfirmation.title}
-          message={deleteConfirmation.message}
-          confirmLabel="Remove"
-          isDangerous={true}
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setDeleteConfirmation((prev) => ({ ...prev, show: false }))}
+      {removing && (
+        <RemoveAssuredModal
+          assured={removing}
+          vesselName={vessel.name}
+          policies={policies}
+          entities={entities}
+          onClose={() => setRemoving(null)}
+          onDone={(message) => {
+            showSuccess(message)
+            if (selectedAssuredId === removing.id) setSelectedAssuredId(null)
+            setRemoving(null)
+            loadData()
+          }}
+          onError={showError}
+        />
+      )}
+      {addedPrompt && (
+        <AddAssuredToPoliciesModal
+          {...addedPrompt}
+          policies={policies.filter((p) => p.status === 'active')}
+          onClose={() => setAddedPrompt(null)}
+          onDone={(message) => {
+            showSuccess(message)
+            setAddedPrompt(null)
+            loadData()
+          }}
+          onError={showError}
         />
       )}
     </section>

@@ -198,6 +198,9 @@ import {
   UserGroup,
   Vessel,
   VesselAssured,
+  VesselAssuredHistory,
+  VesselPolicyAssured,
+  RemoveAssuredOptions,
   VesselAuditEntry,
   VesselClassification,
   VesselCustomDocType,
@@ -5340,6 +5343,79 @@ export class MySQLAdapter {
         /* idempotent migration: already applied or not applicable */
       }
 
+      // Assured history on the vessel + the assureds of each hand-filled policy (2026-11-05)
+      try {
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_assured_history (
+          id VARCHAR(36) PRIMARY KEY,
+          vessel_id VARCHAR(36) NOT NULL,
+          entity_id VARCHAR(36) NULL,
+          entity_name VARCHAR(255) NOT NULL,
+          role VARCHAR(255) NOT NULL,
+          from_date DATE NULL,
+          to_date DATE NULL,
+          ended_by VARCHAR(255) NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_vah_vessel (vessel_id),
+          INDEX idx_vah_entity (entity_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_policy_assureds (
+          id VARCHAR(36) PRIMARY KEY,
+          policy_id VARCHAR(36) NOT NULL,
+          entity_id VARCHAR(36) NULL,
+          entity_name VARCHAR(255) NOT NULL,
+          role VARCHAR(255) NOT NULL DEFAULT '',
+          from_date DATE NULL,
+          to_date DATE NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_vpa_policy (policy_id),
+          INDEX idx_vpa_entity (entity_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+        const [vaFrom] = (await this.pool.query(
+          "SHOW COLUMNS FROM vessel_assureds LIKE 'from_date'"
+        )) as [RowDataPacket[], unknown]
+        if (vaFrom.length === 0)
+          await this.pool.query('ALTER TABLE vessel_assureds ADD COLUMN from_date DATE NULL')
+        await this.backfillPolicyAssureds()
+      } catch (e) {
+        console.error('Assured per policy migration failed:', e)
+      }
+
+      // Former names checked by the user 2026-11-05: typos, same-day corrections and temporary
+      // "X EX Y" steps go; the audit log keeps what happened. By row id, safe to run again
+      try {
+        await this.pool.query('DELETE FROM vessel_name_history WHERE id IN (?)', [
+          [
+            'd70a348a-b8f9-410a-aca3-0903cd3c70f3',
+            'aff03cd6-e400-4deb-9f6e-a9315ddb46b2',
+            '384ac0ec-c385-4486-b3f9-02c71a6277d6',
+            'f51b88dc-e665-4207-ab4b-a92c04539941',
+            '2797f6b3-6f6f-4db6-bcde-89d3b3bcfc51',
+            'aa5b80a5-5a6e-4ec9-9b72-7eaa6aca727c',
+            'e2a5eafc-d31e-4c1b-b85e-60286a7639c0',
+            '809df2f9-a117-4e7e-8718-667a45763b74',
+            '902a76c9-0bdb-4833-9c40-d31e43f7c883',
+            '813057c7-76e8-461a-ac0f-5d530cc726bd',
+            'f15036ea-dc2d-49ba-806c-51890af427e9',
+            'a0ada6b2-09b9-482f-bd2d-6663db8b7e81',
+            '4d7e1188-cf50-4533-b0ad-d30a179fa16c'
+          ]
+        ])
+        // Two records carried the same IMO; the user gave the right one 2026-11-05
+        const [imoFix] = (await this.pool.query(
+          "UPDATE vessels SET imo_number = '8841668' WHERE id = '9018eb14-a0f1-4a1b-85e6-a3f92e513251' AND imo_number = '8841632'"
+        )) as [ResultSetHeader, unknown]
+        if (imoFix.affectedRows > 0)
+          await this.addVesselAuditEntry(
+            '9018eb14-a0f1-4a1b-85e6-a3f92e513251',
+            'IMO Number',
+            '8841632',
+            '8841668',
+            'system'
+          )
+      } catch (e) {
+        console.error('Former names clean-up failed:', e)
+      }
+
       // Migration: title on survey_warranty_templates
       try {
         const [swtCol] = (await this.pool.query(
@@ -7276,11 +7352,16 @@ export class MySQLAdapter {
         'DELETE n FROM policy_renewal_notes n JOIN vessel_dynamic_policies p ON p.id = n.policy_id WHERE p.vessel_id = ?',
         [id]
       )
+      await run(
+        'DELETE a FROM vessel_policy_assureds a JOIN vessel_dynamic_policies p ON p.id = a.policy_id WHERE p.vessel_id = ?',
+        [id]
+      )
       // the vessel's own rows
       const ownTables = [
         'survey_warranties',
         'condition_surveys',
         'vessel_assureds',
+        'vessel_assured_history',
         'vessel_audit_log',
         'vessel_classifications',
         'vessel_custom_doc_types',
@@ -8017,6 +8098,8 @@ export class MySQLAdapter {
       AND NOT EXISTS (SELECT 1 FROM quotations x WHERE x.customer_entity_id = e.id AND x.deleted_at IS NULL)
       AND NOT EXISTS (SELECT 1 FROM quotation_assureds x WHERE x.entity_id = e.id)
       AND NOT EXISTS (SELECT 1 FROM policy_doc_addresses x WHERE x.entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM vessel_assured_history x WHERE x.entity_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM vessel_policy_assureds x WHERE x.entity_id = e.id)
       AND NOT EXISTS (SELECT 1 FROM policy_blue_cards x WHERE x.owner_entity_id = e.id)
       AND NOT EXISTS (SELECT 1 FROM receipts x WHERE x.payer_entity_id = e.id)
       AND NOT EXISTS (SELECT 1 FROM entity_commission_overrides x WHERE x.entity_id = e.id)`
@@ -8263,9 +8346,11 @@ export class MySQLAdapter {
                 + (SELECT COUNT(*) FROM quotation_assureds WHERE entity_id = ?) AS quots,
               (SELECT COUNT(*) FROM vessel_dynamic_policies WHERE customer_entity_id = ? OR broker_entity_id = ?)
                 + (SELECT COUNT(*) FROM policy_doc_addresses WHERE entity_id = ?)
+                + (SELECT COUNT(*) FROM vessel_policy_assureds WHERE entity_id = ?)
+                + (SELECT COUNT(*) FROM vessel_assured_history WHERE entity_id = ?)
                 + (SELECT COUNT(*) FROM policy_blue_cards WHERE owner_entity_id = ?) AS pols,
               (SELECT COUNT(*) FROM receipts WHERE payer_entity_id = ?) AS recs`,
-      [id, id, id, id, id, id, id]
+      [id, id, id, id, id, id, id, id, id]
     )) as QueryRows
     const quots = Number(use?.quots || 0)
     const pols = Number(use?.pols || 0)
@@ -8759,6 +8844,14 @@ export class MySQLAdapter {
           updates.name,
           oldRole.name
         ])
+        await connection.execute('UPDATE vessel_policy_assureds SET role = ? WHERE role = ?', [
+          updates.name,
+          oldRole.name
+        ])
+        await connection.execute('UPDATE vessel_assured_history SET role = ? WHERE role = ?', [
+          updates.name,
+          oldRole.name
+        ])
       }
 
       await connection.commit()
@@ -8838,7 +8931,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     // Name and type of the entity come along: compliance checks need to know persons from companies
     let sql =
-      'SELECT va.id, va.vessel_id as vesselId, va.entity_id as entityId, va.role, va.address_id as addressId, e.name as entityName, e.type as entityType FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id'
+      "SELECT va.id, va.vessel_id as vesselId, va.entity_id as entityId, va.role, va.address_id as addressId, DATE_FORMAT(COALESCE(va.from_date, va.created_at), '%Y-%m-%d') as fromDate, e.name as entityName, e.type as entityType FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id"
     const params: SqlValue[] = []
     if (vesselId) {
       sql += ' WHERE va.vessel_id = ?'
@@ -8861,6 +8954,241 @@ export class MySQLAdapter {
   async deleteVesselAssured(id: string): Promise<void> {
     if (!this.pool) return
     await this.pool.execute('DELETE FROM vessel_assureds WHERE id = ?', [id])
+  }
+
+  /**
+   * Once only: active policies get their assureds (a converted policy its converter list, the
+   * others the vessel's current ones). Expired and cancelled ones stay "not recorded": today's
+   * assured may not have been theirs. The broker (c/o) is the policy's customer, not a party.
+   */
+  private async backfillPolicyAssureds(): Promise<void> {
+    if (!this.pool) return
+    const [done] = (await this.pool.query(
+      "SELECT 1 FROM app_settings WHERE setting_key = 'policy_assureds_backfilled'"
+    )) as [RowDataPacket[], unknown]
+    if (done.length > 0) return
+    await this.pool.query(
+      `INSERT INTO vessel_policy_assureds (id, policy_id, entity_id, entity_name, role)
+       SELECT UUID(), vdp.id, a.entity_id, COALESCE(e.name, a.entity_name), COALESCE(a.role, '')
+         FROM vessel_dynamic_policies vdp
+         JOIN policy_doc_addresses a ON a.policy_doc_id = vdp.policy_document_id
+         LEFT JOIN entities e ON e.id = a.entity_id
+        WHERE vdp.status = 'active' AND COALESCE(e.name, a.entity_name) IS NOT NULL
+          AND ${MySQLAdapter.NOT_CARE_OF_SQL('a.role')}`
+    )
+    await this.pool.query(
+      `INSERT INTO vessel_policy_assureds (id, policy_id, entity_id, entity_name, role)
+       SELECT UUID(), vdp.id, va.entity_id, e.name, va.role
+         FROM vessel_dynamic_policies vdp
+         JOIN vessel_assureds va ON va.vessel_id = vdp.vessel_id
+         JOIN entities e ON e.id = va.entity_id
+        WHERE vdp.status = 'active' AND ${MySQLAdapter.NOT_CARE_OF_SQL('va.role')}
+          AND NOT EXISTS (SELECT 1 FROM vessel_policy_assureds x WHERE x.policy_id = vdp.id)`
+    )
+    await this.pool.query(
+      "INSERT INTO app_settings (setting_key, setting_value) VALUES ('policy_assureds_backfilled', '1')"
+    )
+  }
+
+  private static NOT_CARE_OF_SQL(col: string): string {
+    return `LOWER(REPLACE(REPLACE(COALESCE(${col}, ''), '/', ''), ' ', '')) <> 'co'`
+  }
+
+  /** A new policy starts from the vessel's current assureds */
+  private async fillPolicyAssuredsFromVessel(policyId: string, vesselId: string): Promise<void> {
+    if (!this.pool) return
+    await this.pool.execute(
+      `INSERT INTO vessel_policy_assureds (id, policy_id, entity_id, entity_name, role)
+       SELECT UUID(), ?, va.entity_id, e.name, va.role
+         FROM vessel_assureds va JOIN entities e ON e.id = va.entity_id
+        WHERE va.vessel_id = ? AND ${MySQLAdapter.NOT_CARE_OF_SQL('va.role')}`,
+      [policyId, vesselId]
+    )
+  }
+
+  async getVesselAssuredHistory(vesselId: string): Promise<VesselAssuredHistory[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT h.id, h.vessel_id AS vesselId, h.entity_id AS entityId,
+              COALESCE(e.name, h.entity_name) AS entityName, h.role,
+              DATE_FORMAT(h.from_date, '%Y-%m-%d') AS fromDate,
+              DATE_FORMAT(h.to_date, '%Y-%m-%d') AS toDate, h.ended_by AS endedBy
+         FROM vessel_assured_history h LEFT JOIN entities e ON e.id = h.entity_id
+        WHERE h.vessel_id = ? ORDER BY h.to_date DESC, h.created_at DESC`,
+      [vesselId]
+    )
+    return rows as VesselAssuredHistory[]
+  }
+
+  /**
+   * A real change of assured: it goes to the vessel's history, the replacement (if any) comes on
+   * the vessel, and only the chosen policies follow (old one up to the day before, new one from
+   * the date). Returns the names for the audit log.
+   */
+  async removeVesselAssuredWithHistory(
+    id: string,
+    opts: RemoveAssuredOptions,
+    endedBy: string
+  ): Promise<{
+    vesselId: string
+    vesselName: string
+    entityName: string
+    role: string
+    replacementName: string | null
+  }> {
+    if (!this.pool) throw new Error('DB Not connected')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.endDate || '')) throw new Error('Enter the end date')
+    const conn = await this.pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      const [found] = (await conn.query(
+        `SELECT va.vessel_id, va.entity_id, va.role, e.name AS entity_name, v.name AS vessel_name,
+                DATE_FORMAT(COALESCE(va.from_date, va.created_at), '%Y-%m-%d') AS from_date
+           FROM vessel_assureds va
+           LEFT JOIN entities e ON e.id = va.entity_id
+           LEFT JOIN vessels v ON v.id = va.vessel_id
+          WHERE va.id = ?`,
+        [id]
+      )) as [RowDataPacket[], unknown]
+      const va = found[0]
+      if (!va) throw new Error('This assured is no longer on the vessel')
+
+      await conn.execute(
+        `INSERT INTO vessel_assured_history
+           (id, vessel_id, entity_id, entity_name, role, from_date, to_date, ended_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          uuidv4(),
+          va.vessel_id,
+          va.entity_id,
+          va.entity_name || '',
+          va.role,
+          va.from_date,
+          opts.endDate,
+          endedBy
+        ]
+      )
+      await conn.execute('DELETE FROM vessel_assureds WHERE id = ?', [id])
+
+      let replacementName: string | null = null
+      if (opts.replacementEntityId) {
+        const [ent] = (await conn.query('SELECT name FROM entities WHERE id = ?', [
+          opts.replacementEntityId
+        ])) as [RowDataPacket[], unknown]
+        replacementName = ent[0]?.name || null
+        if (!replacementName) throw new Error('The replacement company was not found')
+        const [already] = (await conn.query(
+          'SELECT id FROM vessel_assureds WHERE vessel_id = ? AND entity_id = ? AND role = ?',
+          [va.vessel_id, opts.replacementEntityId, va.role]
+        )) as [RowDataPacket[], unknown]
+        if (already.length === 0)
+          await conn.execute(
+            'INSERT INTO vessel_assureds (id, vessel_id, entity_id, role, from_date) VALUES (?, ?, ?, ?, ?)',
+            [uuidv4(), va.vessel_id, opts.replacementEntityId, va.role, opts.endDate]
+          )
+      }
+
+      if (opts.policyIds?.length) {
+        await conn.query(
+          `UPDATE vessel_policy_assureds SET to_date = DATE_SUB(?, INTERVAL 1 DAY)
+            WHERE policy_id IN (?) AND entity_id = ? AND role = ? AND to_date IS NULL`,
+          [opts.endDate, opts.policyIds, va.entity_id, va.role]
+        )
+        if (opts.replacementEntityId)
+          for (const policyId of opts.policyIds)
+            await conn.execute(
+              `INSERT INTO vessel_policy_assureds
+                 (id, policy_id, entity_id, entity_name, role, from_date)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [uuidv4(), policyId, opts.replacementEntityId, replacementName, va.role, opts.endDate]
+            )
+      }
+      await conn.commit()
+      return {
+        vesselId: va.vessel_id,
+        vesselName: va.vessel_name || '',
+        entityName: va.entity_name || '',
+        role: va.role,
+        replacementName
+      }
+    } catch (e) {
+      await conn.rollback()
+      throw e
+    } finally {
+      conn.release()
+    }
+  }
+
+  /** A new assured of the vessel on the policies the user chose */
+  async addVesselAssuredToPolicies(
+    policyIds: string[],
+    a: { entityId: string; role: string; fromDate?: string | null }
+  ): Promise<void> {
+    if (!this.pool || !policyIds?.length) return
+    const [ent] = (await this.pool.query('SELECT name FROM entities WHERE id = ?', [
+      a.entityId
+    ])) as [RowDataPacket[], unknown]
+    const name = ent[0]?.name
+    if (!name) throw new Error('The company was not found')
+    for (const policyId of policyIds)
+      await this.pool.execute(
+        `INSERT INTO vessel_policy_assureds (id, policy_id, entity_id, entity_name, role, from_date)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), policyId, a.entityId, name, a.role, a.fromDate || null]
+      )
+  }
+
+  /** Replaces a policy's assured list. Returns what the audit log needs */
+  async setVesselPolicyAssureds(
+    policyId: string,
+    rows: VesselPolicyAssured[]
+  ): Promise<{ vesselId: string; policyNumber: string; before: string; after: string } | null> {
+    if (!this.pool) return null
+    const describe = (list: { entityName: string; role: string }[]): string =>
+      list.map((r) => `${r.entityName} (${r.role})`).join(', ')
+    const conn = await this.pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      const [pol] = (await conn.query(
+        'SELECT vessel_id, policy_number FROM vessel_dynamic_policies WHERE id = ?',
+        [policyId]
+      )) as [RowDataPacket[], unknown]
+      if (!pol[0]) throw new Error('This policy no longer exists')
+      const [old] = (await conn.query(
+        `SELECT COALESCE(e.name, a.entity_name) AS entityName, a.role
+           FROM vessel_policy_assureds a LEFT JOIN entities e ON e.id = a.entity_id
+          WHERE a.policy_id = ?`,
+        [policyId]
+      )) as [RowDataPacket[], unknown]
+      await conn.execute('DELETE FROM vessel_policy_assureds WHERE policy_id = ?', [policyId])
+      for (const r of rows)
+        await conn.execute(
+          `INSERT INTO vessel_policy_assureds
+             (id, policy_id, entity_id, entity_name, role, from_date, to_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            uuidv4(),
+            policyId,
+            r.entityId || null,
+            r.entityName,
+            r.role || '',
+            r.fromDate || null,
+            r.toDate || null
+          ]
+        )
+      await conn.commit()
+      return {
+        vesselId: pol[0].vessel_id,
+        policyNumber: pol[0].policy_number || '',
+        before: describe(old as { entityName: string; role: string }[]),
+        after: describe(rows)
+      }
+    } catch (e) {
+      await conn.rollback()
+      throw e
+    } finally {
+      conn.release()
+    }
   }
 
   async updateVesselAssuredRole(id: string, role: string): Promise<void> {
@@ -18886,6 +19214,27 @@ export class MySQLAdapter {
     }
     for (const p of policies) p.values = byPolicy.get(p.id) || []
 
+    // Who is assured under each: current first, owners, then managers, then the others
+    const [assuredRows] = await this.pool.query(
+      `SELECT a.id, a.policy_id AS policyId, a.entity_id AS entityId,
+              COALESCE(e.name, a.entity_name) AS entityName, a.role,
+              DATE_FORMAT(a.from_date, '%Y-%m-%d') AS fromDate,
+              DATE_FORMAT(a.to_date, '%Y-%m-%d') AS toDate
+         FROM vessel_policy_assureds a LEFT JOIN entities e ON e.id = a.entity_id
+        WHERE a.policy_id IN (?)
+        ORDER BY a.to_date IS NOT NULL,
+                 CASE WHEN a.role LIKE '%owner%' THEN 0 WHEN a.role LIKE '%manag%' THEN 1 ELSE 2 END,
+                 a.role, a.from_date`,
+      [policies.map((p) => p.id)]
+    )
+    const assuredsByPolicy = new Map<string, VesselPolicyAssured[]>()
+    for (const a of assuredRows as Row<VesselPolicyAssured>[]) {
+      const list = assuredsByPolicy.get(a.policyId) || []
+      list.push(a)
+      assuredsByPolicy.set(a.policyId, list)
+    }
+    for (const p of policies) p.assureds = assuredsByPolicy.get(p.id) || []
+
     return policies
   }
 
@@ -20421,6 +20770,17 @@ export class MySQLAdapter {
         )
       }
     }
+    // The insured chosen in the converter are this policy's assureds
+    await pool.execute('DELETE FROM vessel_policy_assureds WHERE policy_id = ?', [targetId])
+    await pool.execute(
+      `INSERT INTO vessel_policy_assureds (id, policy_id, entity_id, entity_name, role)
+       SELECT UUID(), ?, a.entity_id, COALESCE(e.name, a.entity_name), COALESCE(a.role, '')
+         FROM policy_doc_addresses a LEFT JOIN entities e ON e.id = a.entity_id
+        WHERE a.policy_doc_id = ? AND COALESCE(e.name, a.entity_name) IS NOT NULL
+          AND ${MySQLAdapter.NOT_CARE_OF_SQL('a.role')}`,
+      [targetId, p.policyDocumentId]
+    )
+
     await setValue(incChar?.id, 'value_date', inception, false)
     await setValue(endChar?.id, 'value_date', expiry, false)
     if (p.premium > 0) await setValue(premChar?.id, 'value_amount', p.premium, true)
@@ -21081,6 +21441,9 @@ export class MySQLAdapter {
         policy.notes || null
       ]
     )
+    // A past policy added by hand is not filled: today's assured may not have been its assured
+    if ((policy.status || 'active') === 'active')
+      await this.fillPolicyAssuredsFromVessel(id, policy.vesselId)
     return id
   }
 
@@ -21152,6 +21515,7 @@ export class MySQLAdapter {
     if (!this.pool) return
     // Its field values first: there is no cascading foreign key in most databases
     await this.pool.execute('DELETE FROM vessel_policy_values WHERE policy_id = ?', [id])
+    await this.pool.execute('DELETE FROM vessel_policy_assureds WHERE policy_id = ?', [id])
     await this.pool.execute('DELETE FROM vessel_dynamic_policies WHERE id = ?', [id])
   }
 

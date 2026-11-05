@@ -169,9 +169,41 @@ export interface VesselAssured {
   entityId: string
   role: string
   addressId?: string | null
+  /** Since when (YYYY-MM-DD): the date given, else when it was entered (read only) */
+  fromDate?: string | null
   /** From the linked entity (read only) */
   entityName?: string
   entityType?: 'company' | 'person'
+}
+
+/** An assured that is no longer on the vessel */
+export interface VesselAssuredHistory {
+  id: string
+  vesselId: string
+  entityId: string | null
+  entityName: string
+  role: string
+  fromDate: string | null
+  toDate: string | null
+  endedBy: string | null
+}
+
+/** Ending an assured on the vessel: the date, who replaces it, which policies follow */
+export interface RemoveAssuredOptions {
+  endDate: string
+  replacementEntityId?: string | null
+  policyIds: string[]
+}
+
+/** Who is assured under a hand-filled policy. Blank dates = the whole policy period */
+export interface VesselPolicyAssured {
+  id: string
+  policyId: string
+  entityId: string | null
+  entityName: string
+  role: string
+  fromDate?: string | null
+  toDate?: string | null
 }
 
 export interface EntityAddress {
@@ -1613,6 +1645,7 @@ export interface VesselDynamicPolicy {
   createdAt?: string
   updatedAt?: string
   values?: VesselPolicyValue[]
+  assureds?: VesselPolicyAssured[]
 }
 
 export interface VesselPolicyValue {
