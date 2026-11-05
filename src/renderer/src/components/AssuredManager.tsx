@@ -27,7 +27,7 @@ import {
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Badge, Field, EmptyState, Combobox, SegmentedControl } from './ui'
+import { Badge, Field, EmptyState, Combobox, Modal, SegmentedControl } from './ui'
 import { RemoveAssuredModal, AddAssuredToPoliciesModal } from './AssuredPolicyDialogs'
 import { isCareOfRole } from '../utils/policyAssureds'
 import { formatDate } from '../utils/dateUtils'
@@ -109,6 +109,8 @@ export default function AssuredManager({
   const [history, setHistory] = useState<VesselAssuredHistory[]>([])
   const [policies, setPolicies] = useState<VesselDynamicPolicy[]>([])
   const [removing, setRemoving] = useState<VesselAssured | null>(null)
+  // A former assured's papers
+  const [formerOpen, setFormerOpen] = useState<VesselAssuredHistory | null>(null)
   const [addedPrompt, setAddedPrompt] = useState<{
     entityId: string
     entityName: string
@@ -561,7 +563,12 @@ export default function AssuredManager({
                 </tr>
               ))}
               {history.map((h) => (
-                <tr key={h.id}>
+                <tr
+                  key={h.id}
+                  className={h.entityId ? 'clickable' : undefined}
+                  title={h.entityId ? 'Open this company and its papers' : undefined}
+                  onClick={() => h.entityId && setFormerOpen(h)}
+                >
                   <td style={{ fontWeight: 600 }}>{h.entityName}</td>
                   <td>
                     <Badge tone="neutral">{h.role}</Badge>
@@ -1014,6 +1021,20 @@ export default function AssuredManager({
         </div>
       </div>
 
+      {formerOpen?.entityId && (
+        <Modal
+          title={formerOpen.entityName}
+          onClose={() => setFormerOpen(null)}
+          width={720}
+          closeOnOverlay={false}
+        >
+          <EntityEditPanel
+            entityId={formerOpen.entityId}
+            canManage={canManageAssureds}
+            onChanged={loadData}
+          />
+        </Modal>
+      )}
       {removing && (
         <RemoveAssuredModal
           assured={removing}

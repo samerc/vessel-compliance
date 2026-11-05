@@ -188,8 +188,17 @@ function excelSerialToDate(serial: number): string {
   return formatDateShort(date)
 }
 
+/** -$39,813.00: the minus goes before the currency sign */
+function fmtAmount(v: number, sign: string): string {
+  const amount = Math.abs(v).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+  return `${v < 0 ? '-' : ''}${sign}${amount}`
+}
+
 function fmt(v: number): string {
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return fmtAmount(v, '$')
 }
 
 // Preview table uses plain number formatting, labelled with the chosen currency
@@ -472,7 +481,7 @@ async function exportToPDF(
     grandIncurred = 0
 
   const fmtCur = (v: number): string =>
-    `${cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$'}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    fmtAmount(v, cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$')
 
   for (const uwy of data) {
     bodyRows.push([
