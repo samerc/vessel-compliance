@@ -56,6 +56,13 @@ interface VesselParticulars {
   others: string[]
 }
 
+/** Typed on the report screen for what the app does not have; used for this report only */
+interface ManualParticulars {
+  imo?: string
+  owners?: string
+  managers?: string
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const vesselKey = (name: string): string =>
@@ -104,6 +111,21 @@ async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
       others: named(/^(?![\s\S]*(owner|manag))/i, /^$/)
     }
   })
+}
+
+/** What the app has wins; a typed value only fills a blank. One name per line */
+function withManual(p: VesselParticulars, m?: ManualParticulars): VesselParticulars {
+  const names = (text?: string): string[] =>
+    (text || '')
+      .split('\n')
+      .map((n) => n.trim())
+      .filter(Boolean)
+  return {
+    ...p,
+    imo: p.imo || m?.imo?.trim() || '',
+    owners: p.owners.length ? p.owners : names(m?.owners),
+    managers: p.managers.length ? p.managers : names(m?.managers)
+  }
 }
 
 function excelSerialToDate(serial: number): string {
@@ -599,6 +621,7 @@ async function exportToPDF(
 export default function LossRecordReport(): React.JSX.Element {
   const [data, setData] = useState<LossUWY[] | null>(null)
   const [particulars, setParticulars] = useState<VesselParticulars[]>([])
+  const [manual, setManual] = useState<Record<string, ManualParticulars>>({})
   const [fileName, setFileName] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -642,7 +665,7 @@ export default function LossRecordReport(): React.JSX.Element {
     setExporting(true)
     try {
       const settings = await getReportSettings()
-      await exportToPDF(data, particulars, settings, {
+      await exportToPDF(data, merged, settings, {
         currency,
         showReserves,
         showClaimSubtotals
@@ -658,12 +681,17 @@ export default function LossRecordReport(): React.JSX.Element {
   const clearData = (): void => {
     setData(null)
     setParticulars([])
+    setManual({})
     setFileName('')
     setError(null)
   }
 
-  const missing = particulars.filter((p) => !p.found).map((p) => p.vesselName)
-  const particularsOf = new Map(particulars.map((p) => [p.vesselName, p]))
+  const merged = particulars.map((p) => withManual(p, manual[p.vesselName]))
+  const particularsOf = new Map(merged.map((p) => [p.vesselName, p]))
+  // Judged on what the app has, so a row stays on screen while its field is being typed
+  const incomplete = particulars.filter((p) => !p.imo || !p.owners.length || !p.managers.length)
+  const setManualField = (vessel: string, field: keyof ManualParticulars, value: string): void =>
+    setManual((m) => ({ ...m, [vessel]: { ...m[vessel], [field]: value } }))
 
   // Summary stats derived from parsed data
   const stats = data
@@ -757,24 +785,98 @@ export default function LossRecordReport(): React.JSX.Element {
             </div>
           )}
 
-          {missing.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)',
-                color: 'var(--text-primary)'
-              }}
-            >
-              <AlertCircle size={16} />
-              <span style={{ fontSize: '0.88rem' }}>
-                Not found in the app, printed without IMO and parties:{' '}
-                <strong>{missing.join(', ')}</strong>. Check the vessel names in the Excel.
-              </span>
+          {/* What the app does not have for a vessel can be typed for this report */}
+          {incomplete.length > 0 && (
+            <div className="table-wrap">
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '14px 18px',
+                  borderBottom: '1px solid var(--table-border)'
+                }}
+              >
+                <AlertCircle size={16} color="var(--warning)" style={{ flexShrink: 0 }} />
+                <div>
+                  <div
+                    style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)' }}
+                  >
+                    Missing vessel details
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Type what is missing, one name per line. It prints on this report only and is
+                    not saved to the vessel.
+                  </div>
+                </div>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '22%' }}>Vessel</th>
+                    <th style={{ width: '14%' }}>IMO</th>
+                    <th style={{ width: '32%' }}>Owners</th>
+                    <th style={{ width: '32%' }}>Managers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incomplete.map((p) => {
+                    const typed = manual[p.vesselName]
+                    const names = (
+                      field: 'owners' | 'managers',
+                      label: string
+                    ): React.JSX.Element =>
+                      p[field].length ? (
+                        <td className="muted">{p[field].join(', ')}</td>
+                      ) : (
+                        <td>
+                          <textarea
+                            rows={2}
+                            aria-label={`${label} of ${p.vesselName}`}
+                            value={typed?.[field] || ''}
+                            onChange={(e) => setManualField(p.vesselName, field, e.target.value)}
+                            style={{ width: '100%', resize: 'vertical' }}
+                          />
+                        </td>
+                      )
+                    return (
+                      <tr key={p.vesselName}>
+                        <td style={{ fontWeight: '600', verticalAlign: 'top' }}>
+                          {p.vesselName}
+                          {!p.found && (
+                            <div
+                              style={{
+                                fontWeight: '400',
+                                fontSize: '0.78rem',
+                                color: 'var(--text-secondary)'
+                              }}
+                            >
+                              Not in the app. Check the name in the Excel.
+                            </div>
+                          )}
+                        </td>
+                        {p.imo ? (
+                          <td className="muted">
+                            <span className="mono">{p.imo}</span>
+                          </td>
+                        ) : (
+                          <td>
+                            <input
+                              type="text"
+                              aria-label={`IMO of ${p.vesselName}`}
+                              value={typed?.imo || ''}
+                              onChange={(e) => setManualField(p.vesselName, 'imo', e.target.value)}
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                        )}
+                        {names('owners', 'Owners')}
+                        {names('managers', 'Managers')}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 
