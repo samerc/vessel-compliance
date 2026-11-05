@@ -2806,7 +2806,7 @@ function StepDetails({
                       margin: '4px 0 0'
                     }}
                   >
-                    Custom insured — not linked to an existing entity.
+                    Not in the Directory yet: added as a company when the policy is created.
                   </p>
                 )}
                 <div style={{ marginTop: '8px' }}>

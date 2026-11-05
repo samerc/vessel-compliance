@@ -6250,7 +6250,9 @@ app.whenReady().then(() => {
         )
       const result = await db.convertQuotationToPolicy(quotationId, {
         ...convertOptions,
-        createdBy: session.id
+        createdBy: session.id,
+        createdByName: session.username,
+        screenedParties: screening.parties
       })
       if (Array.isArray(result))
         await db

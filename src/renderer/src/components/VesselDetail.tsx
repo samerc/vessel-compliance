@@ -75,7 +75,7 @@ import AssuredManager from './AssuredManager'
 import { PolicyAssuredList, PolicyAssuredsEditor } from './PolicyAssureds'
 import { RenameVesselModal, FormerNamesModal } from './VesselNameDialogs'
 import VesselSoldModal from './VesselSoldModal'
-import { vesselNameAt } from '../utils/policyAssureds'
+import { invertedAssuredDates, vesselNameAt } from '../utils/policyAssureds'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
 import { TypeChip, Modal, Field, EmptyState, Combobox, MultiSelect } from './ui'
@@ -4542,6 +4542,11 @@ function DynamicPoliciesView({
 
   const handleSavePolicy = async (): Promise<void> => {
     if (!formTypeId) return
+    const inverted = invertedAssuredDates(formAssureds)
+    if (inverted) {
+      showError(`${inverted.entityName}: the To date cannot be before the From date`)
+      return
+    }
     try {
       const typeChars = characteristics.filter((c) => c.policyTypeId === formTypeId)
       if (editingPolicyId) {
@@ -5556,11 +5561,13 @@ function VesselTimeline({
         if (Array.isArray(auditLog)) {
           for (const entry of auditLog) {
             const isAssured = entry.fieldName?.toLowerCase().includes('assured')
+            // Already says what happened ("Former Name Removed"): no "changed" after it
+            const isEvent = isAssured || /\bremoved$/i.test(entry.fieldName || '')
             allEvents.push({
               date: entry.changedAt || '',
               type: 'audit',
-              title: isAssured ? entry.fieldName : `${entry.fieldName} changed`,
-              subtitle: isAssured
+              title: isEvent ? entry.fieldName : `${entry.fieldName} changed`,
+              subtitle: isEvent
                 ? entry.newValue || entry.oldValue || undefined
                 : entry.oldValue && entry.newValue
                   ? `${entry.oldValue} → ${entry.newValue}`

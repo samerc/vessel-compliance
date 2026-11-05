@@ -30,9 +30,9 @@ function ago(s: string): string {
   })
 }
 
-// "Assured Added" etc. read as they are; other fields get "changed"
+// "Assured Added", "Former Name Removed" etc. read as they are; other fields get "changed"
 function auditTitle(e: VesselAuditEntry): string {
-  return /^Assured /.test(e.fieldName) ? e.fieldName : `${e.fieldName} changed`
+  return /^Assured |\bremoved$/i.test(e.fieldName) ? e.fieldName : `${e.fieldName} changed`
 }
 
 const sectionTitle: React.CSSProperties = { margin: 0, fontSize: '0.95rem', fontWeight: 600 }

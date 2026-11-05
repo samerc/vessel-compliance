@@ -2506,18 +2506,19 @@ function polMakePageProperties(): ISectionPropertiesOptions {
 }
 
 // Capture mode: when enabled, polDownloadBlob stores the blob instead of downloading
-let _polCaptureMode = false
-let _polCapturedBlob: Blob | null = null
+// Policy documents are built one at a time: the font sizes above are shared by the whole build
+let polBuildChain: Promise<unknown> = Promise.resolve()
+function polInTurn<T>(work: () => Promise<T>): Promise<T> {
+  const run = polBuildChain.then(work, work)
+  polBuildChain = run.catch(() => {})
+  return run
+}
 
 // Resolves once the file is saved; rejects on cancel or a failed write, so nothing after it
 // (exported marks, success toasts) runs for a file that was never written. A policy with a
 // folder (set by the converter) saves there without asking; otherwise, or when the folder
 // cannot be reached, the Save dialog asks
 async function polDownloadBlob(blob: Blob, filename: string, policyId?: string): Promise<void> {
-  if (_polCaptureMode) {
-    _polCapturedBlob = blob
-    return
-  }
   if (policyId) await savePolicyFile(blob, filename, policyId)
   else await saveFile(blob, filename)
 }
@@ -4269,16 +4270,23 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 
 // ==================== Policy Document Export ====================
 
-export async function exportPolicyDocx(
+export function exportPolicyDocx(policyId: string): Promise<void> {
+  return polInTurn(() => buildPolicyDocx(policyId))
+}
+
+/** Builds the policy document: saved as a file, or handed to `capture` for a bundle or a PDF */
+async function buildPolicyDocx(
   policyId: string,
   totalPages?: number,
-  includeTC?: boolean
+  includeTC?: boolean,
+  capture?: (blob: Blob) => void
 ): Promise<void> {
   const storable = !totalPages && !includeTC
   if (storable) {
     const stored = await polStoredFile(policyId, 'policy')
     if (stored) {
-      await polDownloadBlob(stored.blob, stored.fileName, policyId)
+      if (capture) capture(stored.blob)
+      else await polDownloadBlob(stored.blob, stored.fileName, policyId)
       return
     }
   }
@@ -5363,7 +5371,8 @@ export async function exportPolicyDocx(
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`
   if (storable) await polStoreFile(policyId, 'policy', { blob, fileName: polFileName })
-  await polDownloadBlob(blob, polFileName, policyId)
+  if (capture) capture(blob)
+  else await polDownloadBlob(blob, polFileName, policyId)
 
   // Mark policy as exported
   try {
@@ -5379,10 +5388,18 @@ export async function exportPolicyDocx(
 
 /**
  * Generate a policy DOCX as an ArrayBuffer (without downloading).
- * Uses capture mode to intercept the blob from exportPolicyDocx.
  * @param totalPages - if provided, hardcodes "Page X of N" instead of using auto NUMPAGES
  */
-async function generatePolicyDocxBuffer(
+function generatePolicyDocxBuffer(
+  policyId: string,
+  totalPages?: number,
+  includeTC?: boolean
+): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
+  return polInTurn(() => capturePolicyDocxBuffer(policyId, totalPages, includeTC))
+}
+
+/** Only for code already holding its turn */
+async function capturePolicyDocxBuffer(
   policyId: string,
   totalPages?: number,
   includeTC?: boolean
@@ -5394,20 +5411,15 @@ async function generatePolicyDocxBuffer(
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
   const fileName = `${data.policy.policyNumber} - ${vName}${revSuffix}`
 
-  // Enable capture mode so polDownloadBlob stores blob instead of downloading
-  _polCaptureMode = true
-  _polCapturedBlob = null
-  try {
-    await exportPolicyDocx(policyId, totalPages, includeTC)
-    // _polCapturedBlob is set by polDownloadBlob during exportPolicyDocx (TS can't track this)
-    const captured = _polCapturedBlob as Blob | null
-    if (!captured) throw new Error('Failed to generate policy document')
-    const buffer = await captured.arrayBuffer()
-    return { buffer, fileName, typeCode }
-  } finally {
-    _polCaptureMode = false
-    _polCapturedBlob = null
-  }
+  let captured: Blob | null = null
+  await buildPolicyDocx(policyId, totalPages, includeTC, (blob) => {
+    captured = blob
+  })
+  // Set by the callback above (TS can't track this)
+  const blob = captured as Blob | null
+  if (!blob) throw new Error('Failed to generate policy document')
+  const buffer = await blob.arrayBuffer()
+  return { buffer, fileName, typeCode }
 }
 
 /**
@@ -6776,13 +6788,20 @@ async function buildCreditAdviceBlobFresh(
  * optional Credit Advice (when there is commission), and each supplied blue card.
  * All content comes from the frozen export snapshot, exactly like the individual exports.
  */
-export async function exportPolicyBundleZip(
+export function exportPolicyBundleZip(
   policyId: string,
   opts: { includeCA?: boolean; blueCards?: { data: BlueCardData; cardType: BlueCardType }[] } = {}
 ): Promise<void> {
+  return polInTurn(() => buildPolicyBundleZip(policyId, opts))
+}
+
+async function buildPolicyBundleZip(
+  policyId: string,
+  opts: { includeCA?: boolean; blueCards?: { data: BlueCardData; cardType: BlueCardType }[] }
+): Promise<void> {
   const zip = new JSZip()
 
-  const pol = await generatePolicyDocxBuffer(policyId)
+  const pol = await capturePolicyDocxBuffer(policyId)
   // generatePolicyDocxBuffer returns fileName WITHOUT extension (the PDF path re-derives it)
   const polFileName = /\.docx$/i.test(pol.fileName) ? pol.fileName : `${pol.fileName}.docx`
   zip.file(polFileName, pol.buffer)

@@ -4,7 +4,7 @@ import type { AssuredRole, VesselPolicyAssured } from '../../../shared/types'
 import { Combobox, Field } from './ui'
 import { formatDate } from '../utils/dateUtils'
 import { asArray } from '../utils/ipc'
-import { dayBefore, isCareOfRole, todayIso } from '../utils/policyAssureds'
+import { dayBefore, invertedAssuredDates, isCareOfRole, todayIso } from '../utils/policyAssureds'
 
 /** The assureds shown on a policy of the vessel's Policies tab */
 export function PolicyAssuredList({
@@ -121,8 +121,11 @@ export function PolicyAssuredsEditor({
     setAddEntity(null)
     setAddRole('')
   }
+  // The old company keeps at least its first day
+  const changeTooEarly = (row: VesselPolicyAssured): boolean =>
+    !!row.fromDate && !!changeDate && changeDate <= row.fromDate
   const confirmChange = (row: VesselPolicyAssured): void => {
-    if (!changeEntity || !changeDate) return
+    if (!changeEntity || !changeDate || changeTooEarly(row)) return
     onChange([
       ...rows.map((r) => (r.id === row.id ? { ...r, toDate: dayBefore(changeDate) } : r)),
       newRow(changeEntity, row.role, changeDate)
@@ -133,6 +136,7 @@ export function PolicyAssuredsEditor({
   }
   const patch = (id: string, field: 'fromDate' | 'toDate', value: string): void =>
     onChange(rows.map((r) => (r.id === id ? { ...r, [field]: value || null } : r)))
+  const inverted = invertedAssuredDates(rows)
 
   const entityPicker = (
     text: string,
@@ -282,6 +286,11 @@ export function PolicyAssuredsEditor({
           </table>
         </div>
       )}
+      {inverted && (
+        <div role="alert" style={{ color: 'var(--danger)', fontSize: '0.82rem', marginTop: '6px' }}>
+          {inverted.entityName}: the To date cannot be before the From date.
+        </div>
+      )}
 
       {changing &&
         (() => {
@@ -299,11 +308,20 @@ export function PolicyAssuredsEditor({
                   onChange={(e) => setChangeDate(e.target.value)}
                 />
               </Field>
+              {changeTooEarly(row) && (
+                <div
+                  role="alert"
+                  style={{ gridColumn: '1 / -1', color: 'var(--danger)', fontSize: '0.82rem' }}
+                >
+                  {row.entityName} starts on {formatDate(row.fromDate)}: the change must be after
+                  that date.
+                </div>
+              )}
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
                   className="btn-primary btn-sm"
-                  disabled={!changeEntity || !changeDate}
+                  disabled={!changeEntity || !changeDate || changeTooEarly(row)}
                   onClick={() => confirmChange(row)}
                 >
                   Apply

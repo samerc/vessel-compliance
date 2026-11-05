@@ -8,6 +8,8 @@ A vessel typed on a quotation has no record. Before the converter opens, `Conver
 
 ### Assured per policy (2026-11-05)
 
+An insured typed in the converter becomes a Directory company when the policy is created (`entityForTypedInsured`: same tidy name reuses the entry; a new one takes the converter's sanctions result, else PENDING; its address is saved on it), so a new vessel record gets it as an assured.
+
 `vessel_policy_assureds` = who is assured under a hand-filled policy (`vessel_dynamic_policies`): entity (or a typed name), role, optional from / to (blank = whole period; ended rows stay). Shown on the vessel's Policies tab, edited in the policy form (Fill from vessel, Add assured, Change from a date). A new ACTIVE policy (also Renew) starts from the vessel's current assureds; a policy added as expired starts empty; conversion copies the converter's insured (`policy_doc_addresses`). The c/o is never copied: the broker is the policy's customer. Backfill ran once (`app_settings.policy_assureds_backfilled`): active policies only, expired / cancelled show "Not recorded" (user decision). Names are read through the entity, so a typo fixed in the Directory reaches every policy.
 
 ### Customer Assignment (Policy-Level)

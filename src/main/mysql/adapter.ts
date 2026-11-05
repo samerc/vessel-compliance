@@ -9036,6 +9036,38 @@ export class MySQLAdapter {
     return rows as VesselAssuredHistory[]
   }
 
+  /** An assured cannot end before it started, on the vessel or on a chosen policy */
+  private async assertAssuredCanEnd(
+    id: string,
+    endDate: string,
+    policyIds?: string[]
+  ): Promise<void> {
+    const show = (d: string): string => d.split('-').reverse().join('/')
+    const [rows] = (await this.pool!.query(
+      `SELECT va.entity_id, va.role, e.name, DATE_FORMAT(va.from_date, '%Y-%m-%d') AS given_from
+         FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id
+        WHERE va.id = ?`,
+      [id]
+    )) as [RowDataPacket[], unknown]
+    const va = rows[0]
+    if (!va) return
+    if (va.given_from && endDate < va.given_from)
+      throw new Error(
+        `${va.name || 'This assured'} started on ${show(va.given_from)}: the end date cannot be earlier`
+      )
+    if (!policyIds?.length) return
+    const [late] = (await this.pool!.query(
+      `SELECT policy_id, DATE_FORMAT(from_date, '%Y-%m-%d') AS d FROM vessel_policy_assureds
+        WHERE policy_id IN (?) AND entity_id = ? AND role = ? AND to_date IS NULL AND from_date >= ?
+        LIMIT 1`,
+      [policyIds, va.entity_id, va.role, endDate]
+    )) as [RowDataPacket[], unknown]
+    if (late[0])
+      throw new Error(
+        `${va.name || 'This assured'} starts on a chosen policy on ${show(late[0].d)}: the change must be after that date`
+      )
+  }
+
   /**
    * A real change of assured: it goes to the vessel's history, the replacement (if any) comes on
    * the vessel, and only the chosen policies follow (old one up to the day before, new one from
@@ -9054,6 +9086,7 @@ export class MySQLAdapter {
   }> {
     if (!this.pool) throw new Error('DB Not connected')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.endDate || '')) throw new Error('Enter the end date')
+    await this.assertAssuredCanEnd(id, opts.endDate, opts.policyIds)
     const conn = await this.pool.getConnection()
     try {
       await conn.beginTransaction()
@@ -9079,7 +9112,8 @@ export class MySQLAdapter {
           va.entity_id,
           va.entity_name || '',
           va.role,
-          va.from_date,
+          // No date was given and it was entered after this end date: the start is not known
+          va.from_date <= opts.endDate ? va.from_date : null,
           opts.endDate,
           endedBy
         ]
@@ -9159,6 +9193,9 @@ export class MySQLAdapter {
   async applyVesselSale(vesselId: string, sale: VesselSale, changedBy: string): Promise<void> {
     if (!this.pool) throw new Error('DB Not connected')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(sale.date || '')) throw new Error('Enter the date of sale')
+    // All or nothing: a refusal halfway would leave the sale half recorded
+    for (const id of sale.endAssuredIds)
+      await this.assertAssuredCanEnd(id, sale.date, sale.policyIds)
     for (const id of sale.endAssuredIds)
       await this.removeVesselAssuredWithHistory(
         id,
@@ -9318,6 +9355,9 @@ export class MySQLAdapter {
     if (!this.pool) return null
     const describe = (list: { entityName: string; role: string }[]): string =>
       list.map((r) => `${r.entityName} (${r.role})`).join(', ')
+    const inverted = rows.find((r) => r.fromDate && r.toDate && r.toDate < r.fromDate)
+    if (inverted)
+      throw new Error(`${inverted.entityName}: the To date cannot be before the From date`)
     const conn = await this.pool.getConnection()
     try {
       await conn.beginTransaction()
@@ -21017,6 +21057,44 @@ export class MySQLAdapter {
     })
   }
 
+  /**
+   * An insured typed in the converter becomes a Directory company, so it can be an assured of the
+   * vessel. The same name reuses the entry; a new one takes the converter's sanctions result.
+   */
+  private async entityForTypedInsured(
+    typed: string | undefined,
+    who: { userId: string; username?: string; parties?: ScreenedParty[] }
+  ): Promise<string | null> {
+    const name = MySQLAdapter.tidyName(typed || '')
+    if (!name) return null
+    const [found] = (await this.pool!.query('SELECT id FROM entities WHERE name = ? LIMIT 1', [
+      name
+    ])) as [RowDataPacket[], unknown]
+    if (found[0]) return found[0].id as string
+    const party = (who.parties || []).find(
+      (p) => p.kind === 'name' && MySQLAdapter.tidyName(p.name).toLowerCase() === name.toLowerCase()
+    )
+    const clear = party?.status === 'CLEAR'
+    const created = await this.addEntity({
+      name,
+      type: 'company',
+      ofacStatus: clear ? 'CLEARED' : 'PENDING',
+      ofacMatchFound: false,
+      ofacCheckedAt: clear ? party?.checkedAt || undefined : undefined
+    })
+    await this.logActivity({
+      userId: who.userId,
+      username: who.username || '',
+      action: 'CREATE',
+      module: 'Entities',
+      entityType: 'entity',
+      entityId: created.id,
+      entityName: name,
+      details: `Created entity ${name} from the insured typed in the policy converter`
+    }).catch(() => {})
+    return created.id
+  }
+
   private async convertQuotationToPolicyLocked(
     quotationId: string,
     options: {
@@ -21037,6 +21115,9 @@ export class MySQLAdapter {
       showAddresses: boolean
       blueCards: string[]
       createdBy: string
+      createdByName?: string
+      /** The converter's sanctions check, for an insured typed by hand */
+      screenedParties?: ScreenedParty[]
       selectedAlternativeId?: string | null
       exchangeRate?: number
       // Per-vessel insured list edited in the wizard (overrides auto-derivation when present)
@@ -21233,16 +21314,28 @@ export class MySQLAdapter {
       if (Array.isArray(options.insured)) {
         for (let ai = 0; ai < insuredForVessel.length; ai++) {
           const r = insuredForVessel[ai]
+          const entityId =
+            r.entityId ||
+            (await this.entityForTypedInsured(r.entityName, {
+              userId: options.createdBy,
+              username: options.createdByName,
+              parties: options.screenedParties
+            }))
           // Persist a brand-new address back to the entity (dedup against existing line 1)
-          if (r.isNewAddress && r.entityId && r.addressText && r.addressText.trim()) {
+          if (
+            (r.isNewAddress || !r.entityId) &&
+            entityId &&
+            r.addressText &&
+            r.addressText.trim()
+          ) {
             try {
               const [exist] = await this.pool.query(
                 'SELECT id FROM entity_addresses WHERE entity_id = ? AND TRIM(address_line1) = TRIM(?) LIMIT 1',
-                [r.entityId, r.addressText]
+                [entityId, r.addressText]
               )
               if ((exist as RowDataPacket[]).length === 0) {
                 await this.addEntityAddress({
-                  entityId: r.entityId,
+                  entityId,
                   label: (r.addressLabel || '').trim() || r.role || 'Policy Address',
                   addressLine1: r.addressText.trim()
                 })
@@ -21251,22 +21344,12 @@ export class MySQLAdapter {
               /* non-critical */
             }
           }
-          // Store the typed name for custom insured (no linked entity) so it renders on the policy
-          const customName = r.entityId ? null : (r.entityName || '').trim() || null
           await this.pool.execute(
             `
                         INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, entity_name, role, address_text, \`order\`)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     `,
-            [
-              uuidv4(),
-              policyId,
-              r.entityId || null,
-              customName,
-              r.role || '',
-              r.addressText || '',
-              ai
-            ]
+            [uuidv4(), policyId, entityId, null, r.role || '', r.addressText || '', ai]
           )
         }
       } else {

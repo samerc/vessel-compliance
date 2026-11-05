@@ -1,4 +1,11 @@
 /** Not a party of the policy: the broker is the policy's customer */
+/** The first row whose To date is before its From date */
+export function invertedAssuredDates<
+  T extends { fromDate?: string | null; toDate?: string | null }
+>(rows: T[]): T | undefined {
+  return rows.find((r) => r.fromDate && r.toDate && r.toDate < r.fromDate)
+}
+
 export const isCareOfRole = (role: string | null | undefined): boolean =>
   (role || '').toLowerCase().replace(/[^a-z]/g, '') === 'co'
 
