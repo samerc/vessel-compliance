@@ -624,14 +624,19 @@ export default function WarrantyManager({
           />
           <span style={{ fontWeight: '600', fontSize: '0.9rem', flex: 1 }}>{w.description}</span>
           {w.reference && (
+            // To copy: one click selects the whole reference and does not open / close the row
             <span
+              title="Click to select, then Ctrl+C to copy"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 fontSize: '0.72rem',
                 fontFamily: 'monospace',
                 padding: '2px 8px',
                 borderRadius: '6px',
                 background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)',
-                color: 'var(--text-secondary)'
+                color: 'var(--text-secondary)',
+                cursor: 'text',
+                userSelect: 'all'
               }}
             >
               {w.reference}
