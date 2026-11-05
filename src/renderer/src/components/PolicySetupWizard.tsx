@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import ConvertVesselGate from './ConvertVesselGate'
 import {
   ArrowLeft,
   ArrowRight,
@@ -1192,6 +1193,20 @@ export default function PolicySetupWizard({
       </div>
     )
   }
+
+  // Typed vessels get a record or a link first: the steps below key everything on the vessel
+  const unlinkedVessels = qVessels.filter((v) => !v.vesselId)
+  if (unlinkedVessels.length > 0)
+    return (
+      <ConvertVesselGate
+        vessels={unlinkedVessels}
+        onCancel={onCancel}
+        onResolved={() => {
+          setLoading(true)
+          void loadData()
+        }}
+      />
+    )
 
   const fmtMoney = (n: number): string =>
     `${quotation?.premiumCurrency || 'USD'} ${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`

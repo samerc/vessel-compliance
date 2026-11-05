@@ -1866,6 +1866,28 @@ app.whenReady().then(() => {
       details: `Recorded the sale of ${vRows[0]?.name || vesselId} on ${sale.date}`
     }).catch(() => {})
   })
+  safeHandle('db:setQuotationVesselLink', async (event, qvId: string, vesselId: string) => {
+    await requirePermission(event, 'quotations:edit')
+    return db.setQuotationVesselLink(qvId, vesselId)
+  })
+  safeHandle(
+    'db:createVesselFromQuotationVessel',
+    async (event, qvId: string, imoNumber: string) => {
+      const user = await requirePermission(event, 'vessels:create')
+      const id = await db.createVesselFromQuotationVessel(qvId, imoNumber, user.username)
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'CREATE',
+        module: 'Vessels',
+        entityType: 'vessel',
+        entityId: id,
+        entityName: imoNumber,
+        details: `Created the vessel record ${imoNumber} from a quotation`
+      }).catch(() => {})
+      return id
+    }
+  )
   safeHandle('db:getLossRecordLookup', (event, policyNumbers: string[]) => {
     requireSession(event)
     return db.getLossRecordLookup(policyNumbers)

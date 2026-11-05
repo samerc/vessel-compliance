@@ -266,6 +266,8 @@ export interface Api {
   deleteVesselNameHistory: (id: string) => Promise<void>
   setVesselNameHistoryDate: (id: string, date: string) => Promise<void>
   applyVesselSale: (vesselId: string, sale: VesselSale) => Promise<void>
+  setQuotationVesselLink: (qvId: string, vesselId: string) => Promise<void>
+  createVesselFromQuotationVessel: (qvId: string, imoNumber: string) => Promise<string>
   getLossRecordLookup: (policyNumbers: string[]) => Promise<LossRecordLookup>
   deleteVessel: (id: string) => Promise<{ success: boolean; message?: string }>
 

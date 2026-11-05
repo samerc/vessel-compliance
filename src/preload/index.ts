@@ -60,6 +60,10 @@ const api: Api = {
   setVesselNameHistoryDate: (id, date) =>
     ipcRenderer.invoke('db:setVesselNameHistoryDate', id, date),
   applyVesselSale: (vesselId, sale) => ipcRenderer.invoke('db:applyVesselSale', vesselId, sale),
+  setQuotationVesselLink: (qvId, vesselId) =>
+    ipcRenderer.invoke('db:setQuotationVesselLink', qvId, vesselId),
+  createVesselFromQuotationVessel: (qvId, imoNumber) =>
+    ipcRenderer.invoke('db:createVesselFromQuotationVessel', qvId, imoNumber),
   getLossRecordLookup: (policyNumbers) =>
     ipcRenderer.invoke('db:getLossRecordLookup', policyNumbers),
   getVesselNameHistory: (vesselId) => ipcRenderer.invoke('db:getVesselNameHistory', vesselId),

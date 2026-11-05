@@ -2,6 +2,10 @@
 
 Customer per policy, vessel policies and renewals, the policy system (converter, exports, freezing, signed files), revisions, blue cards, signatures, T&C, QR, QuickBooks, commissions, war declaration. Read with the root CLAUDE.md (architecture, IPC chain, migrations, code style).
 
+### Typed vessels at conversion (2026-11-05)
+
+A vessel typed on a quotation has no record. Before the converter opens, `ConvertVesselGate` makes the user link each one (match by the IMO field, else exact name, or search any vessel) or create a record from the typed details (`createVesselFromQuotationVessel`, needs `vessels:create`). If the names differ it warns to use Vessel sold first, because a linked quotation vessel reads the record. `convertQuotationToPolicy` refuses an unlinked vessel. A vessel with no assureds takes the converter's insured at conversion. The Vessel tab already offers Link / Add as typed when a typed IMO exists.
+
 ### Assured per policy (2026-11-05)
 
 `vessel_policy_assureds` = who is assured under a hand-filled policy (`vessel_dynamic_policies`): entity (or a typed name), role, optional from / to (blank = whole period; ended rows stay). Shown on the vessel's Policies tab, edited in the policy form (Fill from vessel, Add assured, Change from a date). A new ACTIVE policy (also Renew) starts from the vessel's current assureds; a policy added as expired starts empty; conversion copies the converter's insured (`policy_doc_addresses`). The c/o is never copied: the broker is the policy's customer. Backfill ran once (`app_settings.policy_assureds_backfilled`): active policies only, expired / cancelled show "Not recorded" (user decision). Names are read through the entity, so a typo fixed in the Directory reaches every policy.

@@ -9184,6 +9184,79 @@ export class MySQLAdapter {
       })
   }
 
+  /** A vessel typed on a quotation now points to its record */
+  async setQuotationVesselLink(qvId: string, vesselId: string): Promise<void> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const [qv] = (await this.pool.query('SELECT quotation_id FROM quotation_vessels WHERE id = ?', [
+      qvId
+    ])) as [RowDataPacket[], unknown]
+    if (!qv[0]) throw new Error('This vessel is no longer on the quotation')
+    const [v] = (await this.pool.query('SELECT id FROM vessels WHERE id = ?', [vesselId])) as [
+      RowDataPacket[],
+      unknown
+    ]
+    if (!v[0]) throw new Error('The vessel was not found')
+    const [dup] = (await this.pool.query(
+      'SELECT id FROM quotation_vessels WHERE quotation_id = ? AND vessel_id = ? AND id <> ?',
+      [qv[0].quotation_id, vesselId, qvId]
+    )) as [RowDataPacket[], unknown]
+    if (dup[0]) throw new Error('This vessel is already on the quotation')
+    await this.pool.execute('UPDATE quotation_vessels SET vessel_id = ? WHERE id = ?', [
+      vesselId,
+      qvId
+    ])
+  }
+
+  /** A record for a vessel typed on a quotation, from what was typed, linked to it */
+  async createVesselFromQuotationVessel(
+    qvId: string,
+    imoNumber: string,
+    changedBy: string
+  ): Promise<string> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const [rows] = (await this.pool.query('SELECT * FROM quotation_vessels WHERE id = ?', [
+      qvId
+    ])) as [RowDataPacket[], unknown]
+    const qv = rows[0]
+    if (!qv) throw new Error('This vessel is no longer on the quotation')
+    const imo = (imoNumber || qv.imo_number || '').trim()
+    if (!imo) throw new Error('Enter the IMO or registration number')
+    const name = String(qv.name || '')
+      .trim()
+      .toUpperCase()
+    if (!name) throw new Error('This vessel has no name on the quotation')
+    const created = await this.addVessel({ name, imoNumber: imo, isActive: true })
+    // The flag can be typed as its name or its code (STP)
+    const [flag] = (await this.pool.query(
+      'SELECT id FROM flag_states WHERE name = ? OR iso3_code = ? OR display_name = ? LIMIT 1',
+      [qv.flag || '', qv.flag || '', qv.flag || '']
+    )) as [RowDataPacket[], unknown]
+    const [type] = (await this.pool.query('SELECT id FROM vessel_types WHERE name = ? LIMIT 1', [
+      qv.vessel_type || ''
+    ])) as [RowDataPacket[], unknown]
+    await this.updateVessel(
+      created.id,
+      {
+        flagStateId: flag[0]?.id || undefined,
+        vesselTypeId: type[0]?.id || undefined,
+        builtYear: qv.built_year ?? undefined,
+        rebuiltYear: qv.rebuilt_year ?? undefined,
+        grossTonnage: qv.gross_tonnage != null ? Number(qv.gross_tonnage) : undefined,
+        classificationSociety: qv.classification || undefined,
+        callSign: qv.call_sign || undefined
+      },
+      changedBy
+    )
+    // A type typed as an abbreviation (GC, BC) has no row in the list: the text is kept
+    if (!type[0] && qv.vessel_type)
+      await this.pool.execute('UPDATE vessels SET vessel_type = ? WHERE id = ?', [
+        qv.vessel_type,
+        created.id
+      ])
+    await this.setQuotationVesselLink(qvId, created.id)
+    return created.id
+  }
+
   /** Loss Record: the assureds of the policies named in the Excel, and every former vessel name */
   async getLossRecordLookup(policyNumbers: string[]): Promise<LossRecordLookup> {
     if (!this.pool) return { policies: [], formerNames: [] }
@@ -20869,6 +20942,21 @@ export class MySQLAdapter {
         )
       }
     }
+    // A vessel with no assureds (a new record) takes the insured chosen in the converter
+    const [hasAssured] = (await pool.query(
+      'SELECT 1 FROM vessel_assureds WHERE vessel_id = ? LIMIT 1',
+      [p.vesselId]
+    )) as [RowDataPacket[], unknown]
+    if (hasAssured.length === 0)
+      await pool.execute(
+        `INSERT INTO vessel_assureds (id, vessel_id, entity_id, role, from_date)
+         SELECT UUID(), ?, a.entity_id, a.role, ?
+           FROM policy_doc_addresses a
+          WHERE a.policy_doc_id = ? AND a.entity_id IS NOT NULL AND COALESCE(a.role, '') <> ''
+            AND ${MySQLAdapter.NOT_CARE_OF_SQL('a.role')}`,
+        [p.vesselId, inception || null, p.policyDocumentId]
+      )
+
     // The insured chosen in the converter are this policy's assureds
     await pool.execute('DELETE FROM vessel_policy_assureds WHERE policy_id = ?', [targetId])
     await pool.execute(
@@ -21011,6 +21099,15 @@ export class MySQLAdapter {
 
     const createdPolicies: ConvertedPolicy[] = []
     const vessels = await this.getQuotationVessels(quotationId)
+
+    // A policy needs a vessel record: the converter links typed vessels before it opens
+    for (const vid of options.vesselIds) {
+      const v = vessels.find((x) => x.vesselId === vid || x.id === vid)
+      if (!v?.vesselId)
+        throw new Error(
+          `${v?.name || 'A vessel'} has no vessel record. Link it to a vessel or create one first.`
+        )
+    }
 
     for (const vid of options.vesselIds) {
       const vessel = vessels.find((v) => v.vesselId === vid || v.id === vid)
