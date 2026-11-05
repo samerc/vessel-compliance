@@ -118,6 +118,10 @@ function fmt(v: number): string {
 
 // Preview table uses plain number formatting, labelled with the chosen currency
 
+/** Damage type "No Claim Record": a claim was opened but nothing was paid, so its amounts are 0 */
+const isNoClaimRecord = (damageType: string): boolean =>
+  /^no\s*claims?\s*records?$/i.test(damageType.trim())
+
 // ── Excel parser ──────────────────────────────────────────────────────────────
 
 async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
@@ -158,9 +162,6 @@ async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
       typeof rawPaidDate === 'number'
         ? excelSerialToDate(rawPaidDate)
         : String(rawPaidDate || '').trim()
-    const paidAmount = Number(row[11]) || 0
-    const reserves = Number(row[12]) || 0
-    const totalIncurred = Number(row[13]) || 0
 
     if (!uwyMap.has(uwy)) uwyMap.set(uwy, new Map())
     const vesselMap = uwyMap.get(uwy)!
@@ -182,6 +183,11 @@ async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
     }
 
     const claim = vesselData.claims.get(claimId)!
+    // The damage type may be filled on the claim's first row only
+    const noClaim = isNoClaimRecord(damageType || claim.damageType)
+    const paidAmount = noClaim ? 0 : Number(row[11]) || 0
+    const reserves = noClaim ? 0 : Number(row[12]) || 0
+    const totalIncurred = noClaim ? 0 : Number(row[13]) || 0
     claim.payments.push({ paymentType, paidDate, paidAmount, reserves, totalIncurred })
     claim.totalPaid += paidAmount
     claim.totalReserves += reserves
