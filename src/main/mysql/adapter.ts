@@ -201,6 +201,9 @@ import {
   VesselAssuredHistory,
   VesselPolicyAssured,
   RemoveAssuredOptions,
+  VesselNameChange,
+  VesselSale,
+  LossRecordLookup,
   VesselAuditEntry,
   VesselClassification,
   VesselCustomDocType,
@@ -7007,7 +7010,12 @@ export class MySQLAdapter {
     return { ...vessel, id }
   }
 
-  async updateVessel(id: string, updates: Partial<Vessel>, changedBy?: string): Promise<void> {
+  async updateVessel(
+    id: string,
+    updates: Partial<Vessel>,
+    changedBy?: string,
+    nameChange?: VesselNameChange
+  ): Promise<void> {
     if (!this.pool) return
 
     // Fetch current vessel for audit logging
@@ -7043,10 +7051,18 @@ export class MySQLAdapter {
 
     if (updates.name !== undefined) {
       // Record name history before update
-      if (current && current.name !== updates.name) {
+      // A corrected typo was never a name of the vessel. The date of a rename is the user's
+      if (current && current.name !== updates.name && nameChange?.kind !== 'typo') {
         await this.pool.execute(
-          'INSERT INTO vessel_name_history (id, vessel_id, previous_name, changed_by) VALUES (?, ?, ?, ?)',
-          [uuidv4(), id, current.name, changedBy || 'system']
+          `INSERT INTO vessel_name_history (id, vessel_id, previous_name, changed_by, changed_at)
+           VALUES (?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))`,
+          [
+            uuidv4(),
+            id,
+            current.name,
+            changedBy || 'system',
+            nameChange?.date ? `${nameChange.date} 12:00:00` : null
+          ]
         )
       }
       fields.push('name = ?')
@@ -7249,7 +7265,7 @@ export class MySQLAdapter {
   async getVesselNameHistory(vesselId: string): Promise<VesselNameHistory[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, vessel_id as vesselId, previous_name as previousName, changed_at as changedAt, changed_by as changedBy FROM vessel_name_history WHERE vessel_id = ? ORDER BY changed_at DESC',
+      "SELECT id, vessel_id as vesselId, previous_name as previousName, DATE_FORMAT(changed_at, '%Y-%m-%d %H:%i:%s') as changedAt, changed_by as changedBy FROM vessel_name_history WHERE vessel_id = ? ORDER BY changed_at DESC",
       [vesselId]
     )
     return rows as Row<VesselNameHistory>[]
@@ -9116,6 +9132,89 @@ export class MySQLAdapter {
       throw e
     } finally {
       conn.release()
+    }
+  }
+
+  async deleteVesselNameHistory(id: string): Promise<{ vesselId: string; name: string } | null> {
+    if (!this.pool) return null
+    const [rows] = (await this.pool.query(
+      'SELECT vessel_id, previous_name FROM vessel_name_history WHERE id = ?',
+      [id]
+    )) as [RowDataPacket[], unknown]
+    if (!rows[0]) return null
+    await this.pool.execute('DELETE FROM vessel_name_history WHERE id = ?', [id])
+    return { vesselId: rows[0].vessel_id, name: rows[0].previous_name }
+  }
+
+  async setVesselNameHistoryDate(id: string, date: string): Promise<void> {
+    if (!this.pool) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw new Error('Enter the date')
+    await this.pool.execute('UPDATE vessel_name_history SET changed_at = ? WHERE id = ?', [
+      `${date} 12:00:00`,
+      id
+    ])
+  }
+
+  /** A sale in one step. Only the chosen policies follow; the audit log is written by the caller */
+  async applyVesselSale(vesselId: string, sale: VesselSale, changedBy: string): Promise<void> {
+    if (!this.pool) throw new Error('DB Not connected')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sale.date || '')) throw new Error('Enter the date of sale')
+    for (const id of sale.endAssuredIds)
+      await this.removeVesselAssuredWithHistory(
+        id,
+        { endDate: sale.date, policyIds: sale.policyIds },
+        changedBy
+      )
+    for (const a of sale.newAssureds) {
+      const [already] = (await this.pool.query(
+        'SELECT id FROM vessel_assureds WHERE vessel_id = ? AND entity_id = ? AND role = ?',
+        [vesselId, a.entityId, a.role]
+      )) as [RowDataPacket[], unknown]
+      if (already.length === 0)
+        await this.pool.execute(
+          'INSERT INTO vessel_assureds (id, vessel_id, entity_id, role, from_date) VALUES (?, ?, ?, ?, ?)',
+          [uuidv4(), vesselId, a.entityId, a.role, sale.date]
+        )
+      await this.addVesselAssuredToPolicies(sale.policyIds, { ...a, fromDate: sale.date })
+    }
+    if (sale.newName)
+      await this.updateVessel(vesselId, { name: sale.newName }, changedBy, {
+        kind: 'rename',
+        date: sale.date
+      })
+  }
+
+  /** Loss Record: the assureds of the policies named in the Excel, and every former vessel name */
+  async getLossRecordLookup(policyNumbers: string[]): Promise<LossRecordLookup> {
+    if (!this.pool) return { policies: [], formerNames: [] }
+    const [names] = await this.pool.query(
+      'SELECT vessel_id AS vesselId, previous_name AS previousName FROM vessel_name_history'
+    )
+    const formerNames = names as LossRecordLookup['formerNames']
+    const wanted = policyNumbers.filter(Boolean)
+    if (wanted.length === 0) return { policies: [], formerNames }
+    const number = "TRIM(REPLACE(vdp.policy_number, ' (RENEWED - PLEASE VERIFY)', ''))"
+    const [pols] = (await this.pool.query(
+      `SELECT vdp.id, ${number} AS policyNumber, vdp.vessel_id AS vesselId
+         FROM vessel_dynamic_policies vdp WHERE ${number} IN (?)`,
+      [wanted]
+    )) as [RowDataPacket[], unknown]
+    if (pols.length === 0) return { policies: [], formerNames }
+    const [rows] = (await this.pool.query(
+      `SELECT a.policy_id AS policyId, COALESCE(e.name, a.entity_name) AS entityName, a.role
+         FROM vessel_policy_assureds a LEFT JOIN entities e ON e.id = a.entity_id
+        WHERE a.policy_id IN (?)`,
+      [pols.map((p) => p.id)]
+    )) as [RowDataPacket[], unknown]
+    return {
+      formerNames,
+      policies: pols.map((p) => ({
+        policyNumber: p.policyNumber,
+        vesselId: p.vesselId,
+        assureds: rows
+          .filter((r) => r.policyId === p.id)
+          .map((r) => ({ entityName: r.entityName, role: r.role }))
+      }))
     }
   }
 

@@ -48,8 +48,13 @@ interface LossUWY {
 
 /** A vessel of the Excel with its particulars from the app (found = false when no vessel matched) */
 interface VesselParticulars {
+  /** One row per vessel + policy: another policy can have other assureds */
+  key: string
   vesselName: string
+  policyId: string
   found: boolean
+  /** Why the assureds are blank, or who the vessel is now */
+  note?: string
   imo: string
   owners: string[]
   managers: string[]
@@ -72,43 +77,92 @@ const vesselKey = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim()
 
-/** IMO and parties (owners, managers, others) from the app for each vessel named in the Excel */
+/** The c/o broker is left out (user 2026-11-02) */
+const notCareOf = (role: string | null | undefined): boolean =>
+  (role || '').toLowerCase().replace(/[^a-z]/g, '') !== 'co'
+
+/** Owners, managers and the other parties; a plain role prints the name only, any other adds it */
+function splitParties(
+  parties: { entityName?: string | null; role?: string | null }[]
+): Pick<VesselParticulars, 'owners' | 'managers' | 'others'> {
+  const named = (re: RegExp, plain: RegExp): string[] => [
+    ...new Set(
+      parties
+        .filter((a) => a.entityName && notCareOf(a.role) && re.test(a.role || ''))
+        .map((a) =>
+          plain.test((a.role || '').trim()) ? a.entityName! : `${a.entityName} (${a.role})`
+        )
+    )
+  ]
+  return {
+    owners: named(/owner/i, /^registered owners?$/i),
+    managers: named(/manag/i, /^managers?$/i),
+    // Every other party (Co-Assured, Operators, Mortgagee, ...) with its role
+    others: named(/^(?![\s\S]*(owner|manag))/i, /^$/)
+  }
+}
+
+/**
+ * IMO and parties for each vessel + policy of the Excel. The policy's own assureds come first.
+ * A vessel found only by a former name or a policy with no assured leaves them blank to type:
+ * today's owners may not have been the assured then.
+ */
 async function loadParticulars(data: LossUWY[]): Promise<VesselParticulars[]> {
-  const names = [...new Set(data.flatMap((u) => u.vessels.map((v) => v.vesselName)))]
-  const [vessels, assureds] = await Promise.all([
+  const wanted = new Map<string, { vesselName: string; policyId: string }>()
+  for (const u of data)
+    for (const v of u.vessels)
+      wanted.set(`${v.vesselName}|${v.policyId}`, {
+        vesselName: v.vesselName,
+        policyId: v.policyId
+      })
+  const [vessels, assureds, lookup] = await Promise.all([
     window.api.getVessels().then((r) => asArray<Vessel>(r)),
-    window.api.getVesselAssureds().then((r) => asArray<VesselAssured>(r))
+    window.api.getVesselAssureds().then((r) => asArray<VesselAssured>(r)),
+    window.api.getLossRecordLookup([...new Set([...wanted.values()].map((w) => w.policyId))])
   ])
-  return names.map((vesselName) => {
+  const blank = { owners: [], managers: [], others: [] }
+  const imoOf = (id: string): string => vessels.find((v) => v.id === id)?.imoNumber || ''
+  return [...wanted.entries()].map(([key, { vesselName, policyId }]) => {
+    const base = { key, vesselName, policyId }
+    const policy = lookup.policies?.find((p) => p.policyNumber === policyId)
+    if (policy) {
+      const parties = splitParties(policy.assureds)
+      return {
+        ...base,
+        found: true,
+        imo: imoOf(policy.vesselId),
+        ...parties,
+        note: policy.assureds.length ? undefined : `No assured recorded on policy ${policyId}.`
+      }
+    }
     // The same name can belong to an old record: the active vessel wins
     const matches = vessels.filter((v) => vesselKey(v.name) === vesselKey(vesselName))
     const vessel = matches.find((v) => v.isActive) || matches[0]
-    if (!vessel) return { vesselName, found: false, imo: '', owners: [], managers: [], others: [] }
-    // The c/o broker is left out (user 2026-11-02)
-    const parties = assureds.filter(
-      (a) =>
-        a.vesselId === vessel.id &&
-        a.entityName &&
-        (a.role || '').toLowerCase().replace(/[^a-z]/g, '') !== 'co'
+    if (vessel)
+      return {
+        ...base,
+        found: true,
+        imo: vessel.imoNumber || '',
+        ...splitParties(assureds.filter((a) => a.vesselId === vessel.id))
+      }
+    const former = lookup.formerNames?.find(
+      (f) => vesselKey(f.previousName) === vesselKey(vesselName)
     )
-    // A plain role prints the name only, any other (Technical Managers, ...) adds the role
-    const named = (re: RegExp, plain: RegExp): string[] => [
-      ...new Set(
-        parties
-          .filter((a) => re.test(a.role || ''))
-          .map((a) =>
-            plain.test((a.role || '').trim()) ? a.entityName! : `${a.entityName} (${a.role})`
-          )
-      )
-    ]
+    const now = former && vessels.find((v) => v.id === former.vesselId)
+    if (now)
+      return {
+        ...base,
+        found: true,
+        imo: now.imoNumber || '',
+        ...blank,
+        note: `Former name of ${now.name}. Policy ${policyId || '(none)'} is not in the app, so enter who was assured then.`
+      }
     return {
-      vesselName,
-      found: true,
-      imo: vessel.imoNumber || '',
-      owners: named(/owner/i, /^registered owners?$/i),
-      managers: named(/manag/i, /^managers?$/i),
-      // Every other party (Co-Assured, Operators, Mortgagee, ...) with its role
-      others: named(/^(?![\s\S]*(owner|manag))/i, /^$/)
+      ...base,
+      found: false,
+      imo: '',
+      ...blank,
+      note: 'Not in the app. Check the name in the Excel.'
     }
   })
 }
@@ -152,13 +206,42 @@ async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-  // Row 0 is the header; skip it and filter out empty rows (vessel = col B = index 1)
-  const dataRows = rows.slice(1).filter((r) => String(r[1] || '').trim() !== '')
+  // Columns are found by their heading, wherever they are. A missing one stops the report: read by
+  // position, a shifted file printed its amounts under the wrong headings without any warning
+  const norm = (v: unknown): string =>
+    String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+  const COLUMNS: Record<string, { re: RegExp; label: string; optional?: boolean }> = {
+    vessel: { re: /^vessel( name)?$/, label: 'Vessel' },
+    dateOfLoss: { re: /^(date of loss|loss date)$/, label: 'Date of Loss' },
+    claimId: { re: /^claim( id| no\.?| number| #)?$/, label: 'Claim ID' },
+    policyId: { re: /^policy( id| no\.?| number| #)?$/, label: 'Policy ID' },
+    uwy: { re: /^(uwy|underwriting year)$/, label: 'UWY' },
+    damageType: { re: /^damage( type)?$/, label: 'Damage Type' },
+    details: { re: /^(details?|payment type)$/, label: 'Details', optional: true },
+    paidDate: { re: /^(paid date|date paid)$/, label: 'Paid Date', optional: true },
+    paidAmount: { re: /^paid( amount)?$/, label: 'Paid Amount' },
+    reserves: { re: /^reserves?$/, label: 'Reserves' },
+    totalIncurred: { re: /^total incurred( claims)?$/, label: 'Total Incurred' }
+  }
+  const headerIdx = rows.findIndex((r) => r.some((c) => COLUMNS.vessel.re.test(norm(c))))
+  if (headerIdx < 0)
+    throw new Error('No heading row found: one row must have a column called Vessel.')
+  const col: Record<string, number> = {}
+  for (const [k, c] of Object.entries(COLUMNS))
+    col[k] = rows[headerIdx].findIndex((h) => c.re.test(norm(h)))
+  const missing = Object.entries(COLUMNS)
+    .filter(([k, c]) => col[k] < 0 && !c.optional)
+    .map(([, c]) => c.label)
+  if (missing.length) throw new Error(`Columns not found in the Excel: ${missing.join(', ')}.`)
 
-  // col indices (0-based):
-  // 0=label(ignore), 1=vessel, 2=dateOfLoss, 3=claimId, 4=policyId,
-  // 5=GWP(ignore), 6=UWY, 7=damageType, 8=details,
-  // 9=paidTo(ignore), 10=paidDate, 11=paidAmount, 12=reserves, 13=totalIncurred
+  // Empty rows and repeated heading rows are not data
+  const dataRows = rows.slice(headerIdx + 1).filter((r) => {
+    const v = norm(r[col.vessel])
+    return v !== '' && !COLUMNS.vessel.re.test(v)
+  })
 
   const uwyMap = new Map<
     number,
@@ -166,20 +249,20 @@ async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
   >()
 
   for (const row of dataRows) {
-    const vesselName = String(row[1] || '').trim()
+    const vesselName = String(row[col.vessel] || '').trim()
     if (!vesselName) continue
 
-    const rawDate = row[2]
+    const rawDate = row[col.dateOfLoss]
     const dateOfLoss =
       typeof rawDate === 'number' ? excelSerialToDate(rawDate) : String(rawDate || '').trim()
-    const claimId = String(row[3] || '').trim()
-    const policyId = String(row[4] || '').trim()
-    const uwy = Number(row[6]) || 0
+    const claimId = String(row[col.claimId] || '').trim()
+    const policyId = String(row[col.policyId] || '').trim()
+    const uwy = Number(row[col.uwy]) || 0
 
-    const damageType = String(row[7] || '').trim()
-    const paymentType = String(row[8] || '').trim()
+    const damageType = String(row[col.damageType] || '').trim()
+    const paymentType = col.details >= 0 ? String(row[col.details] || '').trim() : ''
 
-    const rawPaidDate = row[10]
+    const rawPaidDate = col.paidDate >= 0 ? row[col.paidDate] : ''
     const paidDate =
       typeof rawPaidDate === 'number'
         ? excelSerialToDate(rawPaidDate)
@@ -207,9 +290,9 @@ async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
     const claim = vesselData.claims.get(claimId)!
     // The damage type may be filled on the claim's first row only
     const noClaim = isNoClaimRecord(damageType || claim.damageType)
-    const paidAmount = noClaim ? 0 : Number(row[11]) || 0
-    const reserves = noClaim ? 0 : Number(row[12]) || 0
-    const totalIncurred = noClaim ? 0 : Number(row[13]) || 0
+    const paidAmount = noClaim ? 0 : Number(row[col.paidAmount]) || 0
+    const reserves = noClaim ? 0 : Number(row[col.reserves]) || 0
+    const totalIncurred = noClaim ? 0 : Number(row[col.totalIncurred]) || 0
     claim.payments.push({ paymentType, paidDate, paidAmount, reserves, totalIncurred })
     claim.totalPaid += paidAmount
     claim.totalReserves += reserves
@@ -393,7 +476,11 @@ async function exportToPDF(
 
   for (const uwy of data) {
     bodyRows.push([
-      { content: `UNDERWRITING YEAR ${uwy.year}`, colSpan: colCount, styles: S.uwyHeader }
+      {
+        content: uwy.year ? `UNDERWRITING YEAR ${uwy.year}` : 'UNDERWRITING YEAR NOT GIVEN',
+        colSpan: colCount,
+        styles: S.uwyHeader
+      }
     ])
 
     for (const vessel of uwy.vessels) {
@@ -483,7 +570,7 @@ async function exportToPDF(
 
     bodyRows.push([
       {
-        content: `Underwriting Year ${uwy.year} Total`,
+        content: uwy.year ? `Underwriting Year ${uwy.year} Total` : 'Total',
         colSpan: colCount - (showRes ? 3 : 2),
         styles: { ...S.uwyTotal, halign: 'right' as const }
       },
@@ -515,7 +602,10 @@ async function exportToPDF(
     margin,
     head: [['Vessel', 'IMO', 'Owners', 'Managers', 'Other Parties']],
     body: particulars.map((p) => [
-      p.vesselName,
+      // The same vessel on two policies: the policy tells the rows apart
+      particulars.filter((x) => x.vesselName === p.vesselName).length > 1
+        ? `${p.vesselName}\n${p.policyId}`
+        : p.vesselName,
       p.imo || '-',
       p.owners.join('\n') || '-',
       p.managers.join('\n') || '-',
@@ -652,9 +742,13 @@ export default function LossRecordReport(): React.JSX.Element {
           setData(parsed)
           setParticulars(await loadParticulars(parsed))
         }
-      } catch {
-        setError('Failed to parse the file. Make sure it matches the expected format.')
+      } catch (err) {
+        setError(
+          (err instanceof Error && err.message) ||
+            'Failed to read the file. Make sure it matches the expected format.'
+        )
         setData(null)
+        setFileName('')
       }
     }
     reader.readAsArrayBuffer(file)
@@ -686,12 +780,15 @@ export default function LossRecordReport(): React.JSX.Element {
     setError(null)
   }
 
-  const merged = particulars.map((p) => withManual(p, manual[p.vesselName]))
-  const particularsOf = new Map(merged.map((p) => [p.vesselName, p]))
+  const merged = particulars.map((p) => withManual(p, manual[p.key]))
+  const particularsOf = new Map(merged.map((p) => [p.key, p]))
+  const noUwy = data
+    ? [...new Set(data.filter((u) => !u.year).flatMap((u) => u.vessels.map((v) => v.vesselName)))]
+    : []
   // Judged on what the app has, so a row stays on screen while its field is being typed
   const incomplete = particulars.filter((p) => !p.imo || !p.owners.length || !p.managers.length)
-  const setManualField = (vessel: string, field: keyof ManualParticulars, value: string): void =>
-    setManual((m) => ({ ...m, [vessel]: { ...m[vessel], [field]: value } }))
+  const setManualField = (key: string, field: keyof ManualParticulars, value: string): void =>
+    setManual((m) => ({ ...m, [key]: { ...m[key], [field]: value } }))
 
   // Summary stats derived from parsed data
   const stats = data
@@ -785,6 +882,27 @@ export default function LossRecordReport(): React.JSX.Element {
             </div>
           )}
 
+          {noUwy.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.88rem' }}>
+                No underwriting year in the Excel for <strong>{noUwy.join(', ')}</strong>. Add it to
+                the file and load it again, or it prints as &quot;not given&quot;.
+              </span>
+            </div>
+          )}
+
           {/* What the app does not have for a vessel can be typed for this report */}
           {incomplete.length > 0 && (
             <div className="table-wrap">
@@ -821,7 +939,7 @@ export default function LossRecordReport(): React.JSX.Element {
                 </thead>
                 <tbody>
                   {incomplete.map((p) => {
-                    const typed = manual[p.vesselName]
+                    const typed = manual[p.key]
                     const names = (
                       field: 'owners' | 'managers',
                       label: string
@@ -834,16 +952,16 @@ export default function LossRecordReport(): React.JSX.Element {
                             rows={2}
                             aria-label={`${label} of ${p.vesselName}`}
                             value={typed?.[field] || ''}
-                            onChange={(e) => setManualField(p.vesselName, field, e.target.value)}
+                            onChange={(e) => setManualField(p.key, field, e.target.value)}
                             style={{ width: '100%', resize: 'vertical' }}
                           />
                         </td>
                       )
                     return (
-                      <tr key={p.vesselName}>
+                      <tr key={p.key}>
                         <td style={{ fontWeight: '600', verticalAlign: 'top' }}>
                           {p.vesselName}
-                          {!p.found && (
+                          {p.note && (
                             <div
                               style={{
                                 fontWeight: '400',
@@ -851,7 +969,7 @@ export default function LossRecordReport(): React.JSX.Element {
                                 color: 'var(--text-secondary)'
                               }}
                             >
-                              Not in the app. Check the name in the Excel.
+                              {p.note}
                             </div>
                           )}
                         </td>
@@ -865,7 +983,7 @@ export default function LossRecordReport(): React.JSX.Element {
                               type="text"
                               aria-label={`IMO of ${p.vesselName}`}
                               value={typed?.imo || ''}
-                              onChange={(e) => setManualField(p.vesselName, 'imo', e.target.value)}
+                              onChange={(e) => setManualField(p.key, 'imo', e.target.value)}
                               style={{ width: '100%' }}
                             />
                           </td>
@@ -916,10 +1034,12 @@ export default function LossRecordReport(): React.JSX.Element {
                 {data.flatMap((uwy) =>
                   uwy.vessels.map((v, vi) => (
                     <tr key={`${uwy.year}-${v.vesselName}`}>
-                      <td className="muted">{vi === 0 ? uwy.year : ''}</td>
+                      <td className="muted">{vi === 0 ? uwy.year || 'Not given' : ''}</td>
                       <td style={{ fontWeight: '600' }}>{v.vesselName}</td>
                       <td className="muted">
-                        <span className="mono">{particularsOf.get(v.vesselName)?.imo || '-'}</span>
+                        <span className="mono">
+                          {particularsOf.get(`${v.vesselName}|${v.policyId}`)?.imo || '-'}
+                        </span>
                       </td>
                       <td className="muted">
                         <span className="mono">{v.policyId}</span>

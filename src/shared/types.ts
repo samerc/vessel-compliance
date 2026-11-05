@@ -188,6 +188,31 @@ export interface VesselAssuredHistory {
   endedBy: string | null
 }
 
+/** A vessel name edit: a real rename (kept as a former name, with its date) or a typo (not kept) */
+export interface VesselNameChange {
+  kind: 'rename' | 'typo'
+  date?: string
+}
+
+/** Recording a sale in one step */
+export interface VesselSale {
+  date: string
+  newName: string
+  endAssuredIds: string[]
+  newAssureds: { entityId: string; role: string }[]
+  policyIds: string[]
+}
+
+/** What the Loss Record needs to print the assureds of the policy, not of today's vessel */
+export interface LossRecordLookup {
+  policies: {
+    policyNumber: string
+    vesselId: string
+    assureds: { entityName: string; role: string }[]
+  }[]
+  formerNames: { vesselId: string; previousName: string }[]
+}
+
 /** Ending an assured on the vessel: the date, who replaces it, which policies follow */
 export interface RemoveAssuredOptions {
   endDate: string

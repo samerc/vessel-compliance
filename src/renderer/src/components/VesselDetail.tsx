@@ -51,6 +51,7 @@ import {
   VesselPolicy,
   VesselDynamicPolicy,
   VesselPolicyAssured,
+  VesselNameChange,
   PolicyTypeCharacteristic,
   PolicyTypeCondition,
   Entity,
@@ -72,6 +73,9 @@ import DocumentDatesModal, { type DocumentDatesRequest } from './DocumentDatesMo
 import DocumentHistoryModal from './DocumentHistoryModal'
 import AssuredManager from './AssuredManager'
 import { PolicyAssuredList, PolicyAssuredsEditor } from './PolicyAssureds'
+import { RenameVesselModal, FormerNamesModal } from './VesselNameDialogs'
+import VesselSoldModal from './VesselSoldModal'
+import { vesselNameAt } from '../utils/policyAssureds'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
 import { TypeChip, Modal, Field, EmptyState, Combobox, MultiSelect } from './ui'
@@ -532,6 +536,11 @@ export default function VesselDetail({
   const [creatingQuote, setCreatingQuote] = useState(false)
   const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
   const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
+  const [askRename, setAskRename] = useState(false)
+  const [showFormerNames, setShowFormerNames] = useState(false)
+  const [showSold, setShowSold] = useState(false)
+  // Bumped after a sale: the Assured tab reads the assureds again
+  const [assuredKey, setAssuredKey] = useState(0)
   const [showNotesModal, setShowNotesModal] = useState(false)
   const [vesselNotesList, setVesselNotesList] = useState<VesselNote[]>([])
   const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
@@ -960,6 +969,12 @@ export default function VesselDetail({
 
   const handleSaveVessel = async (): Promise<void> => {
     if (!editName.trim() || !editImo.trim()) return
+    // A changed name: renamed, or a typo?
+    if (editName.trim() !== (vessel.name || '').trim()) setAskRename(true)
+    else await saveVesselDetails()
+  }
+
+  const saveVesselDetails = async (nameChange?: VesselNameChange): Promise<void> => {
     // Capture old values before save for endorsement trigger check
     const oldValues: Record<string, string> = {
       name: vessel.name || '',
@@ -975,18 +990,22 @@ export default function VesselDetail({
             .map((cs) => cs.abbreviation || cs.name)
             .join(' / ')
         : editClassification || null
-    await window.api.updateVessel(vessel.id, {
-      name: editName,
-      imoNumber: editImo,
-      builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
-      rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
-      grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
-      vesselTypeId: editVesselType || null,
-      classificationSociety: classText,
-      callSign: editCallSign || null,
-      flagStateId: selectedFlagStateId || null
-      // null clears a column; Partial<Vessel> has no null for these fields
-    } satisfies NullableVesselUpdate as Partial<Vessel>)
+    await window.api.updateVessel(
+      vessel.id,
+      {
+        name: editName,
+        imoNumber: editImo,
+        builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
+        rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
+        grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
+        vesselTypeId: editVesselType || null,
+        classificationSociety: classText,
+        callSign: editCallSign || null,
+        flagStateId: selectedFlagStateId || null
+        // null clears a column; Partial<Vessel> has no null for these fields
+      } satisfies NullableVesselUpdate as Partial<Vessel>,
+      nameChange
+    )
     setVessel((v) => ({
       ...v,
       name: editName,
@@ -1811,6 +1830,19 @@ export default function VesselDetail({
                       {i < nameHistory.length - 1 ? ', ' : ''}
                     </span>
                   ))}
+                  {hasPermission('vessels:edit') && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        style={{ padding: 0, color: 'var(--accent-primary)' }}
+                        onClick={() => setShowFormerNames(true)}
+                      >
+                        Manage
+                      </button>
+                    </>
+                  )}
                 </p>
               )}
             </>
@@ -1881,6 +1913,16 @@ export default function VesselDetail({
                   }}
                 >
                   Edit Details
+                </button>
+              )}
+              {hasPermission('vessels:edit') && hasPermission('assureds:manage') && (
+                <button
+                  onClick={() => setShowSold(true)}
+                  className="btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                  title="Record a sale: date, new name, new owners, and what happens on the policies"
+                >
+                  Vessel sold
                 </button>
               )}
               <button
@@ -3535,17 +3577,76 @@ export default function VesselDetail({
           )}
 
           {detailView === 'assureds' && (
-            <AssuredManager vessel={vessel} onPanelOpenChange={setAssuredPanelOpen} />
+            <AssuredManager
+              key={assuredKey}
+              vessel={vessel}
+              onPanelOpenChange={setAssuredPanelOpen}
+            />
           )}
 
           {detailView === 'surveys' && (
             <ConditionSurveyManager vessel={vessel} initialSurveyId={initialSurveyId} />
           )}
 
+          {askRename && (
+            <RenameVesselModal
+              from={vessel.name}
+              to={editName}
+              onCancel={() => setAskRename(false)}
+              onConfirm={(change) => {
+                setAskRename(false)
+                void saveVesselDetails(change)
+              }}
+            />
+          )}
+          {showFormerNames && (
+            <FormerNamesModal
+              history={nameHistory}
+              onError={showError}
+              onClose={() => setShowFormerNames(false)}
+              onChanged={() => {
+                window.api
+                  .getVesselNameHistory(vessel.id)
+                  .then((h) => {
+                    const list = asArray<VesselNameHistory>(h)
+                    setNameHistory(list)
+                    if (list.length === 0) setShowFormerNames(false)
+                  })
+                  .catch(() => {})
+              }}
+            />
+          )}
+          {showSold && (
+            <VesselSoldModal
+              vesselId={vessel.id}
+              vesselName={vessel.name}
+              onClose={() => setShowSold(false)}
+              onError={showError}
+              onDone={() => {
+                setShowSold(false)
+                showSuccess('Sale recorded')
+                setAssuredKey((k) => k + 1)
+                loadDynamicPolicies()
+                void Promise.all([
+                  window.api.getVessels(),
+                  window.api.getVesselNameHistory(vessel.id)
+                ]).then(([all, h]) => {
+                  const fresh = asArray<Vessel>(all).find((v) => v.id === vessel.id)
+                  if (fresh) {
+                    setVessel((v) => ({ ...v, name: fresh.name }))
+                    setEditName(fresh.name)
+                  }
+                  setNameHistory(asArray<VesselNameHistory>(h))
+                })
+              }}
+            />
+          )}
           {detailView === 'policies' && (
             <>
               <DynamicPoliciesView
                 vesselId={vessel.id}
+                vesselName={vessel.name}
+                nameHistory={nameHistory}
                 dynamicPolicies={dynamicPolicies}
                 isLight={isLight}
                 onReload={loadDynamicPolicies}
@@ -4264,12 +4365,16 @@ type PolicyFormValue = string | number | boolean | null | undefined
 
 function DynamicPoliciesView({
   vesselId,
+  vesselName,
+  nameHistory,
   dynamicPolicies,
   onReload,
   showSuccess,
   showError
 }: {
   vesselId: string
+  vesselName: string
+  nameHistory: VesselNameHistory[]
   dynamicPolicies: VesselDynamicPolicy[]
   isLight: boolean
   onReload: () => void
@@ -4731,6 +4836,20 @@ function DynamicPoliciesView({
                     }}
                   />
                   <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
+                  {(() => {
+                    // The vessel's name when this policy started
+                    const inception = p.values?.find(
+                      (v) =>
+                        v.fieldType === 'date' &&
+                        /inception|start/i.test(v.characteristicName || '')
+                    )?.valueDate
+                    const nameThen = vesselNameAt(inception, nameHistory, vesselName)
+                    return nameThen !== vesselName ? (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        {nameThen} (now {vesselName})
+                      </span>
+                    ) : null
+                  })()}
                   {(() => {
                     const headerNum =
                       p.policyNumber ||

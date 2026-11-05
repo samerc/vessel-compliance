@@ -26,6 +26,25 @@ export interface WhatsNewEntry {
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
     version: '8.1.0',
+    update: 'assured-per-policy',
+    date: '2026-11-05',
+    items: [
+      {
+        tag: 'New',
+        text: 'Each policy now shows who was assured under it, and the Assured tab of a vessel has a History view. Removing or adding an assured asks what happens on each active policy.'
+      },
+      {
+        tag: 'New',
+        text: 'Vessel sold: one step on the vessel page for the date, new name and new owners. Policies keep the name the vessel had when they started.'
+      },
+      {
+        tag: 'Improved',
+        text: 'Loss Record prints the assureds of each policy, finds vessels by former names and lets you type what is missing.'
+      }
+    ]
+  },
+  {
+    version: '8.1.0',
     update: 'policy-signing-lists',
     date: '2026-11-04',
     items: [

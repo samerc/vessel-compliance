@@ -16,6 +16,9 @@ import {
   VesselAssuredHistory,
   VesselPolicyAssured,
   RemoveAssuredOptions,
+  VesselNameChange,
+  VesselSale,
+  LossRecordLookup,
   EntityUBO,
   User,
   SanctionsMatch,
@@ -254,8 +257,16 @@ export interface Api {
   addVessel: (
     vessel: Omit<Vessel, 'id'>
   ) => Promise<{ success: boolean; data?: Vessel; message?: string }>
-  updateVessel: (id: string, updates: Partial<Vessel>) => Promise<void>
+  updateVessel: (
+    id: string,
+    updates: Partial<Vessel>,
+    nameChange?: VesselNameChange
+  ) => Promise<void>
   getVesselNameHistory: (vesselId: string) => Promise<VesselNameHistory[]>
+  deleteVesselNameHistory: (id: string) => Promise<void>
+  setVesselNameHistoryDate: (id: string, date: string) => Promise<void>
+  applyVesselSale: (vesselId: string, sale: VesselSale) => Promise<void>
+  getLossRecordLookup: (policyNumbers: string[]) => Promise<LossRecordLookup>
   deleteVessel: (id: string) => Promise<{ success: boolean; message?: string }>
 
   getVesselDocuments: (vesselId?: string) => Promise<VesselDocument[]>

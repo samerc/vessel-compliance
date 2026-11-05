@@ -261,6 +261,10 @@ Entity document types are configurable via Admin Panel → Entity Document Types
 
 One vessel record per IMO, also after a sale. `vessel_assureds` holds only the CURRENT assureds, so everything that reads it (compliance, screening, new quotations) needs no filter. Ended ones move to `vessel_assured_history` (`removeVesselAssuredWithHistory`): name, role, from, to, ended by. The Remove button asks: "the assured changed" (end date, optional replacement, then per active policy: leave as is = cancel and re-issue, or change from that date = endorsement) or "entered by mistake" (plain delete, no history, policies untouched). Adding an assured asks the same per policy (default leave as is; not asked for a c/o). Vessel changes NEVER reach a policy unless chosen. The Assured tab has Current / History; ended assureds have no papers link yet (their papers stay in the Directory). Both new tables count as "in use" for deleting and merging a company.
 
+**Vessel names (2026-11-05)**: saving a changed name asks "renamed" (with a date, kept in `vessel_name_history`) or "typo" (no former name). Former names: Manage next to them on the vessel page (edit date, remove a typo). `vesselNameAt` (utils/policyAssureds.ts) gives the name on a date: a policy that started before a rename shows "OLD (now NEW)" on the Policies tab. The date is the rename date entered, not a registry fact.
+
+**Vessel sold**: button on the vessel page (`VesselSoldModal`, `applyVesselSale`): date, new name, tick who ends, new assureds (a typed new company is created with its sanctions check), per active policy leave as is or change from that date. Cancelling and re-issuing stays on the policy itself.
+
 ### AssuredManager (Vessel Assureds Page)
 
 Redesigned to table + slide-in panel layout:

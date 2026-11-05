@@ -33,6 +33,8 @@ import type {
   VesselAssured,
   VesselPolicyAssured,
   RemoveAssuredOptions,
+  VesselNameChange,
+  VesselSale,
   VesselClassification,
   VesselCustomDocType,
   VesselDocument,
@@ -1756,7 +1758,12 @@ app.whenReady().then(() => {
   })
   safeHandle(
     'db:updateVessel',
-    async (event, id: string, updates: Partial<Vessel> & { is_active?: boolean }) => {
+    async (
+      event,
+      id: string,
+      updates: Partial<Vessel> & { is_active?: boolean },
+      nameChange?: VesselNameChange
+    ) => {
       const user = await requirePermission(event, 'vessels:edit')
       const [vRows] = await db.pool!.query<RowDataPacket[]>(
         'SELECT name FROM vessels WHERE id = ?',
@@ -1765,7 +1772,7 @@ app.whenReady().then(() => {
       const vessel = vRows[0]
       const vesselName = updates.name || vessel?.name || id
       await keepConfirmedSanctions(event, 'vessels', id, updates)
-      const result = await db.updateVessel(id, updates, user.username)
+      const result = await db.updateVessel(id, updates, user.username, nameChange)
       const changedFields = Object.keys(updates).filter((k) => updates[k] !== undefined)
       const changeSummary = changedFields
         .map((k) => {
@@ -1802,6 +1809,67 @@ app.whenReady().then(() => {
       return result
     }
   )
+  safeHandle('db:deleteVesselNameHistory', async (event, id: string) => {
+    const user = await requirePermission(event, 'vessels:edit')
+    const r = await db.deleteVesselNameHistory(id)
+    if (r)
+      db.addVesselAuditEntry(r.vesselId, 'Former Name Removed', r.name, null, user.username).catch(
+        () => {}
+      )
+  })
+  safeHandle('db:setVesselNameHistoryDate', async (event, id: string, date: string) => {
+    await requirePermission(event, 'vessels:edit')
+    return db.setVesselNameHistoryDate(id, date)
+  })
+  safeHandle('db:applyVesselSale', async (event, vesselId: string, sale: VesselSale) => {
+    const user = await requirePermission(event, 'vessels:edit')
+    await requirePermission(event, 'assureds:manage')
+    const [vRows] = await db.pool!.query<RowDataPacket[]>('SELECT name FROM vessels WHERE id = ?', [
+      vesselId
+    ])
+    const [gone] = sale.endAssuredIds.length
+      ? await db.pool!.query<RowDataPacket[]>(
+          'SELECT va.role, e.name FROM vessel_assureds va JOIN entities e ON e.id = va.entity_id WHERE va.id IN (?)',
+          [sale.endAssuredIds]
+        )
+      : [[] as RowDataPacket[]]
+    const [come] = sale.newAssureds.length
+      ? await db.pool!.query<RowDataPacket[]>('SELECT id, name FROM entities WHERE id IN (?)', [
+          sale.newAssureds.map((a) => a.entityId)
+        ])
+      : [[] as RowDataPacket[]]
+    await db.applyVesselSale(vesselId, sale, user.username)
+    for (const g of gone)
+      db.addVesselAuditEntry(
+        vesselId,
+        'Assured Removed',
+        `${g.name} (${g.role}), ended ${sale.date}`,
+        null,
+        user.username
+      ).catch(() => {})
+    for (const a of sale.newAssureds)
+      db.addVesselAuditEntry(
+        vesselId,
+        'Assured Added',
+        null,
+        `${come.find((c) => c.id === a.entityId)?.name || a.entityId} (${a.role}), from ${sale.date}`,
+        user.username
+      ).catch(() => {})
+    db.logActivity({
+      userId: user.id,
+      username: user.username,
+      action: 'UPDATE',
+      module: 'Vessels',
+      entityType: 'vessel',
+      entityId: vesselId,
+      entityName: sale.newName || vRows[0]?.name || vesselId,
+      details: `Recorded the sale of ${vRows[0]?.name || vesselId} on ${sale.date}`
+    }).catch(() => {})
+  })
+  safeHandle('db:getLossRecordLookup', (event, policyNumbers: string[]) => {
+    requireSession(event)
+    return db.getLossRecordLookup(policyNumbers)
+  })
   safeHandle('db:getVesselNameHistory', (event, vesselId: string) => {
     requireSession(event)
     return db.getVesselNameHistory(vesselId)

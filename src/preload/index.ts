@@ -54,7 +54,14 @@ const api: Api = {
   getVessels: () => ipcRenderer.invoke('db:getVessels'),
   getVesselsPaginated: (params) => ipcRenderer.invoke('db:getVesselsPaginated', params),
   addVessel: (vessel) => ipcRenderer.invoke('db:addVessel', vessel),
-  updateVessel: (id, updates) => ipcRenderer.invoke('db:updateVessel', id, updates),
+  updateVessel: (id, updates, nameChange) =>
+    ipcRenderer.invoke('db:updateVessel', id, updates, nameChange),
+  deleteVesselNameHistory: (id) => ipcRenderer.invoke('db:deleteVesselNameHistory', id),
+  setVesselNameHistoryDate: (id, date) =>
+    ipcRenderer.invoke('db:setVesselNameHistoryDate', id, date),
+  applyVesselSale: (vesselId, sale) => ipcRenderer.invoke('db:applyVesselSale', vesselId, sale),
+  getLossRecordLookup: (policyNumbers) =>
+    ipcRenderer.invoke('db:getLossRecordLookup', policyNumbers),
   getVesselNameHistory: (vesselId) => ipcRenderer.invoke('db:getVesselNameHistory', vesselId),
   deleteVessel: (id) => ipcRenderer.invoke('db:deleteVessel', id),
 
