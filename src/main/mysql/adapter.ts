@@ -23640,6 +23640,10 @@ export class MySQLAdapter {
     const conn = await this.pool.getConnection()
     try {
       await conn.execute('SET FOREIGN_KEY_CHECKS=0')
+      // Replaced as one step, one save at a time: overlapping saves each deleted, then each
+      // inserted their full list, which left copies of every condition (DRAFT-H-0056)
+      await conn.beginTransaction()
+      await conn.query('SELECT id FROM quotations WHERE id = ? FOR UPDATE', [quotationId])
       await conn.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [
         quotationId
       ])
@@ -23661,6 +23665,10 @@ export class MySQLAdapter {
           ]
         )
       }
+      await conn.commit()
+    } catch (e) {
+      await conn.rollback().catch(() => {})
+      throw e
     } finally {
       // Re-enable FK checks even on error; never return an FK-off connection to the pool
       try {
@@ -23704,6 +23712,9 @@ export class MySQLAdapter {
     if (!this.pool) return
     const fk = await this.fkOff()
     try {
+      // One step, one save at a time (see setQuotationHullConditions)
+      await fk.query('START TRANSACTION')
+      await fk.query('SELECT id FROM quotations WHERE id = ? FOR UPDATE', [quotationId])
       await fk.execute('DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?', [
         quotationId
       ])
@@ -23725,6 +23736,10 @@ export class MySQLAdapter {
           ]
         )
       }
+      await fk.query('COMMIT')
+    } catch (e) {
+      await fk.query('ROLLBACK').catch(() => {})
+      throw e
     } finally {
       await fk.done()
     }

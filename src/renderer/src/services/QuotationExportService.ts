@@ -2610,7 +2610,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // ---- Hull Conditions ----
   {
-    const hc = data.hullConditions
+    // Each condition once per alternative, even if the saved rows hold copies
+    const hcSeen = new Set<string>()
+    const hc = data.hullConditions.filter((qc) => {
+      const key = `${qc.hullConditionId}::${qc.alternativeId || ''}`
+      if (hcSeen.has(key)) return false
+      hcSeen.add(key)
+      return true
+    })
     // Sort additional conditions by per-quotation order_index (falls back to settings order)
     const dAddlSettingsOrder = new Map(
       data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i])

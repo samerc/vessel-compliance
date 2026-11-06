@@ -82,6 +82,7 @@ import { Modal, Field, SaveStatus, Badge, TypeChip, Combobox } from './ui'
 import { ScreeningBadge } from './ScreeningPanel'
 import { ReadOnlyContext } from '../contexts/ReadOnlyContext'
 import { ok, asArray } from '../utils/ipc'
+import { hullConditionsMissingAmount } from '../utils/hullConditionAmounts'
 import { confirmDialog } from './DialogHost'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
@@ -952,6 +953,14 @@ export default function QuotationEditor({
   }
 
   const handleExportWithDraftCheck = async (format: 'pdf' | 'word'): Promise<void> => {
+    // A blank amount would print as {amount}: nothing is approved or exported until it is filled
+    if (q.quotationTypeCode === 'H') {
+      const missing = await hullConditionsMissingAmount(q).catch(() => [])
+      if (missing.length > 0) {
+        showError(`Enter the amount in Conditions before exporting: ${missing.join(', ')}`)
+        return
+      }
+    }
     const canApprove = hasPermission('quotations:approve')
     if (isDraft && canApprove) {
       // User can approve — show choice: draft or approve & export

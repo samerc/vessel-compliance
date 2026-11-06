@@ -617,6 +617,15 @@ export default function HullConditionsTab({
   const addOverrideRef = useRef<HTMLDivElement>(null)
   const condDefaultsApplied = useRef(false)
   const addDefaultsApplied = useRef(false)
+  // Ticks made quickly run one after the other, each on the result of the one before: from the
+  // same starting list they overwrite each other's tick
+  const tickSaves = useRef<Promise<void>>(Promise.resolve())
+  const latestConditions = useRef<QuotationHullCondition[]>([])
+  const latestAdditional = useRef<QuotationHullAdditionalCondition[]>([])
+  useEffect(() => {
+    latestConditions.current = qConditions
+    latestAdditional.current = qAdditional
+  }, [qConditions, qAdditional])
   const orderNormalized = useRef(false)
 
   // Close add-override dropdown on outside click
@@ -1088,36 +1097,42 @@ export default function HullConditionsTab({
     alternativeId: c.alternativeId
   })
 
-  const toggleCondition = async (condId: string, alternativeId?: string | null): Promise<void> => {
+  const toggleCondition = (condId: string, alternativeId?: string | null): Promise<void> => {
     const altId = alternativeId || null
-    const existing = qConditions.find(
-      (c) => c.hullConditionId === condId && c.alternativeId === altId
-    )
-    let updated: typeof qConditions
-    if (existing) {
-      updated = qConditions.filter(
-        (c) => !(c.hullConditionId === condId && c.alternativeId === altId)
+    tickSaves.current = tickSaves.current.then(async () => {
+      const current = latestConditions.current
+      const existing = current.find(
+        (c) => c.hullConditionId === condId && c.alternativeId === altId
       )
-    } else {
-      updated = [
-        ...qConditions,
-        {
-          id: '',
-          quotationId: quotation.id,
-          hullConditionId: condId,
-          order: qConditions.length,
-          conditionSection: getCondSection(condId),
-          alternativeId: altId
-        } as QuotationHullCondition
-      ]
-    }
-    try {
-      await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
-      const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
-      setQConditions(Array.isArray(fresh) ? fresh : [])
-    } catch (err) {
-      showError((err as { message?: string }).message || 'Failed to update')
-    }
+      let updated: typeof current
+      if (existing) {
+        updated = current.filter(
+          (c) => !(c.hullConditionId === condId && c.alternativeId === altId)
+        )
+      } else {
+        updated = [
+          ...current,
+          {
+            id: '',
+            quotationId: quotation.id,
+            hullConditionId: condId,
+            order: current.length,
+            conditionSection: getCondSection(condId),
+            alternativeId: altId
+          } as QuotationHullCondition
+        ]
+      }
+      try {
+        await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
+        const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
+        const list = Array.isArray(fresh) ? fresh : []
+        latestConditions.current = list
+        setQConditions(list)
+      } catch (err) {
+        showError((err as { message?: string }).message || 'Failed to update')
+      }
+    })
+    return tickSaves.current
   }
 
   const updateConditionOverride = (condId: string, text: string): void => {
@@ -1208,38 +1223,44 @@ export default function HullConditionsTab({
     order: c.order
   })
 
-  const toggleAdditional = async (addId: string): Promise<void> => {
-    let updated: QuotationHullAdditionalCondition[]
-    if (selectedAddIds.has(addId)) {
-      updated = qAdditional.filter((c) => c.hullAdditionalConditionId !== addId)
-    } else {
-      // Append after the whole combined additional+custom list (shared order namespace)
-      const maxOrder = Math.max(
-        -1,
-        ...qAdditional.map((c) => c.order ?? 0),
-        ...customConditions.map((c) => c.order ?? 0)
-      )
-      updated = [
-        ...qAdditional,
-        {
-          id: '',
-          quotationId: quotation.id,
-          hullAdditionalConditionId: addId,
-          order: maxOrder + 1,
-          alternativeId: null
-        } as QuotationHullAdditionalCondition
-      ]
-    }
-    try {
-      await window.api.hullSetQuotationHullAdditionalConditions(
-        quotation.id,
-        updated.map(mapAddForSave)
-      )
-      const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
-      setQAdditional(Array.isArray(fresh) ? fresh : [])
-    } catch (err) {
-      showError((err as { message?: string }).message || 'Failed to update')
-    }
+  const toggleAdditional = (addId: string): Promise<void> => {
+    tickSaves.current = tickSaves.current.then(async () => {
+      const current = latestAdditional.current
+      let updated: QuotationHullAdditionalCondition[]
+      if (current.some((c) => c.hullAdditionalConditionId === addId)) {
+        updated = current.filter((c) => c.hullAdditionalConditionId !== addId)
+      } else {
+        // Append after the whole combined additional+custom list (shared order namespace)
+        const maxOrder = Math.max(
+          -1,
+          ...current.map((c) => c.order ?? 0),
+          ...customConditions.map((c) => c.order ?? 0)
+        )
+        updated = [
+          ...current,
+          {
+            id: '',
+            quotationId: quotation.id,
+            hullAdditionalConditionId: addId,
+            order: maxOrder + 1,
+            alternativeId: null
+          } as QuotationHullAdditionalCondition
+        ]
+      }
+      try {
+        await window.api.hullSetQuotationHullAdditionalConditions(
+          quotation.id,
+          updated.map(mapAddForSave)
+        )
+        const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
+        const list = Array.isArray(fresh) ? fresh : []
+        latestAdditional.current = list
+        setQAdditional(list)
+      } catch (err) {
+        showError((err as { message?: string }).message || 'Failed to update')
+      }
+    })
+    return tickSaves.current
   }
 
   const updateAdditionalOverride = (addId: string, text: string): void => {
