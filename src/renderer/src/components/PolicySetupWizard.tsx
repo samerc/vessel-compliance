@@ -35,6 +35,7 @@ import {
 } from '../../../shared/types'
 import {
   computePayablePremium,
+  quotationIvPayable,
   splitInstalments,
   addMonthsISO,
   round2,
@@ -1435,6 +1436,12 @@ export default function PolicySetupWizard({
                 isMultiSelection={isMultiSelection}
                 onUpdateVesselPremium={updateVesselPremium}
                 computePayable={computePayable}
+                ivPayable={quotationIvPayable(
+                  quotation.ivPremiumAmount || 0,
+                  quotation,
+                  qVessels,
+                  discounts
+                )}
               />
             )}
 
@@ -2056,7 +2063,8 @@ function StepInstalments({
   qVessels,
   isMultiSelection,
   onUpdateVesselPremium,
-  computePayable
+  computePayable,
+  ivPayable
 }: {
   data: WizardData
   quotation: Quotation
@@ -2071,6 +2079,8 @@ function StepInstalments({
   isMultiSelection: boolean
   onUpdateVesselPremium: (vesselId: string, amount: number) => void
   computePayable: (tech: number) => number
+  /** IV after NCB, UPCC and discounts (a fixed amount comes off the hull premium only) */
+  ivPayable: number
 }): React.JSX.Element {
   const labelUpper: React.CSSProperties = {
     fontSize: '0.7rem',
@@ -2241,7 +2251,7 @@ function StepInstalments({
             {
               label: 'IV',
               tech: quotation.ivPremiumAmount || 0,
-              pay: cp(quotation.ivPremiumAmount || 0)
+              pay: ivPayable
             }
           ]
           const totalTech = rows.reduce((s, r) => s + r.tech, 0)

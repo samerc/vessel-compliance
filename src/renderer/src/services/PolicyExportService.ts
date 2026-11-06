@@ -64,7 +64,7 @@ import {
   EndorsementSection,
   EndorsementInstalment
 } from '../../../shared/types'
-import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
+import { computePayablePremium, ivPayablePremium, vesselTechnical } from '../../../shared/premium'
 import { careOfName } from '../../../shared/careOf'
 import { resolvePolicySurveyWarranty, DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
@@ -6120,7 +6120,7 @@ async function buildDebitAdviceBlobFresh(
         : sumVP > 0
           ? (ivPremRaw * (data.vessel.premiumAmount || 0)) / sumVP
           : ivPremRaw / qvs.length
-    const ivPay = computePayablePremium(ivShare, data.quotation, data.discounts || [], data.vessel)
+    const ivPay = ivPayablePremium(ivShare, data.quotation, data.discounts || [], data.vessel)
     const hmPay = Math.round((totalPremium - ivPay) * 100) / 100
     premiumContent.push(
       ...polBuildAmountBreakdown(

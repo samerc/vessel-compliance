@@ -102,7 +102,12 @@ import { formatDateLong } from '../utils/dateUtils'
 import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 import { fillTextDeductibles } from '../../../shared/deductibleValues'
 import { careOfName } from '../../../shared/careOf'
-import { hullClausesPerVesselOnly, upccPercentFor, upccPercentText } from '../../../shared/premium'
+import {
+  hullClausesPerVesselOnly,
+  quotationIvPayable,
+  upccPercentFor,
+  upccPercentText
+} from '../../../shared/premium'
 
 // ==================== Export Snapshot ====================
 
@@ -4309,6 +4314,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           : (afterNcb * (wq.upccEnabled ? upccPercentFor(wq, vessel) : 0)) / 100
       return wApplyExtra(afterNcb - upccDed)
     }
+    // Increased Value after NCB, UPCC and discounts (a fixed amount comes off H&M only)
+    const wIvPayable = quotationIvPayable(
+      wq.ivPremiumAmount || 0,
+      wq,
+      data.quotationVessels,
+      data.discounts
+    )
     const wIsMultiVessel = data.quotationVessels.length >= 2
     // Hull quotes with alternatives price per alternative, not per vessel — don't let stale
     // per-vessel premium values divert the export away from the per-alternative rendering.
@@ -4478,7 +4490,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             align: AlignmentType.RIGHT
           })
         ]
-        if (wHasDiscount) ivCells.push(mCell('', mPayW))
+        if (wHasDiscount)
+          ivCells.push(
+            mCell(formatCurrency(wIvPayable, wq.premiumCurrency), mPayW, {
+              bold: true,
+              align: AlignmentType.RIGHT
+            })
+          )
         mRows.push(new TableRow({ children: ivCells }))
       }
       premContent.push(
@@ -4752,7 +4770,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
 
       // Build premium line items: { label, tech, prev? }
-      type PremLine = { label: string; tech: number; prev?: number }
+      type PremLine = { label: string; tech: number; prev?: number; iv?: boolean }
       const lines: PremLine[] = []
       // Limit alternatives: each premium is labelled with its limit, in a "Limit : Premium" table
       let wLolPremTable = false
@@ -4872,7 +4890,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           lines.push({ label: wAltLabel, tech: alt.premiumAmount || 0 })
         }
         if (wq.ivEnabled && wq.ivPremiumAmount != null)
-          lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
+          lines.push({ label: 'IV', tech: wq.ivPremiumAmount, iv: true })
       } else if (
         data.agreedValueOptions.length > 0 &&
         data.agreedValueOptions.some((o) => o.premiumAmount != null)
@@ -4886,10 +4904,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
         }
         if (wq.ivEnabled && wq.ivPremiumAmount != null)
-          lines.push({ label: 'IV', tech: wq.ivPremiumAmount })
+          lines.push({ label: 'IV', tech: wq.ivPremiumAmount, iv: true })
       } else if (wq.ivEnabled) {
         lines.push({ label: 'Section A', tech: wq.premiumAmount || 0 })
-        if (wq.ivPremiumAmount != null) lines.push({ label: 'Section B', tech: wq.ivPremiumAmount })
+        if (wq.ivPremiumAmount != null)
+          lines.push({ label: 'Section B', tech: wq.ivPremiumAmount, iv: true })
       } else {
         lines.push({ label: '', tech: wq.premiumAmount || 0 })
       }
@@ -4951,7 +4970,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             rows.push(
               premRow(
                 l.label || 'Payable Premium',
-                formatCurrency(wComputePayable(l.tech), wq.premiumCurrency)
+                formatCurrency(l.iv ? wIvPayable : wComputePayable(l.tech), wq.premiumCurrency)
               )
             )
           }
@@ -5262,7 +5281,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (data.discounts.length > 0) {
       // Running base for {amount}: technical premium after NCB/UPCC, then each prior discount
       let wDiscBase = (() => {
-        const tech = wq.premiumAmount || 0
+        const tech = (wq.premiumAmount || 0) + (wq.ivEnabled ? wq.ivPremiumAmount || 0 : 0)
         const ncbDed = wNcbType === 'amount' ? wNcbFixedAmt : (tech * wNcbPct) / 100
         const an = tech - ncbDed
         const upccDed = wUpccType === 'amount' ? wUpccFixedAmt : (an * wUpccPct) / 100

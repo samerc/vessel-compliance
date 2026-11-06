@@ -106,6 +106,51 @@ export function computePayablePremium(
   return round2(r)
 }
 
+/** Payable premium of the Increased Value section. Percentage NCB, UPCC and discounts apply to
+ *  it as to H&M; a fixed amount is taken once, from H&M, so H&M payable + this = the payable of
+ *  the two together (what the converter charges). */
+export function ivPayablePremium(
+  iv: number,
+  q: PremiumDiscountSource,
+  extra: ExtraDiscount[] = [],
+  vessel?: VesselDiscountFlags | null
+): number {
+  let r = Number(iv) || 0
+  if (q.ncbEnabled && !vessel?.ncbExcluded && q.ncbDiscountType !== 'amount')
+    r -= (r * (Number(q.ncbDiscountPercent) || 0)) / 100
+  if (q.upccEnabled && !vessel?.upccExcluded && q.upccDiscountType !== 'amount')
+    r -= (r * upccPercentFor(q, vessel)) / 100
+  for (const d of deductedDiscounts(extra)) {
+    if (d.discountType !== 'amount') r -= (r * (Number(d.percent) || 0)) / 100
+  }
+  return round2(r)
+}
+
+/** A vessel's share of a fleet-level amount (IV): in proportion to the vessels' own premiums,
+ *  evenly if none are set. */
+export function fleetShare(
+  amount: number,
+  vessels: { premiumAmount?: number | null }[],
+  vessel: { premiumAmount?: number | null }
+): number {
+  const n = vessels.length || 1
+  const sum = vessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
+  return n <= 1 ? amount : sum > 0 ? (amount * (vessel.premiumAmount || 0)) / sum : amount / n
+}
+
+/** IV payable of a whole quotation: per vessel in a fleet, so exclusions and own UPCC rates count */
+export function quotationIvPayable(
+  iv: number,
+  q: PremiumDiscountSource,
+  vessels: (VesselDiscountFlags & { premiumAmount?: number | null })[],
+  extra: ExtraDiscount[] = []
+): number {
+  if (vessels.length < 2) return ivPayablePremium(iv, q, extra)
+  return round2(
+    vessels.reduce((s, v) => s + ivPayablePremium(fleetShare(iv, vessels, v), q, extra, v), 0)
+  )
+}
+
 /** Hull "alternatives" that only give vessels their own clause wording (at most one shared
  *  clause, at most one own clause per vessel) are not alternatives to choose from: the
  *  quotation is priced per vessel, not per clause. */
@@ -175,13 +220,7 @@ export function vesselTechnical(
 ): number {
   const { quotation: q, vessels } = ctx
   const n = vessels.length || 1
-  const sumVesselPrem = vessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
-  const share = (fleetAmount: number): number =>
-    n <= 1
-      ? fleetAmount
-      : sumVesselPrem > 0
-        ? (fleetAmount * (qv.premiumAmount || 0)) / sumVesselPrem
-        : fleetAmount / n
+  const share = (fleetAmount: number): number => fleetShare(fleetAmount, vessels, qv)
 
   if (q.quotationTypeCode === 'W' && q.warExcessEnabled) {
     const s1Amt = qv.agreedValue ?? q.agreedValue ?? 0

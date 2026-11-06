@@ -23,7 +23,12 @@ import { MoneyInput } from './shared'
 import { Field, useDragSort, DragHandle, moveInArray } from '../ui'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 import { isPiLike } from '../../../../shared/quotationTypes'
-import { hullClausesPerVesselOnly } from '../../../../shared/premium'
+import {
+  computePayablePremium,
+  hullClausesPerVesselOnly,
+  quotationIvPayable,
+  round2
+} from '../../../../shared/premium'
 import { cachedSetting, masterData } from './masterDataCache'
 import { htmlToPlainText } from '../../utils/htmlToDocx'
 
@@ -437,6 +442,9 @@ export default function PremiumTab({
     isMultiVessel && !hullMultiAlt && !piMultiAlt && hasDiscount
       ? qVessels.reduce((sum, v) => sum + vesselPayable(v), 0)
       : applyExtraDiscounts(afterNcb - upccDeduction)
+  // Increased Value: NCB, UPCC and discounts apply to it as well (as the converter charges it)
+  const ivTechnical = quotation.ivEnabled ? quotation.ivPremiumAmount || 0 : 0
+  const ivPayable = quotationIvPayable(ivTechnical, quotation, qVessels, discounts)
   const premiumLabel = hasDiscount ? 'Technical Premium' : 'Premium'
   // A new-business quotation has no previous premium: the fields show on renewals only (or
   // when a previous amount was already entered, so it can still be seen and cleared)
@@ -782,6 +790,28 @@ export default function PremiumTab({
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
             {currency} p.a.
           </span>
+          {hasDiscount && ivTechnical > 0 && (
+            <span
+              style={{
+                fontSize: '0.76rem',
+                color: 'var(--accent-primary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              payable {currency} {fmtAmt(ivPayable)}
+            </span>
+          )}
+          {numInst > 1 && ivTechnical > 0 && (
+            <span
+              style={{
+                fontSize: '0.76rem',
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              · {numInst} × {currency} {fmtAmt(ivPayable / numInst)}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -1585,6 +1615,17 @@ export default function PremiumTab({
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                         {currency} p.a.
                       </span>
+                      {numInst > 1 && ivTechnical > 0 && (
+                        <span
+                          style={{
+                            fontSize: '0.76rem',
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          · {numInst} × {currency} {fmtAmt(ivPayable / numInst)}
+                        </span>
+                      )}
                     </div>
                   )}
                   <button
@@ -2225,7 +2266,7 @@ export default function PremiumTab({
                         Increased Value
                       </span>
                       <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
-                        {currency} {fmt(computePayable(quotation.ivPremiumAmount || 0))}
+                        {currency} {fmt(ivPayable)}
                       </span>
                     </div>
                   )}
@@ -2294,11 +2335,60 @@ export default function PremiumTab({
                         Increased Value
                       </span>
                       <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
-                        {currency} {fmt(computePayable(quotation.ivPremiumAmount || 0))}
+                        {currency} {fmt(ivPayable)}
                       </span>
                     </div>
                   )}
                 </div>
+              ) : ivTechnical > 0 ? (
+                (() => {
+                  const total = computePayablePremium(
+                    technicalPremium + ivTechnical,
+                    quotation,
+                    discounts
+                  )
+                  const lines = [
+                    { label: 'Section A (H&M)', amount: round2(total - ivPayable) },
+                    { label: 'Section B (IV)', amount: ivPayable },
+                    { label: 'Total', amount: total }
+                  ]
+                  return (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        marginTop: '8px'
+                      }}
+                    >
+                      {lines.map((l) => (
+                        <div
+                          key={l.label}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                              minWidth: '140px'
+                            }}
+                          >
+                            {l.label}
+                          </span>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
+                            {currency} {fmt(l.amount)}
+                          </span>
+                          {l.label === 'Total' && numInst > 1 && (
+                            <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                              · {numInst} × {currency} {fmt(total / numInst)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()
               ) : (
                 <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>
                   {currency} {fmt(payablePremium)}
