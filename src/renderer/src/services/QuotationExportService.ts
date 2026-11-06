@@ -105,6 +105,7 @@ import { careOfName } from '../../../shared/careOf'
 import {
   hullClausesPerVesselOnly,
   quotationIvPayable,
+  round2,
   upccPercentFor,
   upccPercentText
 } from '../../../shared/premium'
@@ -4913,6 +4914,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         lines.push({ label: '', tech: wq.premiumAmount || 0 })
       }
 
+      // Section A + Section B add up to one premium: they get a Total row. Alternatives and
+      // options do not, they are choices. The payable total is of the two together (what the
+      // converter charges) and Section A is the rest, so the printed figures always add up.
+      const wSectionsTotal = lines.some((l) => l.label === 'Section B')
+      const wSumTech = lines.reduce((s, l) => s + l.tech, 0)
+      const wTotalPayable = round2(wComputePayable(wSumTech))
+      const wLinePayable = (l: PremLine): number =>
+        l.iv
+          ? wIvPayable
+          : wSectionsTotal
+            ? round2(wTotalPayable - wIvPayable)
+            : wComputePayable(l.tech)
       // Section 1/2 war premiums are written above (no lines): no empty Technical/Payable table
       const useTable = lines.length > 1 || (wHasDiscount && lines.length > 0)
       if (useTable) {
@@ -4965,15 +4978,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               )
             }
           }
+          if (wSectionsTotal)
+            rows.push(premRow('Total', formatCurrency(wSumTech, wq.premiumCurrency)))
           if (lines.length > 1) rows.push(premRow('Payable Premium', ''))
           for (const l of lines) {
             rows.push(
               premRow(
                 l.label || 'Payable Premium',
-                formatCurrency(l.iv ? wIvPayable : wComputePayable(l.tech), wq.premiumCurrency)
+                formatCurrency(wLinePayable(l), wq.premiumCurrency)
               )
             )
           }
+          if (wSectionsTotal)
+            rows.push(premRow('Total', formatCurrency(wTotalPayable, wq.premiumCurrency)))
           premContent.push(premTable(rows))
         } else if (wLolPremTable) {
           // Limit alternatives: "Limit : Premium" (as the FD&D / P&I quotes are written)
@@ -5003,6 +5020,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const l of lines) {
             rows.push(premRow(l.label, formatCurrency(l.tech, wq.premiumCurrency)))
           }
+          if (wSectionsTotal)
+            rows.push(premRow('Total', formatCurrency(wSumTech, wq.premiumCurrency)))
           premContent.push(premTable(rows))
         }
         if (!wLolPremTable || wHasDiscount) premContent.push(np('per annum'))
