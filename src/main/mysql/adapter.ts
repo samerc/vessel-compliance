@@ -564,6 +564,58 @@ export class MySQLAdapter {
     }
   }
 
+  // Saves of a whole quotation list (delete its rows, insert the new list), per quotation in the
+  // order they arrive on this PC
+  private quotationListSaves = new Map<string, Promise<void>>()
+
+  /**
+   * Replace a list of a quotation's rows as one step, one save at a time. Overlapping saves each
+   * deleted, then each inserted their full list, which left copies of every row (DRAFT-H-0056).
+   * The queue keeps this PC's saves in order, the row lock holds back other PCs.
+   */
+  private async replaceQuotationList(
+    quotationId: string,
+    fn: (conn: PoolConnection) => Promise<void>,
+    opts: { fkOff?: boolean } = {}
+  ): Promise<void> {
+    const pool = this.pool
+    if (!pool) return
+    const run = async (): Promise<void> => {
+      const conn = await pool.getConnection()
+      let fkChanged = false
+      try {
+        if (opts.fkOff) {
+          await conn.query('SET FOREIGN_KEY_CHECKS=0')
+          fkChanged = true
+        }
+        await conn.beginTransaction()
+        await conn.query('SELECT id FROM quotations WHERE id = ? FOR UPDATE', [quotationId])
+        await fn(conn)
+        await conn.commit()
+      } catch (e) {
+        await conn.rollback().catch(() => {})
+        throw e
+      } finally {
+        // Never return an FK-off connection to the pool
+        try {
+          if (fkChanged) await conn.query('SET FOREIGN_KEY_CHECKS=1')
+          conn.release()
+        } catch {
+          conn.destroy()
+        }
+      }
+    }
+    const previous = this.quotationListSaves.get(quotationId) ?? Promise.resolve()
+    const mine = previous.catch(() => {}).then(run)
+    this.quotationListSaves.set(quotationId, mine)
+    try {
+      await mine
+    } finally {
+      if (this.quotationListSaves.get(quotationId) === mine)
+        this.quotationListSaves.delete(quotationId)
+    }
+  }
+
   async tryNamedLock(name: string): Promise<(() => Promise<void>) | null> {
     if (!this.pool) return null
     const conn = await this.pool.getConnection()
@@ -17590,25 +17642,26 @@ export class MySQLAdapter {
     clauseIds: string[],
     descriptionOverrides?: Record<string, string>
   ): Promise<void> {
-    if (!this.pool) return
-    // Preserve existing vessel_scope and alternative_id values before delete+re-insert
-    const [existing] = (await this.pool.query(
-      'SELECT pi_clause_id, vessel_scope, alternative_id FROM quotation_clauses WHERE quotation_id = ?',
-      [quotationId]
-    )) as QueryRows
-    const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
-    for (const r of existing) {
-      scopeMap[r.pi_clause_id] = { vs: r.vessel_scope, alt: r.alternative_id }
-    }
-    await this.pool.execute('DELETE FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
-    for (const cid of clauseIds) {
-      const override = descriptionOverrides?.[cid] || null
-      const saved = scopeMap[cid]
-      await this.pool.execute(
-        'INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
-        [uuidv4(), quotationId, cid, override, saved?.vs || null, saved?.alt || null]
-      )
-    }
+    await this.replaceQuotationList(quotationId, async (conn) => {
+      // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+      const [existing] = (await conn.query(
+        'SELECT pi_clause_id, vessel_scope, alternative_id FROM quotation_clauses WHERE quotation_id = ?',
+        [quotationId]
+      )) as QueryRows
+      const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+      for (const r of existing) {
+        scopeMap[r.pi_clause_id] = { vs: r.vessel_scope, alt: r.alternative_id }
+      }
+      await conn.execute('DELETE FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
+      for (const cid of clauseIds) {
+        const override = descriptionOverrides?.[cid] || null
+        const saved = scopeMap[cid]
+        await conn.execute(
+          'INSERT INTO quotation_clauses (id, quotation_id, pi_clause_id, description_override, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [uuidv4(), quotationId, cid, override, saved?.vs || null, saved?.alt || null]
+        )
+      }
+    })
   }
 
   async addQuotationClause(
@@ -17780,26 +17833,25 @@ export class MySQLAdapter {
   }
 
   async setQuotationWarranties(quotationId: string, warrantyIds: string[]): Promise<void> {
-    if (!this.pool) return
-    // Preserve existing vessel_scope and alternative_id values before delete+re-insert
-    const [existing] = (await this.pool.query(
-      'SELECT pi_warranty_id, vessel_scope, alternative_id FROM quotation_warranties WHERE quotation_id = ?',
-      [quotationId]
-    )) as QueryRows
-    const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
-    for (const r of existing) {
-      scopeMap[r.pi_warranty_id] = { vs: r.vessel_scope, alt: r.alternative_id }
-    }
-    await this.pool.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [
-      quotationId
-    ])
-    for (let i = 0; i < warrantyIds.length; i++) {
-      const saved = scopeMap[warrantyIds[i]]
-      await this.pool.execute(
-        'INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
-        [uuidv4(), quotationId, warrantyIds[i], i, saved?.vs || null, saved?.alt || null]
-      )
-    }
+    await this.replaceQuotationList(quotationId, async (conn) => {
+      // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+      const [existing] = (await conn.query(
+        'SELECT pi_warranty_id, vessel_scope, alternative_id FROM quotation_warranties WHERE quotation_id = ?',
+        [quotationId]
+      )) as QueryRows
+      const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+      for (const r of existing) {
+        scopeMap[r.pi_warranty_id] = { vs: r.vessel_scope, alt: r.alternative_id }
+      }
+      await conn.execute('DELETE FROM quotation_warranties WHERE quotation_id = ?', [quotationId])
+      for (let i = 0; i < warrantyIds.length; i++) {
+        const saved = scopeMap[warrantyIds[i]]
+        await conn.execute(
+          'INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [uuidv4(), quotationId, warrantyIds[i], i, saved?.vs || null, saved?.alt || null]
+        )
+      }
+    })
   }
 
   // -- Quotation Custom Warranties --
@@ -18161,36 +18213,35 @@ export class MySQLAdapter {
     quotationId: string,
     items: { piExclusionId?: string; customText?: string }[]
   ): Promise<void> {
-    if (!this.pool) return
-    // Preserve existing vessel_scope and alternative_id values before delete+re-insert
-    const [existing] = (await this.pool.query(
-      'SELECT pi_exclusion_id, vessel_scope, alternative_id FROM quotation_exclusions WHERE quotation_id = ?',
-      [quotationId]
-    )) as QueryRows
-    const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
-    for (const r of existing) {
-      if (r.pi_exclusion_id)
-        scopeMap[r.pi_exclusion_id] = { vs: r.vessel_scope, alt: r.alternative_id }
-    }
-    await this.pool.execute('DELETE FROM quotation_exclusions WHERE quotation_id = ?', [
-      quotationId
-    ])
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      const saved = item.piExclusionId ? scopeMap[item.piExclusionId] : undefined
-      await this.pool.execute(
-        'INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-          uuidv4(),
-          quotationId,
-          item.piExclusionId || null,
-          item.customText || null,
-          saved?.vs || null,
-          saved?.alt || null,
-          i
-        ]
-      )
-    }
+    await this.replaceQuotationList(quotationId, async (conn) => {
+      // Preserve existing vessel_scope and alternative_id values before delete+re-insert
+      const [existing] = (await conn.query(
+        'SELECT pi_exclusion_id, vessel_scope, alternative_id FROM quotation_exclusions WHERE quotation_id = ?',
+        [quotationId]
+      )) as QueryRows
+      const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
+      for (const r of existing) {
+        if (r.pi_exclusion_id)
+          scopeMap[r.pi_exclusion_id] = { vs: r.vessel_scope, alt: r.alternative_id }
+      }
+      await conn.execute('DELETE FROM quotation_exclusions WHERE quotation_id = ?', [quotationId])
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        const saved = item.piExclusionId ? scopeMap[item.piExclusionId] : undefined
+        await conn.execute(
+          'INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            uuidv4(),
+            quotationId,
+            item.piExclusionId || null,
+            item.customText || null,
+            saved?.vs || null,
+            saved?.alt || null,
+            i
+          ]
+        )
+      }
+    })
   }
 
   async addQuotationExclusion(
@@ -18426,16 +18477,17 @@ export class MySQLAdapter {
     quotationId: string,
     countries: { name: string; listType: string }[]
   ): Promise<void> {
-    if (!this.pool) return
-    await this.pool.execute('DELETE FROM quotation_excluded_countries WHERE quotation_id = ?', [
-      quotationId
-    ])
-    for (const c of countries) {
-      await this.pool.execute(
-        'INSERT INTO quotation_excluded_countries (id, quotation_id, name, list_type) VALUES (?, ?, ?, ?)',
-        [uuidv4(), quotationId, c.name, c.listType]
-      )
-    }
+    await this.replaceQuotationList(quotationId, async (conn) => {
+      await conn.execute('DELETE FROM quotation_excluded_countries WHERE quotation_id = ?', [
+        quotationId
+      ])
+      for (const c of countries) {
+        await conn.execute(
+          'INSERT INTO quotation_excluded_countries (id, quotation_id, name, list_type) VALUES (?, ?, ?, ?)',
+          [uuidv4(), quotationId, c.name, c.listType]
+        )
+      }
+    })
   }
 
   // -- Quotation Trading Intros (per-vessel) --
@@ -18724,8 +18776,7 @@ export class MySQLAdapter {
     quotationId: string,
     instalments: { instalmentNumber: number; daysFromInception: number }[]
   ): Promise<void> {
-    if (!this.pool) return
-    await this.inTransaction(async (conn) => {
+    await this.replaceQuotationList(quotationId, async (conn) => {
       await conn.execute('DELETE FROM quotation_instalments WHERE quotation_id = ?', [quotationId])
       for (const inst of instalments) {
         await conn.execute(
@@ -22897,30 +22948,30 @@ export class MySQLAdapter {
     quotationId: string,
     items: { hullTextId?: string; text: string; section?: string; vesselScope?: string[] | null }[]
   ): Promise<void> {
-    if (!this.pool) return
-    const fk = await this.fkOff()
-    try {
-      await fk.execute('DELETE FROM quotation_agreed_value_items WHERE quotation_id = ?', [
-        quotationId
-      ])
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        await fk.execute(
-          'INSERT INTO quotation_agreed_value_items (id, quotation_id, hull_text_id, text, section, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            uuidv4(),
-            quotationId,
-            item.hullTextId || null,
-            item.text,
-            item.section || 'hm',
-            i,
-            item.vesselScope ? JSON.stringify(item.vesselScope) : null
-          ]
-        )
-      }
-    } finally {
-      await fk.done()
-    }
+    await this.replaceQuotationList(
+      quotationId,
+      async (conn) => {
+        await conn.execute('DELETE FROM quotation_agreed_value_items WHERE quotation_id = ?', [
+          quotationId
+        ])
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          await conn.execute(
+            'INSERT INTO quotation_agreed_value_items (id, quotation_id, hull_text_id, text, section, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              uuidv4(),
+              quotationId,
+              item.hullTextId || null,
+              item.text,
+              item.section || 'hm',
+              i,
+              item.vesselScope ? JSON.stringify(item.vesselScope) : null
+            ]
+          )
+        }
+      },
+      { fkOff: true }
+    )
   }
 
   // ==================== Quotation Agreed Value Options ====================
@@ -23628,7 +23679,6 @@ export class MySQLAdapter {
       alternativeId?: string | null
     }[]
   ): Promise<void> {
-    if (!this.pool) return
     // Dedup by hullConditionId + alternativeId (keep first occurrence)
     const seen = new Set<string>()
     const dedupedItems = items.filter((item) => {
@@ -23637,47 +23687,33 @@ export class MySQLAdapter {
       seen.add(key)
       return true
     })
-    const conn = await this.pool.getConnection()
-    try {
-      await conn.execute('SET FOREIGN_KEY_CHECKS=0')
-      // Replaced as one step, one save at a time: overlapping saves each deleted, then each
-      // inserted their full list, which left copies of every condition (DRAFT-H-0056)
-      await conn.beginTransaction()
-      await conn.query('SELECT id FROM quotations WHERE id = ? FOR UPDATE', [quotationId])
-      await conn.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [
-        quotationId
-      ])
-      for (let i = 0; i < dedupedItems.length; i++) {
-        const item = dedupedItems[i]
-        await conn.execute(
-          'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            uuidv4(),
-            quotationId,
-            item.hullConditionId,
-            item.textOverride || null,
-            item.conditionSection || 'both',
-            item.amount ?? null,
-            item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null,
-            i,
-            item.vesselScope ? JSON.stringify(item.vesselScope) : null,
-            item.alternativeId || null
-          ]
-        )
-      }
-      await conn.commit()
-    } catch (e) {
-      await conn.rollback().catch(() => {})
-      throw e
-    } finally {
-      // Re-enable FK checks even on error; never return an FK-off connection to the pool
-      try {
-        await conn.execute('SET FOREIGN_KEY_CHECKS=1')
-        conn.release()
-      } catch {
-        conn.destroy()
-      }
-    }
+    await this.replaceQuotationList(
+      quotationId,
+      async (conn) => {
+        await conn.execute('DELETE FROM quotation_hull_conditions WHERE quotation_id = ?', [
+          quotationId
+        ])
+        for (let i = 0; i < dedupedItems.length; i++) {
+          const item = dedupedItems[i]
+          await conn.execute(
+            'INSERT INTO quotation_hull_conditions (id, quotation_id, hull_condition_id, text_override, condition_section, amount, vessel_amounts, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              uuidv4(),
+              quotationId,
+              item.hullConditionId,
+              item.textOverride || null,
+              item.conditionSection || 'both',
+              item.amount ?? null,
+              item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null,
+              i,
+              item.vesselScope ? JSON.stringify(item.vesselScope) : null,
+              item.alternativeId || null
+            ]
+          )
+        }
+      },
+      { fkOff: true }
+    )
   }
 
   // ==================== Quotation Hull Additional Conditions ====================
@@ -23709,40 +23745,34 @@ export class MySQLAdapter {
       order?: number
     }[]
   ): Promise<void> {
-    if (!this.pool) return
-    const fk = await this.fkOff()
-    try {
-      // One step, one save at a time (see setQuotationHullConditions)
-      await fk.query('START TRANSACTION')
-      await fk.query('SELECT id FROM quotations WHERE id = ? FOR UPDATE', [quotationId])
-      await fk.execute('DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?', [
-        quotationId
-      ])
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        // Honor an explicit order when supplied (shared namespace with custom conditions); fall back to array index
-        const orderIdx = item.order != null ? item.order : i
-        await fk.execute(
-          'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            uuidv4(),
-            quotationId,
-            item.hullAdditionalConditionId,
-            item.textOverride || null,
-            orderIdx,
-            item.vesselScope ? JSON.stringify(item.vesselScope) : null,
-            item.alternativeId || null,
-            item.amount != null ? item.amount : null
-          ]
+    await this.replaceQuotationList(
+      quotationId,
+      async (conn) => {
+        await conn.execute(
+          'DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?',
+          [quotationId]
         )
-      }
-      await fk.query('COMMIT')
-    } catch (e) {
-      await fk.query('ROLLBACK').catch(() => {})
-      throw e
-    } finally {
-      await fk.done()
-    }
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          // Honor an explicit order when supplied (shared namespace with custom conditions); fall back to the list position
+          const orderIdx = item.order != null ? item.order : i
+          await conn.execute(
+            'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              uuidv4(),
+              quotationId,
+              item.hullAdditionalConditionId,
+              item.textOverride || null,
+              orderIdx,
+              item.vesselScope ? JSON.stringify(item.vesselScope) : null,
+              item.alternativeId || null,
+              item.amount != null ? item.amount : null
+            ]
+          )
+        }
+      },
+      { fkOff: true }
+    )
   }
 
   // -- Custom Hull Additional Conditions (per quotation) --
@@ -23929,27 +23959,29 @@ export class MySQLAdapter {
     quotationId: string,
     items: { warConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]
   ): Promise<void> {
-    if (!this.pool) return
-    const fk = await this.fkOff()
-    try {
-      await fk.execute('DELETE FROM quotation_war_conditions WHERE quotation_id = ?', [quotationId])
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        await fk.execute(
-          'INSERT INTO quotation_war_conditions (id, quotation_id, war_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
-          [
-            uuidv4(),
-            quotationId,
-            item.warConditionId,
-            item.textOverride || null,
-            i,
-            item.vesselScope ? JSON.stringify(item.vesselScope) : null
-          ]
-        )
-      }
-    } finally {
-      await fk.done()
-    }
+    await this.replaceQuotationList(
+      quotationId,
+      async (conn) => {
+        await conn.execute('DELETE FROM quotation_war_conditions WHERE quotation_id = ?', [
+          quotationId
+        ])
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          await conn.execute(
+            'INSERT INTO quotation_war_conditions (id, quotation_id, war_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              uuidv4(),
+              quotationId,
+              item.warConditionId,
+              item.textOverride || null,
+              i,
+              item.vesselScope ? JSON.stringify(item.vesselScope) : null
+            ]
+          )
+        }
+      },
+      { fkOff: true }
+    )
   }
 
   // ==================== War Risk Settings ====================
@@ -24923,44 +24955,37 @@ export class MySQLAdapter {
     quotationId: string,
     items: QuotationSurveyWarranty[]
   ): Promise<void> {
-    if (!this.pool) return
-    const conn = await this.pool.getConnection()
-    try {
-      await conn.execute('SET FOREIGN_KEY_CHECKS=0')
-      await conn.execute('DELETE FROM quotation_survey_warranties WHERE quotation_id = ?', [
-        quotationId
-      ])
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        await conn.execute(
-          `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, surveyor_value, date_of_survey_value, custom_text, order_index, vessel_scope, alternative_id)
+    await this.replaceQuotationList(
+      quotationId,
+      async (conn) => {
+        await conn.execute('DELETE FROM quotation_survey_warranties WHERE quotation_id = ?', [
+          quotationId
+        ])
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          await conn.execute(
+            `INSERT INTO quotation_survey_warranties (id, quotation_id, template_id, text, deadline_value, days_value, event_value, surveyor_value, date_of_survey_value, custom_text, order_index, vessel_scope, alternative_id)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            item.id || uuidv4(),
-            quotationId,
-            item.templateId || null,
-            item.text,
-            item.deadlineValue || null,
-            item.daysValue || null,
-            item.eventValue || null,
-            item.surveyorValue || null,
-            item.dateOfSurveyValue || null,
-            item.customText || null,
-            i,
-            item.vesselScope ? JSON.stringify(item.vesselScope) : null,
-            item.alternativeId || null
-          ]
-        )
-      }
-    } finally {
-      // Re-enable FK checks even on error; never return an FK-off connection to the pool
-      try {
-        await conn.execute('SET FOREIGN_KEY_CHECKS=1')
-        conn.release()
-      } catch {
-        conn.destroy()
-      }
-    }
+            [
+              item.id || uuidv4(),
+              quotationId,
+              item.templateId || null,
+              item.text,
+              item.deadlineValue || null,
+              item.daysValue || null,
+              item.eventValue || null,
+              item.surveyorValue || null,
+              item.dateOfSurveyValue || null,
+              item.customText || null,
+              i,
+              item.vesselScope ? JSON.stringify(item.vesselScope) : null,
+              item.alternativeId || null
+            ]
+          )
+        }
+      },
+      { fkOff: true }
+    )
   }
 
   async addQuotationSurveyWarranty(
@@ -27236,26 +27261,26 @@ export class MySQLAdapter {
     section: string,
     items: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]
   ): Promise<void> {
-    if (!this.pool) return
-    await this.pool.execute(
-      'DELETE FROM quotation_cargo_clauses WHERE quotation_id = ? AND section = ?',
-      [quotationId, section]
-    )
-    for (let i = 0; i < items.length; i++) {
-      const id = uuidv4()
-      await this.pool.execute(
-        'INSERT INTO quotation_cargo_clauses (id, quotation_id, cargo_clause_id, text_override, order_index, section, amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-          id,
-          quotationId,
-          items[i].cargoClauseId,
-          items[i].textOverride || null,
-          i,
-          section,
-          items[i].amount ?? null
-        ]
+    await this.replaceQuotationList(quotationId, async (conn) => {
+      await conn.execute(
+        'DELETE FROM quotation_cargo_clauses WHERE quotation_id = ? AND section = ?',
+        [quotationId, section]
       )
-    }
+      for (let i = 0; i < items.length; i++) {
+        await conn.execute(
+          'INSERT INTO quotation_cargo_clauses (id, quotation_id, cargo_clause_id, text_override, order_index, section, amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            uuidv4(),
+            quotationId,
+            items[i].cargoClauseId,
+            items[i].textOverride || null,
+            i,
+            section,
+            items[i].amount ?? null
+          ]
+        )
+      }
+    })
   }
 
   async getQuotationCargoCustomClauses(

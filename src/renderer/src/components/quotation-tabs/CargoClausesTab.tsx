@@ -1,3 +1,4 @@
+import { useTickQueue } from '../../utils/useTickQueue'
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, ChevronDown, Layers } from 'lucide-react'
 import {
@@ -305,33 +306,29 @@ export default function CargoClausesTab({
 
   const selectedIds = new Set(selectedClauses.map((c) => c.cargoClauseId))
 
-  const toggleClause = async (clause: CargoClause): Promise<void> => {
-    try {
-      let newItems: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]
-      if (selectedIds.has(clause.id)) {
-        newItems = selectedClauses
+  const enqueueTick = useTickQueue(selectedClauses)
+  const toggleClause = (clause: CargoClause): Promise<void> =>
+    enqueueTick(async (current) => {
+      try {
+        const kept = current
           .filter((c) => c.cargoClauseId !== clause.id)
           .map((c) => ({
             cargoClauseId: c.cargoClauseId,
             textOverride: c.textOverride || undefined,
             amount: c.amount ?? null
           }))
-      } else {
-        newItems = [
-          ...selectedClauses.map((c) => ({
-            cargoClauseId: c.cargoClauseId,
-            textOverride: c.textOverride || undefined,
-            amount: c.amount ?? null
-          })),
-          { cargoClauseId: clause.id }
-        ]
+        const newItems: { cargoClauseId: string; textOverride?: string; amount?: number | null }[] =
+          current.some((c) => c.cargoClauseId === clause.id)
+            ? kept
+            : [...kept, { cargoClauseId: clause.id }]
+        await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
+        await loadData()
+        return newItems as QuotationCargoClause[]
+      } catch (err) {
+        showError((err instanceof Error ? err.message : '') || 'Failed to update')
+        return undefined
       }
-      await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
-      await loadData()
-    } catch (err) {
-      showError((err instanceof Error ? err.message : '') || 'Failed to update')
-    }
-  }
+    })
 
   const updateOverride = async (cargoClauseId: string, textOverride: string): Promise<void> => {
     const newItems = selectedClauses.map((c) => ({

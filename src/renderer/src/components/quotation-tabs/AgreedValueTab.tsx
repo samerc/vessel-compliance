@@ -1,3 +1,4 @@
+import { useTickQueue } from '../../utils/useTickQueue'
 import { useState, useEffect, useRef } from 'react'
 import { Plus, X, Trash2 } from 'lucide-react'
 import {
@@ -113,7 +114,9 @@ export default function AgreedValueTab({
     void loadData()
   }, [quotation.id])
 
-  const saveItems = async (updated: QuotationAgreedValueItem[]): Promise<void> => {
+  const saveItems = async (
+    updated: QuotationAgreedValueItem[]
+  ): Promise<QuotationAgreedValueItem[] | void> => {
     try {
       await window.api.hullSetQuotationAgreedValueItems(
         quotation.id,
@@ -125,28 +128,30 @@ export default function AgreedValueTab({
         }))
       )
       const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-      setItems(Array.isArray(fresh) ? fresh : [])
+      const list = Array.isArray(fresh) ? fresh : []
+      setItems(list)
+      return list
     } catch (err) {
       showError((err instanceof Error ? err.message : '') || 'Failed to save')
     }
   }
 
-  const addFromTemplate = async (tmpl: HullAgreedValueText): Promise<void> => {
-    const already = items.some((it) => it.hullTextId === tmpl.id)
-    if (already) return
-    const updated = [
-      ...items,
-      {
-        id: '',
-        quotationId: quotation.id,
-        hullTextId: tmpl.id,
-        text: tmpl.text,
-        section: tmpl.section || 'hm',
-        order: items.length
-      }
-    ]
-    await saveItems(updated)
-  }
+  const enqueueTick = useTickQueue(items)
+  const addFromTemplate = (tmpl: HullAgreedValueText): Promise<void> =>
+    enqueueTick(async (current) => {
+      if (current.some((it) => it.hullTextId === tmpl.id)) return
+      return saveItems([
+        ...current,
+        {
+          id: '',
+          quotationId: quotation.id,
+          hullTextId: tmpl.id,
+          text: tmpl.text,
+          section: tmpl.section || 'hm',
+          order: current.length
+        }
+      ])
+    })
 
   const addCustomText = async (): Promise<void> => {
     if (!newText.trim()) return
@@ -164,9 +169,16 @@ export default function AgreedValueTab({
     setNewText('')
   }
 
-  const removeItem = async (idx: number): Promise<void> => {
-    const updated = items.filter((_, i) => i !== idx)
-    await saveItems(updated)
+  const removeItem = (idx: number): Promise<void> => {
+    const target = items[idx]
+    if (!target) return Promise.resolve()
+    // By content: every save gives the rows new ids. A repeated text loses one copy only
+    return enqueueTick((current) => {
+      const at = current.findIndex(
+        (it) => it.hullTextId === target.hullTextId && it.text === target.text
+      )
+      return at < 0 ? Promise.resolve() : saveItems(current.filter((_, i) => i !== at))
+    })
   }
 
   const updateItemText = async (idx: number, text: string): Promise<void> => {

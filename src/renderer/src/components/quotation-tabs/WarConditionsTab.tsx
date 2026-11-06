@@ -1,3 +1,4 @@
+import { useTickQueue } from '../../utils/useTickQueue'
 import { useState, useEffect, useRef } from 'react'
 import {
   Quotation,
@@ -86,26 +87,31 @@ export default function WarConditionsTab({
       .replace(/\{tc_text\}/g, warSettings.tcText)
   }
 
-  const handleToggle = async (condId: string): Promise<void> => {
-    const newSelected: Pick<QuotationWarCondition, 'warConditionId' | 'vesselScope'>[] =
-      selectedIds.has(condId)
-        ? qConditions.filter((qc) => qc.warConditionId !== condId)
-        : [...qConditions, { warConditionId: condId }]
-    try {
-      await window.api.warSetQuotationWarConditions(
-        quotation.id,
-        newSelected.map((qc) => ({
-          warConditionId: qc.warConditionId,
-          textOverride: overrides[qc.warConditionId] || undefined,
-          vesselScope: qc.vesselScope || undefined
-        }))
-      )
-      const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
-      setQConditions(Array.isArray(fresh) ? fresh : [])
-    } catch {
-      showError('Failed to update conditions')
-    }
-  }
+  const enqueueTick = useTickQueue(qConditions)
+  const handleToggle = (condId: string): Promise<void> =>
+    enqueueTick(async (current) => {
+      const newSelected: Pick<QuotationWarCondition, 'warConditionId' | 'vesselScope'>[] =
+        current.some((qc) => qc.warConditionId === condId)
+          ? current.filter((qc) => qc.warConditionId !== condId)
+          : [...current, { warConditionId: condId }]
+      try {
+        await window.api.warSetQuotationWarConditions(
+          quotation.id,
+          newSelected.map((qc) => ({
+            warConditionId: qc.warConditionId,
+            textOverride: overrides[qc.warConditionId] || undefined,
+            vesselScope: qc.vesselScope || undefined
+          }))
+        )
+        const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
+        const list = Array.isArray(fresh) ? fresh : []
+        setQConditions(list)
+        return list
+      } catch {
+        showError('Failed to update conditions')
+        return undefined
+      }
+    })
 
   const handleOverrideChange = (condId: string, text: string): void => {
     setOverrides((prev) => ({ ...prev, [condId]: text }))
