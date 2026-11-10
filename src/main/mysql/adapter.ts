@@ -342,6 +342,7 @@ const QUOTATION_CONTENT_COLS = [
   'outstanding_premium_text',
   'outstanding_premium_bold',
   'outstanding_premium_underline',
+  'auto_exclusions_offered',
   'full_premium_loss_enabled',
   'full_premium_loss_text',
   'lol_show_premium',
@@ -6414,6 +6415,17 @@ export class MySQLAdapter {
           )
         if (!siHas.has('replaced_by'))
           await this.pool.query(`ALTER TABLE ${siTable} ADD COLUMN replaced_by VARCHAR(36) NULL`)
+      }
+      // Vessel-type exclusions already offered on a quotation (JSON ids): one the user removed is
+      // not added back the next time the Exclusions tab opens
+      {
+        const [aeoCols] = await this.pool.query<RowDataPacket[]>(
+          "SHOW COLUMNS FROM quotations LIKE 'auto_exclusions_offered'"
+        )
+        if (aeoCols.length === 0)
+          await this.pool.query(
+            'ALTER TABLE quotations ADD COLUMN auto_exclusions_offered TEXT DEFAULT NULL'
+          )
       }
     } catch (error) {
       console.error('Schema initialization failed:', error)
@@ -14976,6 +14988,7 @@ export class MySQLAdapter {
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
                 q.outstanding_premium_underline as outstandingPremiumUnderline,
+                q.auto_exclusions_offered as autoExclusionsOffered,
                 q.subjectivity_days as subjectivityDays,
                 q.subjectivities_filled as subjectivitiesFilled,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
@@ -15469,6 +15482,7 @@ export class MySQLAdapter {
       outstandingPremiumText: 'outstanding_premium_text',
       outstandingPremiumBold: 'outstanding_premium_bold',
       outstandingPremiumUnderline: 'outstanding_premium_underline',
+      autoExclusionsOffered: 'auto_exclusions_offered',
       fullPremiumLossEnabled: 'full_premium_loss_enabled',
       fullPremiumLossText: 'full_premium_loss_text',
       lolShowPremium: 'lol_show_premium',

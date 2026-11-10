@@ -123,12 +123,30 @@ export default function ExclusionsTab({
               .map((vt) => vt.id)
           )
           // Exclusions hidden in settings are never auto-selected
-          const toAutoSelect = safeAll.filter(
+          const matching = safeAll.filter(
             (ex) =>
-              isOffered(ex) &&
-              !currentIds.has(ex.id) &&
-              (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
+              isOffered(ex) && (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
           )
+          // Each one is offered once per quotation: one the user removed stays removed. A
+          // quotation from before this was recorded and already holding exclusions counts its
+          // matching ones as offered (its exclusions were set already)
+          const fresh = await window.api.getQuotation(quotation.id).catch(() => null)
+          const stored = fresh && !('error' in fresh) ? fresh.autoExclusionsOffered : null
+          let offered: string[]
+          try {
+            offered = stored ? (JSON.parse(stored) as string[]) : []
+          } catch {
+            offered = []
+          }
+          const legacy = stored == null && safeQe.length > 0
+          const toAutoSelect = legacy
+            ? []
+            : matching.filter((ex) => !currentIds.has(ex.id) && !offered.includes(ex.id))
+          const nowOffered = [...new Set([...offered, ...matching.map((ex) => ex.id)])]
+          if (stored == null || nowOffered.length !== offered.length)
+            await window.api
+              .updateQuotation(quotation.id, { autoExclusionsOffered: JSON.stringify(nowOffered) })
+              .catch(() => {})
           if (toAutoSelect.length > 0) {
             for (const ex of toAutoSelect) {
               await window.api.addQuotationExclusion(quotation.id, ex.id, null)

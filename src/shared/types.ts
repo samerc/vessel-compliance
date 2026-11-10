@@ -1324,6 +1324,8 @@ export interface Quotation {
   outstandingPremiumText?: string | null
   outstandingPremiumBold?: boolean
   outstandingPremiumUnderline?: boolean
+  /** JSON list of the vessel-type exclusion ids already offered (null = never offered) */
+  autoExclusionsOffered?: string | null
   fullPremiumLossEnabled?: boolean
   fullPremiumLossText?: string | null
   /** Limit alternatives (2+): also print each premium next to its limit in the LOL section */
