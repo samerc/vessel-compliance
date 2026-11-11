@@ -26,6 +26,17 @@ export interface WhatsNewEntry {
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
     version: '8.1.0',
+    update: 'paste-vessel-details',
+    date: '2026-11-11',
+    items: [
+      {
+        tag: 'New',
+        text: 'Quoting a new vessel? In the Vessel tab, New Vessel > Paste from email: paste the details the broker sent (GT: ..., Flag: ..., Built ...) and the name, IMO, years, GT, flag, type, class and call sign fill in for you to check.'
+      }
+    ]
+  },
+  {
+    version: '8.1.0',
     update: 'assured-per-policy',
     date: '2026-11-05',
     items: [
