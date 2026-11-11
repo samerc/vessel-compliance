@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Layers, RefreshCw, Pencil, Check, X } from 'lucide-react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
+import { Plus, Trash2, Layers, RefreshCw, Pencil, Check, X, ClipboardPaste } from 'lucide-react'
 import {
   Quotation,
   Vessel,
@@ -14,7 +14,8 @@ import {
 import { ok } from '../../utils/ipc'
 import { addRegistryVessel } from '../../utils/addRegistryVessel'
 import { confirmDialog } from '../DialogHost'
-import { Combobox, Field, useDragSort, DragHandle, moveInArray } from '../ui'
+import { Combobox, Field, Modal, useDragSort, DragHandle, moveInArray } from '../ui'
+import { parseVesselText, ParsedField } from '../../utils/parseVesselText'
 import { masterData } from './masterDataCache'
 
 const EMPTY_NEW_VESSEL = {
@@ -100,6 +101,100 @@ function matchSocieties(q: string, societies: ClassificationSociety[]): Classifi
     .map((x) => x.c)
 }
 
+const PASTE_FIELDS: [ParsedField, string][] = [
+  ['name', 'Name'],
+  ['imoNumber', 'IMO number'],
+  ['builtYear', 'Built year'],
+  ['rebuiltYear', 'Rebuilt year'],
+  ['grossTonnage', 'Gross tonnage'],
+  ['callSign', 'Call sign'],
+  ['flag', 'Flag'],
+  ['vesselType', 'Vessel type'],
+  ['classification', 'Classification']
+]
+
+/** Paste a broker's / owner's text; what is read from it is shown before the form is filled */
+function PasteVesselModal({
+  text,
+  onTextChange,
+  lists,
+  onClose,
+  onFill
+}: {
+  text: string
+  onTextChange: (t: string) => void
+  lists: Parameters<typeof parseVesselText>[1]
+  onClose: () => void
+  onFill: (found: Partial<typeof EMPTY_NEW_VESSEL>) => void
+}): React.JSX.Element {
+  const { values, inList } = parseVesselText(text, lists)
+  const found = PASTE_FIELDS.filter(([f]) => values[f])
+  return (
+    <Modal
+      title="Paste vessel details"
+      icon={<ClipboardPaste size={18} />}
+      onClose={onClose}
+      closeOnOverlay={false}
+      width={640}
+      footer={
+        <>
+          <button onClick={onClose} className="btn-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={() => onFill(Object.fromEntries(found.map(([f]) => [f, values[f] || ''])))}
+            className="btn-primary"
+            disabled={found.length === 0}
+          >
+            Fill{' '}
+            {found.length > 0
+              ? `${found.length} field${found.length === 1 ? '' : 's'}`
+              : 'the form'}
+          </button>
+        </>
+      }
+    >
+      <textarea
+        autoFocus
+        value={text}
+        onChange={(e) => onTextChange(e.target.value)}
+        rows={9}
+        placeholder={
+          'Paste the email text here, e.g.\nVessel: MV OCEAN STAR\nIMO: 9123456\nFlag: Togo\nBuilt: 1998\nGT: 2,345\nClass: BV'
+        }
+        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.85rem' }}
+      />
+      <div style={{ marginTop: '12px', fontSize: '0.85rem' }}>
+        <div style={{ fontWeight: 600, marginBottom: '6px' }}>Read from the text</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '4px 12px' }}>
+          {PASTE_FIELDS.map(([f, label]) => (
+            <Fragment key={f}>
+              <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+              <span>
+                {values[f] ? (
+                  <>
+                    {values[f]}
+                    {inList[f] === false && (
+                      <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
+                        (not in the list, kept as written)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                )}
+              </span>
+            </Fragment>
+          ))}
+        </div>
+        <div style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '0.8rem' }}>
+          Only the fields found are filled; the others keep what you typed.
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 function ClassSocietyInput({
   value,
   onChange,
@@ -166,6 +261,7 @@ export default function VesselTab({
   const [selectedVesselId, setSelectedVesselId] = useState('')
   const [vesselSearch, setVesselSearch] = useState('')
   const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
+  const [pasteText, setPasteText] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
   const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
@@ -818,6 +914,45 @@ export default function VesselTab({
             </div>
           ) : (
             <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '12px'
+                }}
+              >
+                <button
+                  onClick={() => setPasteText('')}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <ClipboardPaste size={13} /> Paste from email
+                </button>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  Paste the vessel details a broker or owner sent and the fields below fill in
+                </span>
+              </div>
+              {pasteText !== null && (
+                <PasteVesselModal
+                  text={pasteText}
+                  onTextChange={setPasteText}
+                  lists={{
+                    flags: flagStatesLocal,
+                    types: vesselTypesLocal,
+                    societies: classSocietiesLocal
+                  }}
+                  onClose={() => setPasteText(null)}
+                  onFill={(found) => {
+                    setNewData((p) => ({ ...p, ...found }))
+                    setPasteText(null)
+                    const n = Object.keys(found).length
+                    showSuccess(
+                      `${n} field${n === 1 ? '' : 's'} filled: check them, then Add Vessel`
+                    )
+                  }}
+                />
+              )}
               <div className="form-grid cols-2" style={{ maxWidth: '600px', marginBottom: '12px' }}>
                 {(
                   [
