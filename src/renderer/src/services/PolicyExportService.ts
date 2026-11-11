@@ -1102,8 +1102,6 @@ interface PolicyExportData {
   technicalPremium?: number | null
   fleets: { id: string; name: string }[]
   vesselClassificationNames: Record<string, string>
-  /** The class as printed in the policy's vessel details: abbreviation, else the name */
-  vesselClassificationAbbrevs: Record<string, string>
   // Extra quotation discounts (beyond NCB/UPCC). Optional: absent on older frozen snapshots.
   discounts?: QuotationDiscount[]
   // Frozen render settings — everything the builders would otherwise read live from
@@ -1439,7 +1437,6 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   // Resolve IACS classification from junction table
   const vesselClassificationNames: Record<string, string> = {}
-  const vesselClassificationAbbrevs: Record<string, string> = {}
   const vesselIacsById: Record<string, boolean> = {}
   try {
     const [classSocieties] = await Promise.all([window.api.getClassificationSocieties()])
@@ -1469,14 +1466,6 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
             })
             .filter(Boolean)
           if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
-          const abbrevs = sorted
-            .map((c) => {
-              const cid = typeof c === 'string' ? c : c.classificationSocietyId
-              const cs = classSocieties.find((s) => s.id === cid)
-              return cs ? cs.abbreviation || cs.name : null
-            })
-            .filter(Boolean)
-          if (abbrevs.length > 0) vesselClassificationAbbrevs[qv.id] = abbrevs.join(' / ')
         }
       } catch {
         /* fall back to the vessel's classification below */
@@ -1495,7 +1484,6 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
             vesselClassificationNames[qv.id] = cs.abbreviation
               ? `${cs.name} (${cs.abbreviation})`
               : cs.name
-            vesselClassificationAbbrevs[qv.id] = cs.abbreviation || cs.name
             if (cs.isIacs) vesselIacsById[qv.id] = true
           }
         }
@@ -1721,8 +1709,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
     agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
     fleets: Array.isArray(fleetsRaw) ? fleetsRaw : [],
-    vesselClassificationNames,
-    vesselClassificationAbbrevs
+    vesselClassificationNames
   }
 }
 
@@ -2767,13 +2754,7 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['IMO Number', vi.imo || '-'],
     [
       'Classification',
-      (data.vessel &&
-        // A policy frozen before abbreviations were kept prints the full name it printed then
-        (data.vesselClassificationAbbrevs
-          ? data.vesselClassificationAbbrevs[data.vessel.id]
-          : data.vesselClassificationNames[data.vessel.id])) ||
-        vi.classification ||
-        '-'
+      (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || '-'
     ]
   ]
   // Call sign is intentionally omitted from policy documents — it only appears on blue cards.
