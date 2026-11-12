@@ -230,6 +230,11 @@ export interface SalePolicy {
   /** NCB / UPCC as written on a policy entered on the vessel ("10%", "0.05", "2000") */
   ncbText: string | null
   upccText: string | null
+  /** Placed through a broker: the commission is needed to work out the credit advice */
+  viaBroker: boolean
+  brokerName: string | null
+  /** The commission rates set for this cover, offered as quick picks */
+  commissionRates: number[]
 }
 
 export interface SaleCancellation {

@@ -48,6 +48,8 @@ interface PolicyChoice {
   ncb: DiscountField
   upcc: DiscountField
   instalments: { instalmentNumber: number; dueDate: string }[]
+  /** Commission %, as typed (asked for when a broker policy has none) */
+  commission: string
 }
 
 const keyOf = (p: SalePolicy): string => p.vesselPolicyId || p.policyDocId || ''
@@ -159,6 +161,7 @@ export default function VesselSoldModal({
         next[keyOf(pol)] = {
           action: ended ? 'leave' : pol.policyDocId ? 'advice' : 'quiet',
           reclaim: false,
+          commission: Number(pol.commissionPercent) > 0 ? String(pol.commissionPercent) : '',
           ncb: asField(ncb),
           upcc: asField(upcc),
           instalments
@@ -187,7 +190,7 @@ export default function VesselSoldModal({
       expiryTime: p.expiryTime,
       cancelDate: date,
       cancelTime: time,
-      commissionPct: Number(p.commissionPercent) || 0,
+      commissionPct: parseFloat(c.commission) || 0,
       reclaim: c.reclaim ? { ncb: asGiven(c.ncb), upcc: asGiven(c.upcc) } : null,
       instalments: c.action === 'advice' ? c.instalments : []
     })
@@ -202,11 +205,21 @@ export default function VesselSoldModal({
   const blocked = toCancel.filter(
     (p) => choices[keyOf(p)]?.action === 'advice' && !((resultOf(p)?.returnPremium || 0) > 0)
   )
+  // Through a broker: the commission is needed for the credit advice
+  const noCommission = toCancel.filter(
+    (p) => p.viaBroker && !(parseFloat(choices[keyOf(p)]?.commission || '') > 0)
+  )
   const nothing =
     ending.size === 0 && filled.length === 0 && name.trim() === vesselName && toCancel.length === 0
 
   const submit = async (): Promise<void> => {
     if (!date || !time || !name.trim() || nothing) return
+    if (noCommission.length > 0) {
+      onError(
+        `Enter the broker's commission for ${noCommission.map((p) => p.policyNumber || p.typeName).join(', ')}`
+      )
+      return
+    }
     if (blocked.length > 0) {
       onError(
         `No return premium for ${blocked.map((p) => p.policyNumber || p.typeName).join(', ')}: check its premium and dates, or cancel it without DA/CA`
@@ -247,7 +260,10 @@ export default function VesselSoldModal({
           (res
             ? ` Return premium ${cur} ${money(res.returnPremium)} (${res.remainingDays}/${res.totalDays} days` +
               (res.given ? `, NCB/UPCC ${cur} ${money(res.given.total)} reclaimed` : '') +
-              ').'
+              ').' +
+              (parseFloat(c.commission) > 0
+                ? ` Commission ${parseFloat(c.commission)}% = ${cur} ${money(res.returnCommission)}.`
+                : '')
             : ' No return premium worked out (premium or dates missing).') +
           (advice ? ' DA/CA issued.' : '')
         return {
@@ -257,7 +273,7 @@ export default function VesselSoldModal({
           effectiveDate: date,
           returnPremium: res?.returnPremium || 0,
           currency: cur,
-          commissionPercent: Number(p.commissionPercent) || 0,
+          commissionPercent: parseFloat(c.commission) || 0,
           annualPremium: Number(p.premium) || null,
           instalments: res?.instalments || [],
           endorsementContent:
@@ -521,7 +537,7 @@ function SalePolicyCard({
               <strong style={{ color: res.returnPremium <= 0 ? 'var(--danger)' : undefined }}>
                 return premium {cur} {money(res.returnPremium)}
               </strong>
-              {c.action === 'advice' && res.returnCommission > 0 && (
+              {res.returnCommission > 0 && (
                 <span style={{ color: 'var(--text-secondary)' }}>
                   {' '}
                   (commission {cur} {money(res.returnCommission)})
@@ -532,6 +548,45 @@ function SalePolicyCard({
             <div style={{ color: 'var(--danger)' }}>
               The premium or the dates are missing: no return premium can be worked out
               {c.action === 'quiet' ? ' (the policy is still set to cancelled)' : ''}
+            </div>
+          )}
+          {(p.viaBroker || Number(p.commissionPercent) > 0) && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '6px',
+                alignItems: 'center',
+                marginTop: '6px',
+                flexWrap: 'wrap'
+              }}
+            >
+              <span>Commission{p.brokerName ? ` (${p.brokerName})` : ''}</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={c.commission}
+                onChange={(e) => onChange({ commission: e.target.value })}
+                aria-label={`Commission % for ${label}`}
+                style={{ width: '80px' }}
+              />
+              <span>%</span>
+              {!(parseFloat(c.commission) > 0) &&
+                p.commissionRates.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => onChange({ commission: String(r) })}
+                  >
+                    {r}%
+                  </button>
+                ))}
+              {p.viaBroker && !(parseFloat(c.commission) > 0) && (
+                <span style={{ color: 'var(--danger)' }}>
+                  Through a broker: enter the commission for the credit advice
+                </span>
+              )}
             </div>
           )}
           {hasGiven && (

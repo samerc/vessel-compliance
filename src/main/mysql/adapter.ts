@@ -9264,8 +9264,11 @@ export class MySQLAdapter {
     if (!this.pool) return []
     const [vdp] = (await this.pool.query(
       `SELECT vdp.id, vdp.policy_type_id AS typeId, pt.code AS typeCode, pt.name AS typeName,
-              vdp.policy_number AS policyNumber, vdp.currency, vdp.policy_document_id AS docId
+              vdp.policy_number AS policyNumber, vdp.currency, vdp.policy_document_id AS docId,
+              vdp.customer_type AS customerType, COALESCE(b.name, c.name) AS brokerName
          FROM vessel_dynamic_policies vdp LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
+         LEFT JOIN entities b ON b.id = vdp.broker_entity_id
+         LEFT JOIN entities c ON c.id = vdp.customer_entity_id
         WHERE vdp.vessel_id = ? AND vdp.status = 'active'
         ORDER BY pt.order_index, vdp.created_at`,
       [vesselId]
@@ -9286,14 +9289,24 @@ export class MySQLAdapter {
               DATE_FORMAT(pd.expiry_date, '%Y-%m-%d') AS expiryDate, pd.expiry_time AS expiryTime,
               pd.premium_amount AS premium, pd.commission_percent AS commissionPercent,
               q.premium_currency AS currency, q.quotation_type_id AS typeId,
-              pt.code AS typeCode, pt.name AS typeName
+              pt.code AS typeCode, pt.name AS typeName,
+              q.customer_type AS customerType, ce.name AS brokerName
          FROM policy_documents pd
          LEFT JOIN quotations q ON q.id = pd.quotation_id
          LEFT JOIN policy_types pt ON pt.id = q.quotation_type_id
+         LEFT JOIN entities ce ON ce.id = q.customer_entity_id
         WHERE pd.vessel_id = ? AND pd.status = 'active'
         ORDER BY pd.created_at DESC`,
       [vesselId]
     )) as [RowDataPacket[], unknown]
+    // The commission rates set for each cover (Policy Settings), offered when one is missing
+    const [rates] = (await this.pool.query(
+      'SELECT policy_type_id AS typeId, commission_percent AS pct FROM policy_type_commissions'
+    )) as [RowDataPacket[], unknown]
+    const ratesOf = (typeId: string | null | undefined): number[] =>
+      [...new Set(rates.filter((x) => x.typeId === typeId).map((x) => Number(x.pct)))]
+        .filter((n) => n > 0)
+        .sort((a, b) => b - a)
     const num = (x: unknown): number | null =>
       x === null || x === undefined || x === '' || !Number.isFinite(Number(x)) ? null : Number(x)
     const time = (x: unknown): string | null => (x ? String(x).slice(0, 5) : null)
@@ -9335,7 +9348,10 @@ export class MySQLAdapter {
         commissionPercent: doc ? num(doc.commissionPercent) : null,
         quotationId: doc?.quotationId || null,
         ncbText: val('NCB')?.t ?? null,
-        upccText: val('UPCC')?.t ?? null
+        upccText: val('UPCC')?.t ?? null,
+        viaBroker: (doc?.customerType || r.customerType) === 'broker',
+        brokerName: r.brokerName || doc?.brokerName || null,
+        commissionRates: ratesOf(r.typeId || doc?.typeId)
       })
     }
     for (const d of docs.filter((x) => !used.has(x.id)))
@@ -9354,7 +9370,10 @@ export class MySQLAdapter {
         commissionPercent: num(d.commissionPercent),
         quotationId: d.quotationId || null,
         ncbText: null,
-        upccText: null
+        upccText: null,
+        viaBroker: d.customerType === 'broker',
+        brokerName: d.brokerName || null,
+        commissionRates: ratesOf(d.typeId)
       })
     return out
   }
