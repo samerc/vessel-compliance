@@ -203,6 +203,8 @@ import {
   RemoveAssuredOptions,
   VesselNameChange,
   VesselSale,
+  SalePolicy,
+  SaleCancellation,
   LossRecordLookup,
   VesselAuditEntry,
   VesselClassification,
@@ -9253,13 +9255,156 @@ export class MySQLAdapter {
     ])
   }
 
+  /**
+   * The vessel's active policies for Vessel sold: each row of the vessel's policies with its
+   * dates / premium / NCB / UPCC, or the policy made in the app for it (its own dates, times,
+   * premium, commission and quotation). A policy made in the app with no row is listed too.
+   */
+  async getVesselSalePolicies(vesselId: string): Promise<SalePolicy[]> {
+    if (!this.pool) return []
+    const [vdp] = (await this.pool.query(
+      `SELECT vdp.id, vdp.policy_type_id AS typeId, pt.code AS typeCode, pt.name AS typeName,
+              vdp.policy_number AS policyNumber, vdp.currency, vdp.policy_document_id AS docId
+         FROM vessel_dynamic_policies vdp LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
+        WHERE vdp.vessel_id = ? AND vdp.status = 'active'
+        ORDER BY pt.order_index, vdp.created_at`,
+      [vesselId]
+    )) as [RowDataPacket[], unknown]
+    const [vals] = vdp.length
+      ? ((await this.pool.query(
+          `SELECT v.policy_id AS policyId, ptc.name, v.value_text AS t, v.value_amount AS a,
+                  DATE_FORMAT(v.value_date, '%Y-%m-%d') AS d
+             FROM vessel_policy_values v
+             JOIN policy_type_characteristics ptc ON ptc.id = v.characteristic_id
+            WHERE v.policy_id IN (?)`,
+          [vdp.map((r) => r.id)]
+        )) as [RowDataPacket[], unknown])
+      : [[] as RowDataPacket[]]
+    const [docs] = (await this.pool.query(
+      `SELECT pd.id, pd.policy_number AS policyNumber, pd.quotation_id AS quotationId,
+              DATE_FORMAT(pd.inception_date, '%Y-%m-%d') AS inceptionDate, pd.inception_time AS inceptionTime,
+              DATE_FORMAT(pd.expiry_date, '%Y-%m-%d') AS expiryDate, pd.expiry_time AS expiryTime,
+              pd.premium_amount AS premium, pd.commission_percent AS commissionPercent,
+              q.premium_currency AS currency, q.quotation_type_id AS typeId,
+              pt.code AS typeCode, pt.name AS typeName
+         FROM policy_documents pd
+         LEFT JOIN quotations q ON q.id = pd.quotation_id
+         LEFT JOIN policy_types pt ON pt.id = q.quotation_type_id
+        WHERE pd.vessel_id = ? AND pd.status = 'active'
+        ORDER BY pd.created_at DESC`,
+      [vesselId]
+    )) as [RowDataPacket[], unknown]
+    const num = (x: unknown): number | null =>
+      x === null || x === undefined || x === '' || !Number.isFinite(Number(x)) ? null : Number(x)
+    const time = (x: unknown): string | null => (x ? String(x).slice(0, 5) : null)
+    const used = new Set<string>()
+    const out: SalePolicy[] = []
+    for (const r of vdp) {
+      const mine = vals.filter((v) => v.policyId === r.id)
+      const val = (name: string): RowDataPacket | undefined =>
+        mine.find((v) => String(v.name).toLowerCase() === name.toLowerCase())
+      const dateOf = (name: string): string | null => {
+        const v = val(name)
+        const s = v?.d || (/^\d{4}-\d{2}-\d{2}/.test(v?.t || '') ? String(v?.t).slice(0, 10) : '')
+        return s || null
+      }
+      // Every premium of the policy: H&M + IV, Premium, War Premium
+      const premiums = mine
+        .filter((v) => /premium/i.test(v.name))
+        .map((v) => num(v.a ?? v.t))
+        .filter((n): n is number => n !== null)
+      const doc =
+        docs.find((d) => d.id === r.docId) ||
+        docs.find((d) => !used.has(d.id) && d.typeId && d.typeId === r.typeId)
+      if (doc) used.add(doc.id)
+      out.push({
+        vesselPolicyId: r.id,
+        policyDocId: doc?.id || null,
+        policyNumber:
+          (doc?.policyNumber || r.policyNumber || '').replace(' (RENEWED - PLEASE VERIFY)', '') ||
+          '',
+        typeCode: r.typeCode || doc?.typeCode || null,
+        typeName: r.typeName || doc?.typeName || null,
+        currency: doc?.currency || r.currency || null,
+        inceptionDate: doc?.inceptionDate || dateOf('Inception Date'),
+        inceptionTime: doc ? time(doc.inceptionTime) : null,
+        expiryDate: doc?.expiryDate || dateOf('End Date'),
+        expiryTime: doc ? time(doc.expiryTime) : null,
+        premium:
+          num(doc?.premium) || (premiums.length ? premiums.reduce((s, n) => s + n, 0) : null),
+        commissionPercent: doc ? num(doc.commissionPercent) : null,
+        quotationId: doc?.quotationId || null,
+        ncbText: val('NCB')?.t ?? null,
+        upccText: val('UPCC')?.t ?? null
+      })
+    }
+    for (const d of docs.filter((x) => !used.has(x.id)))
+      out.push({
+        vesselPolicyId: null,
+        policyDocId: d.id,
+        policyNumber: d.policyNumber || '',
+        typeCode: d.typeCode || null,
+        typeName: d.typeName || null,
+        currency: d.currency || null,
+        inceptionDate: d.inceptionDate || null,
+        inceptionTime: time(d.inceptionTime),
+        expiryDate: d.expiryDate || null,
+        expiryTime: time(d.expiryTime),
+        premium: num(d.premium),
+        commissionPercent: num(d.commissionPercent),
+        quotationId: d.quotationId || null,
+        ncbText: null,
+        upccText: null
+      })
+    return out
+  }
+
+  /** Cancels one policy for a sale: with its endorsement and DA / CA, or only its status */
+  private async cancelPolicyForSale(c: SaleCancellation, userId: string): Promise<void> {
+    if (c.policyDocId && c.issueAdvice) {
+      await this.cancelPolicy(c.policyDocId, {
+        effectiveDate: c.effectiveDate,
+        endorsementContent: c.endorsementContent,
+        returnPremium: c.returnPremium,
+        premiumCurrency: c.currency,
+        commissionPercent: c.commissionPercent,
+        instalments: c.instalments,
+        isProRata: true,
+        annualPremium: c.annualPremium,
+        createdBy: userId
+      })
+    } else if (c.policyDocId) {
+      await this.pool!.execute(
+        "UPDATE policy_documents SET status = 'cancelled' WHERE id = ? AND status = 'active'",
+        [c.policyDocId]
+      )
+      await this.pool!.execute(
+        "UPDATE policy_blue_cards SET status = 'superseded' WHERE policy_doc_id = ? AND status = 'active'",
+        [c.policyDocId]
+      )
+    }
+    if (c.vesselPolicyId)
+      await this.pool!.execute(
+        `UPDATE vessel_dynamic_policies
+            SET status = 'cancelled', notes = CONCAT_WS('\\n', NULLIF(notes, ''), ?)
+          WHERE id = ?`,
+        [c.note, c.vesselPolicyId]
+      )
+  }
+
   /** A sale in one step. Only the chosen policies follow; the audit log is written by the caller */
-  async applyVesselSale(vesselId: string, sale: VesselSale, changedBy: string): Promise<void> {
+  async applyVesselSale(
+    vesselId: string,
+    sale: VesselSale,
+    changedBy: string,
+    userId?: string
+  ): Promise<void> {
     if (!this.pool) throw new Error('DB Not connected')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(sale.date || '')) throw new Error('Enter the date of sale')
     // All or nothing: a refusal halfway would leave the sale half recorded
     for (const id of sale.endAssuredIds)
       await this.assertAssuredCanEnd(id, sale.date, sale.policyIds)
+    for (const c of sale.cancellations || []) await this.cancelPolicyForSale(c, userId || '')
     for (const id of sale.endAssuredIds)
       await this.removeVesselAssuredWithHistory(
         id,
@@ -9283,6 +9428,16 @@ export class MySQLAdapter {
         kind: 'rename',
         date: sale.date
       })
+    // Inactive when nobody takes the vessel over; a cancelled policy must not switch off a
+    // vessel that has new owners
+    if (
+      sale.deactivateVessel !== undefined &&
+      (sale.deactivateVessel || sale.cancellations?.length)
+    )
+      await this.pool.execute('UPDATE vessels SET is_active = ? WHERE id = ?', [
+        sale.deactivateVessel ? 0 : 1,
+        vesselId
+      ])
   }
 
   /** A vessel typed on a quotation now points to its record */

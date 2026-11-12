@@ -1821,6 +1821,10 @@ app.whenReady().then(() => {
     await requirePermission(event, 'vessels:edit')
     return db.setVesselNameHistoryDate(id, date)
   })
+  safeHandle('db:getVesselSalePolicies', async (event, vesselId: string) => {
+    await requirePermission(event, 'vessels:edit')
+    return db.getVesselSalePolicies(vesselId)
+  })
   safeHandle('db:applyVesselSale', async (event, vesselId: string, sale: VesselSale) => {
     const user = await requirePermission(event, 'vessels:edit')
     await requirePermission(event, 'assureds:manage')
@@ -1838,7 +1842,29 @@ app.whenReady().then(() => {
           sale.newAssureds.map((a) => a.entityId)
         ])
       : [[] as RowDataPacket[]]
-    await db.applyVesselSale(vesselId, sale, user.username)
+    // Cancelling policies needs the same right as Cancel Policy
+    if (sale.cancellations?.some((c) => c.policyDocId))
+      await requirePermission(event, 'policies:manage')
+    await db.applyVesselSale(vesselId, sale, user.username, user.id)
+    for (const c of sale.cancellations || []) {
+      db.addVesselAuditEntry(
+        vesselId,
+        'Policy Cancelled',
+        null,
+        `${c.label}: ${c.note}`,
+        user.username
+      ).catch(() => {})
+      db.logActivity({
+        userId: user.id,
+        username: user.username,
+        action: 'UPDATE',
+        module: 'Policies',
+        entityType: 'policy',
+        entityId: c.policyDocId || c.vesselPolicyId || vesselId,
+        entityName: c.label,
+        details: `Cancelled (vessel sold) effective ${c.effectiveDate}${c.issueAdvice ? ', with DA/CA' : ', no DA/CA'}`
+      }).catch(() => {})
+    }
     for (const g of gone)
       db.addVesselAuditEntry(
         vesselId,

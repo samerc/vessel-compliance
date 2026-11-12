@@ -201,6 +201,58 @@ export interface VesselSale {
   endAssuredIds: string[]
   newAssureds: { entityId: string; role: string }[]
   policyIds: string[]
+  /** Time of sale (HH:MM) */
+  time?: string
+  /** Policies cancelled by the sale */
+  cancellations?: SaleCancellation[]
+  /** Set the vessel inactive (no new assured); otherwise it stays active */
+  deactivateVessel?: boolean
+}
+
+/** An active policy of a vessel, as Vessel sold needs it to work out the cancellation */
+export interface SalePolicy {
+  /** vessel_dynamic_policies row (null = a policy made in the app with no row there) */
+  vesselPolicyId: string | null
+  /** policy_documents row (null = a policy entered on the vessel / from the register) */
+  policyDocId: string | null
+  policyNumber: string
+  typeCode: string | null
+  typeName: string | null
+  currency: string | null
+  inceptionDate: string | null
+  inceptionTime: string | null
+  expiryDate: string | null
+  expiryTime: string | null
+  /** Annual payable premium (H&M + IV for a hull policy entered on the vessel) */
+  premium: number | null
+  commissionPercent: number | null
+  quotationId: string | null
+  /** NCB / UPCC as written on a policy entered on the vessel ("10%", "0.05", "2000") */
+  ncbText: string | null
+  upccText: string | null
+}
+
+export interface SaleCancellation {
+  vesselPolicyId: string | null
+  policyDocId: string | null
+  /** Issue the cancellation endorsement with its debit / credit advice (app policies only) */
+  issueAdvice: boolean
+  effectiveDate: string
+  returnPremium: number
+  currency: string
+  commissionPercent: number
+  annualPremium: number | null
+  instalments: {
+    instalmentNumber: number
+    dueDate: string
+    premiumAmount: number
+    commissionAmount: number
+  }[]
+  endorsementContent: string
+  /** Added to the policy's notes on the vessel */
+  note: string
+  /** For the vessel's audit log */
+  label: string
 }
 
 /** What the Loss Record needs to print the assureds of the policy, not of today's vessel */

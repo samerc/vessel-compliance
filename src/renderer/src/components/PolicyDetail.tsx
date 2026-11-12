@@ -42,13 +42,8 @@ import type { DeclarationFields, BlueCardData } from '../services/PolicyExportSe
 import { getReportSettings } from '../services/ReportSettingsService'
 import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
-import {
-  countDays,
-  calcProRataPremium,
-  distributeInstalments,
-  discountGivenFromPayable
-} from '../utils/premiumCalc'
 import type { DiscountGiven, GivenDiscount } from '../utils/premiumCalc'
+import { calcCancellation, cancellationWhen } from '../utils/cancellationCalc'
 import type {
   Entity,
   FlagState,
@@ -316,6 +311,7 @@ export default function PolicyDetail({
   const [cancelMode, setCancelMode] = useState<'instalment' | 'date'>('instalment')
   const [cancelAfterInstalment, setCancelAfterInstalment] = useState(0)
   const [cancelDate, setCancelDate] = useState('')
+  const [cancelTime, setCancelTime] = useState('12:00')
   const [cancelling, setCancelling] = useState(false)
   // Cancel on date: the NCB/UPCC given can be reclaimed (taken off the return premium). Filled
   // from the quotation when the dialog opens; off by default (only some cancellations)
@@ -5524,48 +5520,35 @@ export default function PolicyDetail({
             returnPremium = returnInstalments.reduce((s, i) => s + i.premiumAmount, 0)
             returnCommission = returnInstalments.reduce((s, i) => s + i.commissionAmount, 0)
           } else if (cancelMode === 'date' && cancelDate && policy.premiumAmount) {
-            // Pro-rata calculation using shared utility
-            const totalPrem = Number(policy.premiumAmount) || 0
-            const totalPeriod = countDays(policy.inceptionDate ?? '', policy.expiryDate ?? '')
-            const remainPeriod = countDays(cancelDate, policy.expiryDate ?? '')
-            if (cancelReclaim) {
-              const asGiven = (d: {
-                type: GivenDiscount['type']
-                value: string
-              }): GivenDiscount => ({ type: d.type, value: parseFloat(d.value) || 0 })
-              given = discountGivenFromPayable(totalPrem, asGiven(cancelNcb), asGiven(cancelUpcc))
-              if (given.total <= 0) given = null
-            }
-            if (totalPeriod.days > 0) {
-              const calc = calcProRataPremium(
-                remainPeriod.days,
-                totalPrem,
-                totalPeriod.days,
-                1,
-                commPct,
-                given?.total || 0
-              )
-              grossReturn = calc.grossProRataPremium
-              returnPremium = calc.proRataPremium
-              returnCommission = calc.commissionTotal
-            }
-            // Build instalments using shared bottom-fill
-            if (instalments.length > 0 && returnPremium > 0) {
-              const dist = distributeInstalments(
-                returnPremium,
-                totalPrem,
-                instalments.map((inst) => ({
-                  instalmentNumber: inst.instalmentNumber,
-                  dueDate: inst.dueDate
-                })),
-                commPct
-              )
-              returnInstalments = dist.map((d) => ({
-                instalmentNumber: d.instalmentNumber,
-                dueDate: d.dueDate,
-                premiumAmount: d.premiumAmount,
-                commissionAmount: d.commissionAmount
+            // The Pro-Rata calculator's maths over the policy's own period, with the times
+            // (shared with Vessel sold)
+            const asGiven = (d: { type: GivenDiscount['type']; value: string }): GivenDiscount => ({
+              type: d.type,
+              value: parseFloat(d.value) || 0
+            })
+            const res = calcCancellation({
+              annualPremium: Number(policy.premiumAmount) || 0,
+              inceptionDate: policy.inceptionDate ?? '',
+              inceptionTime: policy.inceptionTime,
+              expiryDate: policy.expiryDate ?? '',
+              expiryTime: policy.expiryTime,
+              cancelDate,
+              cancelTime,
+              commissionPct: commPct,
+              reclaim: cancelReclaim
+                ? { ncb: asGiven(cancelNcb), upcc: asGiven(cancelUpcc) }
+                : null,
+              instalments: instalments.map((inst) => ({
+                instalmentNumber: inst.instalmentNumber,
+                dueDate: inst.dueDate
               }))
+            })
+            if (res) {
+              given = res.given
+              grossReturn = res.grossReturn
+              returnPremium = res.returnPremium
+              returnCommission = res.returnCommission
+              returnInstalments = res.instalments
             }
           }
 
@@ -5588,7 +5571,7 @@ export default function PolicyDetail({
             setCancelling(true)
             try {
               const content =
-                `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>` +
+                `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${cancellationWhen(effectiveDate, cancelMode === 'date' ? cancelTime : null)}.</p>` +
                 (given
                   ? `<p>The No Claims Bonus / UPCC of ${currency} ${given.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} granted on this policy is reclaimed and deducted from the return premium.</p>`
                   : '')
@@ -5699,13 +5682,22 @@ export default function PolicyDetail({
               {/* Date mode */}
               {cancelMode === 'date' && (
                 <div style={{ marginBottom: '16px' }}>
-                  <Field label="Cancellation effective date">
-                    <input
-                      type="date"
-                      value={cancelDate}
-                      onChange={(e) => setCancelDate(e.target.value)}
-                    />
-                  </Field>
+                  <div className="form-grid cols-2">
+                    <Field label="Cancellation effective date">
+                      <input
+                        type="date"
+                        value={cancelDate}
+                        onChange={(e) => setCancelDate(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Time" hint="In the policy's time zone">
+                      <input
+                        type="time"
+                        value={cancelTime}
+                        onChange={(e) => setCancelTime(e.target.value)}
+                      />
+                    </Field>
+                  </div>
                   <label
                     style={{
                       display: 'flex',
