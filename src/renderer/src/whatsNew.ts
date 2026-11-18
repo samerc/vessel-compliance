@@ -26,6 +26,22 @@ export interface WhatsNewEntry {
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
     version: '8.1.0',
+    update: 'sale-cancellation-letters',
+    date: '2026-11-18',
+    items: [
+      {
+        tag: 'New',
+        text: 'Vessel sold now cancels the active policies at the date and time of sale, with each return premium worked out pro-rata (NCB/UPCC reclaim when you tick it, the broker commission for the credit advice). With no new owner the vessel is set to inactive.'
+      },
+      {
+        tag: 'Improved',
+        text: 'Statement of Account / Letter Invoice: bank details, the customer address from the Directory, columns kept per report, and long cells moved to * notes under the table.',
+        featureId: 'report-statement'
+      }
+    ]
+  },
+  {
+    version: '8.1.0',
     update: 'paste-vessel-details',
     date: '2026-11-11',
     items: [
