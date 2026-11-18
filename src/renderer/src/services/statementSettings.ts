@@ -1,12 +1,24 @@
 // Statement of Account settings (app_settings key `statement_settings`). Kept apart from the
 // Word export so the Statement page can load them without loading the docx library.
 
+/** A report column: the Excel column it comes from and the name printed for it */
+export interface StatementColumnMap {
+  key: string
+  label: string
+}
+
+/** A report type (Statement of Account, Letter Invoice...) */
 export interface StatementTitleOption {
   title: string
-  /** Text above the table. Placeholders: {to} {date} {reference} {total} */
+  /** Text above the table (no longer filled by default: the letter starts with it empty) */
   intro: string
-  /** Text below the table. Same placeholders */
+  /** Default text below the table. Placeholders: {to} {date} {reference} {total} */
   closing: string
+  /**
+   * The report's columns in print order, matched to the Excel columns. Excel columns not in
+   * the list are left out. Empty / missing = not set yet (all useful columns are shown)
+   */
+  columns?: StatementColumnMap[]
 }
 
 export interface StatementSettings {
@@ -35,7 +47,7 @@ export const DEFAULT_STATEMENT_SETTINGS: StatementSettings = {
       intro: 'Please find below the statement of your outstanding premiums as at {date}.',
       closing: 'Kindly arrange settlement of the above at your earliest convenience.'
     },
-    { title: 'Invoice', intro: '', closing: '' }
+    { title: 'Letter Invoice', intro: '', closing: '' }
   ],
   columnLabels: {},
   referencePrefix: '',

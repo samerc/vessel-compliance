@@ -44,8 +44,13 @@ export interface StatementExportInput {
   /** ISO YYYY-MM-DD */
   date: string
   to: string
+  /** The customer's address, printed under To (one line per line) */
+  address: string
+  /** Empty = not printed (the user unticked it or left it empty) */
   intro: string
   closing: string
+  /** The chosen bank's details, printed after the text below the table */
+  bankDetails: string
   columns: StatementColumn[]
   /** Visible column keys, in print order */
   visible: string[]
@@ -58,6 +63,9 @@ export interface StatementExportInput {
   orientation: 'auto' | 'portrait' | 'landscape'
   fontSize: number
 }
+
+/** Line breaks in the address and bank details (Windows or Unix) */
+const NEWLINE = /\r?\n/
 
 // A4 + the policy/DA margins
 const PAGE_W = 11906
@@ -400,7 +408,19 @@ export async function buildStatementDocx(
       rows: [
         new TableRow({
           children: [
-            infoCell(input.to ? [labelled('To', input.to)] : [], leftW),
+            infoCell(
+              input.to
+                ? [
+                    labelled('To', input.to),
+                    ...input.address
+                      .split(NEWLINE)
+                      .map((l) => l.trim())
+                      .filter(Boolean)
+                      .map((l) => para(l, { after: 0 }))
+                  ]
+                : [],
+              leftW
+            ),
             infoCell(right, contentW - leftW)
           ]
         })
@@ -418,6 +438,15 @@ export async function buildStatementDocx(
   children.push(dataTable)
   children.push(para('', { after: 160 }))
   if (input.closing.trim()) textBlock(input.closing)
+  // Bank details (as on the Debit Advice: the bank's name is internal, only its details print)
+  const bankLines = input.bankDetails
+    .split(NEWLINE)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (bankLines.length > 0) {
+    children.push(para('Bank Details', { bold: true, after: 60 }))
+    for (const l of bankLines) children.push(para(l, { after: 0 }))
+  }
 
   // ---- Letterhead + footer (same source as the Debit Advice) ----
   const headerParas: Paragraph[] = []

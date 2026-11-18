@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { FileText, X, AlertCircle, Settings, Plus, Trash2, Save } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Modal, Field, useDragSort, DragHandle, moveInArray, FileDrop } from './ui'
+import { Modal, Field, useDragSort, DragHandle, moveInArray, FileDrop, Combobox } from './ui'
+import type { Entity, EntityAddress } from '../../../shared/types'
+import { asArray } from '../utils/ipc'
 import {
   parseStatementWorkbook,
   defaultVisibleColumns,
@@ -17,7 +19,8 @@ import {
   saveStatementSettings,
   DEFAULT_STATEMENT_SETTINGS,
   STATEMENT_PLACEHOLDERS,
-  type StatementSettings
+  type StatementSettings,
+  type StatementTitleOption
 } from '../services/statementSettings'
 import type { StatementExportInput } from '../services/StatementExportService'
 
@@ -26,6 +29,64 @@ import type { StatementExportInput } from '../services/StatementExportService'
 
 const COLS_PREF_KEY = 'statement_columns'
 const ORIENTATION_KEY = 'statement_orientation'
+const BANK_PREF_KEY = 'statement_bank'
+
+type BankRow = { id: string; name: string; details: string; order: number }
+
+/** An address as printed under the customer's name */
+const addressText = (a: EntityAddress): string =>
+  [a.addressLine1, a.addressLine2, [a.postalCode, a.city].filter(Boolean).join(' '), a.country]
+    .map((x) => (x || '').trim())
+    .filter(Boolean)
+    .join('\n')
+
+/** A field label with an Include tick box: unticked, the text is left out of the letter */
+function IncludeLabel({
+  text,
+  checked,
+  onChange
+}: {
+  text: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}): React.JSX.Element {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+      {text}
+      <span
+        role="checkbox"
+        aria-checked={checked}
+        tabIndex={0}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontWeight: 400,
+          cursor: 'pointer'
+        }}
+        onClick={(e) => {
+          e.preventDefault()
+          onChange(!checked)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault()
+            onChange(!checked)
+          }
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          readOnly
+          tabIndex={-1}
+          style={{ accentColor: 'var(--accent-primary)', width: 'auto' }}
+        />
+        Include
+      </span>
+    </span>
+  )
+}
 
 const todayISO = (): string => {
   const d = new Date()
@@ -170,7 +231,9 @@ function StatementSettingsModal({
             </button>
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 10px' }}>
-            Each title can carry a text above and below the table. The first title is the default.
+            One per report (e.g. Statement of Account, Letter Invoice). Each has its default text
+            below the table and its own columns, matched to the Excel columns on the statement page
+            (&quot;Save columns&quot;). The first one is the default.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {s.titles.map((t, i) => (
@@ -203,16 +266,8 @@ function StatementSettingsModal({
                     <Trash2 size={16} />
                   </button>
                 </div>
-                <div className="form-grid cols-2" style={{ marginTop: '10px' }}>
-                  <Field label="Text above the table">
-                    <textarea
-                      rows={3}
-                      value={t.intro}
-                      onChange={(e) => setTitle(i, { intro: e.target.value })}
-                      style={{ resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                  </Field>
-                  <Field label="Text below the table">
+                <div className="form-grid" style={{ marginTop: '10px' }}>
+                  <Field label="Text below the table (default)">
                     <textarea
                       rows={3}
                       value={t.closing}
@@ -220,6 +275,32 @@ function StatementSettingsModal({
                       style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
                   </Field>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '8px',
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  {t.columns && t.columns.length > 0 ? (
+                    <>
+                      <span>
+                        Columns: {t.columns.map((c) => `${c.label} (${c.key})`).join(', ')}
+                      </span>
+                      <button
+                        className="btn-ghost btn-sm"
+                        onClick={() => setTitle(i, { columns: [] })}
+                      >
+                        Reset
+                      </button>
+                    </>
+                  ) : (
+                    <span>Columns not matched yet (set them on the statement page)</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -317,12 +398,21 @@ export default function StatementReport(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'' | 'docx' | 'pdf'>('')
 
+  // The report type (its columns and default text) and the title printed, which can be edited
   const [titleIdx, setTitleIdx] = useState(0)
+  const [title, setTitle] = useState('')
   const [reference, setReference] = useState('')
   const [date, setDate] = useState(todayISO)
   const [to, setTo] = useState('')
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [addresses, setAddresses] = useState<EntityAddress[]>([])
+  const [address, setAddress] = useState('')
+  const [banks, setBanks] = useState<BankRow[]>([])
+  const [bankId, setBankId] = useState('')
   const [intro, setIntro] = useState('')
   const [closing, setClosing] = useState('')
+  const [includeIntro, setIncludeIntro] = useState(true)
+  const [includeClosing, setIncludeClosing] = useState(true)
   const [visible, setVisible] = useState<string[]>([])
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [totalKey, setTotalKey] = useState<string | null>(null)
@@ -342,18 +432,67 @@ export default function StatementReport(): React.JSX.Element {
       if (!alive) return
       setSettings(s)
       setReference((r) => r || s.referencePrefix)
-      setIntro(s.titles[0]?.intro || '')
+      setTitle(s.titles[0]?.title || 'Statement of Account')
       setClosing(s.titles[0]?.closing || '')
+    })
+    void Promise.all([window.api.getEntities(), window.api.bankGetAll()]).then(([e, b]) => {
+      if (!alive) return
+      setEntities(asArray<Entity>(e))
+      const list = asArray<BankRow>(b)
+      setBanks(list)
+      // The bank used last time, else the first one
+      let last = ''
+      try {
+        last = localStorage.getItem(BANK_PREF_KEY) || ''
+      } catch {
+        /* per-viewer convenience only */
+      }
+      setBankId(list.some((x) => x.id === last) ? last : list[0]?.id || '')
     })
     return () => {
       alive = false
     }
   }, [])
 
+  /** The report type's columns: the Excel columns it uses, in its order, with its names */
+  const applyColumns = (parsed: ParsedStatement, t: StatementTitleOption | undefined): void => {
+    const keys = parsed.columns.map((c) => c.key)
+    const mapped = (t?.columns || []).filter((c) => keys.includes(c.key))
+    if (mapped.length > 0) {
+      setVisible(mapped.map((c) => c.key))
+      setLabels(
+        Object.fromEntries(
+          keys.map((k) => [
+            k,
+            mapped.find((c) => c.key === k)?.label || settings.columnLabels[k] || k
+          ])
+        )
+      )
+      return
+    }
+    const pref = loadColumnPrefs()?.filter((k) => keys.includes(k))
+    setVisible(pref && pref.length > 0 ? pref : defaultVisibleColumns(parsed.columns))
+    setLabels(Object.fromEntries(keys.map((k) => [k, settings.columnLabels[k] || k])))
+  }
+
   const pickTitle = (i: number): void => {
+    const t = settings.titles[i]
     setTitleIdx(i)
-    setIntro(settings.titles[i]?.intro || '')
-    setClosing(settings.titles[i]?.closing || '')
+    setTitle(t?.title || '')
+    setClosing(t?.closing || '')
+    if (data) applyColumns(data, t)
+  }
+
+  /** A customer from the Directory: its address goes under its name */
+  const pickCustomer = async (e: Entity): Promise<void> => {
+    setTo(e.name)
+    try {
+      const list = asArray<EntityAddress>(await window.api.getEntityAddresses(e.id))
+      setAddresses(list)
+      setAddress(list[0] ? addressText(list[0]) : '')
+    } catch {
+      setAddresses([])
+    }
   }
 
   const handleFile = (file: File): void => {
@@ -373,12 +512,17 @@ export default function StatementReport(): React.JSX.Element {
         }
         setFileName(file.name)
         setData(parsed)
-        const keys = parsed.columns.map((c) => c.key)
-        const pref = loadColumnPrefs()?.filter((k) => keys.includes(k))
-        setVisible(pref && pref.length > 0 ? pref : defaultVisibleColumns(parsed.columns))
-        setLabels(Object.fromEntries(keys.map((k) => [k, settings.columnLabels[k] || k])))
+        applyColumns(parsed, settings.titles[titleIdx])
         setTotalKey(defaultTotalColumn(parsed.columns))
-        setTo(parsed.groups.length === 1 ? parsed.groups[0] : '')
+        const single = parsed.groups.length === 1 ? parsed.groups[0] : ''
+        setTo(single)
+        setAddresses([])
+        setAddress('')
+        // The file's one customer, when it is in the Directory, brings its address
+        const known = single
+          ? entities.find((x) => x.name.trim().toLowerCase() === single.trim().toLowerCase())
+          : undefined
+        if (known) void pickCustomer(known)
         setShowGroups(parsed.groups.length > 1)
       } catch {
         setError('Failed to read the file.')
@@ -416,19 +560,22 @@ export default function StatementReport(): React.JSX.Element {
       return next
     })
 
+  /** The shown columns, their order and names become the report type's columns */
   const saveColumnNames = async (): Promise<void> => {
     if (!data) return
-    const columnLabels = { ...settings.columnLabels }
-    for (const c of data.columns) {
-      const l = (labels[c.key] || '').trim()
-      if (l && l !== c.key) columnLabels[c.key] = l
-      else delete columnLabels[c.key]
-    }
+    const type = settings.titles[titleIdx]
+    if (!type) return
+    const columns = visible
+      .filter((k) => data.columns.some((c) => c.key === k))
+      .map((k) => ({ key: k, label: (labels[k] || '').trim() || k }))
     try {
-      const next = { ...settings, columnLabels }
+      const next = {
+        ...settings,
+        titles: settings.titles.map((t, i) => (i === titleIdx ? { ...t, columns } : t))
+      }
       await saveStatementSettings(next)
       setSettings(next)
-      showSuccess('Column names saved as default')
+      showSuccess(`Columns saved for ${type.title}`)
     } catch (e) {
       showError(e instanceof Error ? e.message : 'Saving failed')
     }
@@ -445,18 +592,21 @@ export default function StatementReport(): React.JSX.Element {
     data && totalKey && ordered.includes(totalKey)
       ? columnTotals(data.rows, totalKey, currencyKey)
       : []
-  const title = settings.titles[titleIdx]?.title || 'Statement of Account'
+  const typeName = settings.titles[titleIdx]?.title || ''
+  const bank = banks.find((b) => b.id === bankId)
 
   const runExport = async (kind: 'docx' | 'pdf'): Promise<void> => {
     if (!data || ordered.length === 0) return
     setExporting(kind)
     const input: StatementExportInput = {
-      title,
+      title: title.trim() || typeName || 'Statement of Account',
       reference: reference.trim(),
       date,
       to: to.trim(),
-      intro,
-      closing,
+      address: to.trim() ? address : '',
+      intro: includeIntro ? intro : '',
+      closing: includeClosing ? closing : '',
+      bankDetails: bank?.details || '',
       columns: data.columns,
       visible: ordered,
       labels,
@@ -558,20 +708,68 @@ export default function StatementReport(): React.JSX.Element {
             <div className="glass-card" style={{ padding: '18px' }}>
               <h4 className="form-section-title">Letter</h4>
               <div className="form-grid cols-2">
-                <Field label="Title">
-                  <select value={titleIdx} onChange={(e) => pickTitle(Number(e.target.value))}>
-                    {settings.titles.map((t, i) => (
-                      <option key={i} value={i}>
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
+                <Field
+                  label="Title"
+                  hint={typeName ? `Report: ${typeName} (its columns and text)` : undefined}
+                >
+                  <Combobox
+                    aria-label="Title"
+                    options={settings.titles.map((t, i) => ({ i, title: t.title }))}
+                    getKey={(o) => String(o.i)}
+                    getLabel={(o) => o.title}
+                    value={title}
+                    onInputChange={setTitle}
+                    onSelect={(o) => pickTitle(o.i)}
+                    filter={(list) => list}
+                    autoHighlight={false}
+                    placeholder="Pick a report, then edit the title if needed"
+                  />
                 </Field>
                 <Field label="To">
-                  <input
+                  <Combobox
+                    aria-label="To"
+                    options={entities}
+                    getKey={(o) => o.id}
+                    getLabel={(o) => o.name}
                     value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                    placeholder="Customer / broker"
+                    onInputChange={(t) => {
+                      setTo(t)
+                      setAddresses([])
+                    }}
+                    onSelect={(o) => void pickCustomer(o)}
+                    autoHighlight={false}
+                    hideWhenEmpty
+                    placeholder="Customer / broker (Directory or typed)"
+                  />
+                </Field>
+                <Field
+                  label="Address"
+                  span="all"
+                  hint={
+                    addresses.length > 1 ? (
+                      <select
+                        aria-label="Choose the address"
+                        onChange={(e) => {
+                          const a = addresses.find((x) => x.id === e.target.value)
+                          if (a) setAddress(addressText(a))
+                        }}
+                        style={{ marginTop: '4px' }}
+                      >
+                        {addresses.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.label || a.addressLine1}
+                          </option>
+                        ))}
+                      </select>
+                    ) : undefined
+                  }
+                >
+                  <textarea
+                    rows={3}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Printed under the customer's name"
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </Field>
                 <Field label="Reference no.">
@@ -580,21 +778,61 @@ export default function StatementReport(): React.JSX.Element {
                 <Field label="Date">
                   <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </Field>
-                <Field label="Text above the table" span="all">
+                <Field
+                  label={
+                    <IncludeLabel
+                      text="Text above the table"
+                      checked={includeIntro}
+                      onChange={setIncludeIntro}
+                    />
+                  }
+                  span="all"
+                >
                   <textarea
                     rows={2}
                     value={intro}
+                    disabled={!includeIntro}
                     onChange={(e) => setIntro(e.target.value)}
                     style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </Field>
-                <Field label="Text below the table" span="all">
+                <Field
+                  label={
+                    <IncludeLabel
+                      text="Text below the table"
+                      checked={includeClosing}
+                      onChange={setIncludeClosing}
+                    />
+                  }
+                  span="all"
+                >
                   <textarea
                     rows={2}
                     value={closing}
+                    disabled={!includeClosing}
                     onChange={(e) => setClosing(e.target.value)}
                     style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
+                </Field>
+                <Field label="Bank" span="all" hint="Its details print after the text">
+                  <select
+                    value={bankId}
+                    onChange={(e) => {
+                      setBankId(e.target.value)
+                      try {
+                        localStorage.setItem(BANK_PREF_KEY, e.target.value)
+                      } catch {
+                        /* per-viewer convenience only */
+                      }
+                    }}
+                  >
+                    <option value="">No bank</option>
+                    {banks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </div>
               <PlaceholderHint />
@@ -613,9 +851,13 @@ export default function StatementReport(): React.JSX.Element {
                 <h4 className="form-section-title" style={{ margin: 0 }}>
                   Columns
                 </h4>
-                {canConfigure && (
-                  <button className="btn-ghost btn-sm" onClick={saveColumnNames}>
-                    <Save size={14} /> Save column names
+                {canConfigure && typeName && (
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={saveColumnNames}
+                    title={`The shown columns, their order and names become those of ${typeName}`}
+                  >
+                    <Save size={14} /> Save columns for {typeName}
                   </button>
                 )}
               </div>
