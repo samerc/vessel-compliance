@@ -33,7 +33,15 @@ export interface ParsedStatement {
   columns: StatementColumn[]
   rows: StatementRow[]
   groups: string[]
+  /**
+   * Notes written in the Excel on lines of their own starting with "*" (e.g. "*C/V of Hill
+   * Dickinson Inv.10676715"), printed under the table with their markers
+   */
+  notes: string[]
 }
+
+/** A note line: starts with one or more "*" */
+export const NOTE_LINE = /^\*+\s*\S/
 
 const HEADER_HINT = /^(type|date|num|no\.?|number|amount|balance|currency|memo|due date|terms)/i
 const PLACEHOLDER = /^[-–—\s]*$/
@@ -103,6 +111,7 @@ function parseSheet(ws: XLSX.WorkSheet, sheetName: string): ParsedStatement | nu
 
   const rows: StatementRow[] = []
   const groups: string[] = []
+  const notes: string[] = []
   const rawByCol: RawCell[][] = keys.map(() => [])
   let group = ''
 
@@ -116,8 +125,14 @@ function parseSheet(ws: XLSX.WorkSheet, sheetName: string): ParsedStatement | nu
     }
     if (texts.length === 0) continue
     if (/^total\b/i.test(texts[0])) continue // QuickBooks subtotal / grand total
+    const lone = !cells.some((v) => v.num != null || v.isDate)
+    // A note under the table ("*C/V of ..."): not a customer
+    if (lone && NOTE_LINE.test(texts[0])) {
+      notes.push(texts.join(' '))
+      continue
+    }
     // Group (customer) row: a lone name with no figures or dates
-    if (texts.length === 1 && !cells.some((v) => v.num != null || v.isDate)) {
+    if (texts.length === 1 && lone) {
       group = texts[0]
       if (!groups.includes(group)) groups.push(group)
       continue
@@ -151,7 +166,24 @@ function parseSheet(ws: XLSX.WorkSheet, sheetName: string): ParsedStatement | nu
     }
   }
 
-  return { sheetName, columns, rows, groups }
+  return { sheetName, columns, rows, groups, notes }
+}
+
+/** The marker of the next note: one "*" more than the most used so far (*, **, ***) */
+export function nextNoteMarker(notes: string[]): string {
+  const most = Math.max(0, ...notes.map((n) => n.match(/^\*+/)?.[0].length || 0))
+  return '*'.repeat(most + 1)
+}
+
+/**
+ * Where a long cell is cut when part of it moves to a note: at the first dash between words
+ * ("MKK II-C/V of Hill Dickinson..." -> "MKK II" + "C/V of Hill Dickinson..."), else nothing kept
+ * is guessed and the whole text is offered as the note.
+ */
+export function suggestNoteSplit(text: string): { keep: string; note: string } {
+  const m = text.match(/^(.{2,}?)\s*[-–—]\s*(\S.{3,})$/)
+  if (m) return { keep: m[1].trim(), note: m[2].trim() }
+  return { keep: text.trim(), note: '' }
 }
 
 export function formatMoney(n: number): string {

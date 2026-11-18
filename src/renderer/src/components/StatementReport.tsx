@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, X, AlertCircle, Settings, Plus, Trash2, Save } from 'lucide-react'
+import { FileText, X, AlertCircle, Settings, Plus, Trash2, Save, Scissors } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { Modal, Field, useDragSort, DragHandle, moveInArray, FileDrop, Combobox } from './ui'
@@ -12,6 +12,8 @@ import {
   currencyColumn,
   columnTotals,
   formatMoney,
+  nextNoteMarker,
+  suggestNoteSplit,
   type ParsedStatement
 } from '../utils/statementParser'
 import {
@@ -30,6 +32,8 @@ import type { StatementExportInput } from '../services/StatementExportService'
 const COLS_PREF_KEY = 'statement_columns'
 const ORIENTATION_KEY = 'statement_orientation'
 const BANK_PREF_KEY = 'statement_bank'
+/** A text cell longer than this offers to move part of it to a note */
+const LONG_CELL = 22
 
 type BankRow = { id: string; name: string; details: string; order: number }
 
@@ -425,6 +429,49 @@ export default function StatementReport(): React.JSX.Element {
     }
   })
   const [showGroups, setShowGroups] = useState(true)
+  // Notes under the table ("*C/V of ..."), from the Excel or made from a long cell
+  const [notes, setNotes] = useState<string[]>([])
+  const [split, setSplit] = useState<{
+    row: number
+    key: string
+    keep: string
+    note: string
+    marker: string
+  } | null>(null)
+
+  const openSplit = (row: number, key: string): void => {
+    const text = data?.rows[row]?.cells[key] || ''
+    setSplit({ row, key, ...suggestNoteSplit(text), marker: nextNoteMarker(notes) })
+  }
+
+  /** The cell keeps its first part + the mark; the rest goes under the table */
+  const applySplit = (): void => {
+    if (!data || !split || !split.note.trim()) return
+    const rows = data.rows.map((r, i) =>
+      i === split.row
+        ? { ...r, cells: { ...r.cells, [split.key]: `${split.keep.trim()}${split.marker}` } }
+        : r
+    )
+    setData({ ...data, rows })
+    setNotes((n) => [...n, `${split.marker}${split.note.trim()}`])
+    setSplit(null)
+  }
+
+  /** A note deleted: its mark leaves the cells that carry it */
+  const removeNote = (i: number): void => {
+    const marker = notes[i]?.match(/^\*+/)?.[0]
+    setNotes((n) => n.filter((_, j) => j !== i))
+    if (!marker || !data) return
+    const strip = (t: string): string =>
+      t.endsWith(marker) && !t.endsWith(`*${marker}`) ? t.slice(0, -marker.length) : t
+    setData({
+      ...data,
+      rows: data.rows.map((r) => ({
+        ...r,
+        cells: Object.fromEntries(Object.entries(r.cells).map(([k, v]) => [k, strip(v)]))
+      }))
+    })
+  }
 
   useEffect(() => {
     let alive = true
@@ -524,6 +571,7 @@ export default function StatementReport(): React.JSX.Element {
           : undefined
         if (known) void pickCustomer(known)
         setShowGroups(parsed.groups.length > 1)
+        setNotes(parsed.notes)
       } catch {
         setError('Failed to read the file.')
         setData(null)
@@ -607,6 +655,7 @@ export default function StatementReport(): React.JSX.Element {
       intro: includeIntro ? intro : '',
       closing: includeClosing ? closing : '',
       bankDetails: bank?.details || '',
+      notes,
       columns: data.columns,
       visible: ordered,
       labels,
@@ -990,6 +1039,18 @@ export default function StatementReport(): React.JSX.Element {
                       {ordered.map((k) => (
                         <td key={k} className={isRight(k) ? 'num' : undefined}>
                           {r.cells[k]}
+                          {!isRight(k) && (r.cells[k] || '').length > LONG_CELL && (
+                            <button
+                              type="button"
+                              className="btn-ghost btn-icon"
+                              title="Move part of this text to a note under the table"
+                              aria-label="Move part of this text to a note"
+                              onClick={() => openSplit(i, k)}
+                              style={{ marginLeft: '4px', padding: '2px', verticalAlign: 'middle' }}
+                            >
+                              <Scissors size={13} />
+                            </button>
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -1016,7 +1077,103 @@ export default function StatementReport(): React.JSX.Element {
               </tbody>
             </table>
           </div>
+
+          {/* Notes under the table */}
+          <div className="glass-card" style={{ padding: '18px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}
+            >
+              <h4 className="form-section-title" style={{ margin: 0 }}>
+                Notes under the table
+              </h4>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setNotes((n) => [...n, `${nextNoteMarker(n)}`])}
+              >
+                <Plus size={14} /> Add note
+              </button>
+            </div>
+            {notes.length === 0 ? (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+                None. A long cell has a <Scissors size={11} /> button: part of its text moves here
+                with a * mark in the cell.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {notes.map((n, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      value={n}
+                      onChange={(e) =>
+                        setNotes((list) => list.map((x, j) => (j === i ? e.target.value : x)))
+                      }
+                      aria-label={`Note ${i + 1}`}
+                      style={{ flex: 1, fontWeight: 600 }}
+                    />
+                    <button
+                      className="btn-ghost btn-icon"
+                      title="Delete the note (its mark leaves the cell too)"
+                      aria-label="Delete note"
+                      onClick={() => removeNote(i)}
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+      )}
+
+      {split && data && (
+        <Modal
+          title="Move to a note"
+          icon={<Scissors size={18} />}
+          onClose={() => setSplit(null)}
+          closeOnOverlay={false}
+          width={620}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setSplit(null)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={applySplit} disabled={!split.note.trim()}>
+                Move to note {split.marker}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Text in the Excel">
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                {data.rows[split.row]?.cells[split.key]}
+              </div>
+            </Field>
+            <Field label="Kept in the cell" hint={`Printed: ${split.keep.trim()}${split.marker}`}>
+              <input
+                value={split.keep}
+                onChange={(e) => setSplit({ ...split, keep: e.target.value })}
+              />
+            </Field>
+            <Field
+              label="Note under the table"
+              hint={`Printed: ${split.marker}${split.note.trim()}`}
+            >
+              <input
+                autoFocus
+                value={split.note}
+                onChange={(e) => setSplit({ ...split, note: e.target.value })}
+              />
+            </Field>
+          </div>
+        </Modal>
       )}
 
       {error && (

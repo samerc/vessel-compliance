@@ -51,6 +51,8 @@ export interface StatementExportInput {
   closing: string
   /** The chosen bank's details, printed after the text below the table */
   bankDetails: string
+  /** Notes under the table, with their markers ("*C/V of ...") */
+  notes: string[]
   columns: StatementColumn[]
   /** Visible column keys, in print order */
   visible: string[]
@@ -436,6 +438,12 @@ export async function buildStatementDocx(
   }
   if (input.intro.trim()) textBlock(input.intro)
   children.push(dataTable)
+  // Notes of the cells marked *, ** ... (bold, right under the table)
+  const notes = input.notes.map((n) => n.trim()).filter(Boolean)
+  if (notes.length > 0) {
+    children.push(para('', { after: 60 }))
+    for (const n of notes) children.push(para(n, { bold: true, after: 40 }))
+  }
   children.push(para('', { after: 160 }))
   if (input.closing.trim()) textBlock(input.closing)
   // Bank details (as on the Debit Advice: the bank's name is internal, only its details print)
