@@ -18,6 +18,8 @@ import {
   RemoveAssuredOptions,
   VesselNameChange,
   VesselSale,
+  SurveyImportFile,
+  SurveyImportResult,
   SalePolicy,
   LossRecordLookup,
   EntityUBO,
@@ -670,6 +672,12 @@ export interface Api {
   // Condition Surveys
   getConditionSurveys: (vesselId?: string) => Promise<ConditionSurvey[]>
   addConditionSurvey: (survey: Omit<ConditionSurvey, 'id'>) => Promise<ConditionSurvey>
+  /** Surveys of a defects Excel; dryRun = only count what would be created / updated */
+  importSurveyExcel: (
+    file: SurveyImportFile,
+    excelPath: string | null,
+    dryRun: boolean
+  ) => Promise<SurveyImportResult>
   updateConditionSurvey: (id: string, updates: Partial<ConditionSurvey>) => Promise<void>
   deleteConditionSurvey: (id: string) => Promise<void>
   getConditionSurveyTypes: () => Promise<{ id: string; name: string }[]>

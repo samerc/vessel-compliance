@@ -34,7 +34,7 @@ import type {
 } from './rowTypes'
 import { randomUUID as uuidv4, createHash } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
-import { extname } from 'path'
+import { extname, join as joinPath } from 'path'
 import {
   ActivityLogEntry,
   AnalyticsFilters,
@@ -203,6 +203,8 @@ import {
   RemoveAssuredOptions,
   VesselNameChange,
   VesselSale,
+  SurveyImportFile,
+  SurveyImportResult,
   SalePolicy,
   SaleCancellation,
   LossRecordLookup,
@@ -6429,6 +6431,36 @@ export class MySQLAdapter {
             'ALTER TABLE quotations ADD COLUMN auto_exclusions_offered TEXT DEFAULT NULL'
           )
       }
+      // Surveys imported from the defects Excel: the survey's id there (S1) and its cover line;
+      // each defect's report ref, area, kind and the tracker's last update / history
+      {
+        const [csCols] = await this.pool.query<RowDataPacket[]>(
+          'SHOW COLUMNS FROM condition_surveys'
+        )
+        const csHas = new Set(csCols.map((c) => c.Field as string))
+        if (!csHas.has('survey_code'))
+          await this.pool.query(
+            'ALTER TABLE condition_surveys ADD COLUMN survey_code VARCHAR(20) NULL DEFAULT NULL'
+          )
+        if (!csHas.has('cover_line'))
+          await this.pool.query(
+            'ALTER TABLE condition_surveys ADD COLUMN cover_line VARCHAR(20) NULL DEFAULT NULL'
+          )
+        const [sdCols] = await this.pool.query<RowDataPacket[]>('SHOW COLUMNS FROM survey_defects')
+        const sdHas = new Set(sdCols.map((c) => c.Field as string))
+        const sdAdd: [string, string][] = [
+          ['report_ref', 'VARCHAR(100) NULL DEFAULT NULL'],
+          ['area', 'VARCHAR(100) NULL DEFAULT NULL'],
+          ['defect_kind', 'VARCHAR(30) NULL DEFAULT NULL'],
+          ['last_update', 'DATE NULL DEFAULT NULL'],
+          ['last_update_by', 'VARCHAR(100) NULL DEFAULT NULL'],
+          ['last_note', 'TEXT NULL'],
+          ['history', 'TEXT NULL']
+        ]
+        for (const [col, def] of sdAdd)
+          if (!sdHas.has(col))
+            await this.pool.query(`ALTER TABLE survey_defects ADD COLUMN ${col} ${def}`)
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -10581,6 +10613,7 @@ export class MySQLAdapter {
       sql = `SELECT id, vessel_id as vesselId, survey_date as surveyDate,
                    surveyor_id as surveyorId, survey_type as surveyType, reference, location, notes,
                    follow_up_survey_id as followUpSurveyId,
+                   survey_code as surveyCode, cover_line as coverLine,
                    created_at as createdAt, created_by as createdBy
                    FROM condition_surveys WHERE vessel_id = ? ORDER BY survey_date DESC`
       params.push(vesselId)
@@ -10588,6 +10621,7 @@ export class MySQLAdapter {
       sql = `SELECT cs.id, cs.vessel_id as vesselId, cs.survey_date as surveyDate,
                    cs.surveyor_id as surveyorId, cs.survey_type as surveyType, cs.reference, cs.location, cs.notes,
                    cs.follow_up_survey_id as followUpSurveyId,
+                   cs.survey_code as surveyCode, cs.cover_line as coverLine,
                    cs.created_at as createdAt, cs.created_by as createdBy
                    FROM condition_surveys cs
                    JOIN vessels v ON v.id = cs.vessel_id
@@ -10647,6 +10681,10 @@ export class MySQLAdapter {
     if (updates.notes !== undefined) {
       fields.push('notes = ?')
       values.push(updates.notes)
+    }
+    if (updates.coverLine !== undefined) {
+      fields.push('cover_line = ?')
+      values.push(updates.coverLine || null)
     }
     if (fields.length === 0) return
     values.push(id)
@@ -10731,7 +10769,10 @@ export class MySQLAdapter {
     let sql = `SELECT id, survey_id as surveyId, defect_number as defectNumber,
                    description, severity, status, due_date as dueDate, due_event as dueEvent, notes,
                    closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
-                   reopen_reason as reopenReason, created_at as createdAt
+                   reopen_reason as reopenReason, created_at as createdAt,
+                   report_ref as reportRef, area, defect_kind as defectKind,
+                   DATE_FORMAT(last_update, '%Y-%m-%d') as lastUpdate, last_update_by as lastUpdateBy,
+                   last_note as lastNote, history
                    FROM survey_defects`
     const params: SqlValue[] = []
     if (surveyId) {
@@ -10808,6 +10849,18 @@ export class MySQLAdapter {
       fields.push('closure_notes = ?')
       values.push(updates.closureNotes)
     }
+    if (updates.area !== undefined) {
+      fields.push('area = ?')
+      values.push(updates.area || null)
+    }
+    if (updates.defectKind !== undefined) {
+      fields.push('defect_kind = ?')
+      values.push(updates.defectKind || null)
+    }
+    if (updates.reportRef !== undefined) {
+      fields.push('report_ref = ?')
+      values.push(updates.reportRef || null)
+    }
     if (fields.length === 0) return
     values.push(id)
     await this.pool.execute(`UPDATE survey_defects SET ${fields.join(', ')} WHERE id = ?`, values)
@@ -10878,6 +10931,289 @@ export class MySQLAdapter {
   async deleteSurveyAttachment(id: string): Promise<void> {
     if (!this.pool) return
     await this.pool.execute('DELETE FROM survey_attachments WHERE id = ?', [id])
+  }
+
+  /**
+   * Imports the surveys of a defects Excel (read by the renderer). A survey is matched on vessel
+   * (IMO) + survey id (S1); a defect on vessel + item number (D1), whatever the survey. A match
+   * gets the new status, last update / by / note, history and due date; anything else is added.
+   * Deadlines and Alerts go into the notes of the vessel's latest survey of the file. Documents
+   * named on a survey are attached when they sit next to the Excel (`folder`), else skipped.
+   * `dryRun` only counts what would happen.
+   */
+  async importSurveyExcel(
+    file: SurveyImportFile,
+    folder: string | null,
+    opts: { dryRun: boolean; user: string }
+  ): Promise<SurveyImportResult> {
+    if (!this.pool) throw new Error('DB Not connected')
+    const pool = this.pool
+    const write = !opts.dryRun
+    const result: SurveyImportResult = { dryRun: opts.dryRun, surveys: [], noteLines: 0 }
+    const digits = (s: string): string => (s || '').replace(/\D/g, '')
+    const vesselByImo = async (imo: string): Promise<{ id: string; name: string } | null> => {
+      if (!digits(imo)) return null
+      const [v] = await pool.query<RowDataPacket[]>(
+        "SELECT id, name FROM vessels WHERE REPLACE(REPLACE(imo_number, ' ', ''), 'IMO', '') = ? LIMIT 1",
+        [digits(imo)]
+      )
+      return v[0] ? { id: v[0].id, name: v[0].name } : null
+    }
+    // Lines the import writes into notes: replaced on each import, the user's own lines stay
+    const IMPORTED_DEFECT_LINE = /^(Due condition:|Reservation:|Text auto-generated)/
+    const IMPORTED_SURVEY_LINE = /^(Deadline|Alert) [A-Z]+\d+\b/
+    const mergeNotes = (old: string | null, mine: RegExp, lines: string[]): string | null => {
+      const kept = (old || '').split('\n').filter((l) => l.trim() && !mine.test(l.trim()))
+      const all = [...kept, ...lines]
+      return all.length ? all.join('\n') : null
+    }
+    const defectNoteLines = (d: SurveyImportFile['surveys'][number]['defects'][number]): string[] =>
+      [
+        d.dueCondition ? `Due condition: ${d.dueCondition}` : '',
+        d.reservation ? `Reservation: ${d.reservation}` : '',
+        d.generated ? "Text auto-generated, not the surveyor's wording" : ''
+      ].filter(Boolean)
+
+    // Surveyors and survey types, matched by name
+    const [surveyorRows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, company_name AS name FROM surveyors'
+    )
+    const surveyors = surveyorRows.map((r) => ({ id: String(r.id), name: String(r.name) }))
+    const [typeRows] = await pool.query<RowDataPacket[]>('SELECT name FROM condition_survey_types')
+    const typeNames = typeRows.map((r) => String(r.name))
+    const surveyTypeOf = (kind: string): string => {
+      const k = (kind || 'condition').trim().toLowerCase()
+      return (
+        typeNames.find((t) => t.toLowerCase().startsWith(k)) ||
+        `${k.charAt(0).toUpperCase()}${k.slice(1)} Survey`
+      )
+    }
+
+    // The latest survey of the file per vessel, for the Deadlines / Alerts notes
+    const latestByVessel = new Map<string, { id: string | null; date: string }>()
+
+    for (const s of file.surveys) {
+      const row: SurveyImportResult['surveys'][number] = {
+        code: s.code,
+        vesselName: s.vesselName,
+        action: 'skipped',
+        defectsAdded: 0,
+        defectsUpdated: 0,
+        documentsAttached: 0
+      }
+      result.surveys.push(row)
+      const vessel = await vesselByImo(s.imo)
+      if (!vessel) {
+        row.reason = `No vessel with IMO ${s.imo || '(none)'} in the app`
+        continue
+      }
+      row.vesselName = vessel.name
+      if (!s.code) {
+        row.reason = 'The survey has no id (S1, S2...) in B4'
+        continue
+      }
+      if (!s.date) {
+        row.reason = 'The survey has no date'
+        continue
+      }
+
+      // Surveyor: by name (either contains the other), else a new one
+      let surveyorId = ''
+      const sv = s.surveyor.trim().toLowerCase()
+      if (!sv) {
+        row.reason = 'The survey has no surveyor'
+        continue
+      }
+      const known = surveyors.find(
+        (x) => x.name.toLowerCase().includes(sv) || sv.includes(x.name.toLowerCase())
+      )
+      if (known) surveyorId = known.id
+      else {
+        row.newSurveyor = s.surveyor.trim()
+        if (write) {
+          const created = await this.addSurveyor({
+            companyName: s.surveyor.trim(),
+            country: ''
+          } as Omit<Surveyor, 'id'>)
+          surveyorId = created.id
+          surveyors.push({ id: created.id, name: created.companyName })
+        }
+      }
+
+      const [existing] = await pool.query<RowDataPacket[]>(
+        'SELECT id, notes FROM condition_surveys WHERE vessel_id = ? AND survey_code = ? LIMIT 1',
+        [vessel.id, s.code]
+      )
+      let surveyId: string | null = existing[0]?.id || null
+      const fields = {
+        surveyDate: s.date,
+        surveyType: surveyTypeOf(s.kind),
+        reference: s.reference || undefined,
+        location: s.place || undefined,
+        coverLine: s.line || null
+      }
+      if (surveyId) {
+        row.action = 'updated'
+        if (write)
+          await this.updateConditionSurvey(surveyId, {
+            ...fields,
+            ...(surveyorId ? { surveyorId } : {})
+          })
+      } else {
+        row.action = 'created'
+        if (write) {
+          surveyId = uuidv4()
+          await pool.execute(
+            `INSERT INTO condition_surveys
+               (id, vessel_id, survey_date, surveyor_id, survey_type, reference, location,
+                survey_code, cover_line, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              surveyId,
+              vessel.id,
+              s.date,
+              surveyorId,
+              fields.surveyType,
+              s.reference || null,
+              s.place || null,
+              s.code,
+              s.line || null,
+              opts.user
+            ]
+          )
+        }
+      }
+      const prev = latestByVessel.get(vessel.id)
+      if (!prev || s.date >= prev.date)
+        latestByVessel.set(vessel.id, { id: surveyId, date: s.date })
+
+      // Defects: matched on the vessel + item number, whichever survey holds them
+      for (const d of s.defects) {
+        if (!d.item) continue
+        const [found] = await pool.query<RowDataPacket[]>(
+          `SELECT sd.id, sd.status, sd.notes FROM survey_defects sd
+             JOIN condition_surveys cs ON cs.id = sd.survey_id
+            WHERE cs.vessel_id = ? AND sd.defect_number = ? LIMIT 1`,
+          [vessel.id, d.item]
+        )
+        const notes = (old: string | null): string | null =>
+          mergeNotes(old, IMPORTED_DEFECT_LINE, defectNoteLines(d))
+        if (found[0]) {
+          row.defectsUpdated++
+          if (!write) continue
+          const wasOpen = found[0].status === 'OPEN'
+          const closing = d.status === 'CLOSED' && wasOpen
+          const reopening = d.status === 'OPEN' && !wasOpen
+          await pool.execute(
+            `UPDATE survey_defects SET status = ?, last_update = ?, last_update_by = ?, last_note = ?,
+                    history = ?, due_date = ?, notes = ?
+                    ${closing ? ', closed_at = ?, closed_by = ?' : ''}
+                    ${reopening ? ', closed_at = NULL, closed_by = NULL, closure_notes = NULL' : ''}
+              WHERE id = ?`,
+            [
+              d.status,
+              d.lastUpdate,
+              d.lastUpdateBy || null,
+              d.lastNote || null,
+              d.history || null,
+              d.due,
+              notes(found[0].notes),
+              ...(closing
+                ? [d.lastUpdate || formatDateForMySQL(new Date()), d.lastUpdateBy || opts.user]
+                : []),
+              found[0].id
+            ]
+          )
+        } else {
+          row.defectsAdded++
+          if (!write || !surveyId) continue
+          await pool.execute(
+            `INSERT INTO survey_defects
+               (id, survey_id, defect_number, description, status, due_date, notes, report_ref, area,
+                defect_kind, last_update, last_update_by, last_note, history, closed_at, closed_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              uuidv4(),
+              surveyId,
+              d.item,
+              d.text,
+              d.status,
+              d.due,
+              notes(null),
+              d.reportRef || null,
+              d.area || null,
+              d.notSurveyed ? 'not_surveyed' : null,
+              d.lastUpdate,
+              d.lastUpdateBy || null,
+              d.lastNote || null,
+              d.history || null,
+              d.status === 'CLOSED' ? d.lastUpdate || formatDateForMySQL(new Date()) : null,
+              d.status === 'CLOSED' ? d.lastUpdateBy || opts.user : null
+            ]
+          )
+        }
+      }
+
+      // Documents next to the Excel; missing ones are skipped without a word
+      if (folder) {
+        const [have] = surveyId
+          ? await pool.query<RowDataPacket[]>(
+              'SELECT file_path FROM survey_attachments WHERE survey_id = ?',
+              [surveyId]
+            )
+          : [[] as RowDataPacket[]]
+        const attached = new Set(have.map((h) => String(h.file_path).toLowerCase()))
+        for (const name of s.documents) {
+          const fp = joinPath(folder, name)
+          if (!existsSync(fp) || attached.has(fp.toLowerCase())) continue
+          try {
+            if (write && surveyId)
+              await this.addSurveyAttachment({
+                surveyId,
+                filePath: fp,
+                fileName: name,
+                fileType: 'report',
+                uploadedBy: opts.user
+              })
+            row.documentsAttached++
+          } catch {
+            /* a file type the app does not take: skipped */
+          }
+        }
+      }
+    }
+
+    // Deadlines / Alerts: into the notes of the vessel's latest survey of the file (else its
+    // latest survey in the app)
+    for (const block of file.notes) {
+      const vessel = await vesselByImo(block.imo)
+      if (!vessel || block.lines.length === 0) continue
+      let target = latestByVessel.get(vessel.id)?.id || null
+      if (!target && !latestByVessel.has(vessel.id)) {
+        const [last] = await pool.query<RowDataPacket[]>(
+          'SELECT id FROM condition_surveys WHERE vessel_id = ? ORDER BY survey_date DESC LIMIT 1',
+          [vessel.id]
+        )
+        target = last[0]?.id || null
+        if (!target) continue
+      }
+      result.noteLines += block.lines.length
+      if (!write || !target) continue
+      const [cur] = await pool.query<RowDataPacket[]>(
+        'SELECT notes FROM condition_surveys WHERE id = ?',
+        [target]
+      )
+      // A block replaces the earlier lines of its own kind only
+      const kind = block.type === 'Deadlines' ? /^Deadline / : /^Alert /
+      const kept = String(cur[0]?.notes || '')
+        .split('\n')
+        .filter((l) => l.trim() && !(IMPORTED_SURVEY_LINE.test(l.trim()) && kind.test(l.trim())))
+      await pool.execute('UPDATE condition_surveys SET notes = ? WHERE id = ?', [
+        [...kept, ...block.lines].join('\n') || null,
+        target
+      ])
+    }
+    return result
   }
 
   // --- Defect Attachments ---

@@ -428,6 +428,8 @@ const api: Api = {
   // Condition Surveys
   getConditionSurveys: (vesselId) => ipcRenderer.invoke('db:getConditionSurveys', vesselId),
   addConditionSurvey: (survey) => ipcRenderer.invoke('db:addConditionSurvey', survey),
+  importSurveyExcel: (file, excelPath, dryRun) =>
+    ipcRenderer.invoke('db:importSurveyExcel', file, excelPath, dryRun),
   updateConditionSurvey: (id, updates) =>
     ipcRenderer.invoke('db:updateConditionSurvey', id, updates),
   deleteConditionSurvey: (id) => ipcRenderer.invoke('db:deleteConditionSurvey', id),

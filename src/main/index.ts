@@ -35,6 +35,7 @@ import type {
   RemoveAssuredOptions,
   VesselNameChange,
   VesselSale,
+  SurveyImportFile,
   VesselClassification,
   VesselCustomDocType,
   VesselDocument,
@@ -3147,6 +3148,27 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getConditionSurveys(vesselId)
   })
+  safeHandle(
+    'db:importSurveyExcel',
+    async (event, file: SurveyImportFile, excelPath: string | null, dryRun: boolean) => {
+      const user = await requirePermission(event, 'surveys:manage')
+      const folder = excelPath ? dirname(excelPath) : null
+      const result = await db.importSurveyExcel(file, folder, { dryRun, user: user.username })
+      if (!dryRun)
+        for (const s of result.surveys.filter((x) => x.action !== 'skipped'))
+          db.logActivity({
+            userId: user.id,
+            username: user.username,
+            action: s.action === 'created' ? 'CREATE' : 'UPDATE',
+            module: 'Surveys',
+            entityType: 'condition_survey',
+            entityId: s.code,
+            entityName: `${s.vesselName} ${s.code}`,
+            details: `Imported from Excel: ${s.defectsAdded} defect(s) added, ${s.defectsUpdated} updated`
+          }).catch(() => {})
+      return result
+    }
+  )
   safeHandle(
     'db:addConditionSurvey',
     async (event, survey: Omit<ConditionSurvey, 'id'> & { id?: string }) => {

@@ -11,8 +11,10 @@ import {
   Save,
   AlertTriangle,
   CheckCircle,
-  Link2
+  Link2,
+  FileSpreadsheet
 } from 'lucide-react'
+import SurveyExcelImport from './SurveyExcelImport'
 import { useTheme } from '../contexts/ThemeContext'
 import {
   Vessel,
@@ -104,6 +106,7 @@ export default function ConditionSurveyManager({
   const [attachments, setAttachments] = useState<SurveyAttachment[]>([])
   const [expandedSurveyId, setExpandedSurveyId] = useState<string | null>(initialSurveyId ?? null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showExcelImport, setShowExcelImport] = useState(false)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)
   const [showNewSurveyorForm, setShowNewSurveyorForm] = useState(false)
   const [closingSurveyId, setClosingSurveyId] = useState<string | null>(null)
@@ -151,6 +154,7 @@ export default function ConditionSurveyManager({
   const [editType, setEditType] = useState('')
   const [editReference, setEditReference] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editLine, setEditLine] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
   const loadData = useCallback(
@@ -292,6 +296,7 @@ export default function ConditionSurveyManager({
     setEditType(survey.surveyType)
     setEditReference(survey.reference || '')
     setEditLocation(survey.location || '')
+    setEditLine(survey.coverLine || '')
     setEditNotes(survey.notes || '')
     setExpandedSurveyId(survey.id)
   }
@@ -303,6 +308,7 @@ export default function ConditionSurveyManager({
       surveyType: editType,
       reference: editReference.trim(),
       location: editLocation.trim(),
+      coverLine: editLine || null,
       notes: editNotes.trim()
     })
     setEditingSurveyId(null)
@@ -457,6 +463,25 @@ export default function ConditionSurveyManager({
   return (
     <>
       <section className="fade-in" style={{ marginTop: '32px' }}>
+        {showExcelImport && (
+          <SurveyExcelImport
+            vesselImo={vessel.imoNumber}
+            onClose={() => setShowExcelImport(false)}
+            onError={showError}
+            onDone={(r) => {
+              setShowExcelImport(false)
+              const done = r.surveys.filter((s) => s.action !== 'skipped')
+              const added = done.reduce((n, s) => n + s.defectsAdded, 0)
+              const updated = done.reduce((n, s) => n + s.defectsUpdated, 0)
+              showSuccess(
+                `${done.length} survey${done.length === 1 ? '' : 's'} imported: ${added} defect${added === 1 ? '' : 's'} added, ${updated} updated`
+              )
+              void loadData()
+              setDefectRefreshKey((k) => k + 1)
+              void refreshDefectCounts()
+            }}
+          />
+        )}
         <div
           style={{
             display: 'flex',
@@ -486,6 +511,17 @@ export default function ConditionSurveyManager({
               <Download size={16} />
               Export History
             </button>
+            {canManage && (
+              <button
+                onClick={() => setShowExcelImport(true)}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+                title="Surveys and defects from a defects Excel (one sheet per survey); a re-import updates them"
+              >
+                <FileSpreadsheet size={16} />
+                Import from Excel
+              </button>
+            )}
             {canManage && (
               <button
                 onClick={() => setShowAddForm(!showAddForm)}
@@ -696,6 +732,18 @@ export default function ConditionSurveyManager({
                     >
                       <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                         {survey.surveyType}
+                        {(survey.coverLine || survey.surveyCode) && (
+                          <span
+                            style={{
+                              marginLeft: '6px',
+                              fontWeight: 500,
+                              fontSize: '0.75rem',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
+                            {[survey.coverLine, survey.surveyCode].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
                       </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                         {formatDate(survey.surveyDate) || survey.surveyDate}
@@ -1058,6 +1106,20 @@ export default function ConditionSurveyManager({
                                       aria-label="Edit survey location"
                                     />
                                   </Field>
+                                  <Field label="Line" hint="The cover the survey is for">
+                                    <select
+                                      value={editLine}
+                                      onChange={(e) => setEditLine(e.target.value)}
+                                      aria-label="Edit survey line"
+                                    >
+                                      <option value="">Not set</option>
+                                      <option value="P&I">P&amp;I</option>
+                                      <option value="H&M">H&amp;M</option>
+                                      {editLine && !['P&I', 'H&M'].includes(editLine) && (
+                                        <option value={editLine}>{editLine}</option>
+                                      )}
+                                    </select>
+                                  </Field>
                                   <Field label="Surveyor" required span="all">
                                     <select
                                       value={editSurveyorId}
@@ -1115,7 +1177,8 @@ export default function ConditionSurveyManager({
                                     color: 'var(--text-primary)',
                                     margin: 0,
                                     lineHeight: '1.6',
-                                    fontSize: '0.9rem'
+                                    fontSize: '0.9rem',
+                                    whiteSpace: 'pre-wrap'
                                   }}
                                 >
                                   {survey.notes}

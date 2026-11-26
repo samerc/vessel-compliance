@@ -23,7 +23,12 @@ import {
   Copy,
   Check
 } from 'lucide-react'
-import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
+import {
+  SurveyDefect,
+  ConditionSurvey,
+  Vessel,
+  DEFECT_KIND_NOT_SURVEYED
+} from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -160,6 +165,10 @@ export default function DefectManager({
   const [editDueDate, setEditDueDate] = useState('')
   const [editDueEvent, setEditDueEvent] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editArea, setEditArea] = useState('')
+  const [editKind, setEditKind] = useState('')
+  // Area filter ('' = every area)
+  const [areaFilter, setAreaFilter] = useState('')
 
   useEffect(() => {
     if (showAddForm) defectNumberRef.current?.focus()
@@ -233,6 +242,8 @@ export default function DefectManager({
     setEditDueDate(defect.dueDate || '')
     setEditDueEvent(defect.dueEvent || '')
     setEditNotes(defect.notes || '')
+    setEditArea(defect.area || '')
+    setEditKind(defect.defectKind || '')
   }
 
   const handleSaveEdit = async (defectId: string): Promise<void> => {
@@ -246,7 +257,9 @@ export default function DefectManager({
         : undefined,
       dueDate: editDueDate || null,
       dueEvent: editDueEvent.trim() || null,
-      notes: editNotes || undefined
+      notes: editNotes || undefined,
+      area: editArea.trim() || null,
+      defectKind: editKind || null
     })
 
     setEditingDefectId(null)
@@ -311,6 +324,7 @@ export default function DefectManager({
     let filtered = defects
     if (statusFilter === 'open') filtered = filtered.filter((d) => d.status === 'OPEN')
     else if (statusFilter === 'closed') filtered = filtered.filter((d) => d.status !== 'OPEN')
+    if (areaFilter) filtered = filtered.filter((d) => (d.area || '') === areaFilter)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -322,7 +336,11 @@ export default function DefectManager({
       )
     }
     return filtered
-  }, [defects, statusFilter, searchQuery])
+  }, [defects, statusFilter, searchQuery, areaFilter])
+  const areas = useMemo(
+    () => [...new Set(defects.map((d) => (d.area || '').trim()).filter(Boolean))].sort(),
+    [defects]
+  )
 
   const toggleSelectAll = (): void => {
     const openFiltered = filteredDefects.filter((d) => d.status === 'OPEN')
@@ -613,6 +631,27 @@ export default function DefectManager({
               }}
             />
           </div>
+          {areas.length > 0 && (
+            <select
+              value={areaFilter}
+              onChange={(e) => setAreaFilter(e.target.value)}
+              aria-label="Area"
+              style={{
+                marginLeft: '8px',
+                width: 'auto',
+                fontSize: '0.78rem',
+                padding: '5px 10px',
+                borderRadius: '6px'
+              }}
+            >
+              <option value="">All areas</option>
+              {areas.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
@@ -840,6 +879,25 @@ export default function DefectManager({
                     <Field label="Or due event">
                       <DueEventInput value={editDueEvent} onChange={setEditDueEvent} />
                     </Field>
+                    <Field label="Area">
+                      <input
+                        type="text"
+                        value={editArea}
+                        onChange={(e) => setEditArea(e.target.value)}
+                        placeholder="e.g. Hull, Deck, Machinery"
+                        aria-label="Area"
+                      />
+                    </Field>
+                    <Field label="Kind">
+                      <select
+                        value={editKind}
+                        onChange={(e) => setEditKind(e.target.value)}
+                        aria-label="Kind"
+                      >
+                        <option value="">Defect</option>
+                        <option value={DEFECT_KIND_NOT_SURVEYED}>Not surveyed / not tested</option>
+                      </select>
+                    </Field>
                     <Field label="Description" required span="all">
                       <FormattedTextArea
                         placeholder="Description *"
@@ -951,6 +1009,19 @@ export default function DefectManager({
                     }}
                   >
                     #{defect.defectNumber}
+                    {defect.reportRef && (
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="The surveyor's report reference"
+                      >
+                        Ref {defect.reportRef}
+                      </div>
+                    )}
                   </span>
 
                   {/* Description + Due Date */}
@@ -1034,6 +1105,40 @@ export default function DefectManager({
 
                   {/* Badges */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {defect.area && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '10px',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--table-border)',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Area"
+                      >
+                        {defect.area}
+                      </span>
+                    )}
+                    {defect.defectKind === DEFECT_KIND_NOT_SURVEYED && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: 'var(--warning)',
+                          background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.4px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Excluded from cover until tested"
+                      >
+                        Not surveyed / not tested
+                      </span>
+                    )}
                     {/* Severity Badge — flat pill, non-interactive */}
                     {defect.severity ? (
                       <span
@@ -1306,6 +1411,55 @@ export default function DefectManager({
                       uploadedBy={user?.username || 'Unknown'}
                       showError={showError}
                     />
+                    {(defect.lastUpdate || defect.lastNote) && (
+                      <div style={{ marginTop: '12px', fontSize: '13px' }}>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          Last update
+                          {defect.lastUpdate && ` · ${formatDate(defect.lastUpdate)}`}
+                          {defect.lastUpdateBy && ` · ${defect.lastUpdateBy}`}
+                        </div>
+                        {defect.lastNote && (
+                          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                            {defect.lastNote}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {defect.history && (
+                      <details style={{ marginTop: '10px', fontSize: '12px' }}>
+                        <summary
+                          style={{
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}
+                        >
+                          History ({defect.history.split('\n').filter(Boolean).length})
+                        </summary>
+                        <div
+                          style={{
+                            marginTop: '4px',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.5,
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          {defect.history}
+                        </div>
+                      </details>
+                    )}
                     {defect.notes && (
                       <div style={{ marginTop: '12px' }}>
                         <div

@@ -548,6 +548,10 @@ export interface ConditionSurvey {
   endorsementIssued?: boolean | null
   endorsementReminderDate?: string | null
   followUpSurveyId?: string | null
+  /** The survey's id in the imported Excel (S1, S2...): matched with the vessel on re-import */
+  surveyCode?: string | null
+  /** The cover the survey is for: P&I or H&M (a vessel can have one survey under each) */
+  coverLine?: string | null
   createdAt?: string
   createdBy?: string
 }
@@ -618,6 +622,83 @@ export interface SurveyDefect {
   closureNotes?: string
   reopenReason?: string | null
   createdAt?: string
+  /** The surveyor's report reference (7.5/7.6); the defect number is the item (D1) */
+  reportRef?: string | null
+  /** Where on the vessel (Hull, Deck, Machinery...) */
+  area?: string | null
+  /** 'not_surveyed' = not surveyed / not tested (excluded from cover until tested); null = defect */
+  defectKind?: string | null
+  lastUpdate?: string | null
+  lastUpdateBy?: string | null
+  lastNote?: string | null
+  /** One line per update, as kept in the imported Excel */
+  history?: string | null
+}
+
+export const DEFECT_KIND_NOT_SURVEYED = 'not_surveyed'
+
+/** One defect line of a survey sheet in the defects Excel */
+export interface SurveyImportDefect {
+  item: string
+  reportRef: string
+  text: string
+  /** The text was generated, not the surveyor's wording */
+  generated: boolean
+  area: string
+  notSurveyed: boolean
+  status: 'OPEN' | 'CLOSED'
+  lastUpdate: string | null
+  lastUpdateBy: string
+  lastNote: string
+  reservation: string
+  history: string
+  due: string | null
+  dueCondition: string
+}
+
+/** A survey sheet of the defects Excel (A1/B1 = "Type | Survey") */
+export interface SurveyImportSurvey {
+  sheet: string
+  imo: string
+  vesselName: string
+  code: string
+  date: string | null
+  kind: string
+  surveyor: string
+  place: string
+  line: string
+  reference: string
+  documents: string[]
+  defects: SurveyImportDefect[]
+}
+
+/** A Deadlines or Alerts sheet: lines that go into the notes of the vessel's latest survey */
+export interface SurveyImportNotes {
+  sheet: string
+  type: 'Deadlines' | 'Alerts'
+  imo: string
+  lines: string[]
+}
+
+export interface SurveyImportFile {
+  surveys: SurveyImportSurvey[]
+  notes: SurveyImportNotes[]
+}
+
+export interface SurveyImportResult {
+  dryRun: boolean
+  surveys: {
+    code: string
+    vesselName: string
+    action: 'created' | 'updated' | 'skipped'
+    reason?: string
+    defectsAdded: number
+    defectsUpdated: number
+    documentsAttached: number
+    newSurveyor?: string
+  }[]
+  /** Deadline / alert lines put in survey notes */
+  noteLines: number
 }
 
 export interface SurveyAttachment {
