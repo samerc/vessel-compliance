@@ -26,6 +26,21 @@ export interface WhatsNewEntry {
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
     version: '8.1.0',
+    update: 'survey-excel-import',
+    date: '2026-11-26',
+    items: [
+      {
+        tag: 'New',
+        text: "Surveys: Import from Excel on a vessel's Surveys tab brings in the surveys and defects of a defects workbook (area, kind, last update, history, due dates, P&I / H&M line). Importing a newer version updates them."
+      },
+      {
+        tag: 'Improved',
+        text: 'P&I deductibles: the per-vessel amounts stay folded while every vessel has the same deductible; open them to give a vessel its own amount.'
+      }
+    ]
+  },
+  {
+    version: '8.1.0',
     update: 'sale-cancellation-letters',
     date: '2026-11-18',
     items: [
