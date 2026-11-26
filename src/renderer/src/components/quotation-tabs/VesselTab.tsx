@@ -38,6 +38,15 @@ function filterFlags(flags: FlagState[], typed: string): FlagState[] {
     .slice(0, 50)
 }
 
+/** Types whose short name or description ("BC" / "Bulk Carrier") contains the typed text */
+function filterTypes(types: VesselType[], typed: string): VesselType[] {
+  const q = typed.trim().toLowerCase()
+  if (!q) return types
+  return types.filter(
+    (t) => t.name?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)
+  )
+}
+
 async function fetchLookupLists(): Promise<{
   flagStates: FlagState[]
   classSocieties: ClassificationSociety[]
@@ -1012,6 +1021,8 @@ export default function VesselTab({
                     value={newData.vesselType}
                     onInputChange={(t) => setNewData((p) => ({ ...p, vesselType: t }))}
                     options={vesselTypesLocal}
+                    filter={filterTypes}
+                    getDetail={(t) => t.description || null}
                     maxResults={10}
                     getKey={(t) => t.id}
                     getLabel={(t) => t.name || ''}
@@ -1133,6 +1144,48 @@ export default function VesselTab({
                           value={editData.classification}
                           onChange={(v) => setEditData((p) => ({ ...p, classification: v }))}
                           societies={classSocietiesLocal}
+                        />
+                      ) : field === 'flag' ? (
+                        // Same pick-lists as New Vessel
+                        <Combobox
+                          aria-label="Flag"
+                          value={editData.flag}
+                          onInputChange={(t) => setEditData((p) => ({ ...p, flag: t }))}
+                          options={flagStatesLocal}
+                          filter={filterFlags}
+                          getKey={(f) => f.id}
+                          getLabel={(f) => f.name}
+                          getDetail={(f) => (f.iso3Code ? `(${f.iso3Code})` : null)}
+                          onSelect={(f) => setEditData((p) => ({ ...p, flag: f.name }))}
+                          onBlur={() =>
+                            setEditData((p) => {
+                              const typed = p.flag.trim().toLowerCase()
+                              const hit = flagStatesLocal.find(
+                                (f) =>
+                                  f.name?.toLowerCase() === typed ||
+                                  f.iso3Code?.toLowerCase() === typed
+                              )
+                              return hit && hit.name !== p.flag ? { ...p, flag: hit.name } : p
+                            })
+                          }
+                          placeholder="Search flag states..."
+                          emptyText="No flag matches. Check the spelling or type the 3-letter code."
+                        />
+                      ) : field === 'vesselType' ? (
+                        <Combobox
+                          aria-label="Vessel type"
+                          value={editData.vesselType}
+                          onInputChange={(t) => setEditData((p) => ({ ...p, vesselType: t }))}
+                          options={vesselTypesLocal}
+                          filter={filterTypes}
+                          maxResults={10}
+                          getKey={(t) => t.id}
+                          getLabel={(t) => t.name || ''}
+                          getDetail={(t) => t.description || null}
+                          onSelect={(t) => setEditData((p) => ({ ...p, vesselType: t.name }))}
+                          autoHighlight={false}
+                          emptyText="No type matches: the text is kept as typed"
+                          placeholder="Search vessel types..."
                         />
                       ) : (
                         <input

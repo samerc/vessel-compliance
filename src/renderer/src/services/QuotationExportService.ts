@@ -244,6 +244,8 @@ interface QuotationData {
   }[]
   // Resolved classification names per vessel ID (from junction table)
   vesselClassificationNames: Record<string, string>
+  /** Class societies, to print a typed class (name or abbreviation) as its abbreviation */
+  classSocieties?: { name: string; abbreviation?: string }[]
   // Per-vessel trading intro overrides
   tradingIntros: { id: string; text: string; vesselScope: string[] | null; order: number }[]
 }
@@ -652,6 +654,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     logoPath: resolvedLogoPath,
     vesselIacsMap,
     vesselClassificationNames,
+    classSocieties: safeCS,
     hullAgreedValueItems: Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : [],
     agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
     hullClauses: resolvedHullClauses,
@@ -834,21 +837,39 @@ function formatBuiltYear(built?: number | null, rebuilt?: number | null): string
 function getVesselInfo(
   qv: QuotationVessel,
   allVessels: Vessel[],
-  flagStates?: { id: string; name: string; iso3Code?: string }[],
-  classificationNames?: Record<string, string>
+  flagStates?: { id: string; name: string; iso3Code?: string; displayName?: string | null }[],
+  classificationNames?: Record<string, string>,
+  classSocieties?: { name: string; abbreviation?: string }[]
 ): VesselInfo {
+  // A typed flag (name, official name or code) gets its 3-letter code; a typed class (name or
+  // abbreviation) its abbreviation, as the vessels of the registry
+  const low = (s?: string | null): string => (s || '').trim().toLowerCase()
+  const flagCodeOf = (flag?: string): string | undefined => {
+    const t = low(flag)
+    if (!t || !flagStates) return undefined
+    return (
+      flagStates.find((f) => low(f.name) === t || low(f.displayName) === t || low(f.iso3Code) === t)
+        ?.iso3Code || undefined
+    )
+  }
+  const classAbbrev = (text?: string): string | undefined => {
+    const t = low(text)
+    if (!t || !classSocieties) return text
+    const cs = classSocieties.find((c) => low(c.name) === t || low(c.abbreviation) === t)
+    return cs ? cs.abbreviation || cs.name : text
+  }
   const reg = qv.vesselId ? allVessels.find((v) => v.id === qv.vesselId) : null
   if (reg) {
     // Resolve flag name and ISO3 code from system vessel's flagStateId
     const flagMatch =
       reg.flagStateId && flagStates ? flagStates.find((f) => f.id === reg.flagStateId) : null
     const flagName = flagMatch?.name || qv.flag
-    const flagCode = flagMatch?.iso3Code || undefined
+    const flagCode = flagMatch?.iso3Code || flagCodeOf(qv.flag)
     // Use junction table classification names if available, falling back to text field
     const classification =
       classificationNames && qv.vesselId && classificationNames[qv.vesselId]
         ? classificationNames[qv.vesselId]
-        : reg.classificationSociety || qv.classification
+        : classAbbrev(reg.classificationSociety || qv.classification)
     return {
       name: reg.name,
       imo: reg.imoNumber,
@@ -870,7 +891,8 @@ function getVesselInfo(
     gt: qv.grossTonnage,
     type: qv.vesselType,
     flag: qv.flag,
-    classification: qv.classification,
+    flagCode: flagCodeOf(qv.flag),
+    classification: classAbbrev(qv.classification),
     callSign: qv.callSign
   }
 }
@@ -1874,7 +1896,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             qv,
             data.allVessels,
             data.flagStates,
-            data.vesselClassificationNames
+            data.vesselClassificationNames,
+            data.classSocieties
           )
           const flagDisplay = vi.flagCode || vi.flag || '-'
           const cells = showVesselLabel

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, ChevronDown, X, Pencil, Save } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronRight, X, Pencil, Save } from 'lucide-react'
 import {
   Quotation,
   PIDeductible,
@@ -53,6 +53,8 @@ export default function DeductiblesTab({
     }
   }
   const [deductibles, setDeductibles] = useState<QuotationDeductible[]>([])
+  // Per-vessel amounts opened / folded by the user (default: open only when a vessel differs)
+  const [perVesselOpen, setPerVesselOpen] = useState<Record<string, boolean>>({})
   const [masterDeductibles, setMasterDeductibles] = useState<PIDeductible[]>([])
   const [textDeds, setTextDeds] = useState<QuotationTextDeductible[]>([])
   const [masterTextDeds, setMasterTextDeds] = useState<PITextDeductible[]>([])
@@ -547,6 +549,35 @@ export default function DeductiblesTab({
                 const hasSecondary = !!(
                   d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)
                 )
+                // Folded while every vessel has the deductible's own amount; a vessel with its
+                // own amount keeps it open, so a difference is never hidden
+                const num = (x: unknown): number | null =>
+                  x === null || x === undefined || x === '' ? null : Number(x)
+                const differs = scopedVessels.some((v) => {
+                  const a = num(d.vesselAmounts?.[v.id])
+                  const s = num(d.vesselSecondaryAmounts?.[v.id])
+                  return (
+                    (a !== null && a !== num(d.amount)) ||
+                    (s !== null && s !== num(d.secondaryAmount))
+                  )
+                })
+                const open = perVesselOpen[d.id] ?? differs
+                const toggle = (): void => setPerVesselOpen((p) => ({ ...p, [d.id]: !open }))
+                if (!open)
+                  return (
+                    <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={toggle}
+                        title="Open to give a vessel its own amount"
+                        style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}
+                      >
+                        <ChevronRight size={13} /> Amount per vessel: the same for all{' '}
+                        {scopedVessels.length} vessels
+                      </button>
+                    </div>
+                  )
                 return (
                   <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
                     <div
@@ -557,15 +588,21 @@ export default function DeductiblesTab({
                         marginBottom: '4px'
                       }}
                     >
-                      <span
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={toggle}
+                        title="Fold the per-vessel amounts"
                         style={{
                           fontSize: '0.78rem',
                           color: 'var(--text-secondary)',
-                          width: '140px'
+                          width: '140px',
+                          justifyContent: 'flex-start',
+                          padding: '2px 0'
                         }}
                       >
-                        Amount (per vessel):
-                      </span>
+                        <ChevronDown size={13} /> Amount (per vessel):
+                      </button>
                       <span
                         style={{
                           fontSize: '0.72rem',

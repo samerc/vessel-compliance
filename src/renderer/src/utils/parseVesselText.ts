@@ -52,6 +52,7 @@ const LABELS: [LabelField, string][] = [
   ['builtYear', 'y\\.?o\\.?b\\.?'],
   ['builtYear', 'buil[dt](?:\\s+in)?'],
   ['builtYear', 'delivered'],
+  ['builtYear', 'year'],
   ['grossTonnage', 'gross\\s+(?:register(?:ed)?\\s+)?ton(?:nage|s)?'],
   ['grossTonnage', 'g\\.?r\\.?t\\.?'],
   ['grossTonnage', 'g\\.?t\\.?'],
@@ -187,7 +188,21 @@ const FLAG_WORDS: Record<string, string> = {
   bahraini: 'bahrain',
   gambian: 'gambia',
   mauritanian: 'mauritania',
-  somali: 'somalia'
+  somali: 'somalia',
+  // Codes brokers use that are not the ISO ones
+  skn: 'saint kitts and nevis',
+  stk: 'saint kitts and nevis',
+  sk: 'saint kitts and nevis',
+  stv: 'saint vincent and the grenadines',
+  sv: 'saint vincent and the grenadines',
+  pa: 'panama',
+  pan: 'panama',
+  lib: 'liberia',
+  mi: 'marshall islands',
+  tz: 'tanzania',
+  znz: 'tanzania',
+  com: 'comoros',
+  sl: 'sierra leone'
 }
 
 function matchFlag(v: string, flags: FlagState[]): FlagState | undefined {
@@ -226,9 +241,61 @@ function matchFlag(v: string, flags: FlagState[]): FlagState | undefined {
   return undefined
 }
 
+// Words brokers use for a type, as written in the types' descriptions ("BC = Bulk Carrier")
+const TYPE_WORDS: Record<string, string> = {
+  bulker: 'bulk carrier',
+  bulk: 'bulk carrier',
+  'bulk carrier vessel': 'bulk carrier',
+  'general cargo vessel': 'general cargo',
+  'general cargo ship': 'general cargo',
+  'gen cargo': 'general cargo',
+  'general cargo ship with container capacity': 'general cargo with container capacity',
+  livestock: 'livestock carrier',
+  'livestock vessel': 'livestock carrier',
+  'livestock carrier vessel': 'livestock carrier',
+  'container ship': 'container carrier',
+  'container vessel': 'container carrier',
+  containership: 'container carrier',
+  reefer: 'refrigerated',
+  tug: 'tug',
+  tugboat: 'tug'
+}
+
 function matchType(v: string, types: VesselType[]): VesselType | undefined {
   const t = norm(v)
-  return types.find((x) => norm(x.name) === t)
+  if (!t) return undefined
+  const exact = types.find((x) => norm(x.name) === t)
+  if (exact) return exact
+  // The type's description ("Bulk Carrier" for BC), directly or through a broker's word
+  const want = TYPE_WORDS[t] || t
+  return (
+    types.find((x) => x.description && norm(x.description) === want) ||
+    types.find((x) => norm(x.name) === want)
+  )
+}
+
+// Short forms brokers write for a society, keyed by what the app has as abbreviation
+const CLASS_WORDS: Record<string, string> = {
+  nkk: 'NK',
+  'class nk': 'NK',
+  classnk: 'NK',
+  'nippon kaiji': 'NK',
+  lrs: 'LR',
+  lloyds: 'LR',
+  'lloyds register': 'LR',
+  'lloyd s register': 'LR',
+  'dnv gl': 'DNV',
+  dnvgl: 'DNV',
+  gl: 'DNV',
+  krs: 'KR',
+  'korean register': 'KR',
+  'bureau veritas': 'BV',
+  rina: 'RINA',
+  'american bureau': 'ABS',
+  'turk loydu': 'TL',
+  irs: 'IRS',
+  prs: 'PRS',
+  ccs: 'CCS'
 }
 
 function matchSociety(
@@ -237,6 +304,11 @@ function matchSociety(
 ): ClassificationSociety | undefined {
   const t = norm(v)
   if (!t || t === 'none') return undefined
+  const alias = CLASS_WORDS[t]
+  if (alias) {
+    const hit = societies.find((s) => (s.abbreviation || '').toUpperCase() === alias)
+    if (hit) return hit
+  }
   const words = new Set(
     v
       .toUpperCase()
